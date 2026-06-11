@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { run, designStats, toDST, svgToCode, NeedlescriptError } from './lib/index.ts';
-import type { StitchEvent, DesignStats } from './lib/index.ts';
+import type { StitchEvent, DesignStats, DensityResult } from './lib/index.ts';
 import { THREADS, SAFE_R, EXAMPLES } from './data.ts';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
@@ -18,6 +18,7 @@ export interface DesignState {
   events: StitchEvent[];
   pts: StitchEvent[];            // stitch + jump only
   marks: DebugMark[];            // debug pins from the `mark` command
+  density: DensityResult | null; // local density analysis
   stats: DesignStats | null;
   warnings: string[];
   name: string;
@@ -31,7 +32,7 @@ export interface ConsoleMessage {
 }
 
 const INITIAL_DESIGN: DesignState = {
-  events: [], pts: [], marks: [], stats: null, warnings: [], name: 'bloom', ok: false,
+  events: [], pts: [], marks: [], density: null, stats: null, warnings: [], name: 'bloom', ok: false,
 };
 
 let msgId = 0;
@@ -44,6 +45,7 @@ export default function App() {
   const [scrubPos, setScrubPos] = useState(0);
   const [fitMM, setFitMM] = useState(80);
   const [isDragging, setIsDragging] = useState(false);
+  const [showDensity, setShowDensity] = useState(false);
   const svgFileRef = useRef<HTMLInputElement>(null);
 
   function addMsg(text: string, type: ConsoleMessage['type'] = 'info') {
@@ -82,7 +84,7 @@ export default function App() {
       );
 
       const newDesign: DesignState = {
-        events: result.events, pts, marks, stats, warnings, name: designName, ok: true,
+        events: result.events, pts, marks, density: result.density, stats, warnings, name: designName, ok: true,
       };
       setDesign(newDesign);
       setScrubPos(pts.length);
@@ -233,6 +235,8 @@ export default function App() {
           scrubPos={scrubPos}
           onScrubChange={setScrubPos}
           activeLine={activeLine}
+          showDensity={showDensity}
+          onToggleDensity={() => setShowDensity(v => !v)}
         />
       </main>
 

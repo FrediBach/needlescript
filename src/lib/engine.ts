@@ -26,6 +26,7 @@ export interface StitchEvent {
   y: number;
   c: number; // color index
   line?: number; // source line that produced this event (debugging)
+  u?: 1; // underlay stitch (drawn lighter in previews; identical in exports)
 }
 
 export interface RunResult {
@@ -33,6 +34,7 @@ export interface RunResult {
   warnings: string[];
   printed: string[];
   locks: number;
+  density: DensityResult;
 }
 
 export interface DesignStats {
@@ -62,7 +64,7 @@ export type ASTNode =
   | { k: 'make'; name: string; value: ExprNode; line: number }
   | { k: 'local'; name: string; value: ExprNode; line: number }
   | { k: 'output'; value: ExprNode | null; line: number } // value null = "exit"
-  | { k: 'cmd'; name: string; args: ExprNode[]; line: number; label?: string }
+  | { k: 'cmd'; name: string; args: ExprNode[]; line: number; label?: string; word?: string }
   | { k: 'call'; name: string; args: ExprNode[]; line: number };
 
 export type ExprNode =
@@ -200,8 +202,35 @@ export const BUILTIN_ARITY: Record<string, number> = {
   bean: 1, estitch: 1,
   beginfill: 0, endfill: 0, fillangle: 1, fillspacing: 1, filllen: 1,
   lock: 1,
+  pullcomp: 1, shortstitch: 1, autotrim: 1, maxdensity: 1,
   color: 1, stop: 0, trim: 0,
   seed: 1, print: 1, mark: 0, assert: 1,
+};
+
+/** Builtins that take a single quoted-word argument, with their allowed words. */
+export const QWORD_BUILTINS: Record<string, readonly string[]> = {
+  fabric: ['woven', 'knit', 'stretch', 'denim', 'canvas', 'fleece'],
+  underlay: ['auto', 'center', 'edge', 'zigzag', 'off'],
+  fillunderlay: ['auto', 'tatami', 'edge', 'off'],
+};
+
+/** Fabric presets: how much the fabric distorts and how much stitching it tolerates. */
+export const FABRICS: Record<string, {
+  pull: number;          // pull compensation in mm
+  maxDensity: number;    // thread coverage warning threshold, in layers
+  densityFloor?: number; // minimum satin penetration spacing in mm
+  doubleUnderlay?: boolean;
+  note?: string;
+}> = {
+  woven:   { pull: 0.2,  maxDensity: 3.5 },
+  knit:    { pull: 0.5,  maxDensity: 3.0, densityFloor: 0.45 },
+  stretch: { pull: 0.6,  maxDensity: 2.8, densityFloor: 0.5 },
+  denim:   { pull: 0.15, maxDensity: 4.0 },
+  canvas:  { pull: 0.15, maxDensity: 4.0 },
+  fleece:  {
+    pull: 0.3, maxDensity: 2.6, doubleUnderlay: true,
+    note: 'fleece: consider a water-soluble topping so stitches don\u2019t sink into the pile',
+  },
 };
 
 export const FUNC_ARITY: Record<string, number> = {
@@ -219,6 +248,7 @@ export const RESERVED = new Set<string>([
   'while', 'for', 'output', 'op', 'exit', 'and', 'or',
   ...Object.keys(ALIASES),
   ...Object.keys(BUILTIN_ARITY),
+  ...Object.keys(QWORD_BUILTINS),
   ...Object.keys(FUNC_ARITY),
   ...ZERO_FUNCS,
 ]);
@@ -406,6 +436,23 @@ export function parse(tokens: Token[]): ASTNode[] {
       if (!atEnd() && peek().t === 'qword') label = next().v as string;
       return { k: 'cmd', name: 'print', args: [parseExpr()], line: tok.line, label };
     }
+    if (QWORD_BUILTINS[canonical]) {
+      next();
+      const allowed = QWORD_BUILTINS[canonical];
+      const wTok = next();
+      if (!wTok || wTok.t !== 'qword')
+        throw new NeedlescriptError(
+          `${canonical} needs a quoted word, e.g.  ${canonical} "${allowed[0]}`,
+          tok.line,
+        );
+      const word = wTok.v as string;
+      if (!allowed.includes(word))
+        throw new NeedlescriptError(
+          `${canonical} doesn't know "${word}"${didYouMean(word, allowed)} (choices: ${allowed.join(', ')})`,
+          tok.line,
+        );
+      return { k: 'cmd', name: canonical, args: [], line: tok.line, word };
+    }
     if (BUILTIN_ARITY[canonical] !== undefined) {
       next();
       const args: ExprNode[] = [];
@@ -566,6 +613,14 @@ class Machine {
   fillSpacing = 0.4;
   fillLen: number | null = null;
   lockLen = 0.7;
+  pullComp = 0;                 // pull compensation in mm
+  underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag' = 'off';
+  fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge' = 'off';
+  doubleUnderlay = false;       // fleece: stack center + zigzag passes
+  shortStitch = true;           // auto short-stitch on tight satin curves
+  autoTrim = 7;                 // insert trim before jumps ≥ this (0 = off)
+  maxDensity = 3.5;             // coverage warning threshold, in layers of thread
+  satinPath: { x: number; y: number }[] | null = null; // buffered satin column
   recording = false;
   rings: [number, number][][] = [];
   curRing: [number, number][] | null = null;
@@ -578,12 +633,14 @@ class Machine {
   currentLine: number | undefined = undefined; // source line being executed
   stateStack: { x: number; y: number; heading: number; penDown: boolean }[] = [];
 
-  _push(t: EventType, x: number, y: number) {
+  _push(t: EventType, x: number, y: number, u = false) {
     if (this.events.length >= LIMITS.maxStitches)
       throw new NeedlescriptError(
         `Design exceeds ${LIMITS.maxStitches.toLocaleString()} stitches — stopped. Reduce repeats, raise stitchlen, or raise fillspacing.`,
       );
-    this.events.push({ t, x, y, c: this.colorIdx, line: this.currentLine });
+    const ev: StitchEvent = { t, x, y, c: this.colorIdx, line: this.currentLine };
+    if (u) ev.u = 1;
+    this.events.push(ev);
     if (t === 'stitch' || t === 'jump') this.lastEmit = { x, y };
   }
 
@@ -643,6 +700,7 @@ class Machine {
       this.warnings.push('pop ignored — nothing was saved with push');
       return;
     }
+    this.flushSatin();
     this.penDown = false; // travel back as a jump, never sewing
     this.setXY(s.x, s.y);
     this.penDown = s.penDown;
@@ -650,6 +708,7 @@ class Machine {
   }
 
   markHere() {
+    this.flushSatin();
     this._push('mark', this.x, this.y);
   }
 
@@ -668,29 +727,29 @@ class Machine {
     }
 
     if (!this.penDown) {
+      this.flushSatin();
       this._push('jump', nx, ny);
       this.x = nx; this.y = ny;
       return;
     }
 
-    this._ensureStart();
     const dxT = nx - ox, dyT = ny - oy;
     const len = Math.hypot(dxT, dyT);
 
     if (this.mode === 'satin' && this.satinWidth > 0.05) {
-      if (len < 1e-9) return;
-      const px = -dyT / len, py = dxT / len;
-      const half = this.satinWidth / 2;
-      const steps = Math.max(1, Math.ceil(len / this.satinSpacing));
-      for (let s = 1; s <= steps; s++) {
-        const t = s / steps;
-        const cx = ox + dxT * t, cy = oy + dyT * t;
-        this.satinSide = -this.satinSide;
-        this._push('stitch', cx + px * half * this.satinSide, cy + py * half * this.satinSide);
+      // Buffer the column path; it is sewn (underlay first, then the zigzag)
+      // when the column ends — see flushSatin().
+      if (len > 1e-9) {
+        if (!this.satinPath) this.satinPath = [{ x: ox, y: oy }];
+        const lastP = this.satinPath[this.satinPath.length - 1];
+        if (Math.hypot(nx - lastP.x, ny - lastP.y) > 0.05)
+          this.satinPath.push({ x: nx, y: ny });
       }
       this.x = nx; this.y = ny;
       return;
     }
+
+    this._ensureStart();
 
     if (this.mode === 'estitch' && this.eWidth > 0.05) {
       if (len < 1e-9) return;
@@ -730,6 +789,144 @@ class Machine {
     this.x = nx; this.y = ny;
   }
 
+  // ---- Satin column: underlay + zigzag, sewn when the column ends ----
+
+  /** Sew running stitches along a polyline (used for underlay passes). */
+  _runAlong(pts: { x: number; y: number }[], slen: number, u: boolean) {
+    if (!pts.length) return;
+    let cx = this.lastEmit ? this.lastEmit.x : pts[0].x;
+    let cy = this.lastEmit ? this.lastEmit.y : pts[0].y;
+    for (const p of pts) {
+      const d = Math.hypot(p.x - cx, p.y - cy);
+      if (d < 0.1) continue;
+      const steps = Math.max(1, Math.ceil(d / slen));
+      for (let s = 1; s <= steps; s++) {
+        this._push('stitch', cx + (p.x - cx) * s / steps, cy + (p.y - cy) * s / steps, u);
+      }
+      cx = p.x; cy = p.y;
+    }
+  }
+
+  /** Offset a polyline sideways by `dist` along per-vertex left normals. */
+  _offsetPath(pts: { x: number; y: number }[], dist: number): { x: number; y: number }[] {
+    const n = pts.length;
+    if (n < 2) return pts.slice();
+    const out: { x: number; y: number }[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      out.push({ x: pts[i].x - (dy / len) * dist, y: pts[i].y + (dx / len) * dist });
+    }
+    return out;
+  }
+
+  /**
+   * Zigzag along a polyline. `shortStitch` applies the curve-physics fix:
+   * on tight curves the inner-edge penetrations bunch up (thread breaks,
+   * fabric damage), so alternate inner stitches are pulled in to 60% width.
+   */
+  _zigzagAlong(
+    path: { x: number; y: number }[],
+    width: number,
+    spacing: number,
+    u: boolean,
+    shortStitch: boolean,
+  ) {
+    const half = width / 2;
+    let prevUx: number | null = null, prevUy = 0;
+    let innerCounter = 0;
+    let warnedTight = false;
+    for (let i = 1; i < path.length; i++) {
+      const ox = path[i - 1].x, oy = path[i - 1].y;
+      const dxT = path[i].x - ox, dyT = path[i].y - oy;
+      const len = Math.hypot(dxT, dyT);
+      if (len < 1e-9) continue;
+      const ux = dxT / len, uy = dyT / len;
+      const px = -uy, py = ux; // left normal
+      let innerSide = 0;
+      let crowded = false;
+      if (prevUx !== null) {
+        const cross = prevUx * uy - prevUy * ux; // > 0 = turning left
+        const dot = Math.max(-1, Math.min(1, prevUx * ux + prevUy * uy));
+        const theta = Math.acos(dot);
+        // Only treat gentle, continuous turns as curvature — sharp corners
+        // and reversals (retraced columns) are not curves.
+        if (theta > 1e-3 && theta < 2.1) {
+          const R = len / theta; // local curvature radius of the chord sequence
+          if (R < half && !u && !warnedTight) {
+            this.warnings.push(
+              `satin ${width.toFixed(1)} mm is wider than the curve it follows (radius ~${R.toFixed(1)} mm) — split the column or widen the curve`,
+            );
+            warnedTight = true;
+          }
+          if (shortStitch) {
+            const innerSpacing = spacing * (1 - half / Math.max(R, half));
+            if (innerSpacing < 0.3) {
+              crowded = true;
+              innerSide = cross > 0 ? 1 : -1;
+            }
+          }
+        }
+      }
+      const steps = Math.max(1, Math.ceil(len / spacing));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const cx = ox + dxT * t, cy = oy + dyT * t;
+        this.satinSide = -this.satinSide;
+        let h = half;
+        if (crowded && this.satinSide === innerSide) {
+          innerCounter++;
+          if (innerCounter % 2 === 1) h = half * 0.6;
+        }
+        this._push('stitch', cx + px * h * this.satinSide, cy + py * h * this.satinSide, u);
+      }
+      prevUx = ux; prevUy = uy;
+    }
+  }
+
+  /** Sew the buffered satin column: underlay passes first, then the zigzag. */
+  flushSatin() {
+    const path = this.satinPath;
+    this.satinPath = null;
+    if (!path || path.length < 2) return;
+    if (!this.started) {
+      this.started = true;
+      this._push('stitch', path[0].x, path[0].y);
+    }
+    const w = this.satinWidth + this.pullComp;
+    // Resolve underlay: physics says thin columns need none, medium columns a
+    // spine, wide columns a zigzag that lofts the topping and grips the fabric.
+    const mode: 'off' | 'center' | 'edge' | 'zigzag' =
+      this.underlayMode === 'auto'
+        ? (w < 1.5 ? 'off' : w < 4 ? 'center' : 'zigzag')
+        : this.underlayMode;
+    const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
+    const rev = path.slice().reverse();
+    if (mode !== 'off' && this.doubleUnderlay && mode !== 'center') {
+      // heavy-pile fabrics: spine first, then the resolved pass
+      this._runAlong(path, uLen, true);
+      this._runAlong(rev, uLen, true);
+    }
+    if (mode === 'center') {
+      this._runAlong(path, uLen, true);
+      this._runAlong(rev, uLen, true);
+      if (this.doubleUnderlay) {
+        this._zigzagAlong(path, w * 0.6, 2, true, false);
+        this._runAlong(rev, uLen, true);
+      }
+    } else if (mode === 'edge') {
+      const off = Math.max(0.3, w * 0.3);
+      this._runAlong(this._offsetPath(path, off), uLen, true);
+      this._runAlong(this._offsetPath(rev, off), uLen, true);
+    } else if (mode === 'zigzag') {
+      this._zigzagAlong(path, w * 0.6, 2, true, false);
+      this._runAlong(rev, uLen, true);
+    }
+    // The topping
+    this._zigzagAlong(path, w, this.satinSpacing, false, this.shortStitch);
+  }
+
   _closeRing() {
     if (this.curRing && this.curRing.length >= 3) this.rings.push(this.curRing);
     this.curRing = null;
@@ -740,9 +937,78 @@ class Machine {
       throw new NeedlescriptError(
         'beginfill while already recording a fill — close it with endfill first',
       );
+    this.flushSatin();
     this.recording = true;
     this.rings = [];
     this.curRing = [[this.x, this.y]];
+  }
+
+  /** Emit a sequence of fill points, connecting from wherever the thread is. */
+  _emitFillPts(pts: FillPoint[], u: boolean) {
+    if (!pts.length) return;
+    const first = pts[0];
+    if (!this.started) {
+      this.started = true;
+      this._push(Math.hypot(first.x, first.y) > 1 ? 'jump' : 'stitch', first.x, first.y, u);
+    } else {
+      const le = this.lastEmit || { x: 0, y: 0 };
+      const d0 = Math.hypot(first.x - le.x, first.y - le.y);
+      if (d0 > Math.max(this.stitchLen * 1.5, 2)) this._push('jump', first.x, first.y, u);
+      else if (d0 > 0.05) this._push('stitch', first.x, first.y, u);
+    }
+    for (let i = 1; i < pts.length; i++)
+      this._push(pts[i].jump ? 'jump' : 'stitch', pts[i].x, pts[i].y, u);
+  }
+
+  /** Inset a ring towards the interior of the shape by `d` mm (approximate). */
+  _insetRing(ring: [number, number][], all: [number, number][][], d: number): FillPoint[] {
+    // drop a duplicated closing vertex so corner normals stay sane
+    let pts = ring;
+    while (
+      pts.length > 1 &&
+      Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 1e-6
+    )
+      pts = pts.slice(0, -1);
+    const n = pts.length;
+    if (n < 3) return [];
+    const out: FillPoint[] = [];
+    for (let i = 0; i < n; i++) {
+      const p = pts[i];
+      const a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n];
+      // average of the two edge normals ≈ angle bisector
+      const d1x = p[0] - a[0], d1y = p[1] - a[1];
+      const d2x = b[0] - p[0], d2y = b[1] - p[1];
+      const l1 = Math.hypot(d1x, d1y) || 1, l2 = Math.hypot(d2x, d2y) || 1;
+      let nx = -(d1y / l1) - (d2y / l2), ny = d1x / l1 + d2x / l2;
+      const nl = Math.hypot(nx, ny);
+      if (nl < 1e-6) { nx = -d1y / l1; ny = d1x / l1; }
+      else { nx /= nl; ny /= nl; }
+      // pick whichever offset direction actually lands inside the shape
+      const c1: [number, number] = [p[0] + nx * d, p[1] + ny * d];
+      const c2: [number, number] = [p[0] - nx * d, p[1] - ny * d];
+      if (evenOddInside(all, c1[0], c1[1])) out.push({ x: c1[0], y: c1[1], jump: false });
+      else if (evenOddInside(all, c2[0], c2[1])) out.push({ x: c2[0], y: c2[1], jump: false });
+    }
+    if (out.length >= 3) out.push({ ...out[0] }); // close the loop
+    return out.length >= 4 ? out : [];
+  }
+
+  /** Split long runs in a point list into stitch-length steps. */
+  _subdividePts(pts: FillPoint[], slen: number): FillPoint[] {
+    const out: FillPoint[] = [];
+    for (const p of pts) {
+      const prev = out[out.length - 1];
+      if (!prev || p.jump) { out.push(p); continue; }
+      const d = Math.hypot(p.x - prev.x, p.y - prev.y);
+      const steps = Math.max(1, Math.ceil(d / slen));
+      for (let s = 1; s <= steps; s++)
+        out.push({
+          x: prev.x + (p.x - prev.x) * s / steps,
+          y: prev.y + (p.y - prev.y) * s / steps,
+          jump: false,
+        });
+    }
+    return out;
   }
 
   endFill() {
@@ -754,37 +1020,64 @@ class Machine {
       this.warnings.push('fill skipped — the boundary needs at least 3 pen-down points');
       return;
     }
+    const rings = this.rings;
+    this.rings = [];
     const effLen =
       this.fillLen !== null
         ? this.fillLen
         : Math.min(Math.max(this.stitchLen, 1), 7);
-    const pts = generateFill(this.rings, {
+
+    // ---- Underlay (sewn first, so the topping rides on a stable base) ----
+    const ringArea = (r: [number, number][]) => {
+      let s = 0;
+      for (let i = 0; i < r.length; i++) {
+        const a = r[i], b = r[(i + 1) % r.length];
+        s += a[0] * b[1] - b[0] * a[1];
+      }
+      return Math.abs(s / 2);
+    };
+    const area = Math.max(...rings.map(ringArea));
+    let uMode: 'off' | 'tatami' | 'edge' | 'both' = 'off';
+    if (this.fillUnderlayMode === 'auto') uMode = area > 100 ? 'both' : 'tatami';
+    else if (this.fillUnderlayMode === 'tatami') uMode = 'tatami';
+    else if (this.fillUnderlayMode === 'edge') uMode = 'edge';
+    if ((uMode === 'edge' || uMode === 'both') && area >= 30) {
+      for (const ring of rings) {
+        const inset = this._insetRing(ring, rings, 0.5);
+        if (inset.length) this._emitFillPts(this._subdividePts(inset, 2.5), true);
+      }
+    }
+    if (uMode === 'tatami' || uMode === 'both') {
+      const uPts = generateFill(rings, {
+        angle: this.fillAngle + 90, // cross-grain so the topping doesn't sink between rows
+        spacing: Math.min(this.fillSpacing * 4, 5),
+        stitchLen: 4,
+        endNear: { x: this.x, y: this.y },
+        comp: -0.6, // inset so the underlay never peeks out of the topping
+      });
+      if (this.doubleUnderlay && uPts.length) {
+        const uPts2 = generateFill(rings, {
+          angle: this.fillAngle, spacing: Math.min(this.fillSpacing * 4, 5),
+          stitchLen: 4, endNear: { x: this.x, y: this.y }, comp: -0.6,
+        });
+        this._emitFillPts(uPts2, true);
+      }
+      this._emitFillPts(uPts, true);
+    }
+
+    // ---- Topping ----
+    const pts = generateFill(rings, {
       angle: this.fillAngle,
       spacing: this.fillSpacing,
       stitchLen: effLen,
       endNear: { x: this.x, y: this.y },
+      comp: this.pullComp, // rows run along the stitch axis: extend against pull
     });
-    this.rings = [];
     if (!pts.length) {
       this.warnings.push('fill skipped — the area is too small to fill at this spacing');
       return;
     }
-    const first = pts[0];
-    if (!this.started) {
-      this.started = true;
-      this._push(
-        Math.hypot(first.x, first.y) > 1 ? 'jump' : 'stitch',
-        first.x,
-        first.y,
-      );
-    } else {
-      const le = this.lastEmit || { x: 0, y: 0 };
-      const d0 = Math.hypot(first.x - le.x, first.y - le.y);
-      if (d0 > Math.max(this.stitchLen * 1.5, 2)) this._push('jump', first.x, first.y);
-      else if (d0 > 0.05) this._push('stitch', first.x, first.y);
-    }
-    for (let i = 1; i < pts.length; i++)
-      this._push(pts[i].jump ? 'jump' : 'stitch', pts[i].x, pts[i].y);
+    this._emitFillPts(pts, false);
     const back = Math.hypot(
       (this.lastEmit?.x ?? 0) - this.x,
       (this.lastEmit?.y ?? 0) - this.y,
@@ -793,6 +1086,7 @@ class Machine {
   }
 
   colorChange(n: number) {
+    this.flushSatin();
     const idx = Math.max(0, Math.round(n));
     if (idx === this.colorIdx && this.started) return;
     if (this.started) this._push('color', this.x, this.y);
@@ -800,6 +1094,7 @@ class Machine {
   }
 
   trimThread() {
+    this.flushSatin();
     if (this.started) this._push('trim', this.x, this.y);
   }
 }
@@ -825,6 +1120,8 @@ interface FillOpts {
   spacing: number;
   stitchLen: number;
   endNear?: { x: number; y: number };
+  /** Extend (+) or inset (−) each row end along the stitch axis, in mm. */
+  comp?: number;
 }
 
 interface FillPoint {
@@ -862,8 +1159,10 @@ function generateFill(rings: [number, number][][], opt: FillOpts): FillPoint[] {
     }
     xs.sort((p, q) => p - q);
     const segs: Seg[] = [];
+    const comp = opt.comp || 0; // pull compensation (+) or underlay inset (−)
     for (let i = 0; i + 1 < xs.length; i += 2) {
-      if (xs[i + 1] - xs[i] >= 0.5) segs.push({ x0: xs[i], x1: xs[i + 1], y, row: rowIdx });
+      const a0 = xs[i] - comp, a1 = xs[i + 1] + comp;
+      if (a1 - a0 >= 0.5) segs.push({ x0: a0, x1: a1, y, row: rowIdx });
     }
     if (segs.length) rows.push(segs);
   }
@@ -1025,6 +1324,171 @@ export function applyLocks(events: StitchEvent[], L: number): LockResult {
     }
   }
   return { events: out, locks };
+}
+
+// ---------- Auto trim ----------
+
+/**
+ * Insert a trim before any travel of `threshold` mm or more of consecutive
+ * jumps, so long connector threads don't dangle and snag on the garment.
+ * Never trims when nothing has been sewn since the last cut.
+ */
+export function applyAutoTrim(
+  events: StitchEvent[],
+  threshold: number,
+): { events: StitchEvent[]; trims: number } {
+  const out: StitchEvent[] = [];
+  let trims = 0;
+  let sewn = false;
+  let pos: StitchEvent | null = null;
+  let i = 0;
+  while (i < events.length) {
+    const e = events[i];
+    if (e.t === 'stitch') { sewn = true; out.push(e); pos = e; i++; continue; }
+    if (e.t === 'color' || e.t === 'trim') { sewn = false; out.push(e); i++; continue; }
+    if (e.t === 'jump') {
+      // measure the whole consecutive jump run
+      let j = i, jl = 0, p: StitchEvent | null = pos;
+      while (j < events.length && (events[j].t === 'jump' || events[j].t === 'mark')) {
+        if (events[j].t === 'jump') {
+          if (p) jl += Math.hypot(events[j].x - p.x, events[j].y - p.y);
+          p = events[j];
+        }
+        j++;
+      }
+      if (sewn && pos && jl >= threshold) {
+        out.push({ t: 'trim', x: pos.x, y: pos.y, c: e.c, line: e.line });
+        trims++;
+        sewn = false;
+      }
+      for (; i < j; i++) {
+        out.push(events[i]);
+        if (events[i].t === 'jump') pos = events[i];
+      }
+      continue;
+    }
+    out.push(e); // mark
+    i++;
+  }
+  return { events: out, trims };
+}
+
+// ---------- Local density analysis ----------
+
+export interface DensityCell { ix: number; iy: number; count: number; layers: number }
+
+export interface DensityHotspot {
+  x: number;
+  y: number;
+  value: number; // thread coverage in layers ('density') or hits in one hole ('stack')
+  lines: number[];
+  kind: 'density' | 'stack';
+}
+
+export interface DensityResult {
+  cellMM: number;
+  cells: DensityCell[];
+  peak: number; // highest thread coverage, in layers
+  hotspots: DensityHotspot[];
+}
+
+const THREAD_W = 0.4; // typical 40 wt thread width on fabric, mm
+
+/**
+ * Grid analysis of thread build-up. The physical quantity that matters is
+ * **coverage**: millimetres of thread per mm² of fabric, expressed in layers
+ * (1 layer ≈ a clean satin column or tatami fill). Past ~2.5–3 layers the
+ * patch goes hard: needle deflection, thread breaks, puckering. Repeated
+ * penetrations in the same hole cut the fabric and are flagged separately.
+ */
+export function densityMap(
+  events: StitchEvent[],
+  cellMM = 1,
+  threshold = 3,
+): DensityResult {
+  interface Cell { count: number; len: number; lines: Map<number, number> }
+  const grid = new Map<string, Cell>();
+  const micro = new Map<string, { count: number; x: number; y: number; line?: number }>();
+  const cellOf = (x: number, y: number) => {
+    const k = Math.floor(x / cellMM) + ',' + Math.floor(y / cellMM);
+    let cell = grid.get(k);
+    if (!cell) { cell = { count: 0, len: 0, lines: new Map() }; grid.set(k, cell); }
+    return cell;
+  };
+
+  let px: number | null = null, py = 0;
+  for (const e of events) {
+    if (e.t === 'jump') { px = e.x; py = e.y; continue; }
+    if (e.t !== 'stitch') continue;
+    const cell = cellOf(e.x, e.y);
+    cell.count++;
+    if (e.line !== undefined) cell.lines.set(e.line, (cell.lines.get(e.line) || 0) + 1);
+    // spread the thread length of this stitch over the cells it crosses
+    if (px !== null) {
+      const d = Math.hypot(e.x - px, e.y - py);
+      if (d > 1e-6) {
+        const steps = Math.max(1, Math.ceil(d / (cellMM * 0.5)));
+        const dl = d / steps;
+        for (let s = 0; s < steps; s++) {
+          const t = (s + 0.5) / steps;
+          const c = cellOf(px + (e.x - px) * t, py + (e.y - py) * t);
+          c.len += dl;
+          if (e.line !== undefined) c.lines.set(e.line, (c.lines.get(e.line) || 0) + 0.2);
+        }
+      }
+    }
+    // same-hole detection on a 0.15 mm grid
+    const mk = Math.round(e.x / 0.15) + ',' + Math.round(e.y / 0.15);
+    const m = micro.get(mk);
+    if (m) { m.count++; }
+    else micro.set(mk, { count: 1, x: e.x, y: e.y, line: e.line });
+    px = e.x; py = e.y;
+  }
+
+  const cellArea = cellMM * cellMM;
+  const cells: DensityCell[] = [];
+  let peak = 0;
+  for (const [k, cell] of grid) {
+    const [ix, iy] = k.split(',').map(Number);
+    const layers = (cell.len * THREAD_W) / cellArea;
+    if (layers > peak) peak = layers;
+    cells.push({ ix, iy, count: cell.count, layers });
+  }
+
+  const hotspots: DensityHotspot[] = [];
+  if (threshold > 0) {
+    const hot = cells
+      .filter(c => c.layers > threshold)
+      .sort((a, b) => b.layers - a.layers);
+    const taken: DensityCell[] = [];
+    for (const c of hot) {
+      if (taken.some(t => Math.abs(t.ix - c.ix) <= 2 && Math.abs(t.iy - c.iy) <= 2)) continue;
+      taken.push(c);
+      const lines = [...(grid.get(c.ix + ',' + c.iy)?.lines || new Map<number, number>())]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2)
+        .map(l => l[0]);
+      hotspots.push({
+        x: (c.ix + 0.5) * cellMM,
+        y: (c.iy + 0.5) * cellMM,
+        value: c.layers,
+        lines,
+        kind: 'density',
+      });
+      if (taken.length >= 20) break;
+    }
+    for (const m of micro.values()) {
+      if (m.count >= 5) {
+        hotspots.push({
+          x: m.x, y: m.y, value: m.count,
+          lines: m.line !== undefined ? [m.line] : [],
+          kind: 'stack',
+        });
+        if (hotspots.length >= 40) break;
+      }
+    }
+  }
+  return { cellMM, cells, peak, hotspots };
 }
 
 // ---------- Design stats ----------
@@ -1316,7 +1780,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           case 'bk': m.forward(-a[0]); return;
           case 'rt': m.heading = (m.heading + a[0]) % 360; return;
           case 'lt': m.heading = (m.heading - a[0]) % 360; return;
-          case 'up': m.penDown = false; return;
+          case 'up': m.flushSatin(); m.penDown = false; return;
           case 'down': m.penDown = true; return;
           case 'home': m.setXY(0, 0); m.heading = 0; return;
           case 'cs': return;
@@ -1337,6 +1801,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'satin': {
+            m.flushSatin();
             const v = Math.max(0, a[0]);
             if (v > 10)
               m.warnings.push(
@@ -1347,6 +1812,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'estitch': {
+            m.flushSatin();
             const v = Math.max(0, a[0]);
             if (v > 10)
               m.warnings.push(`estitch ${v} mm is very wide — prongs over ~8 mm tend to snag`);
@@ -1385,7 +1851,44 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             m.fillLen = v;
             return;
           }
-          case 'density': m.satinSpacing = Math.min(Math.max(a[0], 0.25), 5); return;
+          case 'density': m.flushSatin(); m.satinSpacing = Math.min(Math.max(a[0], 0.25), 5); return;
+          case 'pullcomp': {
+            const v = Math.min(Math.max(a[0], 0), 1.5);
+            if (v !== a[0]) m.warnings.push(`pullcomp ${a[0]} clamped to ${v} mm (safe range 0–1.5)`);
+            m.pullComp = v;
+            return;
+          }
+          case 'shortstitch': m.shortStitch = a[0] !== 0; return;
+          case 'autotrim': {
+            if (a[0] <= 0) { m.autoTrim = 0; return; }
+            const v = Math.min(Math.max(a[0], 3), 30);
+            if (v !== a[0]) m.warnings.push(`autotrim ${a[0]} clamped to ${v} mm (safe range 3–30, 0 = off)`);
+            m.autoTrim = v;
+            return;
+          }
+          case 'maxdensity': {
+            if (a[0] <= 0) { m.maxDensity = 0; return; }
+            m.maxDensity = Math.min(Math.max(a[0], 1), 8);
+            return;
+          }
+          case 'underlay':
+            m.underlayMode = st.word as typeof m.underlayMode;
+            return;
+          case 'fillunderlay':
+            m.fillUnderlayMode = st.word as typeof m.fillUnderlayMode;
+            return;
+          case 'fabric': {
+            const f = FABRICS[st.word as string];
+            m.pullComp = f.pull;
+            m.underlayMode = 'auto';
+            m.fillUnderlayMode = 'auto';
+            m.maxDensity = f.maxDensity;
+            m.doubleUnderlay = !!f.doubleUnderlay;
+            if (f.densityFloor && m.satinSpacing < f.densityFloor)
+              m.satinSpacing = f.densityFloor;
+            if (f.note && !m.warnings.includes(f.note)) m.warnings.push(f.note);
+            return;
+          }
           case 'color': m.colorChange(a[0]); return;
           case 'stop': m.colorChange(m.colorIdx + 1); return;
           case 'trim': m.trimThread(); return;
@@ -1411,6 +1914,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   execBlock(program, null, 0, 0);
 
+  m.flushSatin();
   if (m.recording) {
     m.warnings.push('beginfill was never closed — endfill added at the end of the program');
     m.endFill();
@@ -1420,6 +1924,33 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       `${m.tinyDropped} sub-${LIMITS.minStitch} mm moves merged into neighbours (too short to sew safely)`,
     );
 
+  if (m.autoTrim > 0) {
+    const at = applyAutoTrim(m.events, m.autoTrim);
+    m.events = at.events;
+  }
+
+  // Analyse coverage before the lock pass: tie-offs are deliberate micro
+  // stitches and would otherwise read as false hotspots at every thread end.
+  const density = densityMap(m.events, 1, m.maxDensity);
+  if (m.maxDensity > 0) {
+    const dens = density.hotspots.filter(h => h.kind === 'density').slice(0, 3);
+    for (const h of dens) {
+      m.warnings.push(
+        `${h.value.toFixed(1)} layers of thread (limit ${m.maxDensity}) near (${h.x.toFixed(0)}, ${h.y.toFixed(0)})` +
+        (h.lines.length ? ` — mostly line${h.lines.length > 1 ? 's' : ''} ${h.lines.join(', ')}` : '') +
+        ' — may pucker or break needles',
+      );
+    }
+    const stacks = density.hotspots.filter(h => h.kind === 'stack').slice(0, 2);
+    for (const h of stacks) {
+      m.warnings.push(
+        `${h.value} needle penetrations in the same hole near (${h.x.toFixed(0)}, ${h.y.toFixed(0)})` +
+        (h.lines.length ? ` — line ${h.lines[0]}` : '') +
+        ' — this can cut the fabric',
+      );
+    }
+  }
+
   let locks = 0;
   if (m.lockLen > 0) {
     const secured = applyLocks(m.events, m.lockLen);
@@ -1427,5 +1958,5 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     locks = secured.locks;
   }
 
-  return { events: m.events, warnings: m.warnings, printed, locks };
+  return { events: m.events, warnings: m.warnings, printed, locks, density };
 }

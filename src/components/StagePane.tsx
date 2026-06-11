@@ -9,14 +9,24 @@ interface Props {
   scrubPos: number;
   onScrubChange: (v: number) => void;
   activeLine: number | null;
+  showDensity: boolean;
+  onToggleDensity: () => void;
 }
 
-export default function StagePane({ design, scrubPos, onScrubChange, activeLine }: Props) {
+export default function StagePane({ design, scrubPos, onScrubChange, activeLine, showDensity, onToggleDensity }: Props) {
   return (
     <section className={styles.pane}>
       <div className={styles.fabric}>
-        <StageCanvas design={design} scrubPos={scrubPos} />
+        <StageCanvas design={design} scrubPos={scrubPos} showDensity={showDensity} />
         <StatsChips design={design} />
+        <button
+          className={`${styles.densityBtn}${showDensity ? ' ' + styles.densityOn : ''}`}
+          onClick={onToggleDensity}
+          title="Toggle the stitch-density heatmap"
+          aria-pressed={showDensity}
+        >
+          density
+        </button>
       </div>
       <PlaybackBar
         total={design.pts.length}

@@ -51,6 +51,60 @@ export default function LanguageReference() {
           </span>
         </div>
 
+        <h3>Fabric &amp; professional quality</h3>
+        <div>
+          <code>fabric "woven · "knit · "stretch · "denim · "canvas · "fleece</code>
+          <span>
+            preset for the target fabric: sets pull compensation, automatic underlay, a density
+            limit, and (knit/stretch) a lighter satin density. Explicit commands afterwards
+            override it
+          </span>
+        </div>
+        <div>
+          <code>pullcomp <i>mm</i></code>
+          <span>
+            pull compensation 0–1.5: thread tension shrinks stitching along the stitch axis, so
+            satin columns are widened and fill rows extended by this much to sew out at true size
+          </span>
+        </div>
+        <div>
+          <code>underlay "auto · "center · "edge · "zigzag · "off</code>
+          <span>
+            stabilising stitches sewn automatically <i>under</i> each satin column: a centre spine,
+            edge runs, or a loose zigzag. <code>"auto</code> picks by width. Drawn thinner in the
+            preview
+          </span>
+        </div>
+        <div>
+          <code>fillunderlay "auto · "tatami · "edge · "off</code>
+          <span>
+            underlay beneath fills: a sparse cross-grain tatami pass and/or an inset edge run so
+            the topping doesn't shift or sink. <code>"auto</code> adds the edge run on large areas
+          </span>
+        </div>
+        <div>
+          <code>shortstitch <i>0/1</i></code>
+          <span>
+            curve physics (on by default): on tight satin curves the inner-edge penetrations bunch
+            up and break thread — alternate inner stitches are automatically shortened
+          </span>
+        </div>
+        <div>
+          <code>autotrim <i>mm</i></code>
+          <span>
+            cut the thread automatically before any travel of this length or more (default 7) so
+            connector threads can't snag; <code>autotrim 0</code> off
+          </span>
+        </div>
+        <div>
+          <code>maxdensity <i>n</i></code>
+          <span>
+            thread-coverage warning threshold in layers (default 3.5; fabric presets tune it —
+            one layer ≈ a clean satin or fill). Stacking past it punches holes, breaks thread,
+            and puckers — see the density heatmap toggle on the stage
+          </span>
+        </div>
+
         <h3>Control</h3>
         <div><code>repeat <i>n</i> [ … ]</code><span>loop; <code>repcount</code> is the 1-based counter</span></div>
         <div><code>while <i>cond</i> [ … ]</code><span>loop while the condition is true (non-zero)</span></div>

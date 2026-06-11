@@ -69,9 +69,9 @@ src/
 - **Editor** — write Needlescript; `⌘`/`Ctrl`+`Enter` runs, `Tab` inserts two spaces.
 - **REPL** — type a single command below the console; it's appended to the program and re-run (`↑`/`↓` for history). Great for nudging a design live.
 - **Console** — run results, warnings, `print` output, and errors with line numbers.
-- **Stage** — a 100 mm virtual hoop rendered on canvas: thread per colour, dashed jump lines, needle penetration points when zoomed, hoop-overflow and density warnings as chips.
+- **Stage** — a 100 mm virtual hoop rendered on canvas: thread per colour, underlay drawn thinner and lighter, dashed jump lines, needle penetration points when zoomed, hoop-overflow and density warnings as chips, plus a **density heatmap toggle** (thread coverage in layers) for spotting bulletproof patches before they pucker.
 - **Playback** — play (~7 s) or scrub the stitch sequence stitch by stitch. While scrubbed, the **source line currently sewing is highlighted in the editor** and shown next to the counter — the fastest way to answer "which line made this stitch?"
-- **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell).
+- **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch).
 - **Download .DST** — export the current design as a Tajima stitch file.
 - **Import SVG** — convert an SVG (button or drag & drop) into *editable* Needlescript code: filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, colours map to the nearest thread. Supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, groups and transforms.
 
@@ -126,7 +126,7 @@ fd 10 -5           ; error — "-5" is a second value, but fd takes one argument
 | `estitch mm` | blanket stitch: prongs of this length on the left of travel, spaced by `stitchlen`. `estitch 0` off |
 | `color n` | switch to thread *n* (emits a DST colour-change stop) |
 | `stop` | shorthand for "next colour" |
-| `trim` | cut the thread here (do this before a long jump) |
+| `trim` | cut the thread here (long travels also get one automatically — see `autotrim`) |
 | `lock mm` | tie-in/tie-off securing: 4 micro back-stitches are sewn automatically wherever the thread starts or ends (design start/end, colour changes, trims, jumps ≥ 4 mm) so runs can't unravel. Size 0.3–1.5 mm (default **0.7**); `lock 0` disables |
 
 ## Fills
@@ -145,6 +145,53 @@ endfill
 | `fillangle deg` | direction of the fill rows (default 0) |
 | `fillspacing mm` | row spacing, 0.25–5 mm (default **0.4**) |
 | `filllen mm` | fill stitch length, 1–7 mm. By default the fill follows `stitchlen`; set `filllen` to override, `filllen 0` to follow again. Rows are brick-offset so penetrations don't line up |
+
+## Professional embroidery & fabric physics
+
+Geometry alone doesn't survive the sewing machine: thread tension pulls fabric inward, stitches sink into the material, tight curves crowd the needle, and layered stitching turns into a bulletproof patch. These commands compensate for the physics. They are **opt-in** — without them, programs sew exactly as written.
+
+The quickest route is a fabric preset:
+
+```text
+fabric "knit       ; pull comp 0.5, auto underlay, lighter satin, density limit 1.2
+```
+
+| Fabric | Pull comp | Coverage limit | Notes |
+|---|---|---|---|
+| `"woven` | 0.2 mm | 3.5 layers | the baseline |
+| `"knit` | 0.5 mm | 3.0 layers | satin density floored at 0.45 mm |
+| `"stretch` | 0.6 mm | 2.8 layers | satin density floored at 0.5 mm |
+| `"denim` / `"canvas` | 0.15 mm | 4.0 layers | stable, tolerates dense stitching |
+| `"fleece` | 0.3 mm | 2.6 layers | doubled underlay, suggests a topping |
+
+Explicit commands after `fabric` override the preset.
+
+### Pull compensation — `pullcomp mm`
+
+Thread tension shrinks stitching along the stitch axis: a 4 mm satin column sews ~3.6 mm wide. `pullcomp` (0–1.5 mm) widens satin columns and extends every fill row at both ends, so shapes sew out at their digitized size and borders actually meet their fills.
+
+### Underlay — `underlay`, `fillunderlay`
+
+Underlay is stabilising stitching sewn automatically *underneath* the visible layer — the single biggest difference between hobby and professional digitizing. It anchors the fabric to the backing, stops shifting, and lifts the topping out of the material. Underlay is sewn in correct machine order (before the topping), shown thinner in the preview, and identical to normal stitches in exports.
+
+| Command | Modes |
+|---|---|
+| `underlay "auto` | for satin columns: `"center` (spine, out and back), `"edge` (runs offset ±30% width), `"zigzag` (open zigzag at 60% width + return run), `"off`. `"auto` picks by width: < 1.5 mm none, < 4 mm center, wider zigzag |
+| `fillunderlay "auto` | for fills: `"tatami` (sparse cross-grain pass at `fillangle + 90`, inset 0.6 mm), `"edge` (run tracing the boundary inset 0.5 mm), `"off`. `"auto` = tatami, plus the edge run on areas over 100 mm² |
+
+A satin column is buffered while you draw it and sewn — underlay first, then the zigzag — when it ends (pen up, mode change, colour change, trim, fill, or end of program). The turtle's position and heading are unaffected.
+
+### Short stitches on curves — `shortstitch 0/1`
+
+On a tight satin curve the inner edge receives the same number of penetrations as the outer edge in a fraction of the space — they bunch up, break thread, and chew the fabric. Needlescript detects local curvature (chord length ÷ turn angle) and pulls **alternate inner-edge stitches in to 60% width**. On by default; `shortstitch 0` disables. If a column is wider than the curve's radius you get a warning — that geometry can't sew cleanly at any setting.
+
+### Local density — `maxdensity n` + heatmap
+
+The physical quantity that matters is **thread coverage**: millimetres of thread per mm² of fabric, expressed in *layers* — one layer is a clean satin column or tatami fill. Past ~2.5–3.5 layers (fabric-dependent) embroidery stops being fabric: needles deflect, thread breaks, the patch puckers. Every run computes a 1 mm coverage grid (deliberate tie-off micro stitches are excluded so thread ends don't read as false hotspots). Hotspots above the limit produce warnings **with coordinates and the source lines that caused them**, and repeated penetrations in the same hole (≥ 5 within 0.15 mm — fabric-cutting territory) are flagged separately. The stage has a heatmap toggle (orange from ~1.2 layers, red from 3); the stats row shows the peak. `maxdensity n` tunes the threshold (default 3.5), `maxdensity 0` silences it. Some constructions legitimately run hot — a satin border over a fill edge measures ~4 layers — and the right move is to raise the limit *knowingly*, as the bundled *patch* example does.
+
+### Automatic trims — `autotrim mm`
+
+Travels of 7 mm or more (configurable 3–30, `autotrim 0` off) automatically get a `trim` before the jump, so connector threads don't dangle and snag on the garment. Trims are never inserted when nothing has been sewn since the last cut.
 
 ## Control flow
 
@@ -314,16 +361,17 @@ Everything in `src/lib/` is DOM-free:
 import { run, designStats, toDST } from './lib/index.ts';
 
 const result = run('repeat 36 [ fd 4 rt 10 ]', { seed: 7 });
-// result.events   — stitch/jump/color/trim/mark stream ({ t, x, y, c, line })
-// result.warnings — non-fatal issues
+// result.events   — stitch/jump/color/trim/mark stream ({ t, x, y, c, line, u })
+// result.warnings — non-fatal issues (clamps, density hotspots, hoop overflow…)
 // result.printed  — output of print
 // result.locks    — number of tie-in/tie-off locks added
+// result.density  — local density grid, peak, and hotspot list
 
 const stats = designStats(result.events);  // counts, bounding box, max stitch…
 const bytes = toDST(result.events, 'rose'); // Uint8Array, ready to save
 ```
 
-Also exported: `tokenize`, `parse`, `applyLocks`, `makeRNG`, `makeNoise`, `suggest`, `svgToCode`, the command tables (`BUILTIN_ARITY`, `FUNC_ARITY`, `ALIASES`, `RESERVED`, `ZERO_FUNCS`), `LIMITS`, and `NeedlescriptError` (which carries the source line in `slLine`).
+Also exported: `tokenize`, `parse`, `applyLocks`, `applyAutoTrim`, `densityMap`, `makeRNG`, `makeNoise`, `suggest`, `svgToCode`, the command tables (`BUILTIN_ARITY`, `QWORD_BUILTINS`, `FABRICS`, `FUNC_ARITY`, `ALIASES`, `RESERVED`, `ZERO_FUNCS`), `LIMITS`, and `NeedlescriptError` (which carries the source line in `slLine`).
 
 ## Tests
 
@@ -331,7 +379,7 @@ Also exported: `tokenize`, `parse`, `applyLocks`, `makeRNG`, `makeNoise`, `sugge
 npm test
 ```
 
-~2,400 lines of Vitest suites in `src/lib/__tests__/` cover the tokenizer, parser, interpreter, language features (loops, reporters, locals, noise, arc, push/pop, debugging commands), locks, stats, DST encoding, and the SVG importer. The bundled examples are tested to run and fit the hoop. When in doubt about a behaviour, the tests are the spec.
+~2,800 lines of Vitest suites in `src/lib/__tests__/` cover the tokenizer, parser, interpreter, language features (loops, reporters, locals, noise, arc, push/pop, debugging commands), the professional layer (underlay, pull compensation, short-stitch, density analysis, autotrim, fabric presets), locks, stats, DST encoding, and the SVG importer. The bundled examples are tested to run and fit the hoop. When in doubt about a behaviour, the tests are the spec.
 
 ## License
 

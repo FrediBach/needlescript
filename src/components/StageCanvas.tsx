@@ -5,9 +5,10 @@ import { THREADS, HOOP_R } from '../data.ts';
 interface Props {
   design: DesignState;
   scrubPos: number;
+  showDensity: boolean;
 }
 
-export default function StageCanvas({ design, scrubPos }: Props) {
+export default function StageCanvas({ design, scrubPos, showDensity }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -22,8 +23,8 @@ export default function StageCanvas({ design, scrubPos }: Props) {
     canvas.width = Math.max(1, Math.round(box.width * dpr));
     canvas.height = Math.max(1, Math.round(box.height * dpr));
 
-    draw(canvas, design, scrubPos, dpr);
-  }, [design, scrubPos]);
+    draw(canvas, design, scrubPos, dpr, showDensity);
+  }, [design, scrubPos, showDensity]);
 
   // Also redraw on resize
   useEffect(() => {
@@ -36,11 +37,11 @@ export default function StageCanvas({ design, scrubPos }: Props) {
       const dpr = window.devicePixelRatio || 1;
       canvas.width = Math.max(1, Math.round(box.width * dpr));
       canvas.height = Math.max(1, Math.round(box.height * dpr));
-      draw(canvas, design, scrubPos, dpr);
+      draw(canvas, design, scrubPos, dpr, showDensity);
     });
     ro.observe(canvas.parentElement!);
     return () => ro.disconnect();
-  }, [design, scrubPos]);
+  }, [design, scrubPos, showDensity]);
 
   return (
     <canvas
@@ -50,7 +51,13 @@ export default function StageCanvas({ design, scrubPos }: Props) {
   );
 }
 
-function draw(canvas: HTMLCanvasElement, design: DesignState, scrubPos: number, dpr: number) {
+function draw(
+  canvas: HTMLCanvasElement,
+  design: DesignState,
+  scrubPos: number,
+  dpr: number,
+  showDensity: boolean,
+) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const w = canvas.width, h = canvas.height;
@@ -94,24 +101,30 @@ function draw(canvas: HTMLCanvasElement, design: DesignState, scrubPos: number, 
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Thread, batched per colour run
+  // Thread, batched per colour/underlay run. Underlay (u) is drawn thinner
+  // and lighter so the construction shows through the topping.
   const tw = Math.max(1.1 * dpr, Math.min(0.45 * scale, 4.5 * dpr));
-  ctx.lineWidth = tw;
   let runColor: number | null = null;
+  let runU = false;
   ctx.beginPath();
   for (let j = 1; j < upto; j++) {
     const p = pts[j], q = pts[j - 1];
     if (p.t !== 'stitch') continue;
-    if (p.c !== runColor) {
+    const pu = p.u === 1;
+    if (p.c !== runColor || pu !== runU) {
       if (runColor !== null) ctx.stroke();
       runColor = p.c;
+      runU = pu;
       ctx.strokeStyle = THREADS[runColor % THREADS.length];
+      ctx.lineWidth = pu ? Math.max(0.8 * dpr, tw * 0.5) : tw;
+      ctx.globalAlpha = pu ? 0.4 : 1;
       ctx.beginPath();
     }
     ctx.moveTo(X(q.x), Y(q.y));
     ctx.lineTo(X(p.x), Y(p.y));
   }
   if (runColor !== null) ctx.stroke();
+  ctx.globalAlpha = 1;
 
   // Needle penetration points when zoomed in
   if (scale > 2.4 * dpr) {
@@ -122,6 +135,21 @@ function draw(canvas: HTMLCanvasElement, design: DesignState, scrubPos: number, 
       ctx.beginPath();
       ctx.arc(X(pts[k].x), Y(pts[k].y), r, 0, 6.2832);
       ctx.fill();
+    }
+  }
+
+  // Density heatmap overlay (thread coverage in layers)
+  if (showDensity && design.density) {
+    const { cellMM, cells } = design.density;
+    for (const c of cells) {
+      if (c.layers < 1.2) continue;
+      const hot = Math.min(1, c.layers / 4);
+      ctx.fillStyle = c.layers >= 3
+        ? `rgba(200, 38, 24, ${0.18 + hot * 0.42})`
+        : `rgba(228, 138, 32, ${0.10 + hot * 0.30})`;
+      const x0 = X(c.ix * cellMM);
+      const y0 = Y((c.iy + 1) * cellMM);
+      ctx.fillRect(x0, y0, cellMM * scale + 0.5, cellMM * scale + 0.5);
     }
   }
 

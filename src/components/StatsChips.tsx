@@ -18,6 +18,8 @@ export default function StatsChips({ design }: Props) {
     if (s.jumps) chips.push({ text: `${s.jumps} jump${s.jumps > 1 ? 's' : ''}` });
     chips.push({ text: `${s.colorsUsed} colour${s.colorsUsed > 1 ? 's' : ''}` });
     chips.push({ text: `${s.width.toFixed(1)} × ${s.height.toFixed(1)} mm` });
+    if (design.density && design.density.peak > 0.5)
+      chips.push({ text: `peak ${design.density.peak.toFixed(1)} layers` });
     design.warnings.forEach(w => chips.push({ text: w, type: 'warn' }));
   }
 

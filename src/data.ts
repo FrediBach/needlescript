@@ -16,11 +16,13 @@ export const SAFE_R = 47;   // sewable field inside the hoop
 
 export const EXAMPLES: Record<string, string> = {
   'bloom — rose of circles': [
-    '; twelve overlapping circles make a rose',
+    '; twelve overlapping circles make a rose.',
+    '; the small fd between circles spreads their',
+    '; start points so no hole is punched twice',
     'stitchlen 2.2',
     'repeat 12 [',
     '  repeat 36 [ fd 3.4 rt 10 ]',
-    '  rt 30',
+    '  rt 30 fd 0.8',
     ']',
   ].join('\n'),
   'wreath — leaf procedure': [
@@ -32,7 +34,7 @@ export const EXAMPLES: Record<string, string> = {
     '  ]',
     'end',
     '',
-    'repeat 8 [ leaf 1.2 rt 45 ]',
+    'repeat 8 [ leaf 1.2 rt 45 fd 0.6 ]',
   ].join('\n'),
   'wander — bounded random walk': [
     '; a random walk that turns back at the edge.',
@@ -158,5 +160,26 @@ export const EXAMPLES: Record<string, string> = {
     '  make "r :r * 1.16',
     '  print "radius :r',
     ']',
+  ].join('\n'),
+  'patch — knit-ready badge': [
+    '; the fabric preset adds pull compensation and',
+    '; automatic underlay. the fill is inset so the',
+    '; satin border covers its edge; that border',
+    '; still measures ~4 layers of thread — fine for',
+    '; a badge, so the limit is raised knowingly.',
+    '; toggle "density" on the stage to see it.',
+    'fabric "knit',
+    'maxdensity 4.5',
+    'fillangle 25',
+    'up setxy -12.8 -14.8 down',
+    'beginfill',
+    '  repeat 4 [ fd 16 arc 90 4.8 ]',
+    'endfill',
+    '',
+    'color 0',
+    'up setxy -14 -16 down',
+    'satin 3',
+    'repeat 4 [ fd 16 arc 90 6 ]',
+    'satin 0',
   ].join('\n'),
 };
