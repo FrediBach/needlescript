@@ -43,7 +43,7 @@ export default function Header({
         mm
       </label>
 
-      <button className={styles.btn} onClick={onSVGImport}>Import SVG</button>
+      <button type="button" className={styles.btn} onClick={onSVGImport}>Import SVG</button>
 
       <select
         ref={selectRef}
@@ -58,11 +58,11 @@ export default function Header({
         ))}
       </select>
 
-      <button className={styles.runBtn} onClick={onRun}>
+      <button type="button" className={styles.runBtn} onClick={onRun}>
         Run&nbsp;&nbsp;<kbd>⌘↵</kbd>
       </button>
 
-      <button className={styles.dlBtn} onClick={onDownloadDST}>Download .DST</button>
+      <button type="button" className={styles.dlBtn} onClick={onDownloadDST}>Download .DST</button>
     </header>
   );
 }

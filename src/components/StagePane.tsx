@@ -20,6 +20,7 @@ export default function StagePane({ design, scrubPos, onScrubChange, activeLine,
         <StageCanvas design={design} scrubPos={scrubPos} showDensity={showDensity} />
         <StatsChips design={design} />
         <button
+          type="button"
           className={`${styles.densityBtn}${showDensity ? ' ' + styles.densityOn : ''}`}
           onClick={onToggleDensity}
           title="Toggle the stitch-density heatmap"

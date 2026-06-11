@@ -1,6 +1,8 @@
-import { useState, useCallback, useRef } from 'react';
-import { run, designStats, toDST, svgToCode, NeedlescriptError } from './lib/index.ts';
-import type { StitchEvent, DesignStats, DensityResult } from './lib/index.ts';
+import { useReducer, useState, useCallback, useRef } from 'react';
+import { run, designStats, NeedlescriptError } from './lib/engine.ts';
+import type { StitchEvent, DesignStats, DensityResult } from './lib/engine.ts';
+import { toDST } from './lib/dst.ts';
+import { svgToCode } from './lib/svg-importer.ts';
 import { THREADS, SAFE_R, EXAMPLES } from './data.ts';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
@@ -37,22 +39,48 @@ const INITIAL_DESIGN: DesignState = {
 
 let msgId = 0;
 
+// Groups the three pieces of state that all change together when the
+// program runs: the compiled design, the console messages, and the
+// playback position.
+interface ProgramState {
+  design: DesignState;
+  messages: ConsoleMessage[];
+  scrubPos: number;
+}
+
+type ProgramAction =
+  | { type: 'run/success'; design: DesignState; scrubPos: number }
+  | { type: 'run/error' }
+  | { type: 'scrub'; pos: number }
+  | { type: 'msg/add'; text: string; msgType: ConsoleMessage['type'] };
+
+function programReducer(state: ProgramState, action: ProgramAction): ProgramState {
+  switch (action.type) {
+    case 'run/success':
+      return { ...state, design: action.design, scrubPos: action.scrubPos };
+    case 'run/error':
+      return { ...state, design: { ...state.design, ok: false, stats: null } };
+    case 'scrub':
+      return { ...state, scrubPos: action.pos };
+    case 'msg/add': {
+      const next = [...state.messages, { id: msgId++, text: action.text, type: action.msgType }];
+      return { ...state, messages: next.length > 40 ? next.slice(next.length - 40) : next };
+    }
+  }
+}
+
 export default function App() {
   const firstKey = Object.keys(EXAMPLES)[0];
   const [source, setSource] = useState(EXAMPLES[firstKey]);
-  const [design, setDesign] = useState<DesignState>(INITIAL_DESIGN);
-  const [messages, setMessages] = useState<ConsoleMessage[]>([]);
-  const [scrubPos, setScrubPos] = useState(0);
   const [fitMM, setFitMM] = useState(80);
   const [isDragging, setIsDragging] = useState(false);
   const [showDensity, setShowDensity] = useState(false);
+  const [program, dispatch] = useReducer(programReducer, { design: INITIAL_DESIGN, messages: [], scrubPos: 0 });
+  const { design, messages, scrubPos } = program;
   const svgFileRef = useRef<HTMLInputElement>(null);
 
   function addMsg(text: string, type: ConsoleMessage['type'] = 'info') {
-    setMessages(prev => {
-      const next = [...prev, { id: msgId++, text, type }];
-      return next.length > 40 ? next.slice(next.length - 40) : next;
-    });
+    dispatch({ type: 'msg/add', text, msgType: type });
   }
 
   const runProgram = useCallback((src: string, designName: string) => {
@@ -86,14 +114,13 @@ export default function App() {
       const newDesign: DesignState = {
         events: result.events, pts, marks, density: result.density, stats, warnings, name: designName, ok: true,
       };
-      setDesign(newDesign);
-      setScrubPos(pts.length);
+      dispatch({ type: 'run/success', design: newDesign, scrubPos: pts.length });
     } catch (err) {
       const msg = err instanceof NeedlescriptError || err instanceof Error
         ? err.message
         : String(err);
       addMsg(msg, 'err');
-      setDesign(prev => ({ ...prev, ok: false, stats: null }));
+      dispatch({ type: 'run/error' });
     }
   }, []);
 
@@ -233,7 +260,7 @@ export default function App() {
         <StagePane
           design={design}
           scrubPos={scrubPos}
-          onScrubChange={setScrubPos}
+          onScrubChange={(pos) => dispatch({ type: 'scrub', pos })}
           activeLine={activeLine}
           showDensity={showDensity}
           onToggleDensity={() => setShowDensity(v => !v)}

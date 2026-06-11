@@ -57,6 +57,7 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
   return (
     <div className={styles.playbar}>
       <button
+        type="button"
         className={styles.playBtn}
         onClick={handlePlayClick}
         aria-label={playing ? 'Pause stitch sequence' : 'Play stitch sequence'}
