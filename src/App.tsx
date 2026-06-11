@@ -273,6 +273,7 @@ export default function App() {
         ref={svgFileRef}
         type="file"
         accept=".svg,image/svg+xml"
+        aria-label="Import SVG file"
         style={{ display: 'none' }}
         onChange={handleFileInput}
       />

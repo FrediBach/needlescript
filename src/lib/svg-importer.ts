@@ -706,9 +706,9 @@ export function svgToCode(svgText: string, opts: ConvertOptions = {}): ConvertRe
       ignored[key] = (ignored[key] || 0) + 1;
       return;
     }
-    const subs = polys
-      .filter(pts => pts.length >= 2)
-      .map(pts => pts.map(p => matApply(m, p)));
+    const subs = polys.flatMap(pts =>
+      pts.length >= 2 ? [pts.map(p => matApply(m, p))] : []
+    );
     if (subs.length) shapes.push({ subpaths: subs, fill, stroke: p2.stroke });
   }
 

@@ -9,27 +9,47 @@ interface Props {
 }
 
 export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine }: Props) {
-  const [playing, setPlaying] = useState(false);
+  // Store *which* total value started playback rather than a plain boolean.
+  // When `total` changes (new design loaded), `playing` becomes false automatically
+  // during render — no useEffect needed to call setPlaying(false).
+  const [playingForTotal, setPlayingForTotal] = useState<number | null>(null);
+  const playing = playingForTotal === total;
   const playReqRef = useRef<number | null>(null);
 
   const stopPlay = useCallback(() => {
-    setPlaying(false);
+    setPlayingForTotal(null);
     if (playReqRef.current !== null) {
       cancelAnimationFrame(playReqRef.current);
       playReqRef.current = null;
     }
   }, []);
 
+  // Stable cleanup: cancels any in-flight rAF without touching state.
+  // playing is already derived from playingForTotal === total, so it
+  // auto-corrects to false during the render that sees the new total.
+  const cancelFrame = useCallback(() => {
+    if (playReqRef.current !== null) {
+      cancelAnimationFrame(playReqRef.current);
+      playReqRef.current = null;
+    }
+  }, []);
+
+  // When total changes (new design), cancel any in-flight animation frame.
+  // No state setter in the effect body — playing is derived, not reset here.
+  useEffect(() => {
+    return cancelFrame;
+  }, [total, cancelFrame]);
+
   const startPlay = useCallback(() => {
     if (total === 0) return;
     let pos = scrubPos >= total ? 0 : scrubPos;
     const perFrame = Math.max(1, Math.round(total / 420)); // ~7 s at 60 fps
-    setPlaying(true);
+    setPlayingForTotal(total);
     function step() {
       pos += perFrame;
       if (pos >= total) {
         onScrubChange(total);
-        setPlaying(false);
+        setPlayingForTotal(null);
         playReqRef.current = null;
         return;
       }
@@ -38,11 +58,6 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
     }
     playReqRef.current = requestAnimationFrame(step);
   }, [total, scrubPos, onScrubChange]);
-
-  // Stop playback if total changes (new design)
-  useEffect(() => {
-    stopPlay();
-  }, [total, stopPlay]);
 
   const handlePlayClick = useCallback(() => {
     if (playing) stopPlay();

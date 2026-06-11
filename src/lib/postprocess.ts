@@ -199,7 +199,7 @@ export function densityMap(
       if (taken.some(t => Math.abs(t.ix - c.ix) <= 2 && Math.abs(t.iy - c.iy) <= 2)) continue;
       taken.push(c);
       const lines = [...(grid.get(c.ix + ',' + c.iy)?.lines || new Map<number, number>())]
-        .sort((a, b) => b[1] - a[1])
+        .toSorted((a, b) => b[1] - a[1])
         .slice(0, 2)
         .map(l => l[0]);
       hotspots.push({

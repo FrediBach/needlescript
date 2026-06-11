@@ -25,9 +25,9 @@ export default function StatsChips({ design }: Props) {
 
   return (
     <div className={styles.stats}>
-      {chips.map((chip, i) => (
+      {chips.map((chip) => (
         <span
-          key={i}
+          key={chip.text}
           className={`${styles.chip}${chip.type ? ' ' + styles[chip.type] : ''}`}
         >
           {chip.text}

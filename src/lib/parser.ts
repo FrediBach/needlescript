@@ -5,6 +5,8 @@ import { NeedlescriptError } from './errors.ts';
 import { ALIASES, BUILTIN_ARITY, QWORD_BUILTINS, FUNC_ARITY, ZERO_FUNCS, RESERVED } from './commands.ts';
 import { didYouMean } from './suggestions.ts';
 
+const COMPARE_OPS = new Set(['<', '>', '=', '<=', '>=', '!=']);
+
 export function parse(tokens: Token[]): ASTNode[] {
   // Pre-scan procedure signatures so call arity is known at parse time.
   const procArity: Record<string, number> = {};
@@ -209,7 +211,7 @@ export function parse(tokens: Token[]): ASTNode[] {
     while (
       !atEnd() &&
       peek().t === 'op' &&
-      ['<', '>', '=', '<=', '>=', '!='].includes(peek().v as string)
+      COMPARE_OPS.has(peek().v as string)
     ) {
       const op = next().v as string;
       left = { k: 'bin', op, left, right: parseAdd() };
