@@ -8,9 +8,10 @@ interface Props {
   design: DesignState;
   scrubPos: number;
   onScrubChange: (v: number) => void;
+  activeLine: number | null;
 }
 
-export default function StagePane({ design, scrubPos, onScrubChange }: Props) {
+export default function StagePane({ design, scrubPos, onScrubChange, activeLine }: Props) {
   return (
     <section className={styles.pane}>
       <div className={styles.fabric}>
@@ -21,6 +22,7 @@ export default function StagePane({ design, scrubPos, onScrubChange }: Props) {
         total={design.pts.length}
         scrubPos={scrubPos}
         onScrubChange={onScrubChange}
+        activeLine={activeLine}
       />
     </section>
   );

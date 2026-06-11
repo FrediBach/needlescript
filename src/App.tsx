@@ -8,9 +8,16 @@ import EditorPane from './components/EditorPane.tsx';
 import StagePane from './components/StagePane.tsx';
 import LanguageReference from './components/LanguageReference.tsx';
 
+export interface DebugMark {
+  x: number;
+  y: number;
+  at: number; // index into pts after which the mark appears
+}
+
 export interface DesignState {
   events: StitchEvent[];
   pts: StitchEvent[];            // stitch + jump only
+  marks: DebugMark[];            // debug pins from the `mark` command
   stats: DesignStats | null;
   warnings: string[];
   name: string;
@@ -24,7 +31,7 @@ export interface ConsoleMessage {
 }
 
 const INITIAL_DESIGN: DesignState = {
-  events: [], pts: [], stats: null, warnings: [], name: 'bloom', ok: false,
+  events: [], pts: [], marks: [], stats: null, warnings: [], name: 'bloom', ok: false,
 };
 
 let msgId = 0;
@@ -50,7 +57,12 @@ export default function App() {
     const t0 = performance.now();
     try {
       const result = run(src);
-      const pts = result.events.filter(e => e.t === 'stitch' || e.t === 'jump');
+      const pts: StitchEvent[] = [];
+      const marks: DebugMark[] = [];
+      for (const e of result.events) {
+        if (e.t === 'stitch' || e.t === 'jump') pts.push(e);
+        else if (e.t === 'mark') marks.push({ x: e.x, y: e.y, at: pts.length });
+      }
       const stats = designStats(result.events);
       const warnings: string[] = [...result.warnings];
 
@@ -70,7 +82,7 @@ export default function App() {
       );
 
       const newDesign: DesignState = {
-        events: result.events, pts, stats, warnings, name: designName, ok: true,
+        events: result.events, pts, marks, stats, warnings, name: designName, ok: true,
       };
       setDesign(newDesign);
       setScrubPos(pts.length);
@@ -184,6 +196,12 @@ export default function App() {
     Promise.resolve().then(() => runProgram(EXAMPLES[firstKey], 'bloom'));
   }
 
+  // Source line currently sewing (only meaningful while scrubbed back / playing)
+  const activeLine =
+    design.ok && scrubPos > 0 && scrubPos < design.pts.length
+      ? design.pts[Math.min(scrubPos, design.pts.length) - 1].line ?? null
+      : null;
+
   return (
     <div
       className={styles.app}
@@ -208,11 +226,13 @@ export default function App() {
           onRun={handleRun}
           messages={messages}
           isDragging={isDragging}
+          activeLine={activeLine}
         />
         <StagePane
           design={design}
           scrubPos={scrubPos}
           onScrubChange={setScrubPos}
+          activeLine={activeLine}
         />
       </main>
 

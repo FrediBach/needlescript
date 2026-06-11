@@ -39,3 +39,8 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+.lineInfo {
+  color: var(--red);
+  font-weight: 600;
+}

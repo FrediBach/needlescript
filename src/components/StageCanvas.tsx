@@ -134,6 +134,27 @@ function draw(canvas: HTMLCanvasElement, design: DesignState, scrubPos: number, 
     ctx.arc(X(n.x), Y(n.y), 4.5 * dpr, 0, 6.2832);
     ctx.stroke();
   }
+
+  // Debug pins from the `mark` command (render-only, never exported)
+  const visibleMarks = design.marks.filter(mk => mk.at <= upto);
+  if (visibleMarks.length) {
+    const r = 6 * dpr;
+    ctx.font = `${9 * dpr}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    visibleMarks.forEach((mk, i) => {
+      const mx = X(mk.x), my = Y(mk.y);
+      ctx.beginPath();
+      ctx.arc(mx, my, r, 0, 6.2832);
+      ctx.fillStyle = 'rgba(255, 253, 247, 0.92)';
+      ctx.fill();
+      ctx.strokeStyle = '#C8472F';
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.stroke();
+      ctx.fillStyle = '#C8472F';
+      ctx.fillText(String(i + 1), mx, my + 0.5 * dpr);
+    });
+  }
 }
 
 function drawHoop(

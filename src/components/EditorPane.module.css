@@ -24,6 +24,14 @@
   flex-shrink: 0;
 }
 
+.editorWrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
 .editor {
   flex: 1;
   min-height: 0;
@@ -39,6 +47,19 @@
   caret-color: var(--gold);
   white-space: pre;
   overflow: auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* Source line currently sewing during playback */
+.lineHighlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(217, 164, 65, 0.13);
+  border-left: 2px solid var(--gold);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .editor::selection {

@@ -18,13 +18,14 @@ export interface Token {
   spAfter?: boolean;
 }
 
-export type EventType = 'stitch' | 'jump' | 'color' | 'trim';
+export type EventType = 'stitch' | 'jump' | 'color' | 'trim' | 'mark';
 
 export interface StitchEvent {
   t: EventType;
   x: number;
   y: number;
   c: number; // color index
+  line?: number; // source line that produced this event (debugging)
 }
 
 export interface RunResult {
@@ -55,9 +56,13 @@ export interface DesignStats {
 export type ASTNode =
   | { k: 'to'; name: string; params: string[]; body: ASTNode[]; line: number }
   | { k: 'repeat'; count: ExprNode; body: ASTNode[]; line: number }
+  | { k: 'while'; cond: ExprNode; body: ASTNode[]; line: number }
+  | { k: 'for'; varName: string; from: ExprNode; to: ExprNode; step: ExprNode; body: ASTNode[]; line: number }
   | { k: 'if'; cond: ExprNode; body: ASTNode[]; elseBody: ASTNode[] | null; line: number }
   | { k: 'make'; name: string; value: ExprNode; line: number }
-  | { k: 'cmd'; name: string; args: ExprNode[]; line: number }
+  | { k: 'local'; name: string; value: ExprNode; line: number }
+  | { k: 'output'; value: ExprNode | null; line: number } // value null = "exit"
+  | { k: 'cmd'; name: string; args: ExprNode[]; line: number; label?: string }
   | { k: 'call'; name: string; args: ExprNode[]; line: number };
 
 export type ExprNode =
@@ -65,7 +70,8 @@ export type ExprNode =
   | { k: 'var'; name: string; line: number }
   | { k: 'neg'; val: ExprNode; line: number }
   | { k: 'bin'; op: string; left: ExprNode; right: ExprNode }
-  | { k: 'func'; name: string; args: ExprNode[]; line: number };
+  | { k: 'func'; name: string; args: ExprNode[]; line: number }
+  | { k: 'callexpr'; name: string; args: ExprNode[]; line: number };
 
 // ---------- Error class ----------
 
@@ -91,6 +97,28 @@ export function makeRNG(seed: number): () => number {
   };
 }
 
+// ---------- Seeded value noise ----------
+// Smooth deterministic noise in [0, 1). Same seed → same field.
+
+function hash2(seed: number, ix: number, iy: number): number {
+  let h = (seed >>> 0) ^ Math.imul(ix, 0x27d4eb2d) ^ Math.imul(iy, 0x165667b1);
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+export function makeNoise(seed: number): (x: number, y?: number) => number {
+  const fade = (t: number) => t * t * (3 - 2 * t);
+  return (x: number, y = 0) => {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const u = fade(x - ix), v = fade(y - iy);
+    const a = hash2(seed, ix, iy), b = hash2(seed, ix + 1, iy);
+    const c = hash2(seed, ix, iy + 1), d = hash2(seed, ix + 1, iy + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  };
+}
+
 // ---------- Tokenizer ----------
 
 export function tokenize(src: string): Token[] {
@@ -106,11 +134,16 @@ export function tokenize(src: string): Token[] {
     if (c === ';') { while (i < src.length && src[i] !== '\n') i++; continue; }
     if (/\s/.test(c)) { i++; continue; }
     if ('[]()'.includes(c)) { tokens.push({ t: c as TokenType, line }); i++; continue; }
-    if ('+-*/<>='.includes(c)) {
-      const spBefore = i === 0 || /[\s\[\(]/.test(src[i - 1]);
-      const spAfter = i + 1 >= src.length || /\s/.test(src[i + 1]);
-      tokens.push({ t: 'op', v: c, line, spBefore, spAfter });
-      i++;
+    if ('+-*/<>=!'.includes(c)) {
+      const spBefore = i === 0 || /[\s[(]/.test(src[i - 1]);
+      let op = c;
+      if ((c === '<' || c === '>' || c === '!') && src[i + 1] === '=') op = c + '=';
+      else if (c === '!')
+        throw new NeedlescriptError('Unexpected character "!" — use != to compare', line);
+      const after = i + op.length;
+      const spAfter = after >= src.length || /\s/.test(src[after]);
+      tokens.push({ t: 'op', v: op, line, spBefore, spAfter });
+      i = after;
       continue;
     }
     if (isDigit(c) || (c === '.' && i + 1 < src.length && isDigit(src[i + 1]))) {
@@ -161,20 +194,73 @@ export const ALIASES: Record<string, string> = {
 export const BUILTIN_ARITY: Record<string, number> = {
   fd: 1, bk: 1, rt: 1, lt: 1,
   up: 0, down: 0, home: 0, cs: 0,
-  setxy: 2, seth: 1,
+  setxy: 2, setx: 1, sety: 1, seth: 1,
+  arc: 2, push: 0, pop: 0,
   stitchlen: 1, satin: 1, density: 1,
   bean: 1, estitch: 1,
   beginfill: 0, endfill: 0, fillangle: 1, fillspacing: 1, filllen: 1,
   lock: 1,
   color: 1, stop: 0, trim: 0,
-  seed: 1, print: 1,
+  seed: 1, print: 1, mark: 0, assert: 1,
 };
 
 export const FUNC_ARITY: Record<string, number> = {
   random: 1, sin: 1, cos: 1, sqrt: 1, abs: 1, round: 1, mod: 2,
+  floor: 1, ceil: 1, min: 2, max: 2, pow: 2, atan: 2,
+  noise: 1, noise2: 2, distance: 2, towards: 2,
+  not: 1,
 };
 
 export const ZERO_FUNCS = new Set(['repcount', 'xcor', 'ycor', 'heading']);
+
+/** Words with special meaning that user procedures must not shadow. */
+export const RESERVED = new Set<string>([
+  'to', 'end', 'repeat', 'if', 'else', 'make', 'local',
+  'while', 'for', 'output', 'op', 'exit', 'and', 'or',
+  ...Object.keys(ALIASES),
+  ...Object.keys(BUILTIN_ARITY),
+  ...Object.keys(FUNC_ARITY),
+  ...ZERO_FUNCS,
+]);
+
+// ---------- "Did you mean?" suggestions ----------
+
+function editDistance(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 2) return 3; // early out — we only care up to 2
+  let prev = new Array<number>(n + 1);
+  let cur = new Array<number>(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(
+        prev[j] + 1,
+        cur[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    [prev, cur] = [cur, prev];
+  }
+  return prev[n];
+}
+
+export function suggest(name: string, candidates: Iterable<string>): string | null {
+  const maxD = name.length <= 3 ? 1 : 2;
+  let best: string | null = null;
+  let bestD = maxD + 1;
+  for (const c of candidates) {
+    if (c === name) continue;
+    const d = editDistance(name, c);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return bestD <= maxD ? best : null;
+}
+
+function didYouMean(name: string, candidates: Iterable<string>): string {
+  const s = suggest(name, candidates);
+  return s ? ` — did you mean "${s}"?` : '';
+}
 
 // ---------- Parser ----------
 
@@ -233,12 +319,7 @@ export function parse(tokens: Token[]): ASTNode[] {
       const nameTok = next();
       if (!nameTok || nameTok.t !== 'word')
         throw new NeedlescriptError('"to" needs a procedure name', tok.line);
-      if (
-        BUILTIN_ARITY[nameTok.v as string] !== undefined ||
-        ALIASES[nameTok.v as string] ||
-        nameTok.v === 'repeat' ||
-        nameTok.v === 'to'
-      )
+      if (RESERVED.has(nameTok.v as string))
         throw new NeedlescriptError(
           `"${nameTok.v}" is a built-in word and can't be redefined`,
           tok.line,
@@ -261,6 +342,28 @@ export function parse(tokens: Token[]): ASTNode[] {
       return { k: 'repeat', count, body, line: tok.line };
     }
 
+    if (name === 'while') {
+      next();
+      const cond = parseExpr();
+      const body = parseBracketBlock();
+      return { k: 'while', cond, body, line: tok.line };
+    }
+
+    if (name === 'for') {
+      next();
+      const nm = next();
+      if (!nm || nm.t !== 'qword')
+        throw new NeedlescriptError(
+          'for needs a quoted counter name, e.g.  for "i 0 10 1 [ … ]',
+          tok.line,
+        );
+      const from = parseExpr();
+      const to = parseExpr();
+      const step = parseExpr();
+      const body = parseBracketBlock();
+      return { k: 'for', varName: nm.v as string, from, to, step, body, line: tok.line };
+    }
+
     if (name === 'if') {
       next();
       const cond = parseExpr();
@@ -273,16 +376,36 @@ export function parse(tokens: Token[]): ASTNode[] {
       return { k: 'if', cond, body, elseBody, line: tok.line };
     }
 
-    if (name === 'make') {
+    if (name === 'make' || name === 'local') {
       next();
       const nm = next();
       if (!nm || nm.t !== 'qword')
-        throw new NeedlescriptError('make needs a quoted name, e.g.  make "size 10', tok.line);
+        throw new NeedlescriptError(
+          `${name} needs a quoted name, e.g.  ${name} "size 10`,
+          tok.line,
+        );
       const value = parseExpr();
-      return { k: 'make', name: nm.v as string, value, line: tok.line };
+      return { k: name as 'make' | 'local', name: nm.v as string, value, line: tok.line };
+    }
+
+    if (name === 'output' || name === 'op') {
+      next();
+      return { k: 'output', value: parseExpr(), line: tok.line };
+    }
+
+    if (name === 'exit') {
+      next();
+      return { k: 'output', value: null, line: tok.line };
     }
 
     const canonical = ALIASES[name] || name;
+    if (canonical === 'print') {
+      next();
+      // Optional label:  print "radius :r
+      let label: string | undefined;
+      if (!atEnd() && peek().t === 'qword') label = next().v as string;
+      return { k: 'cmd', name: 'print', args: [parseExpr()], line: tok.line, label };
+    }
     if (BUILTIN_ARITY[canonical] !== undefined) {
       next();
       const args: ExprNode[] = [];
@@ -297,14 +420,39 @@ export function parse(tokens: Token[]): ASTNode[] {
       return { k: 'call', name, args, line: tok.line };
     }
 
-    throw new NeedlescriptError(`Unknown command "${name}"`, tok.line);
+    throw new NeedlescriptError(
+      `Unknown command "${name}"${didYouMean(name, [...RESERVED, ...Object.keys(procArity)])}`,
+      tok.line,
+    );
   }
 
-  function parseExpr(): ExprNode { return parseCompare(); }
+  function parseExpr(): ExprNode { return parseOr(); }
+
+  function parseOr(): ExprNode {
+    let left = parseAnd();
+    while (!atEnd() && peek().t === 'word' && peek().v === 'or') {
+      next();
+      left = { k: 'bin', op: 'or', left, right: parseAnd() };
+    }
+    return left;
+  }
+
+  function parseAnd(): ExprNode {
+    let left = parseCompare();
+    while (!atEnd() && peek().t === 'word' && peek().v === 'and') {
+      next();
+      left = { k: 'bin', op: 'and', left, right: parseCompare() };
+    }
+    return left;
+  }
 
   function parseCompare(): ExprNode {
     let left = parseAdd();
-    while (!atEnd() && peek().t === 'op' && '<>='.includes(peek().v as string)) {
+    while (
+      !atEnd() &&
+      peek().t === 'op' &&
+      ['<', '>', '=', '<=', '>=', '!='].includes(peek().v as string)
+    ) {
       const op = next().v as string;
       left = { k: 'bin', op, left, right: parseAdd() };
     }
@@ -367,6 +515,21 @@ export function parse(tokens: Token[]): ASTNode[] {
         next();
         return { k: 'func', name: w, args: [], line: tok.line };
       }
+      // User procedure used as a reporter (must "output" a value)
+      if (procArity[w] !== undefined) {
+        next();
+        const args: ExprNode[] = [];
+        for (let a = 0; a < procArity[w]; a++) args.push(parseExpr());
+        return { k: 'callexpr', name: w, args, line: tok.line };
+      }
+      throw new NeedlescriptError(
+        `"${w}" is not a value${didYouMean(w, [
+          ...Object.keys(FUNC_ARITY),
+          ...ZERO_FUNCS,
+          ...Object.keys(procArity),
+        ])}`,
+        tok.line,
+      );
     }
     throw new NeedlescriptError(
       `Expected a value, got "${tok.v !== undefined ? tok.v : tok.t}"`,
@@ -412,13 +575,15 @@ class Machine {
   warnings: string[] = [];
   started = false;
   tinyDropped = 0;
+  currentLine: number | undefined = undefined; // source line being executed
+  stateStack: { x: number; y: number; heading: number; penDown: boolean }[] = [];
 
   _push(t: EventType, x: number, y: number) {
     if (this.events.length >= LIMITS.maxStitches)
       throw new NeedlescriptError(
         `Design exceeds ${LIMITS.maxStitches.toLocaleString()} stitches — stopped. Reduce repeats, raise stitchlen, or raise fillspacing.`,
       );
-    this.events.push({ t, x, y, c: this.colorIdx });
+    this.events.push({ t, x, y, c: this.colorIdx, line: this.currentLine });
     if (t === 'stitch' || t === 'jump') this.lastEmit = { x, y };
   }
 
@@ -440,6 +605,52 @@ class Machine {
     if (!isFinite(dist)) throw new NeedlescriptError('fd/bk got a non-numeric distance');
     const rad = this.heading * Math.PI / 180;
     this.travel(this.x + Math.sin(rad) * dist, this.y + Math.cos(rad) * dist, Math.abs(dist));
+  }
+
+  /**
+   * Sew an arc: turn `deg` degrees in total (positive = right/clockwise,
+   * negative = left) while moving along a circle of the given radius.
+   * Decomposed into half-turn / chord / half-turn steps so every stitch
+   * mode (running, satin, bean, estitch) works on curves.
+   */
+  arc(deg: number, radius: number) {
+    if (!isFinite(deg) || !isFinite(radius))
+      throw new NeedlescriptError('arc got a non-numeric angle or radius');
+    const r = Math.abs(radius);
+    if (Math.abs(deg) < 1e-9 || r < 1e-9) return;
+    const arcLen = Math.abs(deg) * Math.PI / 180 * r;
+    const eff = Math.min(Math.max(this.stitchLen, LIMITS.minStitch), LIMITS.maxStitch);
+    const steps = Math.max(1, Math.ceil(Math.max(arcLen / eff, Math.abs(deg) / 15)));
+    const stepAng = deg / steps;
+    const chord = 2 * r * Math.sin(Math.abs(stepAng) * Math.PI / 360);
+    for (let s = 0; s < steps; s++) {
+      this.heading = (this.heading + stepAng / 2) % 360;
+      const rad = this.heading * Math.PI / 180;
+      this.travel(this.x + Math.sin(rad) * chord, this.y + Math.cos(rad) * chord, chord);
+      this.heading = (this.heading + stepAng / 2) % 360;
+    }
+  }
+
+  pushState() {
+    if (this.stateStack.length >= 500)
+      throw new NeedlescriptError('push/pop stack is too deep (max 500 saved states)');
+    this.stateStack.push({ x: this.x, y: this.y, heading: this.heading, penDown: this.penDown });
+  }
+
+  popState() {
+    const s = this.stateStack.pop();
+    if (!s) {
+      this.warnings.push('pop ignored — nothing was saved with push');
+      return;
+    }
+    this.penDown = false; // travel back as a jump, never sewing
+    this.setXY(s.x, s.y);
+    this.penDown = s.penDown;
+    this.heading = s.heading;
+  }
+
+  markHere() {
+    this._push('mark', this.x, this.y);
   }
 
   travel(nx: number, ny: number, dist: number) {
@@ -779,8 +990,8 @@ export function applyLocks(events: StitchEvent[], L: number): LockResult {
     if (l < 0.2) return;
     const ux = (toward.x - at.x) / d, uy = (toward.y - at.y) / d;
     for (let k = 0; k < 2; k++) {
-      out.push({ t: 'stitch', x: at.x + ux * l, y: at.y + uy * l, c });
-      out.push({ t: 'stitch', x: at.x, y: at.y, c });
+      out.push({ t: 'stitch', x: at.x + ux * l, y: at.y + uy * l, c, line: at.line });
+      out.push({ t: 'stitch', x: at.x, y: at.y, c, line: at.line });
     }
     locks++;
   }
@@ -825,6 +1036,7 @@ export function designStats(events: StitchEvent[]): DesignStats {
   let px: number | null = null, py: number | null = null;
   const colorSet = new Set<number>();
   for (const e of events) {
+    if (e.t === 'mark') continue; // debug pins are render-only
     if (e.t === 'color') { colors++; px = e.x; py = e.y; continue; }
     if (e.t === 'trim') { trims++; continue; }
     if (e.x < minX) minX = e.x; if (e.x > maxX) maxX = e.x;
@@ -862,13 +1074,23 @@ export interface RunOptions {
   seed?: number;
 }
 
+/** Thrown by `output` / `exit` to unwind to the enclosing procedure call. */
+class ReturnSignal {
+  readonly value: number | undefined;
+  constructor(value: number | undefined) {
+    this.value = value;
+  }
+}
+
 export function run(source: string, opts: RunOptions = {}): RunResult {
   const tokens = tokenize(source);
   const program = parse(tokens);
   const m = new Machine();
   const globals: Record<string, number> = Object.create(null);
   const procs: Record<string, ASTNode & { k: 'to' }> = Object.create(null);
-  let rng = makeRNG(opts.seed !== undefined ? opts.seed : 42);
+  const seed0 = opts.seed !== undefined ? opts.seed : 42;
+  let rng = makeRNG(seed0);
+  let noise = makeNoise(seed0);
   let ops = 0;
   const printed: string[] = [];
 
@@ -880,19 +1102,37 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       );
   }
 
-  function evalExpr(node: ExprNode, env: Record<string, number> | null, repcount: number): number {
+  function evalExpr(
+    node: ExprNode,
+    env: Record<string, number> | null,
+    repcount: number,
+    depth: number,
+  ): number {
     tick((node as { line?: number }).line);
     switch (node.k) {
       case 'num': return node.v;
       case 'var': {
         if (env && node.name in env) return env[node.name];
         if (node.name in globals) return globals[node.name];
-        throw new NeedlescriptError(`Unknown variable :${node.name}`, node.line);
+        throw new NeedlescriptError(
+          `Unknown variable :${node.name}${didYouMean(node.name, [
+            ...(env ? Object.keys(env) : []),
+            ...Object.keys(globals),
+          ])}`,
+          node.line,
+        );
       }
-      case 'neg': return -evalExpr(node.val, env, repcount);
+      case 'neg': return -evalExpr(node.val, env, repcount, depth);
       case 'bin': {
-        const a = evalExpr(node.left, env, repcount);
-        const b = evalExpr(node.right, env, repcount);
+        // and / or short-circuit so guards like  :i > 0 and 10 / :i > 2  are safe
+        if (node.op === 'and')
+          return evalExpr(node.left, env, repcount, depth) !== 0 &&
+            evalExpr(node.right, env, repcount, depth) !== 0 ? 1 : 0;
+        if (node.op === 'or')
+          return evalExpr(node.left, env, repcount, depth) !== 0 ||
+            evalExpr(node.right, env, repcount, depth) !== 0 ? 1 : 0;
+        const a = evalExpr(node.left, env, repcount, depth);
+        const b = evalExpr(node.right, env, repcount, depth);
         switch (node.op) {
           case '+': return a + b;
           case '-': return a - b;
@@ -900,12 +1140,15 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           case '/': if (b === 0) throw new NeedlescriptError('Division by zero'); return a / b;
           case '<': return a < b ? 1 : 0;
           case '>': return a > b ? 1 : 0;
+          case '<=': return a <= b ? 1 : 0;
+          case '>=': return a >= b ? 1 : 0;
           case '=': return Math.abs(a - b) < 1e-9 ? 1 : 0;
+          case '!=': return Math.abs(a - b) < 1e-9 ? 0 : 1;
         }
         throw new NeedlescriptError('Unknown operator');
       }
       case 'func': {
-        const args = node.args.map(a => evalExpr(a, env, repcount));
+        const args = node.args.map(a => evalExpr(a, env, repcount, depth));
         switch (node.name) {
           case 'random': return rng() * args[0];
           case 'sin': return Math.sin(args[0] * Math.PI / 180);
@@ -915,7 +1158,28 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return Math.sqrt(args[0]);
           case 'abs': return Math.abs(args[0]);
           case 'round': return Math.round(args[0]);
+          case 'floor': return Math.floor(args[0]);
+          case 'ceil': return Math.ceil(args[0]);
+          case 'min': return Math.min(args[0], args[1]);
+          case 'max': return Math.max(args[0], args[1]);
+          case 'pow': {
+            const v = Math.pow(args[0], args[1]);
+            if (!isFinite(v))
+              throw new NeedlescriptError(
+                `pow ${formatNum(args[0])} ${formatNum(args[1])} is not a finite number`,
+                node.line,
+              );
+            return v;
+          }
           case 'mod': return ((args[0] % args[1]) + args[1]) % args[1];
+          case 'not': return args[0] === 0 ? 1 : 0;
+          // heading-convention angle of the vector (x, y): 0 = up/north, clockwise
+          case 'atan': return (Math.atan2(args[0], args[1]) * 180 / Math.PI + 360) % 360;
+          case 'noise': return noise(args[0]);
+          case 'noise2': return noise(args[0], args[1]);
+          case 'distance': return Math.hypot(args[0] - m.x, args[1] - m.y);
+          case 'towards':
+            return (Math.atan2(args[0] - m.x, args[1] - m.y) * 180 / Math.PI + 360) % 360;
           case 'repcount': return repcount;
           case 'xcor': return m.x;
           case 'ycor': return m.y;
@@ -923,7 +1187,40 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         }
         throw new NeedlescriptError(`Unknown function ${node.name}`, node.line);
       }
+      case 'callexpr': {
+        const v = callProc(node.name, node.args, env, repcount, depth, node.line);
+        if (v === undefined)
+          throw new NeedlescriptError(
+            `"${node.name}" was used as a value but it never reached "output"`,
+            node.line,
+          );
+        return v;
+      }
     }
+  }
+
+  function callProc(
+    name: string,
+    argNodes: ExprNode[],
+    env: Record<string, number> | null,
+    repcount: number,
+    depth: number,
+    line?: number,
+  ): number | undefined {
+    const proc = procs[name];
+    if (!proc)
+      throw new NeedlescriptError(`Procedure "${name}" is used before it is defined`, line);
+    if (depth >= LIMITS.maxCallDepth)
+      throw new NeedlescriptError(`Too much recursion in "${name}"`, line);
+    const newEnv: Record<string, number> = Object.create(null);
+    proc.params.forEach((p, i) => { newEnv[p] = evalExpr(argNodes[i], env, repcount, depth); });
+    try {
+      execBlock(proc.body, newEnv, repcount, depth + 1);
+    } catch (e) {
+      if (e instanceof ReturnSignal) return e.value;
+      throw e;
+    }
+    return undefined;
   }
 
   function execBlock(
@@ -944,30 +1241,76 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     tick(st.line);
     switch (st.k) {
       case 'to': procs[st.name] = st; return;
-      case 'make': globals[st.name] = evalExpr(st.value, env, repcount); return;
+      case 'make': {
+        const v = evalExpr(st.value, env, repcount, depth);
+        // Prefer an existing local (procedure parameter or "local") over a global.
+        if (env && st.name in env) env[st.name] = v;
+        else globals[st.name] = v;
+        return;
+      }
+      case 'local': {
+        if (!env)
+          throw new NeedlescriptError(
+            'local can only be used inside a procedure — use make at the top level',
+            st.line,
+          );
+        env[st.name] = evalExpr(st.value, env, repcount, depth);
+        return;
+      }
       case 'repeat': {
-        const n = Math.floor(evalExpr(st.count, env, repcount));
+        const n = Math.floor(evalExpr(st.count, env, repcount, depth));
         if (n > 200000) throw new NeedlescriptError(`repeat count too large (${n})`, st.line);
         for (let i = 1; i <= n; i++) execBlock(st.body, env, i, depth);
         return;
       }
+      case 'while': {
+        while (evalExpr(st.cond, env, repcount, depth) !== 0) {
+          tick(st.line); // ops budget catches endless loops
+          execBlock(st.body, env, repcount, depth);
+        }
+        return;
+      }
+      case 'for': {
+        const from = evalExpr(st.from, env, repcount, depth);
+        const to = evalExpr(st.to, env, repcount, depth);
+        const step = evalExpr(st.step, env, repcount, depth);
+        if (step === 0) throw new NeedlescriptError('for step can\u2019t be 0', st.line);
+        if ((to - from) / step > 200000)
+          throw new NeedlescriptError('for runs too many times (over 200,000)', st.line);
+        const scope = env ?? globals;
+        const had = st.varName in scope;
+        const prev = scope[st.varName];
+        for (let v = from; step > 0 ? v <= to + 1e-9 : v >= to - 1e-9; v += step) {
+          tick(st.line);
+          scope[st.varName] = v;
+          execBlock(st.body, env, repcount, depth);
+        }
+        if (had) scope[st.varName] = prev;
+        else delete scope[st.varName];
+        return;
+      }
       case 'if': {
-        if (evalExpr(st.cond, env, repcount) !== 0) execBlock(st.body, env, repcount, depth);
+        if (evalExpr(st.cond, env, repcount, depth) !== 0) execBlock(st.body, env, repcount, depth);
         else if (st.elseBody) execBlock(st.elseBody, env, repcount, depth);
         return;
       }
+      case 'output': {
+        if (depth === 0)
+          throw new NeedlescriptError(
+            `"${st.value ? 'output' : 'exit'}" can only be used inside a procedure`,
+            st.line,
+          );
+        throw new ReturnSignal(
+          st.value ? evalExpr(st.value, env, repcount, depth) : undefined,
+        );
+      }
       case 'call': {
-        const proc = procs[st.name];
-        if (!proc) throw new NeedlescriptError(`Procedure "${st.name}" is used before it is defined`, st.line);
-        if (depth >= LIMITS.maxCallDepth)
-          throw new NeedlescriptError(`Too much recursion in "${st.name}"`, st.line);
-        const newEnv: Record<string, number> = Object.create(null);
-        proc.params.forEach((p, i) => { newEnv[p] = evalExpr(st.args[i], env, repcount); });
-        execBlock(proc.body, newEnv, repcount, depth + 1);
+        callProc(st.name, st.args, env, repcount, depth, st.line);
         return;
       }
       case 'cmd': {
-        const a = st.args.map(x => evalExpr(x, env, repcount));
+        m.currentLine = st.line;
+        const a = st.args.map(x => evalExpr(x, env, repcount, depth));
         switch (st.name) {
           case 'fd': m.forward(a[0]); return;
           case 'bk': m.forward(-a[0]); return;
@@ -978,7 +1321,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           case 'home': m.setXY(0, 0); m.heading = 0; return;
           case 'cs': return;
           case 'setxy': m.setXY(a[0], a[1]); return;
+          case 'setx': m.setXY(a[0], m.y); return;
+          case 'sety': m.setXY(m.x, a[0]); return;
           case 'seth': m.heading = a[0] % 360; return;
+          case 'arc': m.arc(a[0], a[1]); return;
+          case 'push': m.pushState(); return;
+          case 'pop': m.popState(); return;
           case 'stitchlen': {
             const v = a[0];
             if (v < LIMITS.minStitch || v > LIMITS.maxStitch)
@@ -1041,8 +1389,20 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           case 'color': m.colorChange(a[0]); return;
           case 'stop': m.colorChange(m.colorIdx + 1); return;
           case 'trim': m.trimThread(); return;
-          case 'seed': rng = makeRNG(Math.floor(a[0])); return;
-          case 'print': printed.push(formatNum(a[0])); return;
+          case 'seed': {
+            const s = Math.floor(a[0]);
+            rng = makeRNG(s);
+            noise = makeNoise(s);
+            return;
+          }
+          case 'print':
+            printed.push((st.label ? st.label + ': ' : '') + formatNum(a[0]));
+            return;
+          case 'mark': m.markHere(); return;
+          case 'assert':
+            if (a[0] === 0)
+              throw new NeedlescriptError('assert failed — the condition is 0 (false)', st.line);
+            return;
         }
         throw new NeedlescriptError(`Unhandled command ${st.name}`, st.line);
       }

@@ -59,6 +59,7 @@ export function toDST(events: StitchEvent[], label?: string): Uint8Array {
   }
 
   for (const e of events) {
+    if (e.t === 'mark') continue; // debug pins are never exported
     if (e.t === 'color') {
       records.push([0, 0, 0b11000011]);
       recColors++;

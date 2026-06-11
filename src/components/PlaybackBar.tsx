@@ -5,9 +5,10 @@ interface Props {
   total: number;
   scrubPos: number;
   onScrubChange: (v: number) => void;
+  activeLine: number | null;
 }
 
-export default function PlaybackBar({ total, scrubPos, onScrubChange }: Props) {
+export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine }: Props) {
   const [playing, setPlaying] = useState(false);
   const playReqRef = useRef<number | null>(null);
 
@@ -73,6 +74,7 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange }: Props) {
       />
       <span className={styles.counter}>
         {scrubPos.toLocaleString()} / {total.toLocaleString()} stitches
+        {activeLine !== null && <span className={styles.lineInfo}> · line {activeLine}</span>}
       </span>
     </div>
   );

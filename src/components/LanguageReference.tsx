@@ -8,8 +8,10 @@ export default function LanguageReference() {
         <h3>Movement (mm · heading 0 = up, clockwise)</h3>
         <div><code>fd <i>n</i> · bk <i>n</i></code><span>sew forward / back; long moves auto-split at stitchlen</span></div>
         <div><code>rt <i>deg</i> · lt <i>deg</i></code><span>turn right / left</span></div>
+        <div><code>arc <i>deg radius</i></code><span>sew along a circle: turn <i>deg</i> in total (negative = left) on a circle of <i>radius</i>; works with satin/bean too</span></div>
         <div><code>up · down</code><span>needle up = travel as jump · needle down = sew</span></div>
-        <div><code>setxy <i>x y</i> · seth <i>deg</i> · home</code><span>position absolutely, set heading, return to 0 0</span></div>
+        <div><code>setxy <i>x y</i> · setx <i>x</i> · sety <i>y</i> · seth <i>deg</i> · home</code><span>position absolutely, set heading, return to 0 0</span></div>
+        <div><code>push · pop</code><span>save the needle state (position, heading, pen) · jump back to it — branches without sewing back</span></div>
 
         <h3>Thread &amp; stitch quality</h3>
         <div><code>stitchlen <i>mm</i></code><span>running-stitch length, clamped 0.4–12 (default 2.5)</span></div>
@@ -51,9 +53,13 @@ export default function LanguageReference() {
 
         <h3>Control</h3>
         <div><code>repeat <i>n</i> [ … ]</code><span>loop; <code>repcount</code> is the 1-based counter</span></div>
-        <div><code>if <i>cond</i> [ … ] else [ … ]</code><span>compare with <code>&lt; &gt; =</code> (0 is false)</span></div>
+        <div><code>while <i>cond</i> [ … ]</code><span>loop while the condition is true (non-zero)</span></div>
+        <div><code>for "i <i>from to step</i> [ … ]</code><span>counted loop; read the counter with <code>:i</code></span></div>
+        <div><code>if <i>cond</i> [ … ] else [ … ]</code><span>compare with <code>&lt; &gt; = &lt;= &gt;= !=</code>, combine with <code>and or not</code> (0 is false)</span></div>
         <div><code>to <i>name</i> :a :b … end</code><span>define a procedure with parameters</span></div>
+        <div><code>output <i>expr</i> · exit</code><span>return a value from a procedure (use it like <code>fd double 5</code>) · leave the procedure early</span></div>
         <div><code>make "x <i>expr</i> · :x</code><span>set and read variables</span></div>
+        <div><code>local "x <i>expr</i></code><span>a variable that exists only inside the current procedure</span></div>
 
         <h3>SVG import</h3>
         <div>
@@ -68,8 +74,17 @@ export default function LanguageReference() {
 
         <h3>Values</h3>
         <div><code>random <i>n</i></code><span>0…n — reproducible; reseed with <code>seed <i>n</i></code></span></div>
-        <div><code>sin cos sqrt abs round mod</code><span>math (degrees); also <code>xcor ycor heading</code></span></div>
-        <div><code>print <i>expr</i> · ; comment</code><span>log a value to the console · rest of line ignored</span></div>
+        <div><code>noise <i>x</i> · noise2 <i>x y</i></code><span>smooth seeded noise 0…1 — sample slowly (e.g. <code>noise2 xcor / 18 ycor / 18</code>) for organic drift</span></div>
+        <div><code>sin cos sqrt abs round mod</code><span>math (degrees); also <code>floor ceil min max pow</code></span></div>
+        <div><code>atan <i>x y</i> · towards <i>x y</i> · distance <i>x y</i></code><span>heading of a vector · heading and distance from the needle to a point</span></div>
+        <div><code>xcor ycor heading repcount</code><span>where the needle is right now</span></div>
+
+        <h3>Debugging</h3>
+        <div><code>print <i>expr</i> · print "label <i>expr</i></code><span>log a value to the console, optionally with a label</span></div>
+        <div><code>mark</code><span>drop a numbered pin on the preview at the needle — never exported to the machine</span></div>
+        <div><code>assert <i>cond</i></code><span>stop with an error (and line number) if the condition is false</span></div>
+        <div><code>playback scrubber</code><span>scrub or play the stitch sequence — the source line being sewn is highlighted in the editor</span></div>
+        <div><code>; comment</code><span>rest of line ignored</span></div>
       </div>
     </details>
   );

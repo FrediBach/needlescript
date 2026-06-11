@@ -8,10 +8,16 @@ interface Props {
   onRun: () => void;
   messages: ConsoleMessage[];
   isDragging: boolean;
+  activeLine: number | null; // source line currently sewing (playback), 1-based
 }
 
-export default function EditorPane({ source, onSourceChange, onRun, messages, isDragging }: Props) {
+// Must match .editor in EditorPane.module.css: font-size 13px × line-height 1.55, padding-top 8px
+const LINE_HEIGHT = 13 * 1.55;
+const PADDING_TOP = 8;
+
+export default function EditorPane({ source, onSourceChange, onRun, messages, isDragging, activeLine }: Props) {
   const [replValue, setReplValue] = useState('');
+  const [scrollTop, setScrollTop] = useState(0);
   const replHistoryRef = useRef<string[]>([]);
   const replIdxRef = useRef(-1);
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -67,18 +73,31 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
     }
   }, [replValue, source, onSourceChange, onRun]);
 
+  const highlightTop =
+    activeLine !== null ? PADDING_TOP + (activeLine - 1) * LINE_HEIGHT - scrollTop : 0;
+
   return (
     <section className={`${styles.pane} ${isDragging ? styles.dragging : ''}`}>
       <div className={styles.paneLabel}>pattern</div>
-      <textarea
-        ref={editorRef}
-        className={styles.editor}
-        value={source}
-        onChange={e => onSourceChange(e.target.value)}
-        onKeyDown={handleEditorKeyDown}
-        spellCheck={false}
-        aria-label="Needlescript program"
-      />
+      <div className={styles.editorWrap}>
+        {activeLine !== null && (
+          <div
+            className={styles.lineHighlight}
+            style={{ top: `${highlightTop}px`, height: `${LINE_HEIGHT}px` }}
+            aria-hidden="true"
+          />
+        )}
+        <textarea
+          ref={editorRef}
+          className={styles.editor}
+          value={source}
+          onChange={e => onSourceChange(e.target.value)}
+          onKeyDown={handleEditorKeyDown}
+          onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
+          spellCheck={false}
+          aria-label="Needlescript program"
+        />
+      </div>
 
       <div className={styles.console} aria-live="polite">
         {messages.map(msg => (
