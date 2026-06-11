@@ -1,0 +1,116 @@
+// Shared constants for the Needlescript playground UI
+
+export const THREADS: string[] = [
+  '#C8472F', // 0 — red
+  '#31604F', // 1 — forest
+  '#3A4E8C', // 2 — blue
+  '#D9A441', // 3 — gold
+  '#8C4A6B', // 4 — mauve
+  '#2B2B2B', // 5 — black
+  '#5E8F8C', // 6 — teal
+  '#B8651B', // 7 — amber
+];
+
+export const HOOP_R = 50;   // 100 mm hoop, radius in mm
+export const SAFE_R = 47;   // sewable field inside the hoop
+
+export const EXAMPLES: Record<string, string> = {
+  'bloom — rose of circles': [
+    '; twelve overlapping circles make a rose',
+    'stitchlen 2.2',
+    'repeat 12 [',
+    '  repeat 36 [ fd 3.4 rt 10 ]',
+    '  rt 30',
+    ']',
+  ].join('\n'),
+  'wreath — leaf procedure': [
+    '; a leaf is two 90-degree arcs',
+    'to leaf :s',
+    '  repeat 2 [',
+    '    repeat 30 [ fd :s rt 3 ]',
+    '    rt 90',
+    '  ]',
+    'end',
+    '',
+    'repeat 8 [ leaf 1.2 rt 45 ]',
+  ].join('\n'),
+  'wander — bounded random walk': [
+    '; a random walk that turns back at the edge.',
+    '; change the seed for a new design.',
+    'seed 11',
+    'stitchlen 2',
+    'repeat 420 [',
+    '  fd 2.6',
+    '  rt random 70 - 35',
+    '  if sqrt ( xcor * xcor + ycor * ycor ) > 36 [',
+    '    rt 140 + random 80',
+    '  ]',
+    ']',
+  ].join('\n'),
+  'star — satin stitch': [
+    '; satin makes a zigzag column 3 mm wide',
+    'up setxy -6 -21 down',
+    'satin 3',
+    'repeat 5 [ fd 42 rt 144 ]',
+    'satin 0',
+  ].join('\n'),
+  'badge — tatami fill, bean border': [
+    '; trace a boundary between beginfill/endfill,',
+    '; then retrace it with a bold triple-run line',
+    'fillangle 30',
+    'up setxy -26 -15 down',
+    'beginfill',
+    '  repeat 6 [ fd 30 rt 60 ]',
+    'endfill',
+    '',
+    'color 3',
+    'bean 3',
+    'repeat 6 [ fd 30 rt 60 ]',
+    'bean 1',
+  ].join('\n'),
+  'sampler — four line weights': [
+    '; running, bean, satin, blanket',
+    'stitchlen 2.5',
+    'up setxy -30 27 seth 90 down',
+    'fd 60',
+    'up setxy -30 10 seth 90 down',
+    'bean 3 fd 60 bean 1',
+    'up setxy -30 -8 seth 90 down',
+    'satin 2.5 fd 60 satin 0',
+    'up setxy -30 -24 seth 90 down',
+    'estitch 4 fd 60 estitch 0',
+  ].join('\n'),
+  'waves — sashiko rows': [
+    '; rows of running-stitch scallops',
+    'stitchlen 2.5',
+    'to wave',
+    '  repeat 3 [',
+    '    repeat 18 [ fd 1.1 rt 10 ]',
+    '    repeat 18 [ fd 1.1 lt 10 ]',
+    '  ]',
+    'end',
+    '',
+    'repeat 4 [',
+    '  up setxy 38 repcount * 16 - 40 seth 180 down',
+    '  wave',
+    ']',
+  ].join('\n'),
+  'tree — recursion, sewn out and back': [
+    '; branches retrace themselves (bk) so the',
+    '; whole tree sews as one unbroken thread',
+    'to branch :len',
+    '  if :len < 5 [ fd :len bk :len ]',
+    '  else [',
+    '    fd :len / 2',
+    '    lt 28 branch :len * 0.62 rt 28',
+    '    fd :len / 4',
+    '    rt 32 branch :len * 0.62 lt 32',
+    '    fd :len / 4',
+    '    bk :len',
+    '  ]',
+    'end',
+    '',
+    'up setxy 0 -27 down',
+    'branch 34',
+  ].join('\n'),
+};

@@ -1,0 +1,135 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--night);
+  border-bottom: 1px dashed var(--line);
+  flex-shrink: 0;
+}
+
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-right: auto;
+}
+
+.wordmark h1 {
+  font-family: var(--serif);
+  font-weight: 640;
+  font-size: 21px;
+  margin: 0;
+  letter-spacing: 0.04em;
+  color: var(--pale);
+}
+
+.needle {
+  color: var(--red);
+}
+
+.tag {
+  color: var(--dim);
+  font-size: 11.5px;
+}
+
+@media (max-width: 1240px) {
+  .tag { display: none; }
+}
+
+.btn,
+.runBtn,
+.dlBtn,
+.select {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--pale);
+  background: var(--desk-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 11px;
+  cursor: pointer;
+}
+
+.btn:hover,
+.select:hover {
+  border-color: var(--dim);
+}
+
+.btn:focus-visible,
+.runBtn:focus-visible,
+.dlBtn:focus-visible,
+.select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.runBtn {
+  background: var(--red);
+  border: 1px solid var(--red-d);
+  color: #FFF4EA;
+  font-weight: 600;
+  padding: 7px 16px;
+  position: relative;
+}
+
+.runBtn::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px dashed rgba(255, 244, 234, 0.55);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.runBtn:hover {
+  background: #D55036;
+}
+
+.dlBtn {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.dlBtn:hover {
+  background: rgba(217, 164, 65, 0.12);
+}
+
+.fit {
+  color: var(--dim);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fit input {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--pale);
+  background: var(--desk-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 6px;
+  width: 56px;
+  text-align: right;
+}
+
+.fit input::-webkit-outer-spin-button,
+.fit input::-webkit-inner-spin-button {
+  opacity: 1;
+}
+
+.fit input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+kbd {
+  font-size: 10px;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 4px;
+}

@@ -1,0 +1,2373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StitchLogo — generative embroidery playground</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,640&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --night:   #1B2030;
+  --desk:    #252B41;
+  --desk-2:  #2D3450;
+  --line:    #3A4163;
+  --pale:    #EDE7DA;
+  --dim:     #9BA1BD;
+  --muslin:  #EFE8D8;
+  --muslin-2:#E5DCC7;
+  --hoop:    #B98B4E;
+  --hoop-d:  #7E5C2E;
+  --red:     #C8472F;
+  --red-d:   #A33823;
+  --gold:    #D9A441;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --serif: "Fraunces", Georgia, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--night); color: var(--pale);
+  font-family: var(--mono); font-size: 13px;
+  display: flex; flex-direction: column;
+}
+
+/* ---------- header ---------- */
+header {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--night);
+  border-bottom: 1px dashed var(--line);
+}
+.wordmark { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.wordmark h1 {
+  font-family: var(--serif); font-weight: 640; font-size: 21px; margin: 0;
+  letter-spacing: 0.04em; color: var(--pale);
+}
+.wordmark h1 .ess { color: var(--red); }
+.wordmark .tag { color: var(--dim); font-size: 11.5px; }
+@media (max-width: 1240px) { .wordmark .tag { display: none; } }
+
+select, button, input[type="text"] {
+  font-family: var(--mono); font-size: 12.5px; color: var(--pale);
+  background: var(--desk-2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 7px 11px;
+}
+select:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--gold); outline-offset: 1px;
+}
+button { cursor: pointer; }
+button:hover { border-color: var(--dim); }
+#runBtn {
+  background: var(--red); border: 1px solid var(--red-d); color: #FFF4EA;
+  font-weight: 600; padding: 7px 16px; position: relative;
+}
+#runBtn::after {  /* stitched border */
+  content: ""; position: absolute; inset: 3px;
+  border: 1px dashed rgba(255,244,234,.55); border-radius: 4px; pointer-events: none;
+}
+#runBtn:hover { background: #D55036; }
+#dlBtn { border-color: var(--gold); color: var(--gold); }
+#dlBtn:hover { background: rgba(217,164,65,.12); }
+kbd { font-size: 10px; color: var(--dim); border: 1px solid var(--line); border-radius: 3px; padding: 1px 4px; }
+.fit { color: var(--dim); font-size: 12px; display: flex; align-items: center; gap: 5px; }
+.fit input { width: 56px; padding: 6px 6px; text-align: right; }
+.fit input::-webkit-outer-spin-button, .fit input::-webkit-inner-spin-button { opacity: 1; }
+body.dragging .pane.left { outline: 2px dashed var(--gold); outline-offset: -8px; }
+body.dragging .pane.left::after {
+  content: "drop SVG to convert"; position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--gold); font-size: 14px; letter-spacing: .08em; background: rgba(27,32,48,.6); pointer-events: none;
+}
+.pane.left { position: relative; }
+
+/* ---------- main split ---------- */
+main { flex: 1; display: grid; grid-template-columns: minmax(330px, 44%) 1fr; min-height: 0; }
+@media (max-width: 880px) {
+  main { grid-template-columns: 1fr; grid-template-rows: minmax(280px, 45%) 1fr; }
+  .pane.left { border-right: none; border-bottom: 1px dashed var(--line); }
+}
+.pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.pane.left { background: var(--desk); border-right: 1px dashed var(--line); }
+
+.pane-label {
+  font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim);
+  padding: 8px 14px 0;
+}
+#editor {
+  flex: 1; min-height: 0; resize: none; width: 100%;
+  background: transparent; color: var(--pale); border: none;
+  font-family: var(--mono); font-size: 13px; line-height: 1.55;
+  padding: 8px 14px 12px; caret-color: var(--gold);
+  white-space: pre; overflow: auto;
+}
+#editor::selection { background: rgba(217,164,65,.28); }
+
+#console {
+  max-height: 96px; overflow-y: auto; padding: 6px 14px;
+  border-top: 1px dashed var(--line); font-size: 12px; line-height: 1.5;
+  color: var(--dim); flex-shrink: 0;
+}
+#console .err  { color: #E98A77; }
+#console .okx  { color: #9DC08B; }
+#console .prn  { color: var(--pale); }
+
+.repl-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px 10px; border-top: 1px dashed var(--line); flex-shrink: 0;
+}
+.repl-row .prompt { color: var(--gold); font-weight: 600; }
+#repl {
+  flex: 1; background: var(--desk-2); border: 1px solid var(--line);
+  border-radius: 6px; padding: 7px 10px; color: var(--pale);
+  font-family: var(--mono); font-size: 12.5px;
+}
+#repl::placeholder { color: #6E7494; }
+
+/* ---------- fabric preview ---------- */
+.pane.right { background: var(--muslin); position: relative; }
+.fabric {
+  position: relative; flex: 1; min-height: 0;
+  background:
+    repeating-linear-gradient(0deg,  rgba(120,100,70,.05) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(120,100,70,.05) 0 1px, transparent 1px 3px),
+    var(--muslin);
+}
+#stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.stats {
+  position: absolute; left: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px;
+  pointer-events: none; max-width: calc(100% - 20px);
+}
+.chip {
+  background: rgba(255,253,247,.88); border: 1px solid rgba(125,100,60,.35);
+  color: #4A3F2C; border-radius: 999px; padding: 3px 10px; font-size: 11px;
+}
+.chip.warn { background: rgba(217,164,65,.18); border-color: var(--gold); color: #7A5A14; }
+.chip.err  { background: rgba(200,71,47,.12); border-color: var(--red); color: #8F2D1B; }
+
+.playbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px; background: var(--muslin-2);
+  border-top: 1px dashed rgba(125,100,60,.45); flex-shrink: 0; color: #5A4D35;
+}
+#playBtn {
+  background: #FFFDF7; border: 1px solid rgba(125,100,60,.45); color: #4A3F2C;
+  width: 34px; height: 30px; padding: 0; font-size: 13px;
+}
+#scrub { flex: 1; accent-color: var(--red); min-width: 80px; }
+#counter { font-size: 11px; min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- reference ---------- */
+details.ref { border-top: 1px dashed var(--line); background: var(--night); flex-shrink: 0; }
+details.ref summary {
+  cursor: pointer; padding: 8px 16px; font-size: 11px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--dim); user-select: none; list-style: none;
+}
+details.ref summary::before { content: "✣ "; color: var(--gold); }
+details.ref[open] summary { border-bottom: 1px dashed var(--line); }
+.refgrid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2px 28px; padding: 10px 18px 16px; max-height: 240px; overflow-y: auto;
+}
+.refgrid div { display: flex; gap: 10px; padding: 3px 0; font-size: 12px; }
+.refgrid code { color: var(--gold); white-space: nowrap; min-width: 168px; }
+.refgrid span { color: var(--dim); }
+.refgrid h3 {
+  grid-column: 1 / -1; margin: 8px 0 2px; font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: #6E7494; font-weight: 500;
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">
+    <h1><span class="ess">S</span>titchLogo</h1>
+    <span class="tag">a turtle that sews — programs export to Tajima .DST</span>
+  </div>
+  <label class="fit">fit <input id="fitMM" type="number" value="80" min="10" max="190" step="5" aria-label="Import size in millimetres"> mm</label>
+  <button id="svgBtn">Import SVG</button>
+  <input type="file" id="svgFile" accept=".svg,image/svg+xml" hidden>
+  <select id="examples" aria-label="Example programs"></select>
+  <button id="runBtn">Run&nbsp;&nbsp;<kbd>⌘↵</kbd></button>
+  <button id="dlBtn">Download .DST</button>
+</header>
+
+<main>
+  <section class="pane left">
+    <div class="pane-label">pattern</div>
+    <textarea id="editor" spellcheck="false" aria-label="StitchLogo program"></textarea>
+    <div id="console" aria-live="polite"></div>
+    <div class="repl-row">
+      <span class="prompt">›</span>
+      <input id="repl" type="text" autocomplete="off"
+             placeholder="type a command and press Enter — it’s appended to the pattern (↑ history)"
+             aria-label="REPL input">
+    </div>
+  </section>
+
+  <section class="pane right">
+    <div class="fabric">
+      <canvas id="stage"></canvas>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div class="playbar">
+      <button id="playBtn" aria-label="Play stitch sequence">▶</button>
+      <input id="scrub" type="range" min="0" max="0" value="0" aria-label="Stitch playback position">
+      <span id="counter">0 / 0 stitches</span>
+    </div>
+  </section>
+</main>
+
+<details class="ref">
+  <summary>Language reference</summary>
+  <div class="refgrid">
+    <h3>Movement (mm · heading 0 = up, clockwise)</h3>
+    <div><code>fd <i>n</i> · bk <i>n</i></code><span>sew forward / back; long moves auto-split at stitchlen</span></div>
+    <div><code>rt <i>deg</i> · lt <i>deg</i></code><span>turn right / left</span></div>
+    <div><code>up · down</code><span>needle up = travel as jump · needle down = sew</span></div>
+    <div><code>setxy <i>x y</i> · seth <i>deg</i> · home</code><span>position absolutely, set heading, return to 0 0</span></div>
+    <h3>Thread &amp; stitch quality</h3>
+    <div><code>stitchlen <i>mm</i></code><span>running-stitch length, clamped 0.4–12 (default 2.5)</span></div>
+    <div><code>satin <i>mm</i></code><span>zigzag column of this width; <code>satin 0</code> back to running</span></div>
+    <div><code>bean <i>n</i></code><span>bold line: each stitch sewn <i>n</i> times (odd, e.g. 3); <code>bean 1</code> off</span></div>
+    <div><code>estitch <i>mm</i></code><span>blanket stitch: prongs of this length on the left of travel, spaced by stitchlen; <code>estitch 0</code> off</span></div>
+    <div><code>density <i>mm</i></code><span>satin penetration spacing (default 0.4)</span></div>
+    <div><code>color <i>n</i> · stop</code><span>thread change (DST stop); <code>stop</code> = next color</span></div>
+    <div><code>trim</code><span>cut thread here (before a long jump)</span></div>
+    <div><code>lock <i>mm</i></code><span>tie-in/tie-off securing: 4 micro back-stitches sewn automatically wherever the thread starts or ends (design start/end, colour changes, trims, jumps ≥ 4 mm) so runs can't unravel. Size 0.3–1.5 (default 0.7, hidden under the stitching); <code>lock 0</code> off</span></div>
+    <h3>Fills</h3>
+    <div><code>beginfill … endfill</code><span>moves between them trace a boundary instead of sewing; <code>endfill</code> sews a tatami fill. A pen-up move (<code>up … down</code>) starts a new ring — inner rings become holes (even-odd)</span></div>
+    <div><code>fillangle <i>deg</i></code><span>direction of the fill rows (default 0)</span></div>
+    <div><code>fillspacing <i>mm</i></code><span>row spacing, 0.25–5 (default 0.4)</span></div>
+    <div><code>filllen <i>mm</i></code><span>fill stitch length, 1–7; by default the fill follows <code>stitchlen</code> — set <code>filllen</code> to override, <code>filllen 0</code> to follow again. Rows are brick-offset</span></div>
+    <h3>Control</h3>
+    <div><code>repeat <i>n</i> [ … ]</code><span>loop; <code>repcount</code> is the 1-based counter</span></div>
+    <div><code>if <i>cond</i> [ … ] else [ … ]</code><span>compare with <code>&lt; &gt; =</code> (0 is false)</span></div>
+    <div><code>to <i>name</i> :a :b … end</code><span>define a procedure with parameters</span></div>
+    <div><code>make "x <i>expr</i> · :x</code><span>set and read variables</span></div>
+    <h3>SVG import</h3>
+    <div><code>Import SVG / drop a file</code><span>converts &lt;path&gt; (M L H V C S Q T A Z), rect, circle, ellipse, line, poly* + transforms into editable code. Filled shapes become beginfill blocks (subpaths become holes), stroked shapes become outlines, shapes with both get a procedure used for fill then border. Colours map to threads; text, images, gradients are skipped</span></div>
+    <h3>Values</h3>
+    <div><code>random <i>n</i></code><span>0…n — reproducible; reseed with <code>seed <i>n</i></code></span></div>
+    <div><code>sin cos sqrt abs round mod</code><span>math (degrees); also <code>xcor ycor heading</code></span></div>
+    <div><code>print <i>expr</i> · ; comment</code><span>log a value to the console · rest of line ignored</span></div>
+  </div>
+</details>
+
+<script>
+// ============================================================
+// StitchLogo core: tokenizer, parser, interpreter, stitch engine,
+// and Tajima DST encoder. No DOM dependencies.
+// Units: millimetres. Heading: degrees, 0 = up/north, clockwise.
+// ============================================================
+
+// ---------- Seeded PRNG (mulberry32) so designs are reproducible ----------
+function makeRNG(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ---------- Tokenizer ----------
+function tokenize(src) {
+  const tokens = [];
+  let i = 0, line = 1;
+  const isDigit = c => c >= '0' && c <= '9';
+  const isWordChar = c => /[A-Za-z0-9_.?]/.test(c);
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '\n') { line++; i++; continue; }
+    if (c === ';') { while (i < src.length && src[i] !== '\n') i++; continue; }
+    if (/\s/.test(c)) { i++; continue; }
+    if ('[]()'.includes(c)) { tokens.push({ t: c, line }); i++; continue; }
+    if ('+-*/<>='.includes(c)) {
+      const spBefore = i === 0 || /[\s\[\(]/.test(src[i - 1]);
+      const spAfter = i + 1 >= src.length || /\s/.test(src[i + 1]);
+      tokens.push({ t: 'op', v: c, line, spBefore, spAfter }); i++; continue;
+    }
+    if (isDigit(c) || (c === '.' && isDigit(src[i + 1]))) {
+      let j = i;
+      while (j < src.length && /[0-9.]/.test(src[j])) j++;
+      const v = parseFloat(src.slice(i, j));
+      if (isNaN(v)) throw new SLError('Bad number "' + src.slice(i, j) + '"', line);
+      tokens.push({ t: 'num', v, line }); i = j; continue;
+    }
+    if (c === ':') {
+      let j = i + 1;
+      while (j < src.length && isWordChar(src[j])) j++;
+      if (j === i + 1) throw new SLError('Expected a name after ":"', line);
+      tokens.push({ t: 'var', v: src.slice(i + 1, j).toLowerCase(), line }); i = j; continue;
+    }
+    if (c === '"') {
+      let j = i + 1;
+      while (j < src.length && isWordChar(src[j])) j++;
+      if (j === i + 1) throw new SLError('Expected a name after the quote (")', line);
+      tokens.push({ t: 'qword', v: src.slice(i + 1, j).toLowerCase(), line }); i = j; continue;
+    }
+    if (/[A-Za-z_]/.test(c)) {
+      let j = i;
+      while (j < src.length && isWordChar(src[j])) j++;
+      tokens.push({ t: 'word', v: src.slice(i, j).toLowerCase(), line }); i = j; continue;
+    }
+    throw new SLError('Unexpected character "' + c + '"', line);
+  }
+  return tokens;
+}
+
+class SLError extends Error {
+  constructor(msg, line) {
+    super(line ? msg + ' (line ' + line + ')' : msg);
+    this.slLine = line;
+  }
+}
+
+// ---------- Builtin command table: name -> arity ----------
+const ALIASES = {
+  forward: 'fd', back: 'bk', backward: 'bk', right: 'rt', left: 'lt',
+  penup: 'up', pendown: 'down', pu: 'up', pd: 'down',
+  setheading: 'seth', clearscreen: 'cs', clear: 'cs', stitchlength: 'stitchlen',
+};
+const BUILTIN_ARITY = {
+  fd: 1, bk: 1, rt: 1, lt: 1,
+  up: 0, down: 0, home: 0, cs: 0,
+  setxy: 2, seth: 1,
+  stitchlen: 1, satin: 1, density: 1,
+  bean: 1, estitch: 1,
+  beginfill: 0, endfill: 0, fillangle: 1, fillspacing: 1, filllen: 1,
+  lock: 1,
+  color: 1, stop: 0, trim: 0,
+  seed: 1, print: 1,
+};
+// Value-returning words used inside expressions
+const FUNC_ARITY = { random: 1, sin: 1, cos: 1, sqrt: 1, abs: 1, round: 1, mod: 2 };
+const ZERO_FUNCS = new Set(['repcount', 'xcor', 'ycor', 'heading']);
+
+// ---------- Parser (recursive descent) ----------
+function parse(tokens) {
+  // Pre-scan procedure signatures so call arity is known at parse time.
+  const procArity = {};
+  for (let k = 0; k < tokens.length; k++) {
+    if (tokens[k].t === 'word' && tokens[k].v === 'to') {
+      const nameTok = tokens[k + 1];
+      if (!nameTok || nameTok.t !== 'word')
+        throw new SLError('"to" must be followed by a procedure name', tokens[k].line);
+      let p = k + 2, n = 0;
+      while (p < tokens.length && tokens[p].t === 'var') { n++; p++; }
+      procArity[nameTok.v] = n;
+    }
+  }
+
+  let pos = 0;
+  const peek = () => tokens[pos];
+  const next = () => tokens[pos++];
+  const atEnd = () => pos >= tokens.length;
+  const lineOf = tok => (tok ? tok.line : (tokens.length ? tokens[tokens.length - 1].line : 1));
+
+  function parseProgram() {
+    const stmts = [];
+    while (!atEnd()) stmts.push(parseStatement());
+    return stmts;
+  }
+
+  function parseBracketBlock() {
+    const open = peek();
+    if (!open || open.t !== '[') throw new SLError('Expected [ to open a block', lineOf(open));
+    next();
+    const stmts = [];
+    while (!atEnd() && peek().t !== ']') stmts.push(parseStatement());
+    if (atEnd()) throw new SLError('Missing ] to close a block opened', open.line);
+    next(); // consume ]
+    return stmts;
+  }
+
+  function parseStatement() {
+    const tok = peek();
+    if (!tok) throw new SLError('Unexpected end of program');
+    if (tok.t !== 'word') throw new SLError('Expected a command, got "' + (tok.v !== undefined ? tok.v : tok.t) + '"', tok.line);
+    const name = tok.v;
+
+    if (name === 'to') {
+      next();
+      const nameTok = next();
+      if (!nameTok || nameTok.t !== 'word') throw new SLError('"to" needs a procedure name', tok.line);
+      if (BUILTIN_ARITY[nameTok.v] !== undefined || ALIASES[nameTok.v] || nameTok.v === 'repeat' || nameTok.v === 'to')
+        throw new SLError('"' + nameTok.v + '" is a built-in word and can\'t be redefined', tok.line);
+      const params = [];
+      while (!atEnd() && peek().t === 'var') params.push(next().v);
+      const body = [];
+      while (!atEnd() && !(peek().t === 'word' && peek().v === 'end')) body.push(parseStatement());
+      if (atEnd()) throw new SLError('Procedure "' + nameTok.v + '" is missing "end"', tok.line);
+      next(); // consume end
+      return { k: 'to', name: nameTok.v, params, body, line: tok.line };
+    }
+    if (name === 'repeat') {
+      next();
+      const count = parseExpr();
+      const body = parseBracketBlock();
+      return { k: 'repeat', count, body, line: tok.line };
+    }
+    if (name === 'if') {
+      next();
+      const cond = parseExpr();
+      const body = parseBracketBlock();
+      let elseBody = null;
+      if (!atEnd() && peek().t === 'word' && peek().v === 'else') { next(); elseBody = parseBracketBlock(); }
+      return { k: 'if', cond, body, elseBody, line: tok.line };
+    }
+    if (name === 'make') {
+      next();
+      const nm = next();
+      if (!nm || nm.t !== 'qword') throw new SLError('make needs a quoted name, e.g.  make "size 10', tok.line);
+      const value = parseExpr();
+      return { k: 'make', name: nm.v, value, line: tok.line };
+    }
+    const canonical = ALIASES[name] || name;
+    if (BUILTIN_ARITY[canonical] !== undefined) {
+      next();
+      const args = [];
+      for (let a = 0; a < BUILTIN_ARITY[canonical]; a++) args.push(parseExpr());
+      return { k: 'cmd', name: canonical, args, line: tok.line };
+    }
+    if (procArity[name] !== undefined) {
+      next();
+      const args = [];
+      for (let a = 0; a < procArity[name]; a++) args.push(parseExpr());
+      return { k: 'call', name, args, line: tok.line };
+    }
+    throw new SLError('Unknown command "' + name + '"', tok.line);
+  }
+
+  // Expressions: comparison < add < mul < unary < primary
+  function parseExpr() { return parseCompare(); }
+  function parseCompare() {
+    let left = parseAdd();
+    while (!atEnd() && peek().t === 'op' && '<>='.includes(peek().v)) {
+      const op = next().v;
+      const right = parseAdd();
+      left = { k: 'bin', op, left, right };
+    }
+    return left;
+  }
+  function parseAdd() {
+    let left = parseMul();
+    while (!atEnd() && peek().t === 'op' && (peek().v === '+' || peek().v === '-')) {
+      // Logo convention: " -5" (space before, glued after) begins a new value,
+      // so `setxy 40 -40` is two arguments, while `40 - 40` subtracts.
+      if (peek().v === '-' && peek().spBefore && !peek().spAfter) break;
+      const op = next().v;
+      const right = parseMul();
+      left = { k: 'bin', op, left, right };
+    }
+    return left;
+  }
+  function parseMul() {
+    let left = parseUnary();
+    while (!atEnd() && peek().t === 'op' && (peek().v === '*' || peek().v === '/')) {
+      const op = next().v;
+      const right = parseUnary();
+      left = { k: 'bin', op, left, right };
+    }
+    return left;
+  }
+  function parseUnary() {
+    if (!atEnd() && peek().t === 'op' && peek().v === '-') {
+      const tok = next();
+      return { k: 'neg', val: parseUnary(), line: tok.line };
+    }
+    return parsePrimary();
+  }
+  function parsePrimary() {
+    const tok = peek();
+    if (!tok) throw new SLError('Expected a value but the program ended');
+    if (tok.t === 'num') { next(); return { k: 'num', v: tok.v }; }
+    if (tok.t === 'var') { next(); return { k: 'var', name: tok.v, line: tok.line }; }
+    if (tok.t === '(') {
+      next();
+      const e = parseExpr();
+      if (atEnd() || peek().t !== ')') throw new SLError('Missing )', tok.line);
+      next();
+      return e;
+    }
+    if (tok.t === 'word') {
+      const w = tok.v;
+      if (FUNC_ARITY[w] !== undefined) {
+        next();
+        const args = [];
+        for (let a = 0; a < FUNC_ARITY[w]; a++) args.push(FUNC_ARITY[w] > 1 ? parseExpr() : parseUnary());
+        return { k: 'func', name: w, args, line: tok.line };
+      }
+      if (ZERO_FUNCS.has(w)) { next(); return { k: 'func', name: w, args: [], line: tok.line }; }
+    }
+    throw new SLError('Expected a value, got "' + (tok.v !== undefined ? tok.v : tok.t) + '"', tok.line);
+  }
+
+  return parseProgram();
+}
+
+// ---------- Stitch engine ----------
+// Event types: 'stitch' (needle down at x,y), 'jump' (move without sewing),
+// 'color' (color change / stop). Coordinates in mm, y axis points up.
+const LIMITS = {
+  maxStitches: 60000,
+  maxOps: 2000000,
+  maxCallDepth: 200,
+  minStitch: 0.4,   // mm – shorter stitches risk thread breaks; merged away
+  maxStitch: 12.0,  // mm – hard machine/DST ceiling per stitch
+};
+
+class Machine {
+  constructor() {
+    this.x = 0; this.y = 0; this.heading = 0;
+    this.penDown = true;
+    this.stitchLen = 2.5;       // running-stitch length, mm
+    this.mode = 'run';          // 'run' | 'satin' | 'estitch'
+    this.satinWidth = 0;        // satin column width, mm
+    this.satinSpacing = 0.4;    // mm between zigzag penetrations
+    this.satinSide = 1;
+    this.eWidth = 0;            // E-stitch (blanket) prong length, mm
+    this.beanRepeats = 1;       // passes per stitch in running mode (odd)
+    this.fillAngle = 0;         // tatami row direction, degrees
+    this.fillSpacing = 0.4;     // tatami row spacing, mm
+    this.fillLen = null;        // tatami stitch length, mm; null = follow stitchlen
+    this.lockLen = 0.7;         // tie-in/tie-off stitch size, mm; 0 = off
+    this.recording = false;     // inside beginfill...endfill
+    this.rings = [];            // recorded boundary rings
+    this.curRing = null;
+    this.lastEmit = null;       // physical needle position {x, y}
+    this.colorIdx = 0;
+    this.events = [];           // {t, x, y, c}
+    this.warnings = [];
+    this.started = false;
+    this.tinyDropped = 0;
+  }
+  _push(t, x, y) {
+    if (this.events.length >= LIMITS.maxStitches)
+      throw new SLError('Design exceeds ' + LIMITS.maxStitches.toLocaleString() + ' stitches — stopped. Reduce repeats, raise stitchlen, or raise fillspacing.');
+    this.events.push({ t, x, y, c: this.colorIdx });
+    if (t === 'stitch' || t === 'jump') this.lastEmit = { x, y };
+  }
+  _ensureStart() {
+    if (!this.started) {
+      this.started = true;
+      this._push('stitch', this.x, this.y); // anchor the first needle drop
+    }
+  }
+  setXY(nx, ny) {
+    // Reposition: travels as a jump if pen is up, sews a line if pen is down.
+    const dx = nx - this.x, dy = ny - this.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1e-9) { this.x = nx; this.y = ny; return; }
+    this.travel(nx, ny, d);
+  }
+  forward(dist) {
+    if (!isFinite(dist)) throw new SLError('fd/bk got a non-numeric distance');
+    const rad = this.heading * Math.PI / 180;
+    const nx = this.x + Math.sin(rad) * dist;
+    const ny = this.y + Math.cos(rad) * dist;
+    this.travel(nx, ny, Math.abs(dist));
+    return;
+  }
+  travel(nx, ny, dist) {
+    const ox = this.x, oy = this.y;
+    // While recording a fill boundary, moves trace rings instead of sewing.
+    if (this.recording) {
+      if (this.penDown) {
+        if (!this.curRing) this.curRing = [[ox, oy]];
+        this.curRing.push([nx, ny]);
+      } else {
+        this._closeRing(); // pen-up move starts a new ring (e.g. a hole)
+      }
+      this.x = nx; this.y = ny;
+      return;
+    }
+    if (!this.penDown) {
+      this._push('jump', nx, ny);
+      this.x = nx; this.y = ny;
+      return;
+    }
+    this._ensureStart();
+    const dxT = nx - ox, dyT = ny - oy;
+    const len = Math.hypot(dxT, dyT);
+    if (this.mode === 'satin' && this.satinWidth > 0.05) {
+      // Satin column: zigzag perpendicular to the travel direction.
+      if (len < 1e-9) return;
+      const px = -dyT / len, py = dxT / len; // unit perpendicular
+      const half = this.satinWidth / 2;
+      const steps = Math.max(1, Math.ceil(len / this.satinSpacing));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const cx = ox + dxT * t, cy = oy + dyT * t;
+        this.satinSide = -this.satinSide;
+        this._push('stitch', cx + px * half * this.satinSide, cy + py * half * this.satinSide);
+      }
+      this.x = nx; this.y = ny;
+      return;
+    }
+    if (this.mode === 'estitch' && this.eWidth > 0.05) {
+      // Blanket stitch: a spine along the path with prongs to the left.
+      if (len < 1e-9) return;
+      const ux = dxT / len, uy = dyT / len;
+      const px = -uy, py = ux; // left of travel
+      const spacing = Math.max(1, this.stitchLen);
+      const steps = Math.max(1, Math.round(len / spacing));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const cx = ox + dxT * t, cy = oy + dyT * t;
+        this._push('stitch', cx, cy);
+        this._push('stitch', cx + px * this.eWidth, cy + py * this.eWidth);
+        this._push('stitch', cx, cy);
+      }
+      this.x = nx; this.y = ny;
+      return;
+    }
+    // Running stitch: split the move so no stitch exceeds stitchLen,
+    // drop sub-min slivers (they cause thread breaks and bird-nesting).
+    if (len < LIMITS.minStitch * 0.5) {
+      // Too tiny to sew on its own; just advance position (merged with next move).
+      this.tinyDropped++;
+      this.x = nx; this.y = ny;
+      return;
+    }
+    const eff = Math.min(Math.max(this.stitchLen, LIMITS.minStitch), LIMITS.maxStitch);
+    const steps = Math.max(1, Math.ceil(len / eff));
+    let pxv = ox, pyv = oy;
+    for (let s = 1; s <= steps; s++) {
+      const t = s / steps;
+      const tx = ox + dxT * t, ty = oy + dyT * t;
+      this._push('stitch', tx, ty);
+      for (let r = 1; r < this.beanRepeats; r++) {
+        // bean stitch: retrace each stitch back and forth, ending forward
+        this._push('stitch', r % 2 === 1 ? pxv : tx, r % 2 === 1 ? pyv : ty);
+      }
+      pxv = tx; pyv = ty;
+    }
+    this.x = nx; this.y = ny;
+  }
+  _closeRing() {
+    if (this.curRing && this.curRing.length >= 3) this.rings.push(this.curRing);
+    this.curRing = null;
+  }
+  beginFill() {
+    if (this.recording) throw new SLError('beginfill while already recording a fill — close it with endfill first');
+    this.recording = true;
+    this.rings = [];
+    this.curRing = [[this.x, this.y]];
+  }
+  endFill() {
+    if (!this.recording) throw new SLError('endfill without a matching beginfill');
+    this._closeRing();
+    this.recording = false;
+    if (!this.rings.length) {
+      this.warnings.push('fill skipped — the boundary needs at least 3 pen-down points');
+      return;
+    }
+    const effLen = this.fillLen !== null ? this.fillLen
+      : Math.min(Math.max(this.stitchLen, 1), 7); // follow stitchlen, fill-safe range
+    const pts = generateFill(this.rings, {
+      angle: this.fillAngle,
+      spacing: this.fillSpacing,
+      stitchLen: effLen,
+      endNear: { x: this.x, y: this.y },
+    });
+    this.rings = [];
+    if (!pts.length) {
+      this.warnings.push('fill skipped — the area is too small to fill at this spacing');
+      return;
+    }
+    // approach the first fill point from the physical needle position
+    const first = pts[0];
+    if (!this.started) {
+      this.started = true;
+      // if the design opens with a fill away from the origin, travel there
+      // as a jump — a stitch event would sew a line from the start point
+      this._push(Math.hypot(first.x, first.y) > 1 ? 'jump' : 'stitch', first.x, first.y);
+    } else {
+      const le = this.lastEmit || { x: 0, y: 0 };
+      const d0 = Math.hypot(first.x - le.x, first.y - le.y);
+      if (d0 > Math.max(this.stitchLen * 1.5, 2)) this._push('jump', first.x, first.y);
+      else if (d0 > 0.05) this._push('stitch', first.x, first.y);
+    }
+    for (let i = 1; i < pts.length; i++) this._push(pts[i].jump ? 'jump' : 'stitch', pts[i].x, pts[i].y);
+    // bring the needle back to the turtle's logical position so the
+    // next command sews from where the boundary trace ended
+    const back = Math.hypot(this.lastEmit.x - this.x, this.lastEmit.y - this.y);
+    if (back > 0.6) this._push('jump', this.x, this.y);
+  }
+  colorChange(n) {
+    const idx = Math.max(0, Math.round(n));
+    if (idx === this.colorIdx && this.started) return;
+    if (this.started) this._push('color', this.x, this.y);
+    this.colorIdx = idx;
+  }
+  trim() {
+    if (this.started) this._push('trim', this.x, this.y);
+  }
+}
+
+// ---------- Interpreter ----------
+function run(source, opts) {
+  opts = opts || {};
+  const tokens = tokenize(source);
+  const program = parse(tokens);
+  const m = new Machine();
+  const globals = Object.create(null);
+  const procs = Object.create(null);
+  let rng = makeRNG(opts.seed !== undefined ? opts.seed : 42);
+  let ops = 0;
+  const printed = [];
+
+  function tick(line) {
+    if (++ops > LIMITS.maxOps)
+      throw new SLError('Program ran too long (possible infinite loop) — stopped', line);
+  }
+
+  function evalExpr(node, env, repcount) {
+    tick(node.line);
+    switch (node.k) {
+      case 'num': return node.v;
+      case 'var': {
+        if (env && node.name in env) return env[node.name];
+        if (node.name in globals) return globals[node.name];
+        throw new SLError('Unknown variable :' + node.name, node.line);
+      }
+      case 'neg': return -evalExpr(node.val, env, repcount);
+      case 'bin': {
+        const a = evalExpr(node.left, env, repcount);
+        const b = evalExpr(node.right, env, repcount);
+        switch (node.op) {
+          case '+': return a + b;
+          case '-': return a - b;
+          case '*': return a * b;
+          case '/': if (b === 0) throw new SLError('Division by zero'); return a / b;
+          case '<': return a < b ? 1 : 0;
+          case '>': return a > b ? 1 : 0;
+          case '=': return Math.abs(a - b) < 1e-9 ? 1 : 0;
+        }
+        break;
+      }
+      case 'func': {
+        const args = node.args.map(a => evalExpr(a, env, repcount));
+        switch (node.name) {
+          case 'random': return rng() * args[0];
+          case 'sin': return Math.sin(args[0] * Math.PI / 180);
+          case 'cos': return Math.cos(args[0] * Math.PI / 180);
+          case 'sqrt': if (args[0] < 0) throw new SLError('sqrt of a negative number', node.line); return Math.sqrt(args[0]);
+          case 'abs': return Math.abs(args[0]);
+          case 'round': return Math.round(args[0]);
+          case 'mod': return ((args[0] % args[1]) + args[1]) % args[1];
+          case 'repcount': return repcount;
+          case 'xcor': return m.x;
+          case 'ycor': return m.y;
+          case 'heading': return m.heading;
+        }
+        break;
+      }
+    }
+    throw new SLError('Cannot evaluate expression', node.line);
+  }
+
+  function execBlock(stmts, env, repcount, depth) {
+    for (const st of stmts) execStmt(st, env, repcount, depth);
+  }
+
+  function execStmt(st, env, repcount, depth) {
+    tick(st.line);
+    switch (st.k) {
+      case 'to': procs[st.name] = st; return;
+      case 'make': globals[st.name] = evalExpr(st.value, env, repcount); return;
+      case 'repeat': {
+        const n = Math.floor(evalExpr(st.count, env, repcount));
+        if (n > 200000) throw new SLError('repeat count too large (' + n + ')', st.line);
+        for (let i = 1; i <= n; i++) execBlock(st.body, env, i, depth);
+        return;
+      }
+      case 'if': {
+        if (evalExpr(st.cond, env, repcount) !== 0) execBlock(st.body, env, repcount, depth);
+        else if (st.elseBody) execBlock(st.elseBody, env, repcount, depth);
+        return;
+      }
+      case 'call': {
+        const proc = procs[st.name];
+        if (!proc) throw new SLError('Procedure "' + st.name + '" is used before it is defined', st.line);
+        if (depth >= LIMITS.maxCallDepth) throw new SLError('Too much recursion in "' + st.name + '"', st.line);
+        const newEnv = Object.create(null);
+        proc.params.forEach((p, i) => { newEnv[p] = evalExpr(st.args[i], env, repcount); });
+        execBlock(proc.body, newEnv, repcount, depth + 1);
+        return;
+      }
+      case 'cmd': {
+        const a = st.args.map(x => evalExpr(x, env, repcount));
+        switch (st.name) {
+          case 'fd': m.forward(a[0]); return;
+          case 'bk': m.forward(-a[0]); return;
+          case 'rt': m.heading = (m.heading + a[0]) % 360; return;
+          case 'lt': m.heading = (m.heading - a[0]) % 360; return;
+          case 'up': m.penDown = false; return;
+          case 'down': m.penDown = true; return;
+          case 'home': m.setXY(0, 0); m.heading = 0; return;
+          case 'cs': return; // accepted for Logo familiarity; preview always redraws
+          case 'setxy': m.setXY(a[0], a[1]); return;
+          case 'seth': m.heading = a[0] % 360; return;
+          case 'stitchlen': {
+            const v = a[0];
+            if (v < LIMITS.minStitch || v > LIMITS.maxStitch)
+              m.warnings.push('stitchlen ' + v + ' clamped to ' + Math.min(Math.max(v, LIMITS.minStitch), LIMITS.maxStitch) + ' mm (machine-safe range is ' + LIMITS.minStitch + '–' + LIMITS.maxStitch + ')');
+            m.stitchLen = Math.min(Math.max(v, LIMITS.minStitch), LIMITS.maxStitch);
+            return;
+          }
+          case 'satin': {
+            const v = Math.max(0, a[0]);
+            if (v > 10) m.warnings.push('satin ' + v + ' mm is very wide — columns over ~8 mm tend to snag; consider splitting');
+            m.satinWidth = v;
+            m.mode = v > 0.05 ? 'satin' : 'run';
+            return;
+          }
+          case 'estitch': {
+            const v = Math.max(0, a[0]);
+            if (v > 10) m.warnings.push('estitch ' + v + ' mm is very wide — prongs over ~8 mm tend to snag');
+            m.eWidth = v;
+            m.mode = v > 0.05 ? 'estitch' : 'run';
+            return;
+          }
+          case 'bean': {
+            let n = Math.round(a[0]);
+            if (n <= 1) { m.beanRepeats = 1; return; }
+            if (n % 2 === 0) { n += 1; m.warnings.push('bean must be odd to keep advancing — using ' + n); }
+            if (n > 9) { n = 9; m.warnings.push('bean clamped to 9 passes'); }
+            m.beanRepeats = n;
+            return;
+          }
+          case 'lock': {
+            if (a[0] <= 0) { m.lockLen = 0; return; }
+            const v = Math.min(Math.max(a[0], 0.3), 1.5);
+            if (v !== a[0]) m.warnings.push('lock ' + a[0] + ' clamped to ' + v + ' mm (safe range 0.3\u20131.5)');
+            m.lockLen = v;
+            return;
+          }
+          case 'beginfill': m.beginFill(); return;
+          case 'endfill': m.endFill(); return;
+          case 'fillangle': m.fillAngle = a[0]; return;
+          case 'fillspacing': {
+            const v = Math.min(Math.max(a[0], 0.25), 5);
+            if (v !== a[0]) m.warnings.push('fillspacing ' + a[0] + ' clamped to ' + v + ' mm (safe range 0.25\u20135)');
+            m.fillSpacing = v;
+            return;
+          }
+          case 'filllen': {
+            if (a[0] <= 0) { m.fillLen = null; return; } // 0 = follow stitchlen again
+            const v = Math.min(Math.max(a[0], 1), 7);
+            if (v !== a[0]) m.warnings.push('filllen ' + a[0] + ' clamped to ' + v + ' mm (safe range 1\u20137)');
+            m.fillLen = v;
+            return;
+          }
+          case 'density': {
+            m.satinSpacing = Math.min(Math.max(a[0], 0.25), 5);
+            return;
+          }
+          case 'color': m.colorChange(a[0]); return;
+          case 'stop': m.colorChange(m.colorIdx + 1); return;
+          case 'trim': m.trim(); return;
+          case 'seed': rng = makeRNG(Math.floor(a[0])); return;
+          case 'print': printed.push(formatNum(a[0])); return;
+        }
+        throw new SLError('Unhandled command ' + st.name, st.line);
+      }
+    }
+  }
+
+  execBlock(program, null, 0, 0);
+
+  if (m.recording) {
+    m.warnings.push('beginfill was never closed — endfill added at the end of the program');
+    m.endFill();
+  }
+  if (m.tinyDropped > 0)
+    m.warnings.push(m.tinyDropped + ' sub-' + LIMITS.minStitch + ' mm moves merged into neighbours (too short to sew safely)');
+
+  let locks = 0;
+  if (m.lockLen > 0) {
+    const secured = applyLocks(m.events, m.lockLen);
+    m.events = secured.events;
+    locks = secured.locks;
+  }
+
+  return { events: m.events, warnings: m.warnings, printed, locks };
+}
+
+function formatNum(v) {
+  return Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+// ---------- Tatami fill ----------
+// rings: array of point arrays (closed implicitly), even-odd rule.
+// Returns [{x, y, jump}] in stitch order.
+function evenOddInside(rings, px, py) {
+  let inside = false;
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length];
+      if ((a[1] <= py && b[1] > py) || (b[1] <= py && a[1] > py)) {
+        const xi = a[0] + (py - a[1]) / (b[1] - a[1]) * (b[0] - a[0]);
+        if (xi > px) inside = !inside;
+      }
+    }
+  }
+  return inside;
+}
+
+function generateFill(rings, opt) {
+  const angle = (opt.angle || 0) * Math.PI / 180;
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const rot = p => [p[0] * ca + p[1] * sa, -p[0] * sa + p[1] * ca];
+  const unrot = p => [p[0] * ca - p[1] * sa, p[0] * sa + p[1] * ca];
+  const R = rings.map(r => r.map(rot));
+  const spacing = Math.min(Math.max(opt.spacing || 0.4, 0.25), 5);
+  const slen = Math.min(Math.max(opt.stitchLen || 3, 1), 7);
+
+  let minY = Infinity, maxY = -Infinity;
+  R.forEach(r => r.forEach(p => { if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1]; }));
+  if (!(maxY - minY > spacing * 0.6)) return [];
+
+  // scanline rows -> even-odd paired segments
+  const rows = [];
+  let rowIdx = 0;
+  for (let y = minY + spacing * 0.5; y < maxY; y += spacing, rowIdx++) {
+    const xs = [];
+    for (const ring of R) {
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i], b = ring[(i + 1) % ring.length];
+        if ((a[1] <= y && b[1] > y) || (b[1] <= y && a[1] > y)) {
+          xs.push(a[0] + (y - a[1]) / (b[1] - a[1]) * (b[0] - a[0]));
+        }
+      }
+    }
+    xs.sort((p, q) => p - q);
+    const segs = [];
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      if (xs[i + 1] - xs[i] >= 0.5) segs.push({ x0: xs[i], x1: xs[i + 1], y, row: rowIdx });
+    }
+    if (segs.length) rows.push(segs);
+  }
+  if (!rows.length) return [];
+
+  // serpentine direction: finish nearest to where the turtle will continue
+  let order = rows;
+  if (opt.endNear) {
+    const en = rot([opt.endNear.x, opt.endNear.y]);
+    const dFirst = Math.abs(en[1] - rows[0][0].y);
+    const dLast = Math.abs(en[1] - rows[rows.length - 1][0].y);
+    if (dFirst < dLast) order = rows.slice().reverse();
+  }
+
+  const out = [];
+  let cur = null;
+  function push(x, y, jump) { out.push({ p: [x, y], jump: !!jump }); cur = [x, y]; }
+  function sewLine(to) {
+    // sew from cur to `to`, never exceeding the fill stitch length
+    const dx = to[0] - cur[0], dy = to[1] - cur[1];
+    const d = Math.hypot(dx, dy);
+    if (d < 0.05) return;
+    const start = [cur[0], cur[1]];
+    const steps = Math.max(1, Math.ceil(d / slen));
+    for (let k = 1; k <= steps; k++) {
+      push(start[0] + dx * k / steps, start[1] + dy * k / steps, false);
+    }
+  }
+  function connect(to) {
+    const d = Math.hypot(to[0] - cur[0], to[1] - cur[1]);
+    if (d < 0.05) return;
+    if (d <= spacing * 3 + 0.6) { sewLine(to); return; } // adjacent-row turnaround
+    // longer connector: sew through the interior if it stays inside, else jump
+    let allIn = d <= 12;
+    if (allIn) {
+      const n = Math.max(2, Math.ceil(d / 1.5));
+      for (let k = 1; k < n; k++) {
+        const mx = cur[0] + (to[0] - cur[0]) * k / n, my = cur[1] + (to[1] - cur[1]) * k / n;
+        if (!evenOddInside(R, mx, my)) { allIn = false; break; }
+      }
+    }
+    if (allIn) sewLine(to);
+    else push(to[0], to[1], true);
+  }
+  function sewSegment(seg, reverse) {
+    const from = reverse ? seg.x1 : seg.x0;
+    const to = reverse ? seg.x0 : seg.x1;
+    if (cur === null) push(from, seg.y, false);
+    else connect([from, seg.y]);
+    // brick-offset penetration grid (global, phase shifts per row);
+    // sewLine between grid points keeps end gaps within slen too
+    const phase = (seg.row % 3) * (slen / 3);
+    const lo = Math.min(from, to) + 0.3, hi = Math.max(from, to) - 0.3;
+    const grid = [];
+    for (let g = Math.ceil((lo - phase) / slen) * slen + phase; g < hi; g += slen) grid.push(g);
+    if (reverse) grid.reverse();
+    for (const g of grid) sewLine([g, seg.y]);
+    sewLine([to, seg.y]);
+  }
+  // Global nearest-neighbour over all segments: fills one branch of a
+  // concave shape completely before moving on, instead of ping-ponging
+  // between branches row by row (which would add a jump per row).
+  const all = [];
+  for (const rowSegs of order) for (const seg of rowSegs) all.push(seg);
+  while (all.length) {
+    let bi = 0, brev = false, bd = Infinity;
+    for (let i = 0; i < all.length; i++) {
+      const sgm = all[i];
+      const dS = cur ? Math.hypot(sgm.x0 - cur[0], sgm.y - cur[1]) : i; // first pick: first segment
+      const dE = cur ? Math.hypot(sgm.x1 - cur[0], sgm.y - cur[1]) : i + 0.5;
+      if (dS < bd) { bd = dS; bi = i; brev = false; }
+      if (dE < bd) { bd = dE; bi = i; brev = true; }
+    }
+    sewSegment(all.splice(bi, 1)[0], brev);
+  }
+  return out.map(o => {
+    const p = unrot(o.p);
+    return { x: p[0], y: p[1], jump: o.jump };
+  });
+}
+
+
+// ---------- Tie-in / tie-off securing stitches ----------
+// Inserts small lock stitches wherever the thread starts or ends for real:
+// design start/end, colour changes, trims, and jump chains long enough to
+// be cut (>= 4 mm). Locks run back and forth along the existing stitch
+// direction so they hide under the thread, and they are position-
+// preserving: the stream before and after a lock is unchanged.
+function applyLocks(events, L) {
+  const THRESH = 4; // mm of jump travel at/above which the thread is assumed cut
+  const parts = [];
+  for (const e of events) {
+    const isRun = e.t === 'stitch';
+    if (!parts.length || parts[parts.length - 1].run !== isRun) parts.push({ run: isRun, ev: [] });
+    parts[parts.length - 1].ev.push(e);
+  }
+  const out = [];
+  let locks = 0;
+  let pos = null; // physical needle position while rebuilding
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  function gapCuts(part, startPos) {
+    let cut = false, jlen = 0, p = startPos;
+    for (const e of part.ev) {
+      if (e.t === 'color' || e.t === 'trim') cut = true;
+      if (e.t === 'jump') { if (p) jlen += dist(p, e); p = e; }
+    }
+    return cut || jlen >= THRESH;
+  }
+  function tie(at, toward, c) {
+    if (!at || !toward) return;
+    const d = dist(at, toward);
+    if (d < 1e-6) return;
+    const l = Math.min(L, d); // never overshoot the neighbouring stitch
+    if (l < 0.2) return;
+    const ux = (toward.x - at.x) / d, uy = (toward.y - at.y) / d;
+    for (let k = 0; k < 2; k++) {
+      out.push({ t: 'stitch', x: at.x + ux * l, y: at.y + uy * l, c });
+      out.push({ t: 'stitch', x: at.x, y: at.y, c });
+    }
+    locks++;
+  }
+  let firstRunSeen = false;
+  for (let pi = 0; pi < parts.length; pi++) {
+    const part = parts[pi];
+    if (!part.run) {
+      part.cut = gapCuts(part, pos);
+      for (const e of part.ev) { out.push(e); if (e.t === 'jump') pos = e; }
+      continue;
+    }
+    const ev = part.ev;
+    const entry = pos;
+    const needIn = !firstRunSeen || (pi > 0 && parts[pi - 1].cut);
+    const nextGap = pi + 1 < parts.length ? parts[pi + 1] : null;
+    const needOut = nextGap === null || gapCuts(nextGap, ev[ev.length - 1]);
+    firstRunSeen = true;
+    if (entry === null) {
+      // design starts here: the first stitch anchors, then lock toward the next
+      out.push(ev[0]); pos = ev[0];
+      if (needIn) tie(ev[0], ev[1] || null, ev[0].c);
+      for (let i = 1; i < ev.length; i++) { out.push(ev[i]); pos = ev[i]; }
+    } else {
+      if (needIn) tie(entry, ev[0], ev[0].c);
+      for (const e of ev) { out.push(e); pos = e; }
+    }
+    if (needOut) {
+      const last = ev[ev.length - 1];
+      const back = ev.length >= 2 ? ev[ev.length - 2] : entry;
+      tie(last, back, last.c);
+    }
+  }
+  return { events: out, locks };
+}
+
+// ---------- Design stats ----------
+function designStats(events) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let stitches = 0, jumps = 0, colors = 0, trims = 0;
+  let maxLen = 0, maxR = 0;
+  let px = null, py = null;
+  const colorSet = new Set();
+  for (const e of events) {
+    if (e.t === 'color') { colors++; px = e.x; py = e.y; continue; }
+    if (e.t === 'trim') { trims++; continue; }
+    if (e.x < minX) minX = e.x; if (e.x > maxX) maxX = e.x;
+    if (e.y < minY) minY = e.y; if (e.y > maxY) maxY = e.y;
+    const rr = Math.hypot(e.x, e.y); if (rr > maxR) maxR = rr;
+    if (e.t === 'stitch') {
+      stitches++;
+      colorSet.add(e.c);
+      if (px !== null) maxLen = Math.max(maxLen, Math.hypot(e.x - px, e.y - py));
+    } else jumps++;
+    px = e.x; py = e.y;
+  }
+  if (!isFinite(minX)) { minX = maxX = minY = maxY = 0; }
+  return {
+    stitches, jumps, trims,
+    colorChanges: colors,
+    colorsUsed: Math.max(1, colorSet.size),
+    width: maxX - minX, height: maxY - minY,
+    minX, maxX, minY, maxY, maxStitchLen: maxLen, maxRadius: maxR,
+  };
+}
+
+// ---------- Tajima DST encoder ----------
+// 3-byte records; each encodes dx, dy in 0.1 mm units, range ±121 per record.
+const DST_BIT = b => 1 << b;
+
+function dstEncodeDelta(x, y, jump) {
+  // x, y in 0.1mm integer units, each within [-121, 121]
+  let b0 = 0, b1 = 0, b2 = 0;
+  b2 |= DST_BIT(0) | DST_BIT(1);
+  if (jump) b2 |= DST_BIT(7);
+  if (x > 40) { b2 |= DST_BIT(2); x -= 81; }
+  if (x < -40) { b2 |= DST_BIT(3); x += 81; }
+  if (y > 40) { b2 |= DST_BIT(5); y -= 81; }
+  if (y < -40) { b2 |= DST_BIT(4); y += 81; }
+  if (x > 13) { b1 |= DST_BIT(2); x -= 27; }
+  if (x < -13) { b1 |= DST_BIT(3); x += 27; }
+  if (y > 13) { b1 |= DST_BIT(5); y -= 27; }
+  if (y < -13) { b1 |= DST_BIT(4); y += 27; }
+  if (x > 4) { b0 |= DST_BIT(2); x -= 9; }
+  if (x < -4) { b0 |= DST_BIT(3); x += 9; }
+  if (y > 4) { b0 |= DST_BIT(5); y -= 9; }
+  if (y < -4) { b0 |= DST_BIT(4); y += 9; }
+  if (x > 1) { b1 |= DST_BIT(0); x -= 3; }
+  if (x < -1) { b1 |= DST_BIT(1); x += 3; }
+  if (y > 1) { b1 |= DST_BIT(7); y -= 3; }
+  if (y < -1) { b1 |= DST_BIT(6); y += 3; }
+  if (x > 0) { b0 |= DST_BIT(0); x -= 1; }
+  if (x < 0) { b0 |= DST_BIT(1); x += 1; }
+  if (y > 0) { b0 |= DST_BIT(7); y -= 1; }
+  if (y < 0) { b0 |= DST_BIT(6); y += 1; }
+  if (x !== 0 || y !== 0) throw new Error('DST encode residual ' + x + ',' + y);
+  return [b0, b1, b2];
+}
+
+function toDST(events, label) {
+  const records = [];
+  // Track integer positions (0.1 mm) to avoid rounding drift.
+  let cx = 0, cy = 0;
+  let started = false;
+  let recStitches = 0, recColors = 0;
+  let minX = 0, maxX = 0, minY = 0, maxY = 0;
+
+  function emitMove(tx, ty, jump) {
+    // tx, ty integer 0.1mm absolute; split deltas over the ±121 record range
+    let dx = tx - cx, dy = ty - cy;
+    do {
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 121));
+      const sx = steps > 1 ? Math.round(dx / steps) : dx;
+      const sy = steps > 1 ? Math.round(dy / steps) : dy;
+      records.push(dstEncodeDelta(sx, sy, jump));
+      recStitches++;
+      cx += sx; cy += sy;
+      if (cx < minX) minX = cx; if (cx > maxX) maxX = cx;
+      if (cy < minY) minY = cy; if (cy > maxY) maxY = cy;
+      dx = tx - cx; dy = ty - cy;
+    } while (dx !== 0 || dy !== 0);
+  }
+
+  for (const e of events) {
+    if (e.t === 'color') {
+      records.push([0, 0, 0b11000011]); // color change / stop
+      recColors++;
+      continue;
+    }
+    if (e.t === 'trim') {
+      // Conventional trim signal: a few zero-length jumps
+      for (let i = 0; i < 3; i++) records.push(dstEncodeDelta(0, 0, true));
+      continue;
+    }
+    const tx = Math.round(e.x * 10), ty = Math.round(e.y * 10);
+    if (!started) { started = true; if (e.t === 'jump') { emitMove(tx, ty, true); continue; } }
+    emitMove(tx, ty, e.t === 'jump');
+  }
+  records.push([0, 0, 0b11110011]); // end of design
+
+  // ---- 512-byte header ----
+  function field(s) { return s + '\r'; }
+  function num(v, width) {
+    let s = String(Math.round(v));
+    while (s.length < width) s = ' ' + s;
+    return s;
+  }
+  function signedNum(v, width) {
+    const sign = v < 0 ? '-' : '+';
+    let s = String(Math.abs(Math.round(v)));
+    while (s.length < width) s = ' ' + s;
+    return sign + s;
+  }
+  let name = (label || 'STITCHLOGO').toUpperCase().replace(/[^A-Z0-9_]/g, '_').slice(0, 16);
+  while (name.length < 16) name += ' ';
+  let header = '';
+  header += field('LA:' + name);
+  header += field('ST:' + num(recStitches, 7));
+  header += field('CO:' + num(recColors, 3));
+  header += field('+X:' + num(Math.abs(maxX), 5));
+  header += field('-X:' + num(Math.abs(minX), 5));
+  header += field('+Y:' + num(Math.abs(maxY), 5));
+  header += field('-Y:' + num(Math.abs(minY), 5));
+  header += field('AX:' + signedNum(cx, 5));
+  header += field('AY:' + signedNum(cy, 5));
+  header += field('MX:' + signedNum(0, 5));
+  header += field('MY:' + signedNum(0, 5));
+  header += field('PD:******');
+  const bytes = new Uint8Array(512 + records.length * 3);
+  for (let i = 0; i < header.length; i++) bytes[i] = header.charCodeAt(i);
+  bytes[header.length] = 0x1a;
+  for (let i = header.length + 1; i < 512; i++) bytes[i] = 0x20;
+  let o = 512;
+  for (const r of records) { bytes[o++] = r[0]; bytes[o++] = r[1]; bytes[o++] = r[2]; }
+  return bytes;
+}
+
+
+
+</script>
+<script>
+// ============================================================
+// StitchLogo SVG importer.
+// Supported: <path> (M L H V C S Q T A Z), <rect> (sharp corners),
+// <circle>, <ellipse>, <line>, <polyline>, <polygon>, nested <g>,
+// transform attributes, stroke/fill colours (mapped to the thread
+// palette). Everything else is skipped and reported.
+// Pipeline: flatten -> scale & centre (y flipped to y-up mm) ->
+// simplify (RDP) -> order paths to minimise jumps -> emit code.
+// ============================================================
+
+/* ---------- path "d" attribute ---------- */
+function parsePathD(d, opts) {
+  opts = opts || {};
+  var minSeg = opts.minSeg || 8, maxSeg = opts.maxSeg || 72;
+  var tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g);
+  if (!tokens) return [];
+  var i = 0;
+  function num() {
+    if (i >= tokens.length) throw new Error('path data ended mid-command');
+    var v = parseFloat(tokens[i++]);
+    if (isNaN(v)) throw new Error('expected a number in path data, got "' + tokens[i - 1] + '"');
+    return v;
+  }
+  function flag() { // arc flags may be written without separators in theory; our regex splits numbers, accept 0/1
+    var v = num();
+    return v !== 0;
+  }
+  var subpaths = [];
+  var pts = null;            // current subpath points
+  var x = 0, y = 0;          // current point
+  var sx = 0, sy = 0;        // subpath start
+  var px = null, py = null;  // previous cubic control (for S)
+  var qx = null, qy = null;  // previous quad control (for T)
+  var cmd = null;
+
+  function start(nx, ny) {
+    if (pts && pts.length >= 2) subpaths.push(pts);
+    pts = [[nx, ny]];
+    x = sx = nx; y = sy = ny;
+  }
+  function lineTo(nx, ny) {
+    if (!pts) start(0, 0); // tolerate paths that skip the initial M
+    pts.push([nx, ny]);
+    x = nx; y = ny;
+  }
+  function segCount(approxLen) {
+    return Math.max(minSeg, Math.min(maxSeg, Math.ceil(approxLen)));
+  }
+  function cubicTo(c1x, c1y, c2x, c2y, ex, ey) {
+    var L = Math.hypot(c1x - x, c1y - y) + Math.hypot(c2x - c1x, c2y - c1y) + Math.hypot(ex - c2x, ey - c2y);
+    var n = segCount(L);
+    var x0 = x, y0 = y;
+    for (var k = 1; k <= n; k++) {
+      var t = k / n, u = 1 - t;
+      var a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, dd = t * t * t;
+      lineTo(a * x0 + b * c1x + c * c2x + dd * ex, a * y0 + b * c1y + c * c2y + dd * ey);
+    }
+    px = c2x; py = c2y;
+  }
+  function quadTo(cx2, cy2, ex, ey) {
+    var L = Math.hypot(cx2 - x, cy2 - y) + Math.hypot(ex - cx2, ey - cy2);
+    var n = segCount(L);
+    var x0 = x, y0 = y;
+    for (var k = 1; k <= n; k++) {
+      var t = k / n, u = 1 - t;
+      lineTo(u * u * x0 + 2 * u * t * cx2 + t * t * ex, u * u * y0 + 2 * u * t * cy2 + t * t * ey);
+    }
+    qx = cx2; qy = cy2;
+  }
+  // W3C SVG arc (F.6.5): endpoint to centre parameterisation, then sample
+  function arcTo(rx, ry, rotDeg, largeArc, sweep, ex, ey) {
+    if (rx === 0 || ry === 0) { lineTo(ex, ey); return; }
+    rx = Math.abs(rx); ry = Math.abs(ry);
+    var phi = rotDeg * Math.PI / 180, cosP = Math.cos(phi), sinP = Math.sin(phi);
+    var dx2 = (x - ex) / 2, dy2 = (y - ey) / 2;
+    var x1 = cosP * dx2 + sinP * dy2, y1 = -sinP * dx2 + cosP * dy2;
+    var lam = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry);
+    if (lam > 1) { var s = Math.sqrt(lam); rx *= s; ry *= s; }
+    var sign = (largeArc !== sweep) ? 1 : -1;
+    var den = rx * rx * y1 * y1 + ry * ry * x1 * x1;
+    var rad = Math.max(0, (rx * rx * ry * ry - den) / den);
+    var co = sign * Math.sqrt(rad);
+    var cxp = co * rx * y1 / ry, cyp = -co * ry * x1 / rx;
+    var cx = cosP * cxp - sinP * cyp + (x + ex) / 2;
+    var cy = sinP * cxp + cosP * cyp + (y + ey) / 2;
+    function ang(ux, uy, vx, vy) {
+      var dot = ux * vx + uy * vy, len = Math.hypot(ux, uy) * Math.hypot(vx, vy);
+      var a = Math.acos(Math.min(1, Math.max(-1, dot / len)));
+      return (ux * vy - uy * vx < 0) ? -a : a;
+    }
+    var th1 = ang(1, 0, (x1 - cxp) / rx, (y1 - cyp) / ry);
+    var dth = ang((x1 - cxp) / rx, (y1 - cyp) / ry, (-x1 - cxp) / rx, (-y1 - cyp) / ry);
+    if (!sweep && dth > 0) dth -= 2 * Math.PI;
+    if (sweep && dth < 0) dth += 2 * Math.PI;
+    var n = segCount(Math.abs(dth) * Math.max(rx, ry));
+    for (var k = 1; k <= n; k++) {
+      var t = th1 + dth * (k / n);
+      lineTo(cx + rx * Math.cos(t) * cosP - ry * Math.sin(t) * sinP,
+             cy + rx * Math.cos(t) * sinP + ry * Math.sin(t) * cosP);
+    }
+  }
+
+  while (i < tokens.length) {
+    var t = tokens[i];
+    if (/^[A-Za-z]$/.test(t)) { cmd = t; i++; }
+    else if (cmd === null) throw new Error('path data must start with M');
+    else if (cmd === 'Z' || cmd === 'z') throw new Error('unexpected number after Z in path data');
+    // implicit repetition: M repeats as L / m as l
+    var rel = cmd === cmd.toLowerCase();
+    var C = cmd.toUpperCase();
+    switch (C) {
+      case 'M': {
+        var nx = num(), ny = num();
+        if (rel) { nx += x; ny += y; }
+        start(nx, ny);
+        cmd = rel ? 'l' : 'L';
+        break;
+      }
+      case 'L': { var lx = num(), ly = num(); lineTo(rel ? x + lx : lx, rel ? y + ly : ly); break; }
+      case 'H': { var hx = num(); lineTo(rel ? x + hx : hx, y); break; }
+      case 'V': { var vy = num(); lineTo(x, rel ? y + vy : vy); break; }
+      case 'C': {
+        var a1 = num(), a2 = num(), a3 = num(), a4 = num(), a5 = num(), a6 = num();
+        if (rel) { a1 += x; a2 += y; a3 += x; a4 += y; a5 += x; a6 += y; }
+        cubicTo(a1, a2, a3, a4, a5, a6);
+        break;
+      }
+      case 'S': {
+        var s3 = num(), s4 = num(), s5 = num(), s6 = num();
+        if (rel) { s3 += x; s4 += y; s5 += x; s6 += y; }
+        var r1 = px !== null ? 2 * x - px : x;
+        var r2 = py !== null ? 2 * y - py : y;
+        cubicTo(r1, r2, s3, s4, s5, s6);
+        break;
+      }
+      case 'Q': {
+        var q1 = num(), q2 = num(), q3 = num(), q4 = num();
+        if (rel) { q1 += x; q2 += y; q3 += x; q4 += y; }
+        quadTo(q1, q2, q3, q4);
+        break;
+      }
+      case 'T': {
+        var t3 = num(), t4 = num();
+        if (rel) { t3 += x; t4 += y; }
+        var rq1 = qx !== null ? 2 * x - qx : x;
+        var rq2 = qy !== null ? 2 * y - qy : y;
+        quadTo(rq1, rq2, t3, t4);
+        break;
+      }
+      case 'A': {
+        var rx = num(), ry = num(), rot = num(), laf = flag(), swf = flag(), ax = num(), ay = num();
+        if (rel) { ax += x; ay += y; }
+        arcTo(rx, ry, rot, laf, swf, ax, ay);
+        break;
+      }
+      case 'Z': {
+        if (pts && pts.length) { lineTo(sx, sy); }
+        break;
+      }
+      default: throw new Error('unsupported path command "' + cmd + '"');
+    }
+    var C2 = cmd.toUpperCase();
+    if (C2 !== 'S' && C2 !== 'C') { px = py = null; }
+    if (C2 !== 'Q' && C2 !== 'T') { qx = qy = null; }
+  }
+  if (pts && pts.length >= 2) subpaths.push(pts);
+  return subpaths;
+}
+
+/* ---------- basic shapes -> polylines (in user units) ---------- */
+function shapeToPolylines(tag, attr) {
+  function n(name, dflt) {
+    var v = attr(name);
+    if (v === null || v === undefined || v === '') return dflt;
+    var f = parseFloat(v);
+    return isNaN(f) ? dflt : f;
+  }
+  function ringPoints(cx, cy, rx, ry, steps) {
+    var p = [];
+    for (var k = 0; k <= steps; k++) {
+      var a = (k / steps) * 2 * Math.PI;
+      p.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
+    }
+    return p;
+  }
+  switch (tag) {
+    case 'path': {
+      var d = attr('d');
+      if (!d) return [];
+      return parsePathD(d);
+    }
+    case 'rect': {
+      var rx0 = n('x', 0), ry0 = n('y', 0), w = n('width', 0), h = n('height', 0);
+      if (w <= 0 || h <= 0) return [];
+      return [[[rx0, ry0], [rx0 + w, ry0], [rx0 + w, ry0 + h], [rx0, ry0 + h], [rx0, ry0]]];
+    }
+    case 'circle': {
+      var r = n('r', 0);
+      if (r <= 0) return [];
+      return [ringPoints(n('cx', 0), n('cy', 0), r, r, 64)];
+    }
+    case 'ellipse': {
+      var erx = n('rx', 0), ery = n('ry', 0);
+      if (erx <= 0 || ery <= 0) return [];
+      return [ringPoints(n('cx', 0), n('cy', 0), erx, ery, 64)];
+    }
+    case 'line':
+      return [[[n('x1', 0), n('y1', 0)], [n('x2', 0), n('y2', 0)]]];
+    case 'polyline':
+    case 'polygon': {
+      var raw = (attr('points') || '').match(/[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g);
+      if (!raw || raw.length < 4) return [];
+      var p = [];
+      for (var k = 0; k + 1 < raw.length; k += 2) p.push([parseFloat(raw[k]), parseFloat(raw[k + 1])]);
+      if (tag === 'polygon') p.push([p[0][0], p[0][1]]);
+      return [p];
+    }
+    default:
+      return null; // null = unsupported (reported), [] = supported but empty
+  }
+}
+
+/* ---------- transforms ---------- */
+function matMul(a, b) { // 2x3 affine [a b c d e f] as in SVG matrix(a,b,c,d,e,f)
+  return [
+    a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
+    a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+    a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5],
+  ];
+}
+function matApply(m, p) { return [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]]; }
+function parseTransform(str) {
+  var m = [1, 0, 0, 1, 0, 0];
+  var re = /(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)/g, mm;
+  while ((mm = re.exec(str)) !== null) {
+    var args = (mm[2].match(/[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g) || []).map(parseFloat);
+    var t = null, a;
+    switch (mm[1]) {
+      case 'matrix': if (args.length === 6) t = args; break;
+      case 'translate': t = [1, 0, 0, 1, args[0] || 0, args.length > 1 ? args[1] : 0]; break;
+      case 'scale': t = [args[0] || 1, 0, 0, args.length > 1 ? args[1] : (args[0] || 1), 0, 0]; break;
+      case 'rotate': {
+        a = (args[0] || 0) * Math.PI / 180;
+        var rot = [Math.cos(a), Math.sin(a), -Math.sin(a), Math.cos(a), 0, 0];
+        if (args.length > 2) {
+          t = matMul(matMul([1, 0, 0, 1, args[1], args[2]], rot), [1, 0, 0, 1, -args[1], -args[2]]);
+        } else t = rot;
+        break;
+      }
+      case 'skewX': a = (args[0] || 0) * Math.PI / 180; t = [1, 0, Math.tan(a), 1, 0, 0]; break;
+      case 'skewY': a = (args[0] || 0) * Math.PI / 180; t = [1, Math.tan(a), 0, 1, 0, 0]; break;
+    }
+    if (t) m = matMul(m, t);
+  }
+  return m;
+}
+
+/* ---------- colours ---------- */
+var SVG_NAMED = {
+  black: '#000000', white: '#ffffff', red: '#ff0000', green: '#008000', lime: '#00ff00',
+  blue: '#0000ff', yellow: '#ffff00', orange: '#ffa500', purple: '#800080', pink: '#ffc0cb',
+  brown: '#a52a2a', gray: '#808080', grey: '#808080', gold: '#ffd700', navy: '#000080',
+  teal: '#008080', maroon: '#800000', olive: '#808000', cyan: '#00ffff', magenta: '#ff00ff',
+};
+function parseColorStr(s) {
+  if (!s) return undefined;
+  s = s.trim().toLowerCase();
+  if (s === 'none' || s === 'transparent') return null;
+  if (s === 'currentcolor' || s === 'inherit') return undefined;
+  if (s[0] === '#') {
+    if (s.length === 4) return [parseInt(s[1] + s[1], 16), parseInt(s[2] + s[2], 16), parseInt(s[3] + s[3], 16)];
+    if (s.length >= 7) return [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
+    return undefined;
+  }
+  var rgb = s.match(/^rgba?\(\s*([\d.]+%?)\s*[, ]\s*([\d.]+%?)\s*[, ]\s*([\d.]+%?)/);
+  if (rgb) {
+    return [rgb[1], rgb[2], rgb[3]].map(function (v) {
+      return v.endsWith('%') ? Math.round(parseFloat(v) * 2.55) : Math.round(parseFloat(v));
+    });
+  }
+  if (SVG_NAMED[s]) return parseColorStr(SVG_NAMED[s]);
+  return undefined;
+}
+function nearestThread(rgb, palette) {
+  var best = 0, bd = Infinity;
+  for (var i = 0; i < palette.length; i++) {
+    var p = parseColorStr(palette[i]);
+    var d = Math.pow(rgb[0] - p[0], 2) + Math.pow(rgb[1] - p[1], 2) + Math.pow(rgb[2] - p[2], 2);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+
+/* ---------- simplify (Ramer-Douglas-Peucker, iterative) ---------- */
+function simplifyRDP(pts, tol) {
+  if (pts.length <= 2) return pts.slice();
+  var keep = new Uint8Array(pts.length);
+  keep[0] = keep[pts.length - 1] = 1;
+  var stack = [[0, pts.length - 1]];
+  var t2 = tol * tol;
+  while (stack.length) {
+    var seg = stack.pop(), a = seg[0], b = seg[1];
+    var ax = pts[a][0], ay = pts[a][1], bx = pts[b][0], by = pts[b][1];
+    var dx = bx - ax, dy = by - ay;
+    var len2 = dx * dx + dy * dy;
+    var maxD = -1, maxI = -1;
+    for (var i = a + 1; i < b; i++) {
+      var d;
+      if (len2 === 0) {
+        d = Math.pow(pts[i][0] - ax, 2) + Math.pow(pts[i][1] - ay, 2);
+      } else {
+        var cr = (pts[i][0] - ax) * dy - (pts[i][1] - ay) * dx;
+        d = cr * cr / len2;
+      }
+      if (d > maxD) { maxD = d; maxI = i; }
+    }
+    if (maxD > t2) { keep[maxI] = 1; stack.push([a, maxI], [maxI, b]); }
+  }
+  var out = [];
+  for (var k = 0; k < pts.length; k++) if (keep[k]) out.push(pts[k]);
+  return out;
+}
+
+/* ---------- main conversion: shapes (user units) -> StitchLogo ---------- */
+// shapes: [{ subpaths: [[x,y],...][], fill: '#hex'|null, stroke: '#hex'|null }]
+function convertShapes(shapes, opts) {
+  opts = opts || {};
+  var fitMM = Math.min(Math.max(opts.fitMM || 80, 5), 200);
+  var palette = opts.palette || ['#C8472F', '#31604F', '#3A4E8C', '#D9A441', '#8C4A6B', '#2B2B2B', '#5E8F8C', '#B8651B'];
+  var name = opts.name || 'import';
+  var maxSegments = opts.maxSegments || 1400;
+
+  // clean subpaths: drop NaNs and consecutive duplicates
+  var work = [];
+  var totalRaw = 0;
+  shapes.forEach(function (sh) {
+    if (sh.fill === null && sh.stroke === null) return; // invisible
+    var subs = [];
+    (sh.subpaths || []).forEach(function (pl) {
+      var pts = [], last = null;
+      pl.forEach(function (p) {
+        if (!isFinite(p[0]) || !isFinite(p[1])) return;
+        if (last && Math.abs(p[0] - last[0]) < 1e-9 && Math.abs(p[1] - last[1]) < 1e-9) return;
+        pts.push([p[0], p[1]]); last = p;
+      });
+      totalRaw += pts.length;
+      if (pts.length >= 2) subs.push(pts);
+    });
+    if (subs.length) work.push({ subpaths: subs, fill: sh.fill, stroke: sh.stroke });
+  });
+  if (!work.length) throw new Error('No stitchable outlines found in this SVG (paths, shapes and lines are supported).');
+
+  // bounds in user units
+  var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  work.forEach(function (sh) {
+    sh.subpaths.forEach(function (pl) {
+      pl.forEach(function (p) {
+        if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
+        if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
+      });
+    });
+  });
+  var span = Math.max(maxX - minX, maxY - minY);
+  if (span < 1e-9) throw new Error('SVG geometry has zero size.');
+  var scale = fitMM / span;
+  var cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+
+  // scale, centre, flip y (SVG y-down -> stitch y-up)
+  work.forEach(function (sh) {
+    sh.subpaths = sh.subpaths.map(function (pl) {
+      return pl.map(function (p) { return [(p[0] - cx) * scale, -(p[1] - cy) * scale]; });
+    });
+  });
+
+  // simplify; raise tolerance until under the segment budget
+  var tolLadder = [0.2, 0.3, 0.45, 0.7, 1.0, 1.5, 2.2];
+  var tol, segs;
+  for (var ti = 0; ti < tolLadder.length; ti++) {
+    tol = tolLadder[ti];
+    segs = 0;
+    work.forEach(function (sh) {
+      sh.simp = sh.subpaths.map(function (pl) {
+        var sp = simplifyRDP(pl, tol);
+        segs += Math.max(0, sp.length - 1);
+        return sp;
+      });
+    });
+    if (segs <= maxSegments) break;
+  }
+
+  function pathLen(pl) {
+    var L = 0;
+    for (var i = 1; i < pl.length; i++) L += Math.hypot(pl[i][0] - pl[i - 1][0], pl[i][1] - pl[i - 1][1]);
+    return L;
+  }
+  function isClosed(pl) {
+    return Math.hypot(pl[0][0] - pl[pl.length - 1][0], pl[0][1] - pl[pl.length - 1][1]) < 0.15;
+  }
+  function threadOf(hex) {
+    var rgb = parseColorStr(hex || '') || [0, 0, 0];
+    return nearestThread(rgb, palette);
+  }
+
+  // build jobs
+  var fillJobs = [], strokeJobs = [], procs = [];
+  var procCount = 0;
+  work.forEach(function (sh) {
+    var usable = sh.simp.filter(function (pl) { return pl.length >= 2 && pathLen(pl) >= 1; });
+    if (!usable.length) return;
+    var fillable = null;
+    if (sh.fill !== null) {
+      // rings for filling: need >= 3 distinct points; open subpaths close implicitly (SVG fill semantics)
+      fillable = usable.filter(function (pl) {
+        return pl.length >= (isClosed(pl) ? 4 : 3) && pathLen(pl) >= 3;
+      });
+      if (!fillable.length) fillable = null;
+    }
+    var wantStroke = sh.stroke !== null;
+    if (fillable && wantStroke) {
+      var pname = 'shape_' + (++procCount);
+      procs.push({ name: pname, subpaths: fillable });
+      fillJobs.push({ thread: threadOf(sh.fill), proc: pname, subpaths: fillable });
+      strokeJobs.push({ thread: threadOf(sh.stroke), proc: pname, subpaths: fillable });
+      // stroke any open extras that weren't fillable
+      usable.forEach(function (pl) {
+        if (fillable.indexOf(pl) < 0) strokeJobs.push({ thread: threadOf(sh.stroke), subpaths: [pl] });
+      });
+    } else if (fillable) {
+      fillJobs.push({ thread: threadOf(sh.fill), subpaths: fillable });
+    } else if (wantStroke) {
+      usable.forEach(function (pl) { strokeJobs.push({ thread: threadOf(sh.stroke), subpaths: [pl] }); });
+    }
+  });
+  if (!fillJobs.length && !strokeJobs.length)
+    throw new Error('All outlines were too small to stitch at this size — try a larger "fit" value.');
+
+  // group jobs by thread (order of first appearance), NN-order within groups
+  function groupJobs(jobs, allowReverse) {
+    var groups = [], byThread = {};
+    jobs.forEach(function (j) {
+      if (!(j.thread in byThread)) { byThread[j.thread] = { thread: j.thread, jobs: [] }; groups.push(byThread[j.thread]); }
+      byThread[j.thread].jobs.push(j);
+    });
+    var curX = 0, curY = 0;
+    groups.forEach(function (g) {
+      var remaining = g.jobs.slice(), ordered = [];
+      while (remaining.length) {
+        var bi = 0, brev = false, bd = Infinity;
+        for (var i = 0; i < remaining.length; i++) {
+          var sp = remaining[i].subpaths;
+          var st = sp[0][0], en = sp[sp.length - 1][sp[sp.length - 1].length - 1];
+          var dS = Math.pow(st[0] - curX, 2) + Math.pow(st[1] - curY, 2);
+          var dE = Math.pow(en[0] - curX, 2) + Math.pow(en[1] - curY, 2);
+          if (dS < bd) { bd = dS; bi = i; brev = false; }
+          if (dE < bd) { bd = dE; bi = i; brev = true; }
+        }
+        var chosen = remaining.splice(bi, 1)[0];
+        if (brev && allowReverse && !chosen.proc && chosen.subpaths.length === 1) {
+          chosen = { thread: chosen.thread, subpaths: [chosen.subpaths[0].slice().reverse()] };
+        }
+        ordered.push(chosen);
+        var lastSub = chosen.subpaths[chosen.subpaths.length - 1];
+        curX = lastSub[lastSub.length - 1][0]; curY = lastSub[lastSub.length - 1][1];
+      }
+      g.jobs = ordered;
+    });
+    return groups;
+  }
+  var fillGroups = groupJobs(fillJobs, false);
+  var strokeGroups = groupJobs(strokeJobs, true);
+
+  // ---- code generation ----
+  function fmt(v) {
+    var r = Math.round(v * 100) / 100;
+    if (Object.is(r, -0)) r = 0;
+    return String(r);
+  }
+  // Each subpath starts with an absolute setxy + seth, so traces are
+  // position-independent (safe to re-run from inside procedures).
+  // Closed loop: the simulation uses the rounded values actually emitted.
+  function traceSubpath(pts, indent) {
+    var lines = [];
+    var sim = { x: Math.round(pts[0][0] * 100) / 100, y: Math.round(pts[0][1] * 100) / 100, h: 0 };
+    lines.push(indent + 'up setxy ' + fmt(sim.x) + ' ' + fmt(sim.y) + ' down');
+    for (var i = 1; i < pts.length; i++) {
+      var dx = pts[i][0] - sim.x, dy = pts[i][1] - sim.y;
+      var dist = Math.hypot(dx, dy);
+      if (dist < 0.005) continue;
+      var ht = Math.atan2(dx, dy) * 180 / Math.PI; // heading: 0 = +y, clockwise
+      var turn = ht - sim.h;
+      while (turn > 180) turn -= 360;
+      while (turn <= -180) turn += 360;
+      turn = Math.round(turn * 100) / 100;
+      dist = Math.round(dist * 100) / 100;
+      if (dist < 0.01) continue;
+      var parts = [];
+      if (i === 1) {
+        var hr = Math.round(ht * 100) / 100;
+        parts.push('seth ' + fmt(hr));
+        sim.h = hr;
+      } else if (Math.abs(turn) >= 0.005) {
+        parts.push((turn >= 0 ? 'rt ' : 'lt ') + fmt(Math.abs(turn)));
+        sim.h += turn;
+        while (sim.h > 180) sim.h -= 360;
+        while (sim.h <= -180) sim.h += 360;
+      }
+      parts.push('fd ' + fmt(dist));
+      var hRad = sim.h * Math.PI / 180;
+      sim.x += Math.sin(hRad) * dist;
+      sim.y += Math.cos(hRad) * dist;
+      lines.push(indent + parts.join(' '));
+    }
+    return lines;
+  }
+  function traceJob(job, indent) {
+    var lines = [];
+    job.subpaths.forEach(function (pl) { lines.push.apply(lines, traceSubpath(pl, indent)); });
+    return lines;
+  }
+
+  var lines = [];
+  lines.push('; imported from ' + name);
+  lines.push('; ' + fillJobs.length + ' fill' + (fillJobs.length === 1 ? '' : 's') + ', ' +
+    strokeJobs.length + ' outline' + (strokeJobs.length === 1 ? '' : 's') +
+    ', fit to ' + fitMM + ' mm, simplified to ' + tol + ' mm');
+  lines.push('stitchlen 2.5');
+  procs.forEach(function (pr) {
+    lines.push('', 'to ' + pr.name);
+    lines.push.apply(lines, traceJob({ subpaths: pr.subpaths }, '  '));
+    lines.push('end');
+  });
+  var multiColor = (fillGroups.length + strokeGroups.length) > 1 ||
+    (fillGroups[0] || strokeGroups[0]).thread !== 0;
+  var emittedColor = null;
+  function emitColor(th) {
+    if ((multiColor || th !== 0) && emittedColor !== th) { lines.push('', 'color ' + th); emittedColor = th; }
+  }
+  if (fillGroups.length) {
+    lines.push('', '; --- fills (sewn first, outlines go on top) ---');
+    lines.push('fillangle 45');
+  }
+  fillGroups.forEach(function (g) {
+    emitColor(g.thread);
+    g.jobs.forEach(function (job) {
+      lines.push('', 'beginfill');
+      if (job.proc) lines.push('  ' + job.proc);
+      else lines.push.apply(lines, traceJob(job, '  '));
+      lines.push('endfill');
+    });
+  });
+  if (strokeGroups.length && fillGroups.length) lines.push('', '; --- outlines ---');
+  strokeGroups.forEach(function (g) {
+    emitColor(g.thread);
+    g.jobs.forEach(function (job) {
+      if (job.proc) lines.push('', job.proc);
+      else { lines.push(''); lines.push.apply(lines, traceJob(job, '')); }
+    });
+  });
+
+  return {
+    code: lines.join('\n'),
+    report: {
+      fills: fillJobs.length,
+      outlines: strokeJobs.length,
+      colors: fillGroups.length + strokeGroups.length,
+      pointsRaw: totalRaw,
+      segments: segs,
+      tolerance: tol,
+      fitMM: fitMM,
+    },
+  };
+}
+
+// Back-compat: stroke-only polyline conversion
+function convertPolylines(polys, opts) {
+  return convertShapes(polys.map(function (pl) {
+    return { subpaths: [pl.pts], stroke: pl.color || '#000000', fill: null };
+  }), opts);
+}
+
+/* ---------- DOM layer (browser): SVG text -> shapes -> code ---------- */
+function svgToCode(svgText, opts) {
+  opts = opts || {};
+  var doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+  var pe = doc.querySelector('parsererror');
+  if (pe) throw new Error('Not valid SVG: ' + pe.textContent.split('\n')[0].slice(0, 120));
+  var root = doc.documentElement;
+  if (!root || root.tagName.toLowerCase() !== 'svg') throw new Error('No <svg> root element found.');
+
+  var SKIP = { defs: 1, symbol: 1, clippath: 1, mask: 1, marker: 1, pattern: 1, style: 1, metadata: 1, title: 1, desc: 1, script: 1, lineargradient: 1, radialgradient: 1, filter: 1 };
+  var GROUPS = { svg: 1, g: 1, a: 1, switch: 1 };
+  var shapes = [];
+  var ignored = {};
+
+  function styleProp(el, prop) {
+    var st = el.getAttribute('style');
+    if (st) {
+      var m = st.match(new RegExp('(?:^|;)\\s*' + prop + '\\s*:\\s*([^;]+)'));
+      if (m) return m[1];
+    }
+    return el.getAttribute(prop);
+  }
+  function rgbToHex(rgb) {
+    return '#' + rgb.map(function (v) { return ('0' + Math.min(255, Math.max(0, v)).toString(16)).slice(-2); }).join('');
+  }
+  // returns '#hex' | null (explicitly none) | inherited value
+  function resolvePaint(el, prop, inherited) {
+    var v = parseColorStr(styleProp(el, prop));
+    if (v === undefined) return inherited;
+    return v === null ? null : rgbToHex(v);
+  }
+
+  // SVG defaults: fill is black, stroke is none
+  (function walk(el, mat, paint) {
+    if (el.nodeType !== 1) return;
+    var tag = el.tagName.toLowerCase();
+    if (SKIP[tag]) return;
+    var m = mat;
+    var tr = el.getAttribute && el.getAttribute('transform');
+    if (tr) m = matMul(mat, parseTransform(tr));
+    var p2 = {
+      stroke: resolvePaint(el, 'stroke', paint.stroke),
+      fill: resolvePaint(el, 'fill', paint.fill),
+    };
+    if (GROUPS[tag]) {
+      for (var i = 0; i < el.children.length; i++) walk(el.children[i], m, p2);
+      return;
+    }
+    var polys = shapeToPolylines(tag, function (a) { return el.getAttribute(a); });
+    if (polys === null) { ignored[tag] = (ignored[tag] || 0) + 1; return; }
+    var fill = (tag === 'line') ? null : p2.fill; // a line cannot be filled
+    if (fill === null && p2.stroke === null) { ignored['invisible (fill:none, stroke:none)'] = (ignored['invisible (fill:none, stroke:none)'] || 0) + 1; return; }
+    var subs = polys
+      .filter(function (pts) { return pts.length >= 2; })
+      .map(function (pts) { return pts.map(function (p) { return matApply(m, p); }); });
+    if (subs.length) shapes.push({ subpaths: subs, fill: fill, stroke: p2.stroke });
+  })(root, [1, 0, 0, 1, 0, 0], { stroke: null, fill: '#000000' });
+
+  var result = convertShapes(shapes, opts);
+  result.report.ignored = ignored;
+  return result;
+}
+
+
+
+</script>
+<script>
+// ============================================================
+// StitchLogo playground UI
+// ============================================================
+(function () {
+  'use strict';
+
+  var THREADS = ['#C8472F', '#31604F', '#3A4E8C', '#D9A441', '#8C4A6B', '#2B2B2B', '#5E8F8C', '#B8651B'];
+  var HOOP_R = 50;          // 100 mm hoop, radius in mm
+  var SAFE_R = 47;          // sewable field inside the hoop
+
+  var EXAMPLES = {
+    'bloom — rose of circles': [
+      '; twelve overlapping circles make a rose',
+      'stitchlen 2.2',
+      'repeat 12 [',
+      '  repeat 36 [ fd 3.4 rt 10 ]',
+      '  rt 30',
+      ']',
+    ].join('\n'),
+    'wreath — leaf procedure': [
+      '; a leaf is two 90-degree arcs',
+      'to leaf :s',
+      '  repeat 2 [',
+      '    repeat 30 [ fd :s rt 3 ]',
+      '    rt 90',
+      '  ]',
+      'end',
+      '',
+      'repeat 8 [ leaf 1.2 rt 45 ]',
+    ].join('\n'),
+    'wander — bounded random walk': [
+      '; a random walk that turns back at the edge.',
+      '; change the seed for a new design.',
+      'seed 11',
+      'stitchlen 2',
+      'repeat 420 [',
+      '  fd 2.6',
+      '  rt random 70 - 35',
+      '  if sqrt ( xcor * xcor + ycor * ycor ) > 36 [',
+      '    rt 140 + random 80',
+      '  ]',
+      ']',
+    ].join('\n'),
+    'star — satin stitch': [
+      '; satin makes a zigzag column 3 mm wide',
+      'up setxy -6 -21 down',
+      'satin 3',
+      'repeat 5 [ fd 42 rt 144 ]',
+      'satin 0',
+    ].join('\n'),
+    'badge — tatami fill, bean border': [
+      '; trace a boundary between beginfill/endfill,',
+      '; then retrace it with a bold triple-run line',
+      'fillangle 30',
+      'up setxy -26 -15 down',
+      'beginfill',
+      '  repeat 6 [ fd 30 rt 60 ]',
+      'endfill',
+      '',
+      'color 3',
+      'bean 3',
+      'repeat 6 [ fd 30 rt 60 ]',
+      'bean 1',
+    ].join('\n'),
+    'sampler — four line weights': [
+      '; running, bean, satin, blanket',
+      'stitchlen 2.5',
+      'up setxy -30 27 seth 90 down',
+      'fd 60',
+      'up setxy -30 10 seth 90 down',
+      'bean 3 fd 60 bean 1',
+      'up setxy -30 -8 seth 90 down',
+      'satin 2.5 fd 60 satin 0',
+      'up setxy -30 -24 seth 90 down',
+      'estitch 4 fd 60 estitch 0',
+    ].join('\n'),
+    'waves — sashiko rows': [
+      '; rows of running-stitch scallops',
+      'stitchlen 2.5',
+      'to wave',
+      '  repeat 3 [',
+      '    repeat 18 [ fd 1.1 rt 10 ]',
+      '    repeat 18 [ fd 1.1 lt 10 ]',
+      '  ]',
+      'end',
+      '',
+      'repeat 4 [',
+      '  up setxy 38 repcount * 16 - 40 seth 180 down',
+      '  wave',
+      ']',
+    ].join('\n'),
+    'tree — recursion, sewn out and back': [
+      '; branches retrace themselves (bk) so the',
+      '; whole tree sews as one unbroken thread',
+      'to branch :len',
+      '  if :len < 5 [ fd :len bk :len ]',
+      '  else [',
+      '    fd :len / 2',
+      '    lt 28 branch :len * 0.62 rt 28',
+      '    fd :len / 4',
+      '    rt 32 branch :len * 0.62 lt 32',
+      '    fd :len / 4',
+      '    bk :len',
+      '  ]',
+      'end',
+      '',
+      'up setxy 0 -27 down',
+      'branch 34',
+    ].join('\n'),
+  };
+
+  // ---------- DOM ----------
+  var editor = document.getElementById('editor');
+  var consoleEl = document.getElementById('console');
+  var repl = document.getElementById('repl');
+  var runBtn = document.getElementById('runBtn');
+  var dlBtn = document.getElementById('dlBtn');
+  var examplesSel = document.getElementById('examples');
+  var statsEl = document.getElementById('stats');
+  var canvas = document.getElementById('stage');
+  var ctx = canvas.getContext('2d');
+  var scrub = document.getElementById('scrub');
+  var playBtn = document.getElementById('playBtn');
+  var counter = document.getElementById('counter');
+
+  Object.keys(EXAMPLES).forEach(function (k) {
+    var o = document.createElement('option');
+    o.value = k; o.textContent = k;
+    examplesSel.appendChild(o);
+  });
+
+  // ---------- state ----------
+  var current = { events: [], pts: [], stats: null, warnings: [], name: 'design', ok: false };
+  var playing = false;
+  var playReq = null;
+  var replHistory = [];
+  var replIdx = -1;
+
+  // ---------- console ----------
+  function log(msg, cls) {
+    var d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.textContent = msg;
+    consoleEl.appendChild(d);
+    while (consoleEl.children.length > 40) consoleEl.removeChild(consoleEl.firstChild);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  // ---------- run pipeline ----------
+  function runProgram(fromRepl) {
+    stopPlay();
+    var src = editor.value;
+    var t0 = performance.now();
+    try {
+      var result = run(src);
+      var pts = [];
+      for (var i = 0; i < result.events.length; i++) {
+        var e = result.events[i];
+        if (e.t === 'stitch' || e.t === 'jump') pts.push(e);
+      }
+      current = {
+        events: result.events,
+        pts: pts,
+        stats: designStats(result.events),
+        warnings: result.warnings.slice(),
+        name: current.name,
+        ok: true,
+      };
+      result.printed.forEach(function (p) { log(p, 'prn'); });
+      var ms = Math.round(performance.now() - t0);
+      log((fromRepl ? '› ' : '') + 'sewed ' + current.stats.stitches.toLocaleString() +
+          ' stitches in ' + ms + ' ms' +
+          (result.locks ? ' · secured ' + result.locks + ' thread end' + (result.locks === 1 ? '' : 's') : ''), 'okx');
+      checkHoop();
+      scrub.max = pts.length;
+      scrub.value = pts.length;
+    } catch (err) {
+      current.ok = false;
+      log(String(err.message || err), 'err');
+    }
+    renderStats();
+    draw();
+  }
+
+  function checkHoop() {
+    var s = current.stats;
+    if (!s) return;
+    if (s.maxRadius > SAFE_R)
+      current.warnings.push('design reaches ' + (s.maxRadius * 2).toFixed(0) + ' mm across — outside the 100 mm hoop');
+    var density = s.stitches / Math.max(1, s.width * s.height);
+    if (density > 4) current.warnings.push('very dense (' + density.toFixed(1) + ' st/mm² avg) — may pucker; raise stitchlen or shrink repeats');
+  }
+
+  function renderStats() {
+    statsEl.innerHTML = '';
+    if (!current.stats) return;
+    var s = current.stats;
+    function chip(txt, cls) {
+      var c = document.createElement('span');
+      c.className = 'chip' + (cls ? ' ' + cls : '');
+      c.textContent = txt;
+      statsEl.appendChild(c);
+    }
+    if (!current.ok) { chip('program error — see console', 'err'); return; }
+    chip(s.stitches.toLocaleString() + ' stitches');
+    if (s.jumps) chip(s.jumps + ' jump' + (s.jumps > 1 ? 's' : ''));
+    chip(s.colorsUsed + ' colour' + (s.colorsUsed > 1 ? 's' : ''));
+    chip(s.width.toFixed(1) + ' × ' + s.height.toFixed(1) + ' mm');
+    current.warnings.forEach(function (w) { chip(w, 'warn'); });
+  }
+
+  // ---------- canvas ----------
+  function resizeCanvas() {
+    var box = canvas.parentElement.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(box.width * dpr));
+    canvas.height = Math.max(1, Math.round(box.height * dpr));
+    draw();
+  }
+
+  function draw() {
+    var w = canvas.width, h = canvas.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    var dpr = window.devicePixelRatio || 1;
+
+    // fit hoop + design
+    var ext = HOOP_R + 6;
+    if (current.stats) {
+      ext = Math.max(ext,
+        Math.abs(current.stats.minX), Math.abs(current.stats.maxX),
+        Math.abs(current.stats.minY), Math.abs(current.stats.maxY));
+      ext += 6;
+    }
+    var scale = Math.min(w, h) / (2 * ext);
+    var cx = w / 2, cy = h / 2;
+    function X(mx) { return cx + mx * scale; }
+    function Y(my) { return cy - my * scale; } // flip: y up in mm
+
+    drawHoop(scale, cx, cy, dpr);
+
+    var pts = current.pts;
+    var upto = Math.min(pts.length, parseInt(scrub.value, 10) || 0);
+    if (pts.length === 0) { updateCounter(0); return; }
+
+    // jumps first (under the thread)
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.setLineDash([4 * dpr, 4 * dpr]);
+    ctx.strokeStyle = 'rgba(90,80,60,0.5)';
+    ctx.lineWidth = 1 * dpr;
+    ctx.beginPath();
+    for (var i = 1; i < upto; i++) {
+      if (pts[i].t === 'jump') {
+        ctx.moveTo(X(pts[i - 1].x), Y(pts[i - 1].y));
+        ctx.lineTo(X(pts[i].x), Y(pts[i].y));
+      }
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // thread, batched per colour run
+    var tw = Math.max(1.1 * dpr, Math.min(0.45 * scale, 4.5 * dpr));
+    ctx.lineWidth = tw;
+    var runColor = null;
+    ctx.beginPath();
+    for (var j = 1; j < upto; j++) {
+      var p = pts[j], q = pts[j - 1];
+      if (p.t !== 'stitch') continue;
+      if (p.c !== runColor) {
+        if (runColor !== null) ctx.stroke();
+        runColor = p.c;
+        ctx.strokeStyle = THREADS[runColor % THREADS.length];
+        ctx.beginPath();
+      }
+      ctx.moveTo(X(q.x), Y(q.y));
+      ctx.lineTo(X(p.x), Y(p.y));
+    }
+    if (runColor !== null) ctx.stroke();
+
+    // needle penetration points when zoomed in enough
+    if (scale > 2.4 * dpr) {
+      ctx.fillStyle = 'rgba(40,30,20,0.45)';
+      var r = Math.max(0.8 * dpr, 0.09 * scale);
+      for (var k = 0; k < upto; k++) {
+        if (pts[k].t !== 'stitch') continue;
+        ctx.beginPath();
+        ctx.arc(X(pts[k].x), Y(pts[k].y), r, 0, 6.2832);
+        ctx.fill();
+      }
+    }
+
+    // needle marker while scrubbed back
+    if (upto > 0 && upto < pts.length) {
+      var n = pts[upto - 1];
+      ctx.strokeStyle = '#1B2030';
+      ctx.lineWidth = 1.4 * dpr;
+      ctx.beginPath();
+      ctx.arc(X(n.x), Y(n.y), 4.5 * dpr, 0, 6.2832);
+      ctx.stroke();
+    }
+    updateCounter(upto);
+  }
+
+  function drawHoop(scale, cx, cy, dpr) {
+    var rIn = HOOP_R * scale, rOut = (HOOP_R + 4.5) * scale;
+    // outer ring (wood)
+    var g = ctx.createRadialGradient(cx, cy, rIn, cx, cy, rOut);
+    g.addColorStop(0, '#C99A5C'); g.addColorStop(0.5, '#B98B4E'); g.addColorStop(1, '#8F6A38');
+    ctx.beginPath();
+    ctx.arc(cx, cy, rOut, 0, 6.2832);
+    ctx.arc(cx, cy, rIn, 0, 6.2832, true);
+    ctx.fillStyle = g; ctx.fill();
+    // inner shadow on fabric
+    ctx.beginPath();
+    ctx.arc(cx, cy, rIn, 0, 6.2832);
+    ctx.strokeStyle = 'rgba(90,70,40,0.35)'; ctx.lineWidth = 1.5 * dpr; ctx.stroke();
+    // hoop screw at the top
+    var sw = 9 * dpr, sh = 14 * dpr;
+    ctx.fillStyle = '#7E5C2E';
+    ctx.fillRect(cx - sw / 2, cy - rOut - sh * 0.55, sw, sh * 0.8);
+    ctx.beginPath();
+    ctx.arc(cx, cy - rOut - sh * 0.55, sw * 0.62, 0, 6.2832);
+    ctx.fillStyle = '#6B4D25'; ctx.fill();
+  }
+
+  function updateCounter(upto) {
+    counter.textContent = upto.toLocaleString() + ' / ' + current.pts.length.toLocaleString() + ' stitches';
+  }
+
+  // ---------- playback ----------
+  function stopPlay() {
+    playing = false;
+    playBtn.textContent = '▶';
+    if (playReq) { cancelAnimationFrame(playReq); playReq = null; }
+  }
+  playBtn.addEventListener('click', function () {
+    if (playing) { stopPlay(); return; }
+    if (current.pts.length === 0) return;
+    if (parseInt(scrub.value, 10) >= current.pts.length) scrub.value = 0;
+    playing = true;
+    playBtn.textContent = '❚❚';
+    var perFrame = Math.max(1, Math.round(current.pts.length / 420)); // ~7 s at 60 fps
+    (function step() {
+      if (!playing) return;
+      var v = parseInt(scrub.value, 10) + perFrame;
+      if (v >= current.pts.length) { scrub.value = current.pts.length; draw(); stopPlay(); return; }
+      scrub.value = v;
+      draw();
+      playReq = requestAnimationFrame(step);
+    })();
+  });
+  scrub.addEventListener('input', function () { stopPlay(); draw(); });
+
+  // ---------- DST download ----------
+  dlBtn.addEventListener('click', function () {
+    if (!current.ok || current.pts.length === 0) {
+      log('nothing to export — run a program with at least one stitch first', 'err');
+      return;
+    }
+    try {
+      var bytes = toDST(current.events, current.name);
+      var blob = new Blob([bytes], { type: 'application/octet-stream' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = current.name.replace(/[^a-z0-9_-]+/gi, '_').toLowerCase() + '.dst';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+      log('exported ' + a.download + ' (' + bytes.length.toLocaleString() + ' bytes)', 'okx');
+    } catch (e) {
+      log('DST export failed: ' + e.message, 'err');
+    }
+  });
+
+  // ---------- editor & REPL ----------
+  runBtn.addEventListener('click', function () { runProgram(false); });
+  editor.addEventListener('keydown', function (ev) {
+    if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') { ev.preventDefault(); runProgram(false); }
+    if (ev.key === 'Tab') {
+      ev.preventDefault();
+      var s = editor.selectionStart, e = editor.selectionEnd;
+      editor.value = editor.value.slice(0, s) + '  ' + editor.value.slice(e);
+      editor.selectionStart = editor.selectionEnd = s + 2;
+    }
+  });
+
+  repl.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') {
+      var line = repl.value.trim();
+      if (!line) return;
+      replHistory.push(line);
+      replIdx = replHistory.length;
+      var v = editor.value;
+      editor.value = v + (v && !v.endsWith('\n') ? '\n' : '') + line;
+      editor.scrollTop = editor.scrollHeight;
+      repl.value = '';
+      runProgram(true);
+    } else if (ev.key === 'ArrowUp') {
+      if (replIdx > 0) { replIdx--; repl.value = replHistory[replIdx]; ev.preventDefault(); }
+    } else if (ev.key === 'ArrowDown') {
+      if (replIdx < replHistory.length - 1) { replIdx++; repl.value = replHistory[replIdx]; }
+      else { replIdx = replHistory.length; repl.value = ''; }
+      ev.preventDefault();
+    }
+  });
+
+  // ---------- SVG import ----------
+  var svgBtn = document.getElementById('svgBtn');
+  var svgFile = document.getElementById('svgFile');
+  var fitMM = document.getElementById('fitMM');
+
+  function importSVGText(text, filename) {
+    try {
+      var fit = parseFloat(fitMM.value) || 80;
+      var res = svgToCode(text, { fitMM: fit, palette: THREADS, name: filename, maxSegments: 1400 });
+      editor.value = res.code;
+      editor.scrollTop = 0;
+      current.name = filename.replace(/\.svg$/i, '') || 'import';
+      var rep = res.report;
+      log('imported ' + filename + ' — ' + rep.fills + ' fill' + (rep.fills === 1 ? '' : 's') +
+          ', ' + rep.outlines + ' outline' + (rep.outlines === 1 ? '' : 's') +
+          ', ' + rep.segments + ' segments (simplified to ' + rep.tolerance + ' mm), ' +
+          rep.colors + ' colour group' + (rep.colors === 1 ? '' : 's'), 'okx');
+      var ig = Object.keys(rep.ignored || {});
+      if (ig.length) {
+        log('skipped unsupported elements: ' + ig.map(function (k) { return rep.ignored[k] + ' <' + k + '>'; }).join(', '));
+      }
+      runProgram(false);
+    } catch (err) {
+      log('SVG import failed: ' + (err.message || err), 'err');
+    }
+  }
+  function importSVGFile(file) {
+    var reader = new FileReader();
+    reader.onload = function () { importSVGText(String(reader.result), file.name); };
+    reader.onerror = function () { log('could not read ' + file.name, 'err'); };
+    reader.readAsText(file);
+  }
+  svgBtn.addEventListener('click', function () { svgFile.click(); });
+  svgFile.addEventListener('change', function () {
+    if (svgFile.files && svgFile.files[0]) importSVGFile(svgFile.files[0]);
+    svgFile.value = '';
+  });
+  var dragDepth = 0;
+  document.addEventListener('dragenter', function (e) { e.preventDefault(); dragDepth++; document.body.classList.add('dragging'); });
+  document.addEventListener('dragover', function (e) { e.preventDefault(); });
+  document.addEventListener('dragleave', function () { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+  document.addEventListener('drop', function (e) {
+    e.preventDefault();
+    dragDepth = 0;
+    document.body.classList.remove('dragging');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f) return;
+    if (/\.svg$/i.test(f.name) || f.type === 'image/svg+xml') importSVGFile(f);
+    else log('only .svg files can be imported', 'err');
+  });
+
+  examplesSel.addEventListener('change', function () {
+    editor.value = EXAMPLES[examplesSel.value];
+    current.name = examplesSel.value.split(' ')[0];
+    runProgram(false);
+  });
+
+  window.addEventListener('resize', resizeCanvas);
+
+  // ---------- boot ----------
+  editor.value = EXAMPLES[Object.keys(EXAMPLES)[0]];
+  current.name = 'bloom';
+  resizeCanvas();
+  runProgram(false);
+})();
+
+</script>
+</body>
+</html>

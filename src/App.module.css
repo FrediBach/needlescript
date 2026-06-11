@@ -1,0 +1,20 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(330px, 44%) 1fr;
+  min-height: 0;
+}
+
+@media (max-width: 880px) {
+  .main {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(280px, 45%) 1fr;
+  }
+}
