@@ -87,7 +87,7 @@ export function scatter(
   const place = (p: Pt) => {
     if (pts.length >= maxPoints)
       throw new NeedlescriptError(
-        `scatter: over ${maxPoints.toLocaleString()} points — raise mindist`,
+        `scatter: over ${maxPoints.toLocaleString('en-US')} points — raise mindist`,
         line,
       );
     grid[gy(p) * gw + gx(p)] = pts.length;

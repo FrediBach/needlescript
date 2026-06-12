@@ -27,7 +27,7 @@ const fromPaths64 = (paths: Paths64): Pt[][] =>
 function checkVertexBudget(what: string, count: number, line?: number) {
   if (count > MAX_CLIP_VERTICES)
     throw new NeedlescriptError(
-      `${what}: too many vertices (${count.toLocaleString()}, limit ${MAX_CLIP_VERTICES.toLocaleString()} per call)`,
+      `${what}: too many vertices (${count.toLocaleString('en-US')}, limit ${MAX_CLIP_VERTICES.toLocaleString('en-US')} per call)`,
       line,
     );
 }

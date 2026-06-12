@@ -137,7 +137,7 @@ export function resample(path: Pt[], spacing: number, maxPoints: number, line?: 
   // chord ≤ arc, so the output can't exceed total/spacing + endpoints
   if (total / spacing + 2 > maxPoints)
     throw new NeedlescriptError(
-      `List too long (resample would produce over ${maxPoints.toLocaleString()} points)`,
+      `List too long (resample would produce over ${maxPoints.toLocaleString('en-US')} points)`,
       line,
     );
   const out: Pt[] = [[path[0][0], path[0][1]]];

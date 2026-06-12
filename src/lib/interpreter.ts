@@ -90,7 +90,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     cells += n;
     if (cells > LIMITS.maxListCells)
       throw new NeedlescriptError(
-        `Too many list cells (over ${LIMITS.maxListCells.toLocaleString()}) — stopped`,
+        `Too many list cells (over ${LIMITS.maxListCells.toLocaleString('en-US')}) — stopped`,
         line,
       );
     tickN(n, line);
@@ -100,7 +100,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   function allocList(items: Val[], line?: number): NsList {
     if (items.length > LIMITS.maxListLen)
       throw new NeedlescriptError(
-        `List too long (${items.length.toLocaleString()} elements, limit ${LIMITS.maxListLen.toLocaleString()})`,
+        `List too long (${items.length.toLocaleString('en-US')} elements, limit ${LIMITS.maxListLen.toLocaleString('en-US')})`,
         line,
       );
     charge(items.length, line);
@@ -169,7 +169,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const count = Math.max(0, Math.ceil((b - a) / s - 1e-9));
         if (count > LIMITS.maxListLen)
           throw new NeedlescriptError(
-            `List too long (${count.toLocaleString()} elements, limit ${LIMITS.maxListLen.toLocaleString()})`,
+            `List too long (${count.toLocaleString('en-US')} elements, limit ${LIMITS.maxListLen.toLocaleString('en-US')})`,
             line,
           );
         const out: Val[] = [];
@@ -186,7 +186,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           );
         if (r > LIMITS.maxListLen)
           throw new NeedlescriptError(
-            `List too long (${r.toLocaleString()} elements, limit ${LIMITS.maxListLen.toLocaleString()})`,
+            `List too long (${r.toLocaleString('en-US')} elements, limit ${LIMITS.maxListLen.toLocaleString('en-US')})`,
             line,
           );
         const out: Val[] = [];
@@ -339,7 +339,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       const pts = pathArg(i, min);
       if (pts.length > LIMITS.maxDelaunayPoints)
         throw new NeedlescriptError(
-          `${name}: too many points (${pts.length.toLocaleString()}, limit ${LIMITS.maxDelaunayPoints.toLocaleString()})`,
+          `${name}: too many points (${pts.length.toLocaleString('en-US')}, limit ${LIMITS.maxDelaunayPoints.toLocaleString('en-US')})`,
           line,
         );
       tickN(pts.length, line);
@@ -402,7 +402,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           m.warnings.push(`chaikin iterations ${formatNum(sc(1))} clamped to ${n} (range 1–6)`);
         if (p.length * Math.pow(2, n) > LIMITS.maxListLen)
           throw new NeedlescriptError(
-            `List too long (chaikin would produce over ${LIMITS.maxListLen.toLocaleString()} points)`,
+            `List too long (chaikin would produce over ${LIMITS.maxListLen.toLocaleString('en-US')} points)`,
             line,
           );
         return path(gm.chaikin(p, n));
@@ -872,7 +872,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             const xs = list(a[0], st.name, st.line);
             if (xs.items.length + 1 > LIMITS.maxListLen)
               throw new NeedlescriptError(
-                `List too long (limit ${LIMITS.maxListLen.toLocaleString()} elements)`,
+                `List too long (limit ${LIMITS.maxListLen.toLocaleString('en-US')} elements)`,
                 st.line,
               );
             checkDepth(a[1], st.line);
@@ -885,7 +885,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             const xs = list(a[0], 'insertat', st.line);
             if (xs.items.length + 1 > LIMITS.maxListLen)
               throw new NeedlescriptError(
-                `List too long (limit ${LIMITS.maxListLen.toLocaleString()} elements)`,
+                `List too long (limit ${LIMITS.maxListLen.toLocaleString('en-US')} elements)`,
                 st.line,
               );
             // 0…len allowed: inserting at len appends.

@@ -58,7 +58,7 @@ export class Machine {
   _push(t: EventType, x: number, y: number, u = false) {
     if (this.events.length >= LIMITS.maxStitches)
       throw new NeedlescriptError(
-        `Design exceeds ${LIMITS.maxStitches.toLocaleString()} stitches — stopped. Reduce repeats, raise stitchlen, or raise fillspacing.`,
+        `Design exceeds ${LIMITS.maxStitches.toLocaleString('en-US')} stitches — stopped. Reduce repeats, raise stitchlen, or raise fillspacing.`,
       );
     const ev: StitchEvent = { t, x, y, c: this.colorIdx, line: this.currentLine };
     if (u) ev.u = 1;
