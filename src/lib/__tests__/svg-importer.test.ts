@@ -221,7 +221,7 @@ describe('svgToCode', () => {
       const { code } = svgToCode(fillAndStroke);
       expect(code).toContain('beginfill');
       // Both fill and stroke use the same procedure
-      expect(code).toMatch(/to shape_\d/);
+      expect(code).toMatch(/def shape_\d\(\)/);
     });
   });
 

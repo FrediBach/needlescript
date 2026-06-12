@@ -59,6 +59,9 @@ export const ZERO_FUNCS = new Set(['repcount', 'xcor', 'ycor', 'heading']);
 export const RESERVED = new Set<string>([
   'to', 'end', 'repeat', 'if', 'else', 'make', 'local',
   'while', 'for', 'output', 'op', 'exit', 'and', 'or',
+  // Modern syntax (RFC-1). 'in' is reserved for future use; 'true'/'false'
+  // lex as the numbers 1/0 but are reserved so definitions error loudly.
+  'let', 'def', 'return', 'step', 'true', 'false', 'in',
   ...Object.keys(ALIASES),
   ...Object.keys(BUILTIN_ARITY),
   ...Object.keys(QWORD_BUILTINS),

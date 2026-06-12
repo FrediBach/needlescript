@@ -56,6 +56,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       case 'var': {
         if (env && node.name in env) return env[node.name];
         if (node.name in globals) return globals[node.name];
+        // Bare reads only parse when the pre-scan saw the name being assigned
+        // somewhere — so a miss here means it was never assigned on the path
+        // that actually ran (e.g.  if 0 [ x = 5 ] print x ).
+        if (node.bare)
+          throw new NeedlescriptError(
+            `Variable "${node.name}" was never assigned on this path`,
+            node.line,
+          );
         throw new NeedlescriptError(
           `Unknown variable :${node.name}${didYouMean(node.name, [
             ...(env ? Object.keys(env) : []),

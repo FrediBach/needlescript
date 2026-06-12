@@ -1,11 +1,15 @@
 // ---------- Shared types ----------
 
-export type TokenType = 'num' | 'var' | 'qword' | 'word' | 'op' | '[' | ']' | '(' | ')';
+export type TokenType = 'num' | 'var' | 'qword' | 'word' | 'op' | '[' | ']' | '(' | ')' | ',';
 
 export interface Token {
   t: TokenType;
   v?: string | number;
   line: number;
+  /** Start character offset in the source (inclusive). */
+  start: number;
+  /** End character offset in the source (exclusive). */
+  end: number;
   spBefore?: boolean;
   spAfter?: boolean;
 }
@@ -61,7 +65,7 @@ export type ASTNode =
 
 export type ExprNode =
   | { k: 'num'; v: number }
-  | { k: 'var'; name: string; line: number }
+  | { k: 'var'; name: string; line: number; bare?: boolean }
   | { k: 'neg'; val: ExprNode; line: number }
   | { k: 'bin'; op: string; left: ExprNode; right: ExprNode }
   | { k: 'func'; name: string; args: ExprNode[]; line: number }

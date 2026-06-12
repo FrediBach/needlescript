@@ -3,6 +3,9 @@
 import type { Token, TokenType } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
 
+/** Compound assignment operators (statement position only — see parser). */
+export const COMPOUND_ASSIGN_OPS = new Set(['+=', '-=', '*=', '/=']);
+
 export function tokenize(src: string): Token[] {
   const tokens: Token[] = [];
   let i = 0;
@@ -13,18 +16,50 @@ export function tokenize(src: string): Token[] {
   while (i < src.length) {
     const c = src[i];
     if (c === '\n') { line++; i++; continue; }
-    if (c === ';') { while (i < src.length && src[i] !== '\n') i++; continue; }
+    // Comments: ";" and "#" to end of line, plus "//" (two adjacent slashes —
+    // a lone "/" is still division).
+    if (c === ';' || c === '#' || (c === '/' && src[i + 1] === '/')) {
+      while (i < src.length && src[i] !== '\n') i++;
+      continue;
+    }
     if (/\s/.test(c)) { i++; continue; }
-    if ('[]()'.includes(c)) { tokens.push({ t: c as TokenType, line }); i++; continue; }
-    if ('+-*/<>=!'.includes(c)) {
+    if ('[]()'.includes(c)) {
+      tokens.push({ t: c as TokenType, line, start: i, end: i + 1 });
+      i++;
+      continue;
+    }
+    if (c === ',') {
+      tokens.push({ t: ',', line, start: i, end: i + 1 });
+      i++;
+      continue;
+    }
+    // ".." is reserved for future syntax (a lone "." already errors below).
+    if (c === '.' && src[i + 1] === '.') {
+      throw new NeedlescriptError('".." is reserved for future syntax', line);
+    }
+    if ('+-*/<>=!%'.includes(c)) {
       const spBefore = i === 0 || /[\s[(]/.test(src[i - 1]);
       let op = c;
       if ((c === '<' || c === '>' || c === '!') && src[i + 1] === '=') op = c + '=';
-      else if (c === '!')
-        throw new NeedlescriptError('Unexpected character "!" — use != to compare', line);
+      else if (c === '=' && src[i + 1] === '=') op = '=='; // == is the same comparison as =
+      else if ('+-*/'.includes(c) && src[i + 1] === '=') op = c + '='; // compound assignment
       const after = i + op.length;
+      if (c === '!' && op === '!') {
+        // Prefix "!" is the same token as "not" (maximal munch: != was caught above).
+        tokens.push({ t: 'word', v: 'not', line, start: i, end: i + 1 });
+        i++;
+        continue;
+      }
       const spAfter = after >= src.length || /\s/.test(src[after]);
-      tokens.push({ t: 'op', v: op, line, spBefore, spAfter });
+      tokens.push({
+        t: 'op',
+        v: op === '==' ? '=' : op,
+        line,
+        start: i,
+        end: after,
+        spBefore,
+        spAfter,
+      });
       i = after;
       continue;
     }
@@ -33,7 +68,7 @@ export function tokenize(src: string): Token[] {
       while (j < src.length && /[0-9.]/.test(src[j])) j++;
       const v = parseFloat(src.slice(i, j));
       if (isNaN(v)) throw new NeedlescriptError(`Bad number "${src.slice(i, j)}"`, line);
-      tokens.push({ t: 'num', v, line });
+      tokens.push({ t: 'num', v, line, start: i, end: j });
       i = j;
       continue;
     }
@@ -41,22 +76,38 @@ export function tokenize(src: string): Token[] {
       let j = i + 1;
       while (j < src.length && isWordChar(src[j])) j++;
       if (j === i + 1) throw new NeedlescriptError('Expected a name after ":"', line);
-      tokens.push({ t: 'var', v: src.slice(i + 1, j).toLowerCase(), line });
+      tokens.push({ t: 'var', v: src.slice(i + 1, j).toLowerCase(), line, start: i, end: j });
       i = j;
       continue;
     }
     if (c === '"') {
+      // Word-string rule: consume the maximal run of word characters. If the
+      // immediately following character is another quote, consume it too —
+      // "knit" and "knit produce the same token. The check is local and O(1),
+      // so two legacy qwords on one line ( make "x 5 print "y 6 ) still lex
+      // as two separate words.
       let j = i + 1;
       while (j < src.length && isWordChar(src[j])) j++;
-      if (j === i + 1) throw new NeedlescriptError('Expected a name after the quote (")', line);
-      tokens.push({ t: 'qword', v: src.slice(i + 1, j).toLowerCase(), line });
+      if (j === i + 1) {
+        if (src[j] === '"') throw new NeedlescriptError('Empty string ""', line);
+        throw new NeedlescriptError('Expected a name after the quote (")', line);
+      }
+      const v = src.slice(i + 1, j).toLowerCase();
+      if (src[j] === '"') j++; // closing quote (optional, modern style)
+      tokens.push({ t: 'qword', v, line, start: i, end: j });
       i = j;
       continue;
     }
     if (/[A-Za-z_]/.test(c)) {
       let j = i;
       while (j < src.length && isWordChar(src[j])) j++;
-      tokens.push({ t: 'word', v: src.slice(i, j).toLowerCase(), line });
+      const w = src.slice(i, j).toLowerCase();
+      // true/false are constant-folded to 1/0 — they are numbers, not names.
+      if (w === 'true' || w === 'false') {
+        tokens.push({ t: 'num', v: w === 'true' ? 1 : 0, line, start: i, end: j });
+      } else {
+        tokens.push({ t: 'word', v: w, line, start: i, end: j });
+      }
       i = j;
       continue;
     }

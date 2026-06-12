@@ -321,16 +321,16 @@ describe('source line tagging', () => {
 
 // ── did-you-mean ────────────────────────────────────────────────────────────
 describe('did-you-mean suggestions', () => {
-  it('suggests close command names', () => {
-    expect(() => run('stichlen 2')).toThrow(/did you mean "stitchlen"/);
+  it('suggests close command names, labelled with their kind', () => {
+    expect(() => run('stichlen 2')).toThrow(/did you mean the command "stitchlen"/);
   });
 
   it('suggests close variable names', () => {
     expect(() => run('make "size 5 fd :sive')).toThrow(/did you mean "size"/);
   });
 
-  it('suggests user procedure names', () => {
-    expect(() => run('to petal fd 1 end petall')).toThrow(/did you mean "petal"/);
+  it('suggests user procedure names, labelled with their kind', () => {
+    expect(() => run('to petal fd 1 end petall')).toThrow(/did you mean the procedure "petal"/);
   });
 
   it('stays silent when nothing is close', () => {

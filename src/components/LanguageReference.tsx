@@ -108,12 +108,12 @@ export default function LanguageReference() {
         <h3>Control</h3>
         <div><code>repeat <i>n</i> [ … ]</code><span>loop; <code>repcount</code> is the 1-based counter</span></div>
         <div><code>while <i>cond</i> [ … ]</code><span>loop while the condition is true (non-zero)</span></div>
-        <div><code>for "i <i>from to step</i> [ … ]</code><span>counted loop; read the counter with <code>:i</code></span></div>
-        <div><code>if <i>cond</i> [ … ] else [ … ]</code><span>compare with <code>&lt; &gt; = &lt;= &gt;= !=</code>, combine with <code>and or not</code> (0 is false)</span></div>
-        <div><code>to <i>name</i> :a :b … end</code><span>define a procedure with parameters</span></div>
-        <div><code>output <i>expr</i> · exit</code><span>return a value from a procedure (use it like <code>fd double 5</code>) · leave the procedure early</span></div>
-        <div><code>make "x <i>expr</i> · :x</code><span>set and read variables</span></div>
-        <div><code>local "x <i>expr</i></code><span>a variable that exists only inside the current procedure</span></div>
+        <div><code>for i = <i>from</i> to <i>to</i> step <i>s</i> [ … ]</code><span>counted loop, inclusive; <code>step</code> optional (default 1, may be negative). Classic: <code>for "i <i>from to step</i> [ … ]</code></span></div>
+        <div><code>if <i>cond</i> [ … ] else if <i>c2</i> [ … ] else [ … ]</code><span>compare with <code>&lt; &gt; = == &lt;= &gt;= !=</code>, combine with <code>and or not</code> (<code>!</code>); <code>true</code>/<code>false</code> are 1/0</span></div>
+        <div><code>def <i>name</i>(a, b) [ … ]</code><span>define a procedure; classic: <code>to <i>name</i> :a :b … end</code></span></div>
+        <div><code>return <i>expr</i> · return</code><span>return a value from a procedure (use it like <code>fd double(5)</code>) · leave early. Classic: <code>output</code> / <code>exit</code></span></div>
+        <div><code>let x = <i>expr</i> · x = <i>expr</i> · x += <i>expr</i></code><span>declare (global at top level, local in a procedure) · assign · compound assign; read as <code>x</code>. Classic: <code>make "x <i>expr</i></code> / <code>local "x <i>expr</i></code> / <code>:x</code></span></div>
+        <div><code>f(a, b) · f a b</code><span>call anything with parens (glued to the name: <code>fd(10)</code> calls, <code>fd (10)</code> groups) or classic prefix style — they mix freely</span></div>
 
         <h3>SVG import</h3>
         <div>
@@ -129,7 +129,7 @@ export default function LanguageReference() {
         <h3>Values</h3>
         <div><code>random <i>n</i></code><span>0…n — reproducible; reseed with <code>seed <i>n</i></code></span></div>
         <div><code>noise <i>x</i> · noise2 <i>x y</i></code><span>smooth seeded noise 0…1 — sample slowly (e.g. <code>noise2 xcor / 18 ycor / 18</code>) for organic drift</span></div>
-        <div><code>sin cos sqrt abs round mod</code><span>math (degrees); also <code>floor ceil min max pow</code></span></div>
+        <div><code>sin cos sqrt abs round mod</code><span>math (degrees); also <code>floor ceil min max pow</code> and the <code>%</code> operator (floor modulo, same as <code>mod</code>)</span></div>
         <div><code>atan <i>x y</i> · towards <i>x y</i> · distance <i>x y</i></code><span>heading of a vector · heading and distance from the needle to a point</span></div>
         <div><code>xcor ycor heading repcount</code><span>where the needle is right now</span></div>
 
@@ -138,7 +138,7 @@ export default function LanguageReference() {
         <div><code>mark</code><span>drop a numbered pin on the preview at the needle — never exported to the machine</span></div>
         <div><code>assert <i>cond</i></code><span>stop with an error (and line number) if the condition is false</span></div>
         <div><code>playback scrubber</code><span>scrub or play the stitch sequence — the source line being sewn is highlighted in the editor</span></div>
-        <div><code>; comment</code><span>rest of line ignored</span></div>
+        <div><code>// comment · # comment · ; comment</code><span>rest of line ignored (a lone <code>/</code> still divides)</span></div>
       </div>
     </details>
   );

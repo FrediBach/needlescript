@@ -544,7 +544,7 @@ export function convertShapes(shapes: Shape[], opts: ConvertOptions = {}): Conve
       y: Math.round(pts[0][1] * 100) / 100,
       h: 0,
     };
-    lines.push(`${indent}up setxy ${fmt(sim.x)} ${fmt(sim.y)} down`);
+    lines.push(`${indent}up setxy(${fmt(sim.x)}, ${fmt(sim.y)}) down`);
     for (let i = 1; i < pts.length; i++) {
       const dx = pts[i][0] - sim.x, dy = pts[i][1] - sim.y;
       const dist = Math.hypot(dx, dy);
@@ -583,18 +583,18 @@ export function convertShapes(shapes: Shape[], opts: ConvertOptions = {}): Conve
   }
 
   const lines: string[] = [];
-  lines.push(`; imported from ${name}`);
+  lines.push(`// imported from ${name}`);
   lines.push(
-    `; ${fillJobs.length} fill${fillJobs.length === 1 ? '' : 's'}, ` +
+    `// ${fillJobs.length} fill${fillJobs.length === 1 ? '' : 's'}, ` +
     `${strokeJobs.length} outline${strokeJobs.length === 1 ? '' : 's'}, ` +
     `fit to ${fitMM} mm, simplified to ${tol} mm`,
   );
   lines.push('stitchlen 2.5');
 
   procs.forEach(pr => {
-    lines.push('', `to ${pr.name}`);
+    lines.push('', `def ${pr.name}() [`);
     lines.push(...traceJob({ thread: 0, subpaths: pr.subpaths }, '  '));
-    lines.push('end');
+    lines.push(']');
   });
 
   const multiColor =
@@ -610,23 +610,23 @@ export function convertShapes(shapes: Shape[], opts: ConvertOptions = {}): Conve
   }
 
   if (fillGroups.length) {
-    lines.push('', '; --- fills (sewn first, outlines go on top) ---');
+    lines.push('', '// --- fills (sewn first, outlines go on top) ---');
     lines.push('fillangle 45');
   }
   fillGroups.forEach(g => {
     emitColor(g.thread);
     g.jobs.forEach(job => {
       lines.push('', 'beginfill');
-      if (job.proc) lines.push(`  ${job.proc}`);
+      if (job.proc) lines.push(`  ${job.proc}()`);
       else lines.push(...traceJob(job, '  '));
       lines.push('endfill');
     });
   });
-  if (strokeGroups.length && fillGroups.length) lines.push('', '; --- outlines ---');
+  if (strokeGroups.length && fillGroups.length) lines.push('', '// --- outlines ---');
   strokeGroups.forEach(g => {
     emitColor(g.thread);
     g.jobs.forEach(job => {
-      if (job.proc) lines.push('', job.proc);
+      if (job.proc) lines.push('', `${job.proc}()`);
       else { lines.push(''); lines.push(...traceJob(job, '')); }
     });
   });

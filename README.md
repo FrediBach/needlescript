@@ -5,20 +5,20 @@ A Logo-inspired programming language and playground for **generative embroidery*
 The goal: let creatives make embroidery that can't easily be drawn in traditional embroidery software — noise fields, recursion, parametric curves, randomness with a seed.
 
 ```text
-; strands drift through a smooth noise field
-to strand
+// strands drift through a smooth noise field
+def strand() [
   repeat 90 [
-    seth ( noise2 xcor / 16 ycor / 16 ) * 720
+    seth (noise2 xcor / 16 ycor / 16) * 720
     fd 1.8
-    if distance 0 0 > 40 [ exit ]
+    if distance(0, 0) > 40 [ return ]
   ]
-end
+]
 
 seed 9
 stitchlen 2
 repeat 14 [
-  up setxy random 64 - 32 random 64 - 32 down
-  strand
+  up setxy(random(64) - 32, random(64) - 32) down
+  strand()
   trim
 ]
 ```
@@ -52,10 +52,15 @@ The app is a React 19 + TypeScript + Vite single-page app. The language engine i
 ```
 src/
 ├── lib/                  the language engine (DOM-free)
-│   ├── engine.ts         tokenizer, parser, interpreter, stitch machine, fills, locks
+│   ├── engine.ts         public library surface (re-exports everything below)
+│   ├── tokenizer.ts      source → tokens (with character offsets)
+│   ├── prescan.ts        procedures, globals and locals, collected before parsing
+│   ├── parser.ts         tokens → AST (modern + classic syntax)
+│   ├── interpreter.ts    AST → stitch events
+│   ├── machine.ts        stitch machine: satin, fills, underlay, limits
+│   ├── postprocess.ts    locks, autotrim, density analysis, stats
 │   ├── dst.ts            Tajima .DST binary encoder
 │   ├── svg-importer.ts   SVG → Needlescript source converter
-│   ├── index.ts          public library surface
 │   └── __tests__/        Vitest suites (the de-facto behavioural spec)
 ├── components/           playground UI (editor, stage, playback, reference)
 ├── data.ts               thread palette, hoop constants, bundled examples
@@ -71,7 +76,7 @@ src/
 - **Console** — run results, warnings, `print` output, and errors with line numbers.
 - **Stage** — a 100 mm virtual hoop rendered on canvas: thread per colour, underlay drawn thinner and lighter, dashed jump lines, needle penetration points when zoomed, hoop-overflow and density warnings as chips, plus a **density heatmap toggle** (thread coverage in layers) for spotting bulletproof patches before they pucker.
 - **Playback** — play (~7 s) or scrub the stitch sequence stitch by stitch. While scrubbed, the **source line currently sewing is highlighted in the editor** and shown next to the counter — the fastest way to answer "which line made this stitch?"
-- **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch).
+- **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch, meadow).
 - **Download .DST** — export the current design as a Tajima stitch file.
 - **Import SVG** — convert an SVG (button or drag & drop) into *editable* Needlescript code: filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, colours map to the nearest thread. Supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, groups and transforms.
 
@@ -79,15 +84,22 @@ src/
 
 # Language guide
 
+Needlescript has two dialects that **mix freely in the same program** and compile to exactly the same stitches:
+
+- the **modern syntax** — `let x = 5`, `setxy(a, b)`, `def leaf(size) [ … ]`, `return`, `for i = 1 to 10`, `else if`, `%`, `!`, `==`, `true`/`false`, `//` comments;
+- the **classic Logo syntax** — `make "x 5`, `setxy :a :b`, `to leaf :size … end`, `output`, `for "i 1 10 1`, `;` comments — which remains valid forever.
+
+The intended idiom is a mix: classic prefix words where they shine (`fd 10 rt 90`, `up … down`), call parentheses wherever expressions nest. The bundled *meadow* example is the reference for that style.
+
 ## Basics
 
 - **Units are millimetres.** The hoop is 100 mm across; the sewable field is a 47 mm radius around the origin `(0, 0)` at the centre.
 - **Heading is in degrees, `0` = up/north, clockwise** (Logo convention). `rt 90` faces east.
 - Words are **case-insensitive** (`FD 10` = `fd 10`).
-- `;` starts a comment to the end of the line.
+- `//`, `#`, and `;` each start a comment to the end of the line. A lone `/` is still division — only two *adjacent* slashes comment.
 - There are no statement separators — whitespace and newlines are interchangeable.
 - The only value type is the **number** (millimetres, degrees, counts, truth values).
-- Truthiness: `0` is false, anything else is true. Comparisons return `1` or `0`.
+- Truthiness: `0` is false, anything else is true. Comparisons return `1` or `0`. `true` and `false` are literals for `1` and `0`.
 
 ### Negative numbers vs subtraction
 
@@ -98,6 +110,8 @@ setxy -6 -21       ; two arguments: the point (-6, -21)
 fd 10 - 5          ; one argument: fd 5 (subtraction)
 fd 10 -5           ; error — "-5" is a second value, but fd takes one argument
 ```
+
+Inside call parentheses the ambiguity disappears: `setxy(-6, -21)` and `fd(10 - 5)` mean exactly what they say, with any spacing.
 
 ## Movement
 
@@ -199,73 +213,87 @@ Travels of 7 mm or more (configurable 3–30, `autotrim 0` off) automatically ge
 |---|---|
 | `repeat n [ … ]` | loop *n* times; `repcount` is the 1-based counter of the innermost repeat |
 | `while cond [ … ]` | loop while the condition is true (non-zero) |
-| `for "i from to step [ … ]` | counted loop, inclusive of *to*; read the counter with `:i`. The step is required and may be negative (`for "i 5 1 -2 [ … ]`). The counter doesn't leak after the loop |
+| `for i = from to to [ … ]` | counted loop, inclusive of *to*; the step defaults to 1 |
+| `for i = from to to step s [ … ]` | …with an explicit (possibly negative) step: `for i = 10 to 1 step -2 [ … ]` |
+| `for "i from to step [ … ]` | the classic spelling; the step is required, read the counter with `:i` |
 | `if cond [ … ]` | run the block if the condition is non-zero |
-| `if cond [ … ] else [ … ]` | …with an alternative |
+| `if cond [ … ] else if cond2 [ … ] else [ … ]` | chains of alternatives, any depth |
+
+The loop counter is read as a plain name (`i`) or classic style (`:i`) and **doesn't leak** after the loop. `to` and `step` end the bound expressions naturally, so `for i = 1 to n * 2 [ … ]` needs no parentheses. (`step` is a reserved word — pick another name for variables and procedures.)
 
 ```text
-for "ring 1 6 1 [
-  arc 360 :ring * 4
+for ring = 1 to 6 [
+  arc 360 ring * 4
 ]
 ```
 
 ## Procedures
 
 ```text
-to leaf :size
+def leaf(size) [
   repeat 2 [
-    repeat 30 [ fd :size rt 3 ]
+    repeat 30 [ fd size rt 3 ]
     rt 90
   ]
-end
+]
 
-repeat 8 [ leaf 1.2 rt 45 ]
+repeat 8 [ leaf(1.2) rt 45 ]
 ```
 
-- `to name :a :b … end` defines a procedure with parameters. Parameters are local.
+- `def name(a, b) [ … ]` defines a procedure; the body is a bracket block like every other block. Parameters are local and read as plain names (`size`) or classic style (`:size`).
+- The classic form `to name :a :b … end` is equivalent and remains valid.
+- Calls work both ways: `leaf(1.2)` or `leaf 1.2` — see [Call syntax](#call-syntax-with-parentheses) for the one rule that separates them.
 - Procedures may be **called before they're defined** in the source (signatures are pre-scanned).
 - Recursion works; depth is limited to 200 calls.
-- `exit` leaves the current procedure immediately.
-- Built-in words can't be shadowed — `to while … end` is a parse error, not a silent surprise.
+- `return` (or classic `exit`) leaves the current procedure immediately.
+- Names can't collide: built-in words can't be shadowed (`def while() [ … ]` is a parse error), a procedure and a variable can't share a name, and parameters can't reuse a procedure or built-in name. Loud and early beats clever.
 
 ### Reporters — procedures that return values
 
-`output expr` (alias `op`) returns a value from a procedure, which can then be used **anywhere an expression is expected**:
+`return expr` (classic: `output expr`, alias `op`) returns a value from a procedure, which can then be used **anywhere an expression is expected**:
 
 ```text
-to spiral_r :i
-  output 2 * pow 1.1 :i
-end
+def spiral_r(i) [
+  return 2 * pow(1.1, i)
+]
 
-to clamp :v :lo :hi
-  output min :hi max :lo :v
-end
+def clamp(v, lo, hi) [
+  return min(hi, max(lo, v))
+]
 
-for "i 1 40 1 [ fd spiral_r :i rt 25 ]
+for i = 1 to 40 [ fd spiral_r(i) rt 25 ]
 ```
 
-- A procedure used as a value must reach `output`, or you get a friendly error.
-- `output` and `exit` are only valid inside a procedure.
-- Reporters can recurse: `to fact :n  if :n < 2 [ output 1 ]  output :n * fact :n - 1  end`.
+- A procedure used as a value must reach `return`/`output`, or you get a friendly error.
+- `return` and `output`/`exit` are only valid inside a procedure.
+- Reporters can recurse: `def fact(n) [ if n < 2 [ return 1 ] return n * fact(n - 1) ]`.
 
 ## Variables
 
 | Syntax | Meaning |
 |---|---|
-| `make "x expr` | set a variable; read it with `:x` |
-| `local "x expr` | a variable that exists only inside the current procedure |
+| `let x = expr` | declare a variable: a **global** at the top level, a **local** inside a procedure |
+| `x = expr` | assign: updates a local if one is in scope, otherwise writes a global |
+| `x += e` · `x -= e` · `x *= e` · `x /= e` | compound assignment: `x += 2` is `x = x + 2` |
+| `make "x expr` | the classic spelling of assignment — same store, same rules |
+| `local "x expr` | the classic spelling of an in-procedure `let` |
+
+Variables are read as plain names (`fd x`) or classic style (`fd :x`) — both resolve identically.
 
 Scoping rules:
 
-- `make` updates an existing **local** (a parameter or `local`) if one with that name is in scope; otherwise it writes a **global**.
-- `local` at the top level is an error — use `make` there.
+- Assignment (`x = …` / `make`) updates an existing **local** (a parameter, `let`, or `local`) if one with that name is in scope; otherwise it writes a **global**. One mental model for both spellings.
+- `let` of a name that's already declared in the same scope, or that collides with a built-in or procedure, is a parse error with a did-you-mean.
+- Plain `x = 1` without a prior `let` is allowed (Logo `make` semantics — friendly for one-liners).
+- `local` at the top level is an error — use `make` or a top-level `let` there.
+- Reading a declared-but-never-assigned variable (e.g. only assigned inside an `if` that didn't run) is a runtime error: *"never assigned on this path"*.
 
 ```text
-to wobble :len
-  local "step :len / 10
-  make "step :step * 2   ; updates the local, not a global
-  repeat 10 [ fd :step rt random 10 - 5 ]
-end
+def wobble(len) [
+  let pace = len / 10
+  pace *= 2              // updates the local, not a global
+  repeat 10 [ fd pace rt random(10) - 5 ]
+]
 ```
 
 ## Expressions
@@ -274,19 +302,40 @@ Operator precedence, loosest to tightest:
 
 1. `or`
 2. `and`
-3. comparisons `< > = <= >= !=` (return `1`/`0`; `=` and `!=` compare with a 1e-9 tolerance)
+3. comparisons `< > = == <= >= !=` (return `1`/`0`; equality compares with a 1e-9 tolerance — `=` and `==` are the same operator)
 4. `+ -`
-5. `* /`
-6. unary `-`, prefix functions (`not`, `sin`, …)
-7. numbers, `:variables`, `( … )`, reporter calls
+5. `* / %`
+6. unary `-`, prefix functions (`not`/`!`, `sin`, …)
+7. numbers, `true`/`false`, variables, `( … )`, calls
 
-`and` / `or` **short-circuit**, so guards like `:i > 0 and 10 / :i > 2` are safe. `not` is a prefix function and binds tightly — write `not (:a = 1)` when negating a comparison.
+`and` / `or` **short-circuit**, so guards like `i > 0 and 10 / i > 2` are safe. `not` (spelled `!` if you prefer) is a prefix function and binds tightly — write `!(a = 1)` when negating a comparison. `%` is the same operation as `mod`: **floor modulo, the result takes the sign of the divisor** — `-7 % 3` is `2` here, not `-1` as in C or JavaScript.
 
-Arguments are written Logo-style, without commas or parentheses: `setxy random 20 random 20`. Use parentheses whenever you want to be explicit about grouping:
+### Call syntax with parentheses
+
+Any function, command or procedure can be called with parentheses and commas — **when the `(` is glued to the name**:
+
+```text
+fd(10)                          // call: fd with one argument
+fd (10)                         // classic: fd, argument is the grouped expression (10)
+setxy(random(20), random 20)    // styles mix freely inside argument slots
+xcor()                          // zero-argument calls are fine
+min(3, 4)  ·  min 3 4           // identical
+```
+
+That one space is the entire rule: glued `(` = argument list, spaced `(` = Logo grouping, so every existing program means what it always meant. Argument counts are checked against the callee's signature, and a trailing comma is allowed.
+
+Classic prefix arguments are written without commas or parentheses: `setxy random 20 random 20`. Use parentheses whenever you want to be explicit about grouping:
 
 ```text
 seth ( noise2 xcor / 16 ycor / 16 ) * 720
 ```
+
+> **Why parens pay off:** classic multi-argument calls parse each argument as a **full expression**, so a trailing operator is absorbed into the last argument — `distance 0 0 < 47` means `distance 0 (0 < 47)`. Single-argument functions bind tightly instead (`random 64 - 32` is `(random 64) - 32`), so you have to know each function's arity *and* which rule it follows. Call parens give every callable one rule:
+>
+> ```text
+> bloom clamp 2.5 + random 3 2.5 5 :kind          ; classic — correct, but you must count arities to read it
+> bloom(clamp(2.5 + random(3), 2.5, 5), kind)     // modern — the parens are the structure
+> ```
 
 ### Functions
 
@@ -297,12 +346,12 @@ seth ( noise2 xcor / 16 ycor / 16 ) * 720
 | `sin deg` · `cos deg` | trigonometry in degrees |
 | `sqrt n` · `abs n` · `round n` · `floor n` · `ceil n` | the usual suspects (`sqrt` of a negative is an error) |
 | `min a b` · `max a b` · `pow a b` | minimum, maximum, power (a non-finite `pow` result is an error) |
-| `mod a b` | floor modulo — always returns a value with the sign of *b* |
+| `mod a b` | floor modulo — always returns a value with the sign of *b*. The `%` operator is the same operation |
 | `atan x y` | the **heading** of the vector (x, y): 0 = north, clockwise — so `atan 1 0` is 90 |
 | `towards x y` | heading from the needle to the point (x, y) — `seth towards 0 0` aims home |
 | `distance x y` | distance from the needle to the point (x, y) |
 
-> Multi-argument functions parse each argument as a **full expression**, so a trailing operator is absorbed into the last argument: `distance 0 0 < 47` means `distance 0 (0 < 47)`. Parenthesise when you mean the comparison: `(distance 0 0) < 47`.
+> Classic multi-argument calls parse each argument as a **full expression**, so a trailing operator is absorbed into the last argument: `distance 0 0 < 47` means `distance 0 (0 < 47)`. Parenthesise when you mean the comparison — `(distance 0 0) < 47` — or use call parens, where it can't happen: `distance(0, 0) < 47`.
 
 ### Reporters (no arguments)
 
@@ -331,7 +380,7 @@ The same seed always reproduces the same design — change the seed, change the 
 | `mark` | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats |
 | `assert cond` | stop with an error (and line number) if the condition is false — great for geometric invariants (`assert (distance 0 0) < 47`) |
 | Playback scrubber | scrub the design stitch by stitch; the **source line being sewn is highlighted** in the editor and shown in the playback bar |
-| Did-you-mean | typos in commands, variables, and procedure names suggest the closest match: `Unknown command "stichlen" — did you mean "stitchlen"?` |
+| Did-you-mean | typos in commands, variables, and procedure names suggest the closest match across every namespace, labelled by kind: `Unknown command "stichlen" — did you mean the command "stitchlen"?` |
 | Warnings | non-fatal issues surface as chips and console lines: clamped values, merged tiny stitches, unclosed fills, hoop overflow, excessive density |
 
 ## Safety limits
@@ -358,7 +407,7 @@ Needlescript guards both your browser and your machine:
 Everything in `src/lib/` is DOM-free:
 
 ```ts
-import { run, designStats, toDST } from './lib/index.ts';
+import { run, designStats, toDST } from './lib/engine.ts';
 
 const result = run('repeat 36 [ fd 4 rt 10 ]', { seed: 7 });
 // result.events   — stitch/jump/color/trim/mark stream ({ t, x, y, c, line, u })
@@ -379,7 +428,7 @@ Also exported: `tokenize`, `parse`, `applyLocks`, `applyAutoTrim`, `densityMap`,
 npm test
 ```
 
-~2,800 lines of Vitest suites in `src/lib/__tests__/` cover the tokenizer, parser, interpreter, language features (loops, reporters, locals, noise, arc, push/pop, debugging commands), the professional layer (underlay, pull compensation, short-stitch, density analysis, autotrim, fabric presets), locks, stats, DST encoding, and the SVG importer. The bundled examples are tested to run and fit the hoop. When in doubt about a behaviour, the tests are the spec.
+~3,000 lines of Vitest suites in `src/lib/__tests__/` cover the tokenizer, parser, interpreter, language features (loops, reporters, locals, noise, arc, push/pop, debugging commands), the modern syntax (`modern-syntax.test.ts` asserts every modern form produces event streams identical to its classic twin), the professional layer (underlay, pull compensation, short-stitch, density analysis, autotrim, fabric presets), locks, stats, DST encoding, and the SVG importer. The bundled examples are tested to run and fit the hoop. When in doubt about a behaviour, the tests are the spec.
 
 ## License
 

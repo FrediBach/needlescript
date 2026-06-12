@@ -36,3 +36,15 @@ export function didYouMean(name: string, candidates: Iterable<string>): string {
   const s = suggest(name, candidates);
   return s ? ` — did you mean "${s}"?` : '';
 }
+
+/**
+ * Like didYouMean, but the candidates carry a kind label ('command',
+ * 'function', 'procedure', 'variable', …) that is woven into the message:
+ *   — did you mean the command "stitchlen"?
+ */
+export function didYouMeanKinded(name: string, candidates: Map<string, string>): string {
+  const s = suggest(name, candidates.keys());
+  if (!s) return '';
+  const kind = candidates.get(s);
+  return kind ? ` — did you mean the ${kind} "${s}"?` : ` — did you mean "${s}"?`;
+}
