@@ -102,6 +102,78 @@ export const LIST_CMDS: Record<string, { min: number; max: number }> = {
   setpos: { min: 1, max: 1 },
 };
 
+// ---------- Generative math builtins (RFC-3) ----------
+//
+// Same soft reservation as LIST_FUNCS: glued-call only, resolved after user
+// procedures, never in RESERVED. A point is [x, y], a path is a list of
+// points, a region is a closed path (closure implicit).
+
+/** Generative-math functions usable in expressions (RFC-3 §4). */
+export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
+  // §4.1 scalars
+  lerp: { min: 3, max: 3 },
+  remap: { min: 5, max: 5 },
+  clamp: { min: 3, max: 3 },
+  smoothstep: { min: 3, max: 3 },
+  gauss: { min: 2, max: 2 },
+  // §4.2 noise
+  snoise2: { min: 2, max: 2 },
+  snoise3: { min: 3, max: 3 },
+  fbm2: { min: 3, max: 3 },
+  // §4.3 vectors
+  vadd: { min: 2, max: 2 },
+  vsub: { min: 2, max: 2 },
+  vscale: { min: 2, max: 2 },
+  vlerp: { min: 3, max: 3 },
+  vdot: { min: 2, max: 2 },
+  vlen: { min: 1, max: 1 },
+  vdist: { min: 2, max: 2 },
+  vnorm: { min: 1, max: 1 },
+  vrot: { min: 2, max: 2 },
+  vheading: { min: 1, max: 1 },
+  vfromheading: { min: 2, max: 2 },
+  // §4.4 paths & curves
+  pathlen: { min: 1, max: 1 },
+  resample: { min: 2, max: 2 },
+  chaikin: { min: 2, max: 2 },
+  catmull: { min: 2, max: 2 },
+  bezier: { min: 5, max: 5 },
+  centroid: { min: 1, max: 1 },
+  bbox: { min: 1, max: 1 },
+  // §4.5 generators
+  scatter: { min: 1, max: 2 },
+  voronoi: { min: 1, max: 2 },
+  triangulate: { min: 1, max: 1 },
+  hull: { min: 1, max: 1 },
+  relax: { min: 2, max: 2 },
+  // §4.6 geometry ops
+  offsetpath: { min: 2, max: 2 },
+  clippaths: { min: 3, max: 3 },
+  inpath: { min: 2, max: 2 },
+};
+
+/** GEN_FUNCS whose given argument is a quoted word, with the allowed words. */
+export const GEN_QWORD_ARG: Record<string, { index: number; allowed: readonly string[] }> = {
+  clippaths: { index: 2, allowed: ['union', 'intersect', 'difference', 'xor'] },
+};
+
+/** Generative-math commands usable as statements (RFC-3 §4.4). */
+export const GEN_CMDS: Record<string, { min: number; max: number }> = {
+  sewpath: { min: 1, max: 1 },
+};
+
+/**
+ * The Library tier (RFC-3 §3): built-in names a user definition may shadow,
+ * with a one-time note instead of a hard error. Everything in RESERVED is
+ * the Core tier (hard error, unchanged).
+ */
+export const LIBRARY_FUNCS = new Set<string>([
+  ...Object.keys(LIST_FUNCS),
+  ...Object.keys(LIST_CMDS),
+  ...Object.keys(GEN_FUNCS),
+  ...Object.keys(GEN_CMDS),
+]);
+
 /** Words with special meaning that user procedures must not shadow. */
 export const RESERVED = new Set<string>([
   'to', 'end', 'repeat', 'if', 'else', 'make', 'local',

@@ -1,5 +1,7 @@
 // Shared constants for the Needlescript playground UI
 
+import { LIMITS } from './lib/machine.ts';
+
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
   '#31604F', // 1 — forest
@@ -12,7 +14,7 @@ export const THREADS: string[] = [
 ];
 
 export const HOOP_R = 50;   // 100 mm hoop, radius in mm
-export const SAFE_R = 47;   // sewable field inside the hoop
+export const SAFE_R = LIMITS.sewableRadius; // sewable field inside the hoop
 
 export const EXAMPLES: Record<string, string> = {
   'bloom — rose of circles': [
@@ -336,5 +338,41 @@ export const EXAMPLES: Record<string, string> = {
     '  off += 2.5                     // drift each echo to the right',
     ']',
     'print "points" len(path)',
+  ].join('\n'),
+  'shatter — generative voronoi': [
+    '// shatter — Voronoi tiles with inset outlines and flow-field',
+    '// hatching inside: a tour of the generative math (RFC-3).',
+    '// scatter → voronoi → offsetpath → resample → sewpath compose',
+    '// because a point is [x, y], a path is a list of points, and a',
+    '// region is a closed path.',
+    'seed 4',
+    'let pts = scatter(9)              // Poisson-disc over the sewable field',
+    'let tiles = voronoi(pts)',
+    '',
+    'color 1',
+    'for cell in tiles [',
+    '  for ring in offsetpath(cell, -0.9) [   // may be 0, 1, or 2+ rings',
+    '    sewpath(resample(ring, 2.2))',
+    '    setpos(ring[0])                      // close the outline',
+    '  ]',
+    '  trim',
+    ']',
+    '',
+    'color 2',
+    'for cell in tiles [',
+    '  let c = centroid(cell)',
+    '  if inpath(c, cell) [             // concave cells can evict their centroid',
+    '    up setpos(c) down',
+    '    let sewing = 1                 // no loop break yet (RFC-4) — a flag instead',
+    '    repeat 25 [',
+    '      if sewing [',
+    '        seth(snoise2(xcor / 14, ycor / 14) * 180)',
+    '        let nxt = vadd(pos(), vfromheading(heading, 1.8))',
+    '        if inpath(nxt, cell) [ fd 1.8 ] else [ sewing = 0 ]',
+    '      ]',
+    '    ]',
+    '    trim',
+    '  ]',
+    ']',
   ].join('\n'),
 };

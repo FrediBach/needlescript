@@ -7,6 +7,8 @@ export default defineConfig({
     // Globals: describe/it/expect available without import
     globals: true,
     include: ['src/**/*.test.ts'],
+    // Determinism tripwire: Math.random throws inside every test (RFC-3 §5)
+    setupFiles: ['src/test-setup.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/lib/**/*.ts'],

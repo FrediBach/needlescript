@@ -57,6 +57,9 @@ src/
 │   ├── prescan.ts        procedures, globals and locals, collected before parsing
 │   ├── parser.ts         tokens → AST (modern + classic syntax)
 │   ├── interpreter.ts    AST → stitch events
+│   ├── genmath.ts        scalars, vectors, paths & curves (RFC-3, hand-rolled)
+│   ├── generators.ts     Poisson-disc scatter, Voronoi, hull, Lloyd's relax
+│   ├── geometry.ts       Clipper2-backed offset & boolean ops (µm integer coords)
 │   ├── machine.ts        stitch machine: satin, fills, underlay, limits
 │   ├── postprocess.ts    locks, autotrim, density analysis, stats
 │   ├── dst.ts            Tajima .DST binary encoder
@@ -76,7 +79,7 @@ src/
 - **Console** — run results, warnings, `print` output, and errors with line numbers.
 - **Stage** — a 100 mm virtual hoop rendered on canvas: thread per colour, underlay drawn thinner and lighter, dashed jump lines, needle penetration points when zoomed, hoop-overflow and density warnings as chips, plus a **density heatmap toggle** (thread coverage in layers) for spotting bulletproof patches before they pucker.
 - **Playback** — play (~7 s) or scrub the stitch sequence stitch by stitch. While scrubbed, the **source line currently sewing is highlighted in the editor** and shown next to the counter — the fastest way to answer "which line made this stitch?"
-- **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch, meadow).
+- **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch, meadow, echo, shatter).
 - **Download .DST** — export the current design as a Tajima stitch file.
 - **Import SVG** — convert an SVG (button or drag & drop) into *editable* Needlescript code: filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, colours map to the nearest thread. Supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, groups and transforms.
 
@@ -414,7 +417,7 @@ All list functions are **call-syntax only**: `len(xs)`, never `len xs` (this is 
 | `indexof(xs, v)` · `contains(xs, v)` | first index of *v* (deep, tolerant compare) or −1 · `1`/`0` |
 | `sum(xs)` · `mean(xs)` · `minof(xs)` · `maxof(xs)` | aggregates, numbers only; `sum([])` is 0, the rest error on an empty list |
 | `pick(xs)` | random element — **seeded**, exactly one RNG draw |
-| `shuffle(xs)` | new shuffled list — **seeded** Fisher–Yates, exactly len−1 draws: same seed, same order, forever |
+| `shuffle(xs)` | new shuffled list — **seeded**, exactly one main-stream draw (it forks a child RNG, see [Randomness & determinism](#randomness--determinism)): same seed, same order, forever |
 | `pos()` | the needle's position as `[xcor, ycor]` |
 | `setpos(p)` | command: like `setxy p[0] p[1]` — makes record/replay symmetric: `append(path, pos())` … `setpos(p)` |
 
@@ -422,15 +425,108 @@ All list functions are **call-syntax only**: `len(xs)`, never `len xs` (this is 
 
 `print` formats lists as `[1, 2, 3]` (nested as `[[0, 1], [2, 3]]`, capped at 64 elements with `… +n more`). List builtin names are resolved only at call position, so classic programs that use names like `:len` for parameters keep working, and a `def` of the same name shadows the builtin.
 
+## Generative math
+
+Lists made the data representable; the generative-math builtins make it *generatable*. Three conventions, stated once and used everywhere: **a point is `[x, y]`, a path is a list of points, a region is a closed path** (the closing segment is implicit). Every function below speaks that vocabulary, so outputs of one feed inputs of the next — `scatter` → `voronoi` → `offsetpath` → `resample` → `sewpath` compose without glue code. All of them are **call-syntax only**, like the list functions.
+
+```text
+seed 4
+let tiles = voronoi(scatter(9))          // Poisson-disc points → Voronoi cells
+for cell in tiles [
+  for ring in offsetpath(cell, -0.9) [   // inset each cell (may vanish — loop skips)
+    sewpath(resample(ring, 2.2))         // even 2.2 mm stitches along the ring
+  ]
+  trim
+]
+```
+
+(See the bundled **shatter** example for the full version with flow-field hatching.)
+
+### Scalars
+
+| Function | Returns |
+|---|---|
+| `lerp(a, b, t)` | a + (b − a)·t, *t* unclamped |
+| `remap(v, inlo, inhi, outlo, outhi)` | linear remap, unclamped |
+| `clamp(v, lo, hi)` | min(hi, max(lo, v)) |
+| `smoothstep(e0, e1, x)` | Hermite ease 0…1 |
+| `gauss(mu, sigma)` | seeded normal (Box-Muller, exactly 2 draws) |
+
+### Noise
+
+| Function | Returns |
+|---|---|
+| `snoise2(x, y)` · `snoise3(x, y, z)` | seeded simplex noise in **−1…1** (industry convention; legacy `noise`/`noise2` keep 0…1). Same seed, same field, forever. The *z* axis is for **variation**, not space: `snoise3(x/14, y/14, motif * 50)` gives each motif its own field |
+| `fbm2(x, y, octaves)` | fractal sum of `snoise2`: lacunarity 2.0, gain 0.5, octaves 1–8 (clamped with a warning), normalised to ≈ −1…1 |
+
+### Vectors (points)
+
+One angle rule: **everything heading-like uses turtle degrees** (0 = north, clockwise positive), matching `seth`, `atan`, `towards`.
+
+| Function | Returns |
+|---|---|
+| `vadd(a, b)` · `vsub(a, b)` | new point |
+| `vscale(a, s)` · `vlerp(a, b, t)` | new point |
+| `vdot(a, b)` · `vlen(a)` · `vdist(a, b)` | number |
+| `vnorm(a)` | unit vector; the zero vector is an **error**, not `[0, 0]` — a silent default heading is a stealth bug |
+| `vrot(a, deg)` | rotated **clockwise** for positive deg (matches `rt`) |
+| `vheading(a)` | turtle heading of the vector (≡ `atan a[0] a[1]`) |
+| `vfromheading(deg, len)` | the inverse — `vfromheading(heading, 1)` is the needle's direction |
+
+There is **no operator broadcasting**: `[1, 2] + [3, 4]` stays a loud error, now with hints (`use vadd(a, b) for element-wise, concat(a, b) to join`). The reason is audience-specific: in Python that expression is *concatenation*, and silently giving it NumPy semantics is the kind of bug that sews before it's noticed.
+
+### Paths & curves
+
+| Function | Returns |
+|---|---|
+| `pathlen(path)` | total polyline length |
+| `resample(path, mm)` | new path whose segments are each exactly *mm* long (the last may be shorter), first & last preserved — the bridge between math-space curves and physical stitch spacing |
+| `chaikin(path, n)` | corner-cut smoothing, *n* iterations 1–6 |
+| `catmull(points, mm)` | Catmull-Rom spline through the control points, resampled |
+| `bezier(p0, c0, c1, p1, mm)` | cubic Bézier, resampled |
+| `centroid(path)` · `bbox(path)` | point · `[minx, miny, maxx, maxy]` |
+| `sewpath(path)` | **command**: exactly `for p in path [ setpos(p) ]` — pen state, stitch mode, satin and auto-split all apply as if hand-walked |
+
+### Generators (seeded)
+
+| Function | Returns |
+|---|---|
+| `scatter(mindist)` · `scatter(mindist, region)` | Poisson-disc (Bridson) points — over the sewable 47 mm field, or inside the region polygon. Capped at 20,000 points |
+| `voronoi(points)` · `voronoi(points, region)` | one cell (a region) per input point, **in input order**, clipped to the sewable disc or the given region |
+| `triangulate(points)` | Delaunay triangles: a list of 3-point regions |
+| `hull(points)` | convex hull as a region, counter-clockwise |
+| `relax(points, n)` | *n* rounds of Lloyd's relaxation (each point moves to its Voronoi cell's centroid) — evens out spacing for stippling |
+
+### Geometry ops
+
+Backed by Clipper2 on ×1000 integer coordinates (µm precision) — results are platform-stable.
+
+| Function | Returns |
+|---|---|
+| `offsetpath(region, mm)` | list of regions — positive inflates, negative shrinks. Shrinking may split a shape into several or into **none** (an empty list, not an error — loops over it naturally do nothing). Round joins |
+| `clippaths(a, b, "op)` | boolean of two regions; op ∈ `"union` `"intersect` `"difference` `"xor`; returns a list of regions |
+| `inpath(p, region)` | 1/0, even-odd rule (consistent with fills) |
+
+### Library names may be shadowed
+
+Built-in words come in two tiers. **Core** — movement, stitching, control flow, everything that predates the generative-math release — can't be redefined (hard error, unchanged). **Library** — every list and generative-math function — can: your own `def clamp(v, lo, hi) [ … ]` wins for the whole program, with a one-time console note (`note: "clamp" shadows a built-in library function (since v3) — rename to silence`). This is what lets the language keep growing a standard library without breaking existing programs that innocently used the same names.
+
 ## Randomness & determinism
 
-Every run is deterministic: `random`, `noise`, `pick` and `shuffle` are driven by a seed (default 42). Reseed with:
+Every run is deterministic: `random`, `gauss`, `noise`, `snoise2/3`, `pick`, `shuffle` and `scatter` are all driven by a seed (default 42). Reseed with:
 
 ```text
 seed 7
 ```
 
-The same seed always reproduces the same design — change the seed, change the piece. This matters for embroidery: what you previewed is exactly what the machine sews.
+The same seed always reproduces the same design — change the seed, change the piece. This matters for embroidery: what you previewed is exactly what the machine sews. The test suite enforces it mechanically: `Math.random` is stubbed to **throw** during every engine test, so nondeterminism can't sneak in through a dependency.
+
+Draw accounting follows the **fork convention**, so editing one part of a design doesn't reshuffle the rest:
+
+- **Fixed-cost functions draw from the main stream:** `random` 1 draw, `pick` 1, `gauss` 2.
+- **Variable-cost generators fork:** `scatter` and `shuffle` draw exactly **one** value from the main stream and use it to seed a child RNG for all internal work. (`voronoi` and `relax` draw nothing.)
+
+Result: inserting a `scatter(6)` shifts a later `random 10` by exactly one draw — the same as inserting a `random`. Draw costs are part of each function's contract and are pinned by tests, as are golden output values per seed: same seed + same engine version ⇒ identical output, and an algorithm change that alters output is a major-version event.
 
 ## Debugging
 
@@ -457,6 +553,9 @@ Needlescript guards both your browser and your machine:
 | Max list length | 100,000 elements |
 | Max total live list cells | 1,000,000 |
 | Max list nesting depth | 16 |
+| Max `scatter` output | 20,000 points |
+| Max `voronoi` / `triangulate` / `hull` / `relax` input | 10,000 points |
+| Max `offsetpath` / `clippaths` input | 50,000 vertices per call |
 | Stitch length | clamped to 0.4–12 mm |
 | Sub-0.4 mm moves | merged into neighbours (too short to sew safely), with a warning |
 
@@ -484,7 +583,9 @@ const stats = designStats(result.events);  // counts, bounding box, max stitch�
 const bytes = toDST(result.events, 'rose'); // Uint8Array, ready to save
 ```
 
-Also exported: `tokenize`, `parse`, `applyLocks`, `applyAutoTrim`, `densityMap`, `makeRNG`, `makeNoise`, `suggest`, `svgToCode`, the command tables (`BUILTIN_ARITY`, `QWORD_BUILTINS`, `FABRICS`, `FUNC_ARITY`, `ALIASES`, `RESERVED`, `ZERO_FUNCS`), `LIMITS`, and `NeedlescriptError` (which carries the source line in `slLine`).
+Also exported: `tokenize`, `parse`, `applyLocks`, `applyAutoTrim`, `densityMap`, `makeRNG`, `makeNoise`, `fork`, `gauss`, `suggest`, `svgToCode`, the command tables (`BUILTIN_ARITY`, `QWORD_BUILTINS`, `FABRICS`, `FUNC_ARITY`, `ALIASES`, `RESERVED`, `ZERO_FUNCS`, `LIST_FUNCS`, `LIST_CMDS`, `GEN_FUNCS`, `GEN_CMDS`, `LIBRARY_FUNCS`), `LIMITS`, and `NeedlescriptError` (which carries the source line in `slLine`).
+
+The engine's only runtime dependencies are three exactly-pinned libraries that each do something genuinely hard: `simplex-noise` (seeded noise tables), `delaunator` (Delaunay triangulation) and `clipper2-ts` (polygon offsetting & booleans). Everything else — `lerp` through `catmull`, even Bridson's Poisson-disc — is hand-rolled, because owning the code is cheaper than auditing a dependency for determinism. None of them touch `Math.random` (the test suite proves it).
 
 ## Tests
 

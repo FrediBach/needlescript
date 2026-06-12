@@ -10,6 +10,10 @@ export const LIMITS = {
   maxListLen: 100000,
   maxListCells: 1000000,
   maxListDepth: 16,
+  // Generative math (RFC-3 §8)
+  sewableRadius: 47,        // the sewable field inside the 100 mm hoop, in mm
+  maxScatterPoints: 20000,
+  maxDelaunayPoints: 10000, // voronoi / triangulate / hull / relax input
 };
 
 // ---------- Stitch machine ----------

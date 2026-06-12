@@ -11,6 +11,26 @@ export function makeRNG(seed: number): () => number {
   };
 }
 
+/**
+ * The fork convention (RFC-3 §7): variable-cost generators draw exactly
+ * one value from the main stream and do all internal work on a child RNG.
+ * Inserting a scatter(…) shifts downstream randomness by exactly one draw.
+ */
+export function fork(rng: () => number): () => number {
+  return makeRNG(Math.floor(rng() * 4294967296));
+}
+
+/**
+ * Seeded normal via Box-Muller — exactly 2 draws, no caching (caching the
+ * second value would make draw counts history-dependent; RFC-3 §4.1).
+ */
+export function gauss(rng: () => number, mu: number, sigma: number): number {
+  const u1 = rng();
+  const u2 = rng();
+  // 1 - u1 ∈ (0, 1]: keeps log() finite for u1 = 0.
+  return mu + sigma * Math.sqrt(-2 * Math.log(1 - u1)) * Math.cos(2 * Math.PI * u2);
+}
+
 // ---------- Seeded value noise ----------
 // Smooth deterministic noise in [0, 1). Same seed → same field.
 

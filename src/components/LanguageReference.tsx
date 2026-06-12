@@ -133,6 +133,21 @@ export default function LanguageReference() {
         <div><code>atan <i>x y</i> · towards <i>x y</i> · distance <i>x y</i></code><span>heading of a vector · heading and distance from the needle to a point</span></div>
         <div><code>xcor ycor heading repcount</code><span>where the needle is right now</span></div>
 
+        <h3>Generative math (a point is [x, y] · a path is a list of points · a region is a closed path)</h3>
+        <div><code>lerp(a, b, t) · remap(v, ilo, ihi, olo, ohi) · clamp(v, lo, hi) · smoothstep(e0, e1, x)</code><span>the scalar utility belt — lerp/remap are unclamped</span></div>
+        <div><code>gauss(mu, sigma)</code><span>seeded normal distribution (exactly 2 random draws)</span></div>
+        <div><code>snoise2(x, y) · snoise3(x, y, z) · fbm2(x, y, octaves)</code><span>seeded simplex noise in <b>−1…1</b> (legacy <code>noise</code> stays 0…1); snoise3's <i>z</i> gives each motif its own field; fbm2 layers 1–8 octaves</span></div>
+        <div><code>vadd vsub vscale vlerp vdot vlen vdist vnorm vrot vheading vfromheading</code><span>vector math on points; angles are turtle degrees (0 = up, clockwise) — <code>vrot(p, 90)</code> matches <code>rt 90</code>, <code>vfromheading(heading, 1)</code> is the needle's direction</span></div>
+        <div><code>pathlen(p) · resample(p, mm) · chaikin(p, n) · catmull(pts, mm) · bezier(p0, c0, c1, p1, mm)</code><span>measure, restitch to even spacing, smooth corners, sample splines — all return paths</span></div>
+        <div><code>centroid(p) · bbox(p)</code><span>centre point · [minx, miny, maxx, maxy]</span></div>
+        <div><code>sewpath(<i>path</i>)</code><span>sew along a path — exactly <code>for p in path [ setpos(p) ]</code>, so pen state and satin apply</span></div>
+        <div><code>scatter(mindist) · scatter(mindist, region)</code><span>seeded Poisson-disc points over the sewable field (or inside a region)</span></div>
+        <div><code>voronoi(pts) · voronoi(pts, region) · triangulate(pts) · hull(pts) · relax(pts, n)</code><span>cells (one region per point, input order) · Delaunay triangles · convex hull · Lloyd's relaxation for even stippling</span></div>
+        <div><code>offsetpath(region, mm)</code><span>inflate (+) or shrink (−) a region; returns a list of regions — shrinking may split a shape or erase it (empty list, loops just skip)</span></div>
+        <div><code>clippaths(a, b, "union)</code><span>boolean of two regions: <code>"union "intersect "difference "xor</code>; returns a list of regions</span></div>
+        <div><code>inpath(p, region)</code><span>1 if the point is inside (even-odd, like fills)</span></div>
+        <div><code>shadowing</code><span>your own <code>def clamp(…)</code> wins over these library functions (one console note); core words like <code>fd</code> stay protected</span></div>
+
         <h3>Debugging</h3>
         <div><code>print <i>expr</i> · print "label <i>expr</i></code><span>log a value to the console, optionally with a label</span></div>
         <div><code>mark</code><span>drop a numbered pin on the preview at the needle — never exported to the machine</span></div>

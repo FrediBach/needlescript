@@ -6,18 +6,34 @@
 
 import type { ASTNode, ExprNode, Token } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
-import { ALIASES, BUILTIN_ARITY, QWORD_BUILTINS, FUNC_ARITY, ZERO_FUNCS, RESERVED, LIST_FUNCS, LIST_CMDS } from './commands.ts';
+import { ALIASES, BUILTIN_ARITY, QWORD_BUILTINS, FUNC_ARITY, ZERO_FUNCS, RESERVED, LIST_FUNCS, LIST_CMDS, GEN_FUNCS, GEN_CMDS, GEN_QWORD_ARG, LIBRARY_FUNCS } from './commands.ts';
 import { didYouMean, didYouMeanKinded } from './suggestions.ts';
 import { prescan } from './prescan.ts';
 import { COMPOUND_ASSIGN_OPS } from './tokenizer.ts';
 
 const COMPARE_OPS = new Set(['<', '>', '=', '<=', '>=', '!=']);
 
-export function parse(tokens: Token[]): ASTNode[] {
+export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
   // Pre-scan procedures, globals and per-procedure locals so both call arity
   // and bare-name resolution are known at parse time.
   const ps = prescan(tokens);
   const procArity = ps.procArity;
+
+  /** Library-tier names already noted as shadowed (one note per name, §3). */
+  const shadowNoted = new Set<string>();
+
+  /**
+   * Library-tier shadowing (RFC-3 §3): a user definition of a Library
+   * builtin wins for the whole program, with a one-time console note.
+   * Core names (RESERVED) stay a hard error — checked by the caller.
+   */
+  function noteLibraryShadow(name: string) {
+    if (!LIBRARY_FUNCS.has(name) || shadowNoted.has(name)) return;
+    shadowNoted.add(name);
+    notes?.push(
+      `note: "${name}" shadows a built-in library function (since v3) — rename to silence`,
+    );
+  }
 
   let pos = 0;
   /** Name of the procedure whose body is being parsed (null at top level). */
@@ -98,6 +114,8 @@ export function parse(tokens: Token[]): ASTNode[] {
     for (const k of ZERO_FUNCS) m.set(k, 'function');
     for (const k of Object.keys(LIST_FUNCS)) m.set(k, 'function');
     for (const k of Object.keys(LIST_CMDS)) m.set(k, 'command');
+    for (const k of Object.keys(GEN_FUNCS)) m.set(k, 'function');
+    for (const k of Object.keys(GEN_CMDS)) m.set(k, 'command');
     for (const k of Object.keys(procArity)) m.set(k, 'procedure');
     for (const k of ps.globalNames) m.set(k, 'variable');
     if (currentProc && ps.procLocals[currentProc])
@@ -189,6 +207,70 @@ export function parse(tokens: Token[]): ASTNode[] {
     return args;
   }
 
+  /**
+   * Parse a generative-math call (RFC-3 §4). Most are plain ranged-arity
+   * calls; the ones in GEN_QWORD_ARG take a quoted word in one slot
+   * (e.g.  clippaths(a, b, "union") ) — validated here, at parse time,
+   * because the runtime has no string values.
+   */
+  function parseGenCall(name: string, line: number): ExprNode {
+    const a = GEN_FUNCS[name];
+    const q = GEN_QWORD_ARG[name];
+    if (!q) {
+      return {
+        k: 'listfunc', name,
+        args: parseParenArgsRange(name, a.min, a.max, line), line,
+      };
+    }
+    next(); // consume '('
+    const args: ExprNode[] = [];
+    let word: string | undefined;
+    let slot = 0;
+    for (;;) {
+      if (atEnd()) throw new NeedlescriptError(`Missing ) in ${name}(…)`, line);
+      if (slot === q.index) {
+        const wTok = peek();
+        if (!wTok || wTok.t !== 'qword')
+          throw new NeedlescriptError(
+            `${name} needs a quoted word here, e.g.  ${name}(a, b, "${q.allowed[0]}")`,
+            lineOf(wTok),
+          );
+        next();
+        word = wTok.v as string;
+        if (!q.allowed.includes(word))
+          throw new NeedlescriptError(
+            `${name} doesn't know "${word}"${didYouMean(word, q.allowed)} (choices: ${q.allowed.join(', ')})`,
+            wTok.line,
+          );
+      } else {
+        args.push(parseExpr());
+      }
+      slot++;
+      if (!atEnd() && peek().t === ',') {
+        next();
+        if (!atEnd() && peek().t === ')') { next(); break; } // trailing comma
+        continue;
+      }
+      if (!atEnd() && peek().t === ')') { next(); break; }
+      const bad = peek();
+      throw new NeedlescriptError(
+        `Expected , or ) in the arguments of ${name}(…), got "${bad ? (bad.v !== undefined ? bad.v : bad.t) : 'end of program'}"`,
+        bad ? bad.line : line,
+      );
+    }
+    if (slot < a.min || slot > a.max)
+      throw new NeedlescriptError(
+        `${name}(…) expects ${a.min === a.max ? `${a.min} arguments` : `${a.min} to ${a.max} arguments`}, got ${slot}`,
+        line,
+      );
+    if (word === undefined)
+      throw new NeedlescriptError(
+        `${name} needs a quoted word, e.g.  ${name}(a, b, "${q.allowed[0]}")`,
+        line,
+      );
+    return { k: 'listfunc', name, args, line, word };
+  }
+
   function parseStatement(): ASTNode {
     const tok = peek();
     if (!tok) throw new NeedlescriptError('Unexpected end of program');
@@ -217,6 +299,7 @@ export function parse(tokens: Token[]): ASTNode[] {
           tok.line,
         );
       const procName = nameTok.v as string;
+      noteLibraryShadow(procName);
       const params: string[] = [];
       while (!atEnd() && peek().t === 'var') {
         const pTok = next();
@@ -256,6 +339,7 @@ export function parse(tokens: Token[]): ASTNode[] {
           tok.line,
         );
       const procName = nameTok.v as string;
+      noteLibraryShadow(procName);
       if (atEnd() || peek().t !== '(')
         throw new NeedlescriptError(
           `"def ${procName}" needs a parameter list in parentheses, e.g.  def ${procName}(size) [ … ]`,
@@ -373,7 +457,7 @@ export function parse(tokens: Token[]): ASTNode[] {
       const nxt = peek();
       const isValueWord = (w: string) =>
         FUNC_ARITY[w] !== undefined || ZERO_FUNCS.has(w) ||
-        LIST_FUNCS[w] !== undefined ||
+        LIST_FUNCS[w] !== undefined || GEN_FUNCS[w] !== undefined ||
         procArity[w] !== undefined || isVariableName(w);
       const startsValue = !!nxt && (
         nxt.t === 'num' || nxt.t === 'var' || nxt.t === '(' ||
@@ -563,12 +647,18 @@ export function parse(tokens: Token[]): ASTNode[] {
         const args = parseParenArgsRange(name, a.min, a.max, tok.line);
         return { k: 'listcmd', name, args, line: tok.line };
       }
+      if (GEN_CMDS[name] !== undefined) {
+        next();
+        const a = GEN_CMDS[name];
+        const args = parseParenArgsRange(name, a.min, a.max, tok.line);
+        return { k: 'listcmd', name, args, line: tok.line };
+      }
       if (QWORD_BUILTINS[canonical])
         throw new NeedlescriptError(
           `${canonical} takes a quoted word, e.g.  ${canonical} "${QWORD_BUILTINS[canonical][0]}"`,
           tok.line,
         );
-      if (FUNC_ARITY[name] !== undefined || ZERO_FUNCS.has(name) || LIST_FUNCS[name] !== undefined)
+      if (FUNC_ARITY[name] !== undefined || ZERO_FUNCS.has(name) || LIST_FUNCS[name] !== undefined || GEN_FUNCS[name] !== undefined)
         throw new NeedlescriptError(
           `"${name}" returns a value — use it inside an expression`,
           tok.line,
@@ -633,8 +723,11 @@ export function parse(tokens: Token[]): ASTNode[] {
       );
     }
 
-    // List builtins are glued-call only (RFC-2 §4): no prefix form exists.
-    if (LIST_CMDS[name] !== undefined || LIST_FUNCS[name] !== undefined)
+    // List/gen builtins are glued-call only (RFC-2 §4): no prefix form exists.
+    if (
+      LIST_CMDS[name] !== undefined || LIST_FUNCS[name] !== undefined ||
+      GEN_CMDS[name] !== undefined || GEN_FUNCS[name] !== undefined
+    )
       throw new NeedlescriptError(
         `list functions need call syntax:  ${name}(…)`,
         tok.line,
@@ -853,9 +946,14 @@ export function parse(tokens: Token[]): ASTNode[] {
             true,
           );
         }
+        // Generative-math builtins (RFC-3): same soft reservation.
+        if (GEN_FUNCS[w] !== undefined) {
+          next();
+          return parsePostfix(parseGenCall(w, tok.line), true);
+        }
         if (isVariableName(w))
           throw new NeedlescriptError(`"${w}" is a variable, not a procedure`, tok.line);
-        if (BUILTIN_ARITY[ALIASES[w] || w] !== undefined || LIST_CMDS[w] !== undefined)
+        if (BUILTIN_ARITY[ALIASES[w] || w] !== undefined || LIST_CMDS[w] !== undefined || GEN_CMDS[w] !== undefined)
           throw new NeedlescriptError(
             `"${w}" is a command — it doesn't return a value`,
             tok.line,
@@ -895,8 +993,8 @@ export function parse(tokens: Token[]): ASTNode[] {
         for (let a = 0; a < procArity[w]; a++) args.push(parseExpr());
         return { k: 'callexpr', name: w, args, line: tok.line };
       }
-      // List builtins are glued-call only (RFC-2 §4): no prefix form exists.
-      if (LIST_FUNCS[w] !== undefined)
+      // List/gen builtins are glued-call only (RFC-2 §4): no prefix form exists.
+      if (LIST_FUNCS[w] !== undefined || GEN_FUNCS[w] !== undefined)
         throw new NeedlescriptError(
           `list functions need call syntax:  ${w}(…)`,
           tok.line,

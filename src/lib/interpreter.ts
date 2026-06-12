@@ -2,8 +2,9 @@
 
 import type { ASTNode, ExprNode, RunResult, RunOptions } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
-import { makeRNG, makeNoise } from './prng.ts';
-import { FABRICS } from './commands.ts';
+import { makeRNG, makeNoise, fork, gauss } from './prng.ts';
+import { createNoise2D, createNoise3D } from 'simplex-noise';
+import { FABRICS, GEN_FUNCS } from './commands.ts';
 import { Machine, LIMITS } from './machine.ts';
 import { tokenize } from './tokenizer.ts';
 import { parse } from './parser.ts';
@@ -14,6 +15,11 @@ import {
   formatNum, formatVal,
 } from './list.ts';
 import type { Val } from './list.ts';
+import * as gm from './genmath.ts';
+import type { Pt } from './genmath.ts';
+import { offsetRegion, clipRegions } from './geometry.ts';
+import { scatter, voronoiCells, triangulate, hull, relax } from './generators.ts';
+import type { Domain } from './generators.ts';
 
 /** Thrown by `output` / `exit` to unwind to the enclosing procedure call. */
 class ReturnSignal {
@@ -25,13 +31,20 @@ class ReturnSignal {
 
 export function run(source: string, opts: RunOptions = {}): RunResult {
   const tokens = tokenize(source);
-  const program = parse(tokens);
+  const parseNotes: string[] = [];
+  const program = parse(tokens, parseNotes);
   const m = new Machine();
+  m.warnings.push(...parseNotes);
   const globals: Record<string, Val> = Object.create(null);
   const procs: Record<string, ASTNode & { k: 'to' }> = Object.create(null);
   const seed0 = opts.seed !== undefined ? opts.seed : 42;
   let rng = makeRNG(seed0);
   let noise = makeNoise(seed0);
+  // Seeded simplex noise (RFC-3 §4.2): permutation tables built from the
+  // seed at seed time, on a stream of their own — same seed, same field,
+  // forever, and zero draws from the main stream.
+  let snoise2 = createNoise2D(makeRNG(seed0));
+  let snoise3 = createNoise3D(makeRNG(seed0 ^ 0x9e3779b9));
   let ops = 0;
   /** Live list cells (slots). Decremented by removeat; lists that simply go
    *  out of reach stay counted — the counter is a tab-protecting ceiling,
@@ -259,11 +272,13 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       case 'shuffle': {
         const xs = list(args[0], 'shuffle', line);
         const out = [...xs.items];
-        // Fisher–Yates, exactly len−1 draws, high index down to 1 — this
-        // draw order is specified so the same seed gives the same order
-        // forever.
+        // Fork convention (RFC-3 §7, amending RFC-2): exactly one draw from
+        // the main stream seeds a child RNG; Fisher–Yates runs on the child,
+        // high index down to 1. Inserting a shuffle shifts downstream
+        // randomness by exactly one draw, regardless of list length.
+        const child = fork(rng);
         for (let i = out.length - 1; i >= 1; i--) {
-          const j = Math.floor(rng() * (i + 1));
+          const j = Math.floor(child() * (i + 1));
           const t = out[i]; out[i] = out[j]; out[j] = t;
         }
         return allocList(out, line);
@@ -277,6 +292,167 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         tick(line);
         return removed;
       }
+    }
+    throw new NeedlescriptError(`Unknown function ${name}`, line);
+  }
+
+  // ---------- Generative math dispatcher (RFC-3) ----------
+  //
+  // Converts list values to plain points/paths (loud shape errors naming
+  // the function), calls the pure modules, charges the op/cell budgets on
+  // the way back. Draw accounting (§7): gauss = 2 direct draws; scatter and
+  // shuffle draw exactly 1 and fork; voronoi/relax/… draw 0.
+
+  function genFunc(
+    name: string,
+    args: Val[],
+    line: number | undefined,
+    word?: string,
+  ): Val {
+    const sc = (i: number) => num(args[i], name, line);
+    const pointArg = (i: number) => gm.toPoint(args[i], name, line);
+    const pathArg = (i: number, min = 2) => gm.toPath(args[i], name, line, min);
+    const regionArg = (i: number) => gm.toRegion(args[i], name, line);
+    const point = (p: Pt) => allocList([p[0], p[1]], line);
+    const path = (pts: Pt[]) => gm.fromPoints(pts, items => allocList(items, line));
+    const regions = (rs: Pt[][]) => allocList(rs.map(r => path(r) as Val), line);
+    const domainArg = (i: number): Domain =>
+      args.length > i
+        ? { kind: 'poly', pts: regionArg(i) }
+        : { kind: 'disc', r: LIMITS.sewableRadius };
+    const delaunayInput = (i: number, min: number) => {
+      const pts = pathArg(i, min);
+      if (pts.length > LIMITS.maxDelaunayPoints)
+        throw new NeedlescriptError(
+          `${name}: too many points (${pts.length.toLocaleString()}, limit ${LIMITS.maxDelaunayPoints.toLocaleString()})`,
+          line,
+        );
+      tickN(pts.length, line);
+      return pts;
+    };
+
+    switch (name) {
+      // ----- §4.1 scalars -----
+      case 'lerp': return gm.lerp(sc(0), sc(1), sc(2));
+      case 'remap': return gm.remap(sc(0), sc(1), sc(2), sc(3), sc(4));
+      case 'clamp': return gm.clamp(sc(0), sc(1), sc(2));
+      case 'smoothstep': return gm.smoothstep(sc(0), sc(1), sc(2));
+      case 'gauss': return gauss(rng, sc(0), sc(1)); // exactly 2 main-stream draws
+
+      // ----- §4.2 noise (range −1…1; legacy noise/noise2 keep 0…1) -----
+      case 'snoise2': return snoise2(sc(0), sc(1));
+      case 'snoise3': return snoise3(sc(0), sc(1), sc(2));
+      case 'fbm2': {
+        const x = sc(0), y = sc(1);
+        const want = Math.round(sc(2));
+        const oct = gm.clamp(want, 1, 8);
+        if (oct !== want)
+          m.warnings.push(`fbm2 octaves ${formatNum(sc(2))} clamped to ${oct} (range 1–8)`);
+        let sum = 0, ampSum = 0, amp = 1, freq = 1;
+        for (let o = 0; o < oct; o++) {
+          sum += snoise2(x * freq, y * freq) * amp;
+          ampSum += amp;
+          amp *= 0.5;
+          freq *= 2; // lacunarity 2.0, gain 0.5 (§4.2)
+        }
+        return sum / ampSum;
+      }
+
+      // ----- §4.3 vectors -----
+      case 'vadd': return point(gm.vadd(pointArg(0), pointArg(1)));
+      case 'vsub': return point(gm.vsub(pointArg(0), pointArg(1)));
+      case 'vscale': return point(gm.vscale(pointArg(0), sc(1)));
+      case 'vlerp': return point(gm.vlerp(pointArg(0), pointArg(1), sc(2)));
+      case 'vdot': return gm.vdot(pointArg(0), pointArg(1));
+      case 'vlen': return gm.vlen(pointArg(0));
+      case 'vdist': return gm.vdist(pointArg(0), pointArg(1));
+      case 'vnorm': return point(gm.vnorm(pointArg(0), line));
+      case 'vrot': return point(gm.vrot(pointArg(0), sc(1)));
+      case 'vheading': return gm.vheading(pointArg(0));
+      case 'vfromheading': return point(gm.vfromheading(sc(0), sc(1)));
+
+      // ----- §4.4 paths & curves -----
+      case 'pathlen': {
+        const p = pathArg(0);
+        tickN(p.length, line);
+        return gm.pathlen(p);
+      }
+      case 'resample':
+        return path(gm.resample(pathArg(0), sc(1), LIMITS.maxListLen, line));
+      case 'chaikin': {
+        const p = pathArg(0);
+        const want = Math.round(sc(1));
+        const n = gm.clamp(want, 1, 6);
+        if (n !== want)
+          m.warnings.push(`chaikin iterations ${formatNum(sc(1))} clamped to ${n} (range 1–6)`);
+        if (p.length * Math.pow(2, n) > LIMITS.maxListLen)
+          throw new NeedlescriptError(
+            `List too long (chaikin would produce over ${LIMITS.maxListLen.toLocaleString()} points)`,
+            line,
+          );
+        return path(gm.chaikin(p, n));
+      }
+      case 'catmull':
+        return path(gm.catmull(pathArg(0), sc(1), LIMITS.maxListLen, line));
+      case 'bezier':
+        return path(gm.bezier(
+          pointArg(0), pointArg(1), pointArg(2), pointArg(3),
+          sc(4), LIMITS.maxListLen, line,
+        ));
+      case 'centroid': return point(gm.centroid(pathArg(0)));
+      case 'bbox': {
+        const [minx, miny, maxx, maxy] = gm.bbox(pathArg(0));
+        return allocList([minx, miny, maxx, maxy], line);
+      }
+
+      // ----- §4.5 generators -----
+      case 'scatter': {
+        // fork convention (§7): exactly one main-stream draw
+        const pts = scatter(sc(0), domainArg(1), fork(rng), LIMITS.maxScatterPoints, line);
+        tickN(pts.length * 4, line);
+        return path(pts.length ? pts : []);
+      }
+      case 'voronoi': {
+        const pts = delaunayInput(0, 1);
+        const cells = voronoiCells(pts, domainArg(1), line);
+        tickN(pts.length * 8, line);
+        return allocList(
+          cells.map(c => (c.length ? path(c) : allocList([], line)) as Val),
+          line,
+        );
+      }
+      case 'triangulate': {
+        const pts = delaunayInput(0, 3);
+        const tris = triangulate(pts, line);
+        return allocList(
+          tris.map(([a, b, c]) => path([pts[a], pts[b], pts[c]]) as Val),
+          line,
+        );
+      }
+      case 'hull': return path(hull(delaunayInput(0, 3), line));
+      case 'relax': {
+        const pts = delaunayInput(0, 1);
+        const want = Math.round(sc(1));
+        const n = gm.clamp(want, 0, 50);
+        if (n !== want)
+          m.warnings.push(`relax iterations ${formatNum(sc(1))} clamped to ${n} (range 0–50)`);
+        tickN(pts.length * 8 * Math.max(1, n), line);
+        return path(relax(pts, n, { kind: 'disc', r: LIMITS.sewableRadius }, line));
+      }
+
+      // ----- §4.6 geometry ops -----
+      case 'offsetpath': {
+        const r = regionArg(0);
+        tickN(r.length * 4, line);
+        return regions(offsetRegion(r, sc(1), line));
+      }
+      case 'clippaths': {
+        const a = regionArg(0), b = regionArg(1);
+        tickN((a.length + b.length) * 4, line);
+        return regions(clipRegions(a, b, word as string, line));
+      }
+      case 'inpath':
+        return gm.pointInRegion(pointArg(0), regionArg(1)) ? 1 : 0;
     }
     throw new NeedlescriptError(`Unknown function ${name}`, line);
   }
@@ -344,6 +520,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'listfunc': {
         const args = node.args.map(a => evalExpr(a, env, repcount, depth));
+        if (GEN_FUNCS[node.name] !== undefined)
+          return genFunc(node.name, args, node.line, node.word);
         return listFunc(node.name, args, node.line);
       }
       case 'bin': {
@@ -363,6 +541,20 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             const eq = deepEqual(av, bv);
             return node.op === '=' ? (eq ? 1 : 0) : (eq ? 0 : 1);
           }
+        }
+        // Arithmetic on lists stays a loud error (RFC-3 §2) — with hints
+        // pointing at the named vector functions. No broadcasting: in
+        // Python  [1,2] + [3,4]  is concatenation, and silently giving it
+        // NumPy semantics is the kind of bug that sews before it's noticed.
+        if ((isList(av) || isList(bv)) && '+-*/'.includes(node.op)) {
+          const hint =
+            node.op === '+' ? ' — use vadd(a, b) for element-wise, concat(a, b) to join'
+              : node.op === '-' ? ' — use vsub(a, b) for element-wise'
+                : ' — use vscale(a, s) to scale a point';
+          throw new NeedlescriptError(
+            `"${node.op}" on lists${hint}`,
+            (node.left as { line?: number }).line ?? (node.right as { line?: number }).line,
+          );
         }
         const a = num(av, node.op, undefined, 'on the left');
         const b = num(bv, node.op, undefined, 'on the right');
@@ -686,6 +878,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             m.setXY(x, y);
             return;
           }
+          case 'sewpath': {
+            // ≡ for p in path [ setpos(p) ] — pen state, stitch mode, satin
+            // and auto-split all apply exactly as if hand-walked (§4.4).
+            const pts = gm.toPath(a[0], 'sewpath', st.line);
+            tickN(pts.length, st.line);
+            for (const [x, y] of pts) m.setXY(x, y);
+            return;
+          }
         }
         throw new NeedlescriptError(`Unhandled command ${st.name}`, st.line);
       }
@@ -825,6 +1025,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             const s = Math.floor(a[0]);
             rng = makeRNG(s);
             noise = makeNoise(s);
+            snoise2 = createNoise2D(makeRNG(s));
+            snoise3 = createNoise3D(makeRNG(s ^ 0x9e3779b9));
             return;
           }
           case 'mark': m.markHere(); return;

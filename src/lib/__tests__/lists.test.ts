@@ -304,10 +304,16 @@ describe('seeded pick and shuffle (test #12)', () => {
     );
   });
 
-  it('shuffle is exactly len−1 draws', () => {
+  it('shuffle is exactly one main-stream draw (fork convention, RFC-3 §7)', () => {
+    // Inserting a shuffle shifts downstream randomness by exactly one draw,
+    // same as inserting a random — regardless of the list's length.
     expectEquivalent(
       'seed 3 let s = shuffle([1, 2, 3, 4]) print random(1000)',
-      'seed 3 repeat 3 [ let z = random(1) ] print random(1000)',
+      'seed 3 let z = random(1) print random(1000)',
+    );
+    expectEquivalent(
+      'seed 5 let s = shuffle(range(100)) print random(1000)',
+      'seed 5 let s = shuffle([1, 2]) print random(1000)',
     );
   });
 
@@ -324,11 +330,13 @@ describe('type guards (test #13)', () => {
     expect(() => run('color [1]')).toThrow(/"color" expected a number/);
   });
 
-  it('arithmetic rejects lists, naming the operand side', () => {
+  it('arithmetic rejects lists, with hints at the vector functions (RFC-3 §2)', () => {
     expect(() => run('print [1] + 1'))
-      .toThrow(/"\+" expected a number, got a list \(length 1\) on the left/);
+      .toThrow(/"\+" on lists — use vadd\(a, b\) for element-wise, concat\(a, b\) to join/);
     expect(() => run('print 1 - [1, 2, 3]'))
-      .toThrow(/"-" expected a number, got a list \(length 3\) on the right/);
+      .toThrow(/"-" on lists — use vsub\(a, b\) for element-wise/);
+    expect(() => run('print [1, 2] * 2'))
+      .toThrow(/"\*" on lists — use vscale\(a, s\) to scale a point/);
     expect(() => run('let xs = [1] print -xs')).toThrow(/"-" expected a number/);
   });
 

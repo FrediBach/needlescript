@@ -73,7 +73,7 @@ export type ExprNode =
   | { k: 'neg'; val: ExprNode; line: number }
   | { k: 'bin'; op: string; left: ExprNode; right: ExprNode }
   | { k: 'func'; name: string; args: ExprNode[]; line: number }
-  | { k: 'listfunc'; name: string; args: ExprNode[]; line: number }
+  | { k: 'listfunc'; name: string; args: ExprNode[]; line: number; word?: string }
   | { k: 'list'; items: ExprNode[]; line: number }
   | { k: 'index'; obj: ExprNode; idx: ExprNode; line: number }
   | { k: 'callval'; obj: ExprNode; args: ExprNode[]; line: number }
