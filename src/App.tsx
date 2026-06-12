@@ -1,14 +1,16 @@
-import { useReducer, useState, useCallback, useRef } from 'react';
+import { useReducer, useState, useCallback, useRef, useMemo } from 'react';
 import { run, designStats, NeedlescriptError } from './lib/engine.ts';
 import type { StitchEvent, DesignStats, DensityResult } from './lib/engine.ts';
 import { toDST } from './lib/dst.ts';
 import { svgToCode } from './lib/svg-importer.ts';
-import { THREADS, SAFE_R, EXAMPLES } from './data.ts';
+import { THREADS, EXAMPLES, DEFAULT_HOOP } from './data.ts';
+import type { HoopConfig } from './data.ts';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
 import EditorPane from './components/EditorPane.tsx';
 import StagePane from './components/StagePane.tsx';
 import ReferenceDialog from './components/ReferenceDialog.tsx';
+import HoopDialog from './components/HoopDialog.tsx';
 
 export interface DebugMark {
   x: number;
@@ -72,13 +74,17 @@ function programReducer(state: ProgramState, action: ProgramAction): ProgramStat
 export default function App() {
   const firstKey = Object.keys(EXAMPLES)[0];
   const [source, setSource] = useState(EXAMPLES[firstKey]);
-  const [fitMM, setFitMM] = useState(80);
+  const [selectedHoop, setSelectedHoop] = useState<HoopConfig>(DEFAULT_HOOP);
+  const [showHoopDialog, setShowHoopDialog] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showDensity, setShowDensity] = useState(false);
   const [showReference, setShowReference] = useState(false);
   const [program, dispatch] = useReducer(programReducer, { design: INITIAL_DESIGN, messages: [], scrubPos: 0 });
   const { design, messages, scrubPos } = program;
   const svgFileRef = useRef<HTMLInputElement>(null);
+
+  // SVG import size derived from current hoop (fits within the sewable area)
+  const fitMM = Math.min(selectedHoop.widthMM, selectedHoop.heightMM) - 10;
 
   function addMsg(text: string, type: ConsoleMessage['type'] = 'info') {
     dispatch({ type: 'msg/add', text, msgType: type });
@@ -97,9 +103,7 @@ export default function App() {
       const stats = designStats(result.events);
       const warnings: string[] = [...result.warnings];
 
-      // hoop checks
-      if (stats.maxRadius > SAFE_R)
-        warnings.push(`design reaches ${(stats.maxRadius * 2).toFixed(0)} mm across — outside the 100 mm hoop`);
+      // density check
       const density = stats.stitches / Math.max(1, stats.width * stats.height);
       if (density > 4)
         warnings.push(`very dense (${density.toFixed(1)} st/mm² avg) — may pucker; raise stitchlen or shrink repeats`);
@@ -124,6 +128,18 @@ export default function App() {
       dispatch({ type: 'run/error' });
     }
   }, []);
+
+  // Hoop-fit warning computed reactively so it updates when the hoop changes
+  // without requring a re-run.
+  const displayDesign = useMemo((): DesignState => {
+    if (!design.stats) return design;
+    const safeR = Math.min(selectedHoop.widthMM, selectedHoop.heightMM) / 2 - 3;
+    if (design.stats.maxRadius > safeR) {
+      const warning = `design reaches ${(design.stats.maxRadius * 2).toFixed(0)} mm — outside the ${selectedHoop.label}`;
+      return { ...design, warnings: [...design.warnings, warning] };
+    }
+    return design;
+  }, [design, selectedHoop]);
 
   const handleRun = useCallback(() => {
     runProgram(source, design.name);
@@ -241,8 +257,8 @@ export default function App() {
       onDrop={handleDrop}
     >
       <Header
-        fitMM={fitMM}
-        onFitMMChange={setFitMM}
+        hoop={selectedHoop}
+        onOpenHoopDialog={() => setShowHoopDialog(true)}
         onSVGImport={handleSVGImport}
         onExampleSelect={handleExampleSelect}
         onRun={handleRun}
@@ -260,7 +276,8 @@ export default function App() {
           activeLine={activeLine}
         />
         <StagePane
-          design={design}
+          design={displayDesign}
+          hoop={selectedHoop}
           scrubPos={scrubPos}
           onScrubChange={(pos) => dispatch({ type: 'scrub', pos })}
           activeLine={activeLine}
@@ -270,6 +287,13 @@ export default function App() {
       </main>
 
       <ReferenceDialog open={showReference} onClose={() => setShowReference(false)} />
+
+      <HoopDialog
+        open={showHoopDialog}
+        current={selectedHoop}
+        onSelect={setSelectedHoop}
+        onClose={() => setShowHoopDialog(false)}
+      />
 
       <input
         ref={svgFileRef}

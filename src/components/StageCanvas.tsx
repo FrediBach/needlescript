@@ -1,14 +1,16 @@
 import { useEffect, useRef } from 'react';
 import type { DesignState } from '../App.tsx';
-import { THREADS, HOOP_R } from '../data.ts';
+import type { HoopConfig } from '../data.ts';
+import { THREADS } from '../data.ts';
 
 interface Props {
   design: DesignState;
+  hoop: HoopConfig;
   scrubPos: number;
   showDensity: boolean;
 }
 
-export default function StageCanvas({ design, scrubPos, showDensity }: Props) {
+export default function StageCanvas({ design, hoop, scrubPos, showDensity }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -23,8 +25,8 @@ export default function StageCanvas({ design, scrubPos, showDensity }: Props) {
     canvas.width = Math.max(1, Math.round(box.width * dpr));
     canvas.height = Math.max(1, Math.round(box.height * dpr));
 
-    draw(canvas, design, scrubPos, dpr, showDensity);
-  }, [design, scrubPos, showDensity]);
+    draw(canvas, design, hoop, scrubPos, dpr, showDensity);
+  }, [design, hoop, scrubPos, showDensity]);
 
   // Also redraw on resize
   useEffect(() => {
@@ -37,11 +39,11 @@ export default function StageCanvas({ design, scrubPos, showDensity }: Props) {
       const dpr = window.devicePixelRatio || 1;
       canvas.width = Math.max(1, Math.round(box.width * dpr));
       canvas.height = Math.max(1, Math.round(box.height * dpr));
-      draw(canvas, design, scrubPos, dpr, showDensity);
+      draw(canvas, design, hoop, scrubPos, dpr, showDensity);
     });
     ro.observe(canvas.parentElement!);
     return () => ro.disconnect();
-  }, [design, scrubPos, showDensity]);
+  }, [design, hoop, scrubPos, showDensity]);
 
   return (
     <canvas
@@ -54,6 +56,7 @@ export default function StageCanvas({ design, scrubPos, showDensity }: Props) {
 function draw(
   canvas: HTMLCanvasElement,
   design: DesignState,
+  hoop: HoopConfig,
   scrubPos: number,
   dpr: number,
   showDensity: boolean,
@@ -65,22 +68,23 @@ function draw(
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  // Fit hoop + design
-  let ext = HOOP_R + 6;
+  // Fit hoop + design — maintain separate per-axis extents for non-square hoops
+  const hoopHalfW = hoop.widthMM / 2;
+  const hoopHalfH = hoop.heightMM / 2;
+  let extX = hoopHalfW + 6;
+  let extY = hoopHalfH + 6;
   if (design.stats) {
-    ext = Math.max(
-      ext,
-      Math.abs(design.stats.minX), Math.abs(design.stats.maxX),
-      Math.abs(design.stats.minY), Math.abs(design.stats.maxY),
-    );
-    ext += 6;
+    const neededX = Math.max(Math.abs(design.stats.minX), Math.abs(design.stats.maxX));
+    const neededY = Math.max(Math.abs(design.stats.minY), Math.abs(design.stats.maxY));
+    extX = Math.max(extX, neededX + 6);
+    extY = Math.max(extY, neededY + 6);
   }
-  const scale = Math.min(w, h) / (2 * ext);
+  const scale = Math.min(w / (2 * extX), h / (2 * extY));
   const cx = w / 2, cy = h / 2;
   const X = (mx: number) => cx + mx * scale;
   const Y = (my: number) => cy - my * scale; // y-up in mm
 
-  drawHoop(ctx, scale, cx, cy, dpr);
+  drawHoop(ctx, hoop, scale, cx, cy, w, h);
 
   const pts = design.pts;
   const upto = Math.min(pts.length, scrubPos || 0);
@@ -185,34 +189,67 @@ function draw(
   }
 }
 
+// Draws the hoop as a flat, minimalistic overlay:
+//   – outside the hoop: slight dark tint so the embroiderable area reads clearly
+//   – hoop edge: thin warm border line
 function drawHoop(
   ctx: CanvasRenderingContext2D,
+  hoop: HoopConfig,
   scale: number,
   cx: number,
   cy: number,
-  dpr: number,
+  canvasW: number,
+  canvasH: number,
 ) {
-  const rIn = HOOP_R * scale, rOut = (HOOP_R + 4.5) * scale;
-  const g = ctx.createRadialGradient(cx, cy, rIn, cx, cy, rOut);
-  g.addColorStop(0, '#C99A5C');
-  g.addColorStop(0.5, '#B98B4E');
-  g.addColorStop(1, '#8F6A38');
+  const rx = (hoop.widthMM / 2) * scale;
+  const ry = (hoop.heightMM / 2) * scale;
+
+  // --- dark overlay outside the hoop using even-odd fill ---
+  ctx.save();
+  ctx.fillStyle = 'rgba(8, 6, 4, 0.1)';
   ctx.beginPath();
-  ctx.arc(cx, cy, rOut, 0, 6.2832);
-  ctx.arc(cx, cy, rIn, 0, 6.2832, true);
-  ctx.fillStyle = g;
-  ctx.fill();
+  ctx.rect(0, 0, canvasW, canvasH);          // outer rectangle (whole canvas)
+  addHoopPath(ctx, hoop, rx, ry, cx, cy, scale);  // inner hoop shape (creates the hole)
+  ctx.fill('evenodd');
+  ctx.restore();
+
+  // --- hoop boundary line ---
+  ctx.save();
   ctx.beginPath();
-  ctx.arc(cx, cy, rIn, 0, 6.2832);
-  ctx.strokeStyle = 'rgba(90,70,40,0.35)';
-  ctx.lineWidth = 1.5 * dpr;
+  addHoopPath(ctx, hoop, rx, ry, cx, cy, scale);
+  ctx.strokeStyle = 'rgba(90, 75, 55, 0.55)';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
-  // Screw at top
-  const sw = 9 * dpr, sh = 14 * dpr;
-  ctx.fillStyle = '#7E5C2E';
-  ctx.fillRect(cx - sw / 2, cy - rOut - sh * 0.55, sw, sh * 0.8);
-  ctx.beginPath();
-  ctx.arc(cx, cy - rOut - sh * 0.55, sw * 0.62, 0, 6.2832);
-  ctx.fillStyle = '#6B4D25';
-  ctx.fill();
+  ctx.restore();
+}
+
+// Adds the hoop shape as a canvas sub-path (no stroke/fill — caller decides).
+function addHoopPath(
+  ctx: CanvasRenderingContext2D,
+  hoop: HoopConfig,
+  rx: number,
+  ry: number,
+  cx: number,
+  cy: number,
+  scale: number,
+) {
+  if (hoop.shape === 'circle') {
+    ctx.arc(cx, cy, rx, 0, Math.PI * 2);
+  } else if (hoop.shape === 'oval') {
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  } else {
+    // Rectangle with gently rounded corners proportional to the hoop size
+    const r = Math.min(5 * scale, rx * 0.12, ry * 0.12);
+    const x = cx - rx, y = cy - ry, w = rx * 2, h = ry * 2;
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
 }

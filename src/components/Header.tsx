@@ -1,10 +1,12 @@
 import { useRef } from 'react';
 import { EXAMPLES } from '../data.ts';
+import type { HoopConfig } from '../data.ts';
+import { HoopIcon } from './HoopDialog.tsx';
 import styles from './Header.module.css';
 
 interface Props {
-  fitMM: number;
-  onFitMMChange: (v: number) => void;
+  hoop: HoopConfig;
+  onOpenHoopDialog: () => void;
   onSVGImport: () => void;
   onExampleSelect: (key: string) => void;
   onRun: () => void;
@@ -13,7 +15,7 @@ interface Props {
 }
 
 export default function Header({
-  fitMM, onFitMMChange, onSVGImport, onExampleSelect, onRun, onDownloadDST, onOpenReference,
+  hoop, onOpenHoopDialog, onSVGImport, onExampleSelect, onRun, onDownloadDST, onOpenReference,
 }: Props) {
   const selectRef = useRef<HTMLSelectElement>(null);
 
@@ -30,19 +32,16 @@ export default function Header({
         <span className={styles.tag}>Logo inspired programming language for generative embroidery</span>
       </div>
 
-      <label className={styles.fit}>
-        fit{' '}
-        <input
-          type="text"
-          value={fitMM}
-          min={10}
-          max={190}
-          step={5}
-          aria-label="Import size in millimetres"
-          onChange={e => onFitMMChange(Number(e.target.value))}
-        />{' '}
-        mm
-      </label>
+      <button
+        type="button"
+        className={styles.hoopBtn}
+        onClick={onOpenHoopDialog}
+        title="Change hoop size and shape"
+        aria-label={`Hoop: ${hoop.label}`}
+      >
+        <HoopIcon hoop={hoop} size={15} />
+        <span>{hoop.label}</span>
+      </button>
 
       <button type="button" className={styles.btn} onClick={onSVGImport}>Import SVG</button>
 

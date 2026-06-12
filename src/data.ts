@@ -1,7 +1,5 @@
 // Shared constants for the Needlescript playground UI
 
-import { LIMITS } from './lib/machine.ts';
-
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
   '#31604F', // 1 — forest
@@ -13,8 +11,26 @@ export const THREADS: string[] = [
   '#B8651B', // 7 — amber
 ];
 
-export const HOOP_R = 50;   // 100 mm hoop, radius in mm
-export const SAFE_R = LIMITS.sewableRadius; // sewable field inside the hoop
+export interface HoopConfig {
+  id: string;
+  label: string;
+  widthMM: number;
+  heightMM: number;
+  shape: 'circle' | 'oval' | 'rectangle';
+}
+
+export const HOOPS: HoopConfig[] = [
+  { id: 'round-100',    label: '100 mm round',    widthMM: 100, heightMM: 100, shape: 'circle'    },
+  { id: 'round-130',    label: '130 mm round',    widthMM: 130, heightMM: 130, shape: 'circle'    },
+  { id: 'round-150',    label: '150 mm round',    widthMM: 150, heightMM: 150, shape: 'circle'    },
+  { id: 'round-200',    label: '200 mm round',    widthMM: 200, heightMM: 200, shape: 'circle'    },
+  { id: 'oval-120x75',  label: '120×75 mm oval',  widthMM: 120, heightMM:  75, shape: 'oval'      },
+  { id: 'oval-150x100', label: '150×100 mm oval', widthMM: 150, heightMM: 100, shape: 'oval'      },
+  { id: 'rect-100',     label: '100×100 mm',      widthMM: 100, heightMM: 100, shape: 'rectangle' },
+  { id: 'rect-180x130', label: '180×130 mm',      widthMM: 180, heightMM: 130, shape: 'rectangle' },
+];
+
+export const DEFAULT_HOOP: HoopConfig = HOOPS[0];
 
 export const EXAMPLES: Record<string, string> = {
   'bloom — rose of circles': [
