@@ -1,5 +1,9 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
+import Editor, { useMonaco } from '@monaco-editor/react';
+import type { OnMount, BeforeMount } from '@monaco-editor/react';
+import type { editor } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
+import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
 import styles from './EditorPane.module.css';
 
 interface Props {
@@ -11,48 +15,87 @@ interface Props {
   activeLine: number | null; // source line currently sewing (playback), 1-based
 }
 
-// Must match .editor in EditorPane.module.css: font-size 13px × line-height 1.55, padding-top 8px
-const LINE_HEIGHT = 13 * 1.55;
-const PADDING_TOP = 8;
+// Font settings match the rest of the app (--mono, 13 px, line-height 1.55)
+const EDITOR_FONT_FAMILY = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+const EDITOR_FONT_SIZE    = 13;
+const EDITOR_LINE_HEIGHT  = Math.round(EDITOR_FONT_SIZE * 1.55); // 20 px
+
+// CSS class applied to the whole-line decoration while the playback line is
+// active. Must be a global (non-hashed) name since Monaco injects the class
+// into its own DOM — the matching rule lives in EditorPane.module.css as a
+// :global block.
+const ACTIVE_LINE_CLASS = 'ns-playback-line';
 
 export default function EditorPane({ source, onSourceChange, onRun, messages, isDragging, activeLine }: Props) {
   const [replValue, setReplValue] = useState('');
-  const [scrollTop, setScrollTop] = useState(0);
   const replHistoryRef = useRef<string[]>([]);
-  const replIdxRef = useRef(-1);
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const replIdxRef     = useRef(-1);
 
-  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      onRun();
-    }
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const el = e.currentTarget;
-      const s = el.selectionStart, end = el.selectionEnd;
-      const next = el.value.slice(0, s) + '  ' + el.value.slice(end);
-      onSourceChange(next);
-      // Restore cursor position after React re-render
-      requestAnimationFrame(() => {
-        el.selectionStart = el.selectionEnd = s + 2;
-      });
-    }
-  }, [onRun, onSourceChange]);
+  // Holds the live Monaco editor instance once mounted.
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  // Holds the decoration collection for the playback active-line highlight.
+  const decoCollRef = useRef<editor.IEditorDecorationsCollection | null>(null);
 
+  // Stable ref so the keyboard-shortcut handler always calls the latest onRun
+  // even after source/design state changes rebuild the callback.
+  const onRunRef = useRef(onRun);
+  onRunRef.current = onRun;
+
+  // ── Monaco lifecycle callbacks ──────────────────────────────────────
+  const handleBeforeMount = useCallback<BeforeMount>((monaco) => {
+    registerNeedlescript(monaco);
+  }, []);
+
+  const handleMount = useCallback<OnMount>((ed, monaco) => {
+    editorRef.current  = ed;
+    decoCollRef.current = ed.createDecorationsCollection();
+
+    // Cmd/Ctrl + Enter → run the program (mirrors the original textarea shortcut)
+    ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      onRunRef.current();
+    });
+  }, []);
+
+  // ── Playback active-line decoration ────────────────────────────────
+  const monaco = useMonaco();
+
+  useEffect(() => {
+    const ed   = editorRef.current;
+    const coll = decoCollRef.current;
+    if (!ed || !coll || !monaco) return;
+
+    if (activeLine !== null) {
+      coll.set([{
+        range: new monaco.Range(activeLine, 1, activeLine, 1),
+        options: {
+          isWholeLine: true,
+          className:   ACTIVE_LINE_CLASS,
+        },
+      }]);
+      // Reveal the line without jarring the user (ScrollType.Smooth = 0)
+      ed.revealLine(activeLine, 0);
+    } else {
+      coll.clear();
+    }
+  }, [activeLine, monaco]);
+
+  // ── REPL ─────────────────────────────────────────────────────────────
   const handleReplKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const line = replValue.trim();
       if (!line) return;
       replHistoryRef.current.push(line);
       replIdxRef.current = replHistoryRef.current.length;
-      const v = source;
-      const next = v + (v && !v.endsWith('\n') ? '\n' : '') + line;
+      const next = source + (source && !source.endsWith('\n') ? '\n' : '') + line;
       onSourceChange(next);
       setReplValue('');
-      // Scroll editor to bottom
+      // Scroll Monaco to the last line so the newly-appended command is visible
       requestAnimationFrame(() => {
-        if (editorRef.current) editorRef.current.scrollTop = editorRef.current.scrollHeight;
+        const ed = editorRef.current;
+        if (ed) {
+          const model = ed.getModel();
+          if (model) ed.revealLine(model.getLineCount());
+        }
       });
       onRun();
     } else if (e.key === 'ArrowUp') {
@@ -73,29 +116,61 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
     }
   }, [replValue, source, onSourceChange, onRun]);
 
-  const highlightTop =
-    activeLine !== null ? PADDING_TOP + (activeLine - 1) * LINE_HEIGHT - scrollTop : 0;
-
+  // ─────────────────────────────────────────────────────────────────────
   return (
     <section className={`${styles.pane} ${isDragging ? styles.dragging : ''}`}>
       <div className={styles.paneLabel}>pattern</div>
+
       <div className={styles.editorWrap}>
-        {activeLine !== null && (
-          <div
-            className={styles.lineHighlight}
-            style={{ top: `${highlightTop}px`, height: `${LINE_HEIGHT}px` }}
-            aria-hidden="true"
-          />
-        )}
-        <textarea
-          ref={editorRef}
-          className={styles.editor}
+        <Editor
+          language="needlescript"
+          theme="needlescript-dark"
           value={source}
-          onChange={e => onSourceChange(e.target.value)}
-          onKeyDown={handleEditorKeyDown}
-          onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
-          spellCheck={false}
-          aria-label="Needlescript program"
+          beforeMount={handleBeforeMount}
+          onMount={handleMount}
+          onChange={(value) => {
+            if (value !== undefined) onSourceChange(value);
+          }}
+          height="100%"
+          width="100%"
+          loading={<div className={styles.editorLoading}>loading editor…</div>}
+          options={{
+            // Typography — must match the rest of the app
+            fontFamily:            EDITOR_FONT_FAMILY,
+            fontSize:              EDITOR_FONT_SIZE,
+            lineHeight:            EDITOR_LINE_HEIGHT,
+            fontLigatures:         false,
+            // Indentation
+            tabSize:               2,
+            insertSpaces:          true,
+            detectIndentation:     false,
+            // Visible features to keep
+            lineNumbers:           'on',
+            lineDecorationsWidth:  0,  // remove glyph margin / extra gutter width
+            folding:               false,
+            // Disable features that add visual noise for a simple scripting editor
+            minimap:               { enabled: false },
+            overviewRulerLanes:    0,
+            hideCursorInOverviewRuler: true,
+            overviewRulerBorder:   false,
+            scrollBeyondLastLine:  false,
+            wordWrap:              'off',
+            // Match original padding
+            padding:               { top: 8, bottom: 12 },
+            // Scrollbars
+            scrollbar: {
+              verticalScrollbarSize:   8,
+              horizontalScrollbarSize:  8,
+              useShadows:              false,
+            },
+            // Suppress language-intelligence popups (we provide highlighting only)
+            quickSuggestions:      false,
+            suggestOnTriggerCharacters: false,
+            parameterHints:        { enabled: false },
+            wordBasedSuggestions:  'off',
+            links:                 false,
+            hover:                 { enabled: false },
+          }}
         />
       </div>
 

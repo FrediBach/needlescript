@@ -24,51 +24,41 @@
   flex-shrink: 0;
 }
 
+/* Monaco editor container — fill all available vertical space */
 .editorWrap {
   position: relative;
   flex: 1;
   min-height: 0;
-  display: flex;
   overflow: hidden;
 }
 
-.editor {
-  flex: 1;
-  min-height: 0;
-  resize: none;
-  width: 100%;
-  background: transparent;
-  color: var(--pale);
-  border: none;
-  font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.55;
-  padding: 8px 14px 12px;
-  caret-color: var(--gold);
-  white-space: pre;
-  overflow: auto;
-  position: relative;
+/* Drag-over highlight: outline the Monaco wrapper instead of the textarea */
+.dragging .editorWrap {
+  outline: 2px dashed var(--gold);
+  outline-offset: -4px;
   z-index: 1;
 }
 
-/* Source line currently sewing during playback */
-.lineHighlight {
-  position: absolute;
-  left: 0;
-  right: 0;
-  background: rgba(217, 164, 65, 0.13);
-  border-left: 2px solid var(--gold);
-  pointer-events: none;
-  z-index: 0;
+/* ── Playback active-line decoration ─────────────────────────────────
+   Monaco injects the className directly into its DOM, so the rule must
+   be global (un-hashed).  The :global wrapper keeps it co-located with
+   this component while opting out of CSS Modules name-mangling.         */
+:global(.ns-playback-line) {
+  background: rgba(217, 164, 65, 0.13) !important;
+  border-left: 2px solid #D9A441 !important;
 }
 
-.editor::selection {
-  background: rgba(217, 164, 65, 0.28);
-}
-
-.editor:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 1px;
+/* Loading skeleton shown while Monaco initialises */
+.editorLoading {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  background: var(--desk);
 }
 
 .console {
@@ -118,12 +108,6 @@
 .repl:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 1px;
-}
-
-/* Drag-over highlight */
-.dragging .editor {
-  outline: 2px dashed var(--gold);
-  outline-offset: -8px;
 }
 
 .dropOverlay {

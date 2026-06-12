@@ -14,8 +14,10 @@
     "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "clipper2-ts": "2.0.1-17",
     "delaunator": "5.1.0",
+    "monaco-editor": "^0.55.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "simplex-noise": "4.0.3"
