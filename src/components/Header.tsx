@@ -25,9 +25,9 @@ export default function Header({
     <header className={styles.header}>
       <div className={styles.wordmark}>
         <h1>
-          <span className={styles.needle}>N</span>eedlescript
+          Needlescript
         </h1>
-        <span className={styles.tag}>a turtle that sews — programs export to Tajima .DST</span>
+        <span className={styles.tag}>Logo inspired programming language for generative embroidery</span>
       </div>
 
       <label className={styles.fit}>
