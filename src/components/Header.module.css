@@ -65,7 +65,7 @@
   outline-offset: 1px;
 }
 
-.runBtn {
+.runBtn, .dlBtn {
   background: var(--red);
   border: 1px solid var(--red-d);
   color: #FFF4EA;
@@ -74,7 +74,7 @@
   position: relative;
 }
 
-.runBtn::after {
+.runBtn::after, .dlBtn::after {
   content: "";
   position: absolute;
   inset: 3px;
@@ -83,17 +83,8 @@
   pointer-events: none;
 }
 
-.runBtn:hover {
+.runBtn:hover, .dlBtn:hover {
   background: #D55036;
-}
-
-.dlBtn {
-  border-color: var(--gold);
-  color: var(--gold);
-}
-
-.dlBtn:hover {
-  background: rgba(217, 164, 65, 0.12);
 }
 
 .helpBtn {

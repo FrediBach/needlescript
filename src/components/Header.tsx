@@ -33,7 +33,7 @@ export default function Header({
       <label className={styles.fit}>
         fit{' '}
         <input
-          type="number"
+          type="text"
           value={fitMM}
           min={10}
           max={190}
