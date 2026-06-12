@@ -146,7 +146,7 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
             detectIndentation:     false,
             // Visible features to keep
             lineNumbers:           'on',
-            lineDecorationsWidth:  0,  // remove glyph margin / extra gutter width
+            lineDecorationsWidth:  8,  // remove glyph margin / extra gutter width
             folding:               false,
             // Disable features that add visual noise for a simple scripting editor
             minimap:               { enabled: false },
@@ -169,7 +169,7 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
             parameterHints:        { enabled: false },
             wordBasedSuggestions:  'off',
             links:                 false,
-            hover:                 { enabled: false },
+            hover:                 { enabled: false }
           }}
         />
       </div>
