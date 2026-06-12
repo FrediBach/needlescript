@@ -181,6 +181,8 @@ export const RESERVED = new Set<string>([
   // Modern syntax (RFC-1). 'in' is reserved for future use; 'true'/'false'
   // lex as the numbers 1/0 but are reserved so definitions error loudly.
   'let', 'def', 'return', 'step', 'true', 'false', 'in',
+  // Loop control (RFC-4).
+  'break', 'continue',
   ...Object.keys(ALIASES),
   ...Object.keys(BUILTIN_ARITY),
   ...Object.keys(QWORD_BUILTINS),

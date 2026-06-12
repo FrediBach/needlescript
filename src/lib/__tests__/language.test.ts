@@ -345,7 +345,7 @@ describe('did-you-mean suggestions', () => {
 
 // ── reserved words ──────────────────────────────────────────────────────────
 describe('reserved words', () => {
-  it.each(['while', 'for', 'output', 'exit', 'local', 'and', 'or', 'not', 'noise', 'arc', 'push'])(
+  it.each(['while', 'for', 'output', 'exit', 'local', 'and', 'or', 'not', 'noise', 'arc', 'push', 'break', 'continue'])(
     'refuses to redefine "%s"',
     (w) => {
       expect(() => run(`to ${w} fd 1 end`)).toThrow(/can't be redefined/);

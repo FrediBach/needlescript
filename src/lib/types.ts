@@ -63,6 +63,8 @@ export type ASTNode =
   | { k: 'letlist'; names: string[]; value: ExprNode; line: number; isLocal: boolean }
   | { k: 'setindex'; name: string; indices: ExprNode[]; op: string; value: ExprNode; line: number }
   | { k: 'output'; value: ExprNode | null; line: number } // value null = "exit"
+  | { k: 'break'; line: number }
+  | { k: 'continue'; line: number }
   | { k: 'cmd'; name: string; args: ExprNode[]; line: number; label?: string; word?: string }
   | { k: 'listcmd'; name: string; args: ExprNode[]; line: number }
   | { k: 'call'; name: string; args: ExprNode[]; line: number };

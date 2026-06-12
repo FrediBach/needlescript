@@ -103,6 +103,7 @@ The intended idiom is a mix: classic prefix words where they shine (`fd 10 rt 90
 - There are no statement separators — whitespace and newlines are interchangeable.
 - The only value type is the **number** (millimetres, degrees, counts, truth values).
 - Truthiness: `0` is false, anything else is true. Comparisons return `1` or `0`. `true` and `false` are literals for `1` and `0`.
+- The `'` character is reserved (`single-quote strings are reserved for a future version`) — it has never been valid, so quoted strings can arrive later without changing any program's meaning.
 
 ### Negative numbers vs subtraction
 
@@ -220,6 +221,8 @@ Travels of 7 mm or more (configurable 3–30, `autotrim 0` off) automatically ge
 | `for i = from to to step s [ … ]` | …with an explicit (possibly negative) step: `for i = 10 to 1 step -2 [ … ]` |
 | `for "i from to step [ … ]` | the classic spelling; the step is required, read the counter with `:i` |
 | `for x in xs [ … ]` | iterate the elements of a [list](#lists); the loop variable doesn't leak |
+| `break` | end the **innermost enclosing loop** immediately |
+| `continue` | skip to the next iteration of the innermost enclosing loop |
 | `if cond [ … ]` | run the block if the condition is non-zero |
 | `if cond [ … ] else if cond2 [ … ] else [ … ]` | chains of alternatives, any depth |
 
@@ -230,6 +233,29 @@ for ring = 1 to 6 [
   arc 360 ring * 4
 ]
 ```
+
+### Leaving loops early — `break` and `continue`
+
+`break` and `continue` work in all loop forms — `repeat`, `while`, both `for` spellings, and `for … in` — and through any nesting of `if`/`else` blocks. `continue` skips the rest of the current iteration: `repcount` advances normally, a `while` re-evaluates its condition, a `for` applies the step (negative steps included), a `for … in` moves to the next element. With `true` as a literal, `while true [ … break ]` is the idiomatic search loop:
+
+```text
+repeat 30 [                         // walk until we leave the cell
+  seth(snoise2(xcor / 11, ycor / 11) * 360)
+  fd 1.5
+  if !inpath(pos(), cell) [ break ]
+]
+```
+
+The four control-transfer words, from smallest to largest jump:
+
+| Word | Leaves | Notes |
+|---|---|---|
+| `continue` | current iteration | innermost loop only |
+| `break` | innermost loop | outer loops unaffected; the outer `repcount` becomes visible again |
+| `exit` / bare `return` | current procedure | unwinds any loops inside it |
+| `output e` / `return e` | current procedure, with a value | likewise |
+
+`break` and `continue` are **lexical**, checked at parse time: they must be written inside a loop body in the same procedure. A `break` inside a helper procedure can't end a loop in its *caller* — the parse error says so and points you at `return`/`exit`, which leave the procedure instead. (They're reserved words now — a program defining `to break … end` gets a loud error with a rename hint.) Loop control is invisible to the stitch machine: a buffered satin column survives a `break` and flushes on the next pen or mode change as always.
 
 ## Procedures
 

@@ -37,6 +37,14 @@ export function tokenize(src: string): Token[] {
     if (c === '.' && src[i + 1] === '.') {
       throw new NeedlescriptError('".." is reserved for future syntax', line);
     }
+    // "'" was never valid; reserving it now (RFC-4 §4) means quoted strings
+    // can arrive in a future version without changing any program's meaning.
+    if (c === "'") {
+      throw new NeedlescriptError(
+        'single-quote strings are reserved for a future version',
+        line,
+      );
+    }
     if ('+-*/<>=!%'.includes(c)) {
       const spBefore = i === 0 || /[\s[(]/.test(src[i - 1]);
       let op = c;

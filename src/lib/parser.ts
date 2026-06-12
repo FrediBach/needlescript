@@ -38,6 +38,12 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
   let pos = 0;
   /** Name of the procedure whose body is being parsed (null at top level). */
   let currentProc: string | null = null;
+  /**
+   * How many loop bodies enclose the current parse position (RFC-4).
+   * `break`/`continue` are lexical: the count resets to 0 inside a `to`/`def`
+   * body, so a loop in the caller never makes them valid in a callee.
+   */
+  let loopDepth = 0;
   /** Textual `let`/param/`local` declarations, for the double-`let` error. */
   const declaredGlobal = new Set<string>();
   const declaredLocal: Record<string, Set<string>> = {};
@@ -161,6 +167,16 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     if ((atEnd() || peek().t !== '[') && lastHeaderIndex)
       throw headerIndexHint(lastHeaderIndex.name, lastHeaderIndex.line);
     return parseBracketBlock();
+  }
+
+  /** A loop body: like parseHeaderBlock, but `break`/`continue` are valid inside. */
+  function parseLoopBlock(): ASTNode[] {
+    loopDepth++;
+    try {
+      return parseHeaderBlock();
+    } finally {
+      loopDepth--;
+    }
   }
 
   /** Parse a parenthesised argument list:  ( expr {, expr} [,] )  */
@@ -308,6 +324,8 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       }
       const prevProc = currentProc;
       currentProc = procName;
+      const prevLoopDepth = loopDepth;
+      loopDepth = 0; // break/continue can't reach a loop in the caller
       const declared = (declaredLocal[procName] ??= new Set());
       for (const p of params) declared.add(p);
       const body: ASTNode[] = [];
@@ -317,6 +335,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         throw new NeedlescriptError(`Procedure "${procName}" is missing "end"`, tok.line);
       next(); // consume end
       currentProc = prevProc;
+      loopDepth = prevLoopDepth;
       return { k: 'to', name: procName, params, body, line: tok.line };
     }
 
@@ -378,10 +397,13 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         }
       }
       currentProc = procName;
+      const prevLoopDepth = loopDepth;
+      loopDepth = 0; // break/continue can't reach a loop in the caller
       const declared = (declaredLocal[procName] ??= new Set());
       for (const p of params) declared.add(p);
       const body = parseBracketBlock();
       currentProc = null;
+      loopDepth = prevLoopDepth;
       return { k: 'to', name: procName, params, body, line: tok.line };
     }
 
@@ -472,14 +494,14 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     if (name === 'repeat') {
       next();
       const count = parseHeaderExpr();
-      const body = parseHeaderBlock();
+      const body = parseLoopBlock();
       return { k: 'repeat', count, body, line: tok.line };
     }
 
     if (name === 'while') {
       next();
       const cond = parseHeaderExpr();
-      const body = parseHeaderBlock();
+      const body = parseLoopBlock();
       return { k: 'while', cond, body, line: tok.line };
     }
 
@@ -492,7 +514,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         const from = parseExpr();
         const to = parseExpr();
         const step = parseHeaderExpr();
-        const body = parseHeaderBlock();
+        const body = parseLoopBlock();
         return { k: 'for', varName: nm.v as string, from, to, step, body, line: tok.line };
       }
       // Modern:  for i = 1 to 10 [ step 2 ] [ … ]
@@ -516,7 +538,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           next();
           step = parseHeaderExpr();
         }
-        const body = parseHeaderBlock();
+        const body = parseLoopBlock();
         return { k: 'for', varName: w, from, to: toExpr, step, body, line: tok.line };
       }
       // Modern (RFC-2):  for x in xs [ … ]
@@ -529,7 +551,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         next(); // name
         next(); // in
         const list = parseHeaderExpr();
-        const body = parseHeaderBlock();
+        const body = parseLoopBlock();
         return { k: 'forin', varName: w, list, body, line: tok.line };
       }
       throw new NeedlescriptError(
@@ -577,6 +599,21 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     if (name === 'exit') {
       next();
       return { k: 'output', value: null, line: tok.line };
+    }
+
+    // Loop control (RFC-4). Lexical, like output/exit: a `break` inside a
+    // procedure can't reach a loop in the caller, and the error says so.
+    if (name === 'break' || name === 'continue') {
+      if (loopDepth === 0)
+        throw new NeedlescriptError(
+          currentProc
+            ? `"${name}" can only be used inside a loop — the loop is in the caller; ` +
+              'use return (or exit/output) to leave the procedure'
+            : `"${name}" can only be used inside a loop`,
+          tok.line,
+        );
+      next();
+      return { k: name, line: tok.line };
     }
 
     // Index assignment (RFC-2):  xs[i] = e   |   grid[i][j] += e

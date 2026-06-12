@@ -29,6 +29,21 @@ class ReturnSignal {
   }
 }
 
+/**
+ * Thrown by `break` / `continue` to unwind to the innermost enclosing loop
+ * (RFC-4). Parse-time validation guarantees a loop catches it before any
+ * procedure boundary; the catches in callProc and at the top level are
+ * defensive only.
+ */
+class LoopSignal {
+  readonly kind: 'break' | 'continue';
+  readonly line?: number;
+  constructor(kind: 'break' | 'continue', line?: number) {
+    this.kind = kind;
+    this.line = line;
+  }
+}
+
 export function run(source: string, opts: RunOptions = {}): RunResult {
   const tokens = tokenize(source);
   const parseNotes: string[] = [];
@@ -647,6 +662,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       execBlock(proc.body, newEnv, repcount, depth + 1);
     } catch (e) {
       if (e instanceof ReturnSignal) return e.value;
+      if (e instanceof LoopSignal)
+        throw new NeedlescriptError(
+          `"${e.kind}" can only be used inside a loop`,
+          e.line,
+        );
       throw e;
     }
     return undefined;
@@ -659,6 +679,26 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     depth: number,
   ) {
     for (const st of stmts) execStmt(st, env, repcount, depth);
+  }
+
+  /**
+   * Run one loop iteration, absorbing loop-control signals (RFC-4).
+   * Returns false if the loop should stop (`break`), true otherwise
+   * (`continue` simply ends the iteration early).
+   */
+  function runLoopBody(
+    body: ASTNode[],
+    env: Record<string, Val> | null,
+    repcount: number,
+    depth: number,
+  ): boolean {
+    try {
+      execBlock(body, env, repcount, depth);
+    } catch (e) {
+      if (e instanceof LoopSignal) return e.kind !== 'break';
+      throw e;
+    }
+    return true;
   }
 
   function execStmt(
@@ -748,13 +788,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       case 'repeat': {
         const n = Math.floor(num(evalExpr(st.count, env, repcount, depth), 'repeat', st.line));
         if (n > 200000) throw new NeedlescriptError(`repeat count too large (${n})`, st.line);
-        for (let i = 1; i <= n; i++) execBlock(st.body, env, i, depth);
+        for (let i = 1; i <= n; i++)
+          if (!runLoopBody(st.body, env, i, depth)) break;
         return;
       }
       case 'while': {
         while (truthy(evalExpr(st.cond, env, repcount, depth), 'while', st.line) !== 0) {
           tick(st.line); // ops budget catches endless loops
-          execBlock(st.body, env, repcount, depth);
+          if (!runLoopBody(st.body, env, repcount, depth)) break;
         }
         return;
       }
@@ -771,7 +812,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         for (let v = from; step > 0 ? v <= to + 1e-9 : v >= to - 1e-9; v += step) {
           tick(st.line);
           scope[st.varName] = v;
-          execBlock(st.body, env, repcount, depth);
+          if (!runLoopBody(st.body, env, repcount, depth)) break;
         }
         if (had) scope[st.varName] = prev;
         else delete scope[st.varName];
@@ -793,7 +834,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         for (let i = 0; i < n; i++) {
           tick(st.line);
           scope[st.varName] = v.items[i];
-          execBlock(st.body, env, repcount, depth);
+          if (!runLoopBody(st.body, env, repcount, depth)) break;
         }
         if (had) scope[st.varName] = prev;
         else delete scope[st.varName];
@@ -815,6 +856,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           st.value ? evalExpr(st.value, env, repcount, depth) : undefined,
         );
       }
+      // Loop control (RFC-4): unwinds to the innermost enclosing loop.
+      // The parser guarantees one exists in the same procedure body.
+      case 'break': throw new LoopSignal('break', st.line);
+      case 'continue': throw new LoopSignal('continue', st.line);
       case 'call': {
         callProc(st.name, st.args, env, repcount, depth, st.line);
         return;
@@ -1036,7 +1081,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     }
   }
 
-  execBlock(program, null, 0, 0);
+  try {
+    execBlock(program, null, 0, 0);
+  } catch (e) {
+    // Defensive: parse-time validation makes an escaping loop signal unreachable.
+    if (e instanceof LoopSignal)
+      throw new NeedlescriptError(`"${e.kind}" can only be used inside a loop`, e.line);
+    throw e;
+  }
 
   m.flushSatin();
   if (m.recording) {

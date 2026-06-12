@@ -109,6 +109,7 @@ export default function LanguageReference() {
         <div><code>repeat <i>n</i> [ … ]</code><span>loop; <code>repcount</code> is the 1-based counter</span></div>
         <div><code>while <i>cond</i> [ … ]</code><span>loop while the condition is true (non-zero)</span></div>
         <div><code>for i = <i>from</i> to <i>to</i> step <i>s</i> [ … ]</code><span>counted loop, inclusive; <code>step</code> optional (default 1, may be negative). Classic: <code>for "i <i>from to step</i> [ … ]</code></span></div>
+        <div><code>break · continue</code><span>end the innermost enclosing loop · skip to its next iteration; works in every loop form (<code>while true [ … break ]</code> is the search idiom). Lexical — a <code>break</code> in a procedure can't end a loop in the caller; use <code>return</code> there</span></div>
         <div><code>if <i>cond</i> [ … ] else if <i>c2</i> [ … ] else [ … ]</code><span>compare with <code>&lt; &gt; = == &lt;= &gt;= !=</code>, combine with <code>and or not</code> (<code>!</code>); <code>true</code>/<code>false</code> are 1/0</span></div>
         <div><code>def <i>name</i>(a, b) [ … ]</code><span>define a procedure; classic: <code>to <i>name</i> :a :b … end</code></span></div>
         <div><code>return <i>expr</i> · return</code><span>return a value from a procedure (use it like <code>fd double(5)</code>) · leave early. Classic: <code>output</code> / <code>exit</code></span></div>
