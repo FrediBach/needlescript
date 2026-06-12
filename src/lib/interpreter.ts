@@ -9,17 +9,16 @@ import { tokenize } from './tokenizer.ts';
 import { parse } from './parser.ts';
 import { applyAutoTrim, applyLocks, densityMap } from './postprocess.ts';
 import { didYouMean } from './suggestions.ts';
-
-function formatNum(v: number): string {
-  return Math.abs(v - Math.round(v)) < 1e-9
-    ? String(Math.round(v))
-    : v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
-}
+import {
+  NsList, isList, num, deepEqual, deepCopy, valDepth, describeVal,
+  formatNum, formatVal,
+} from './list.ts';
+import type { Val } from './list.ts';
 
 /** Thrown by `output` / `exit` to unwind to the enclosing procedure call. */
 class ReturnSignal {
-  readonly value: number | undefined;
-  constructor(value: number | undefined) {
+  readonly value: Val | undefined;
+  constructor(value: Val | undefined) {
     this.value = value;
   }
 }
@@ -28,12 +27,16 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   const tokens = tokenize(source);
   const program = parse(tokens);
   const m = new Machine();
-  const globals: Record<string, number> = Object.create(null);
+  const globals: Record<string, Val> = Object.create(null);
   const procs: Record<string, ASTNode & { k: 'to' }> = Object.create(null);
   const seed0 = opts.seed !== undefined ? opts.seed : 42;
   let rng = makeRNG(seed0);
   let noise = makeNoise(seed0);
   let ops = 0;
+  /** Live list cells (slots). Decremented by removeat; lists that simply go
+   *  out of reach stay counted — the counter is a tab-protecting ceiling,
+   *  not a garbage collector. */
+  let cells = 0;
   const printed: string[] = [];
 
   function tick(line?: number) {
@@ -44,12 +47,246 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       );
   }
 
+  /** Charge n element reads/writes against the op budget. */
+  function tickN(n: number, line?: number) {
+    ops += n;
+    if (ops > LIMITS.maxOps)
+      throw new NeedlescriptError(
+        'Program ran too long (possible infinite loop) — stopped',
+        line,
+      );
+  }
+
+  /** Charge n freshly allocated list cells (and the op budget). */
+  function charge(n: number, line?: number) {
+    cells += n;
+    if (cells > LIMITS.maxListCells)
+      throw new NeedlescriptError(
+        `Too many list cells (over ${LIMITS.maxListCells.toLocaleString()}) — stopped`,
+        line,
+      );
+    tickN(n, line);
+  }
+
+  /** Allocate a new list, enforcing the length limit and charging cells. */
+  function allocList(items: Val[], line?: number): NsList {
+    if (items.length > LIMITS.maxListLen)
+      throw new NeedlescriptError(
+        `List too long (${items.length.toLocaleString()} elements, limit ${LIMITS.maxListLen.toLocaleString()})`,
+        line,
+      );
+    charge(items.length, line);
+    return new NsList(items);
+  }
+
+  /** A condition must be a number; a list is a loud error (RFC-2 §2). */
+  function truthy(v: Val, what: string, line?: number): number {
+    if (isList(v))
+      throw new NeedlescriptError(
+        `"${what}" got ${describeVal(v)} — a list isn't true or false, use len(xs) > 0`,
+        line,
+      );
+    return v;
+  }
+
+  /**
+   * Normalize an index into a list of length `len`: must be a number,
+   * integral within 1e-9, negatives count from the end, out of range
+   * (either direction) is an error.
+   */
+  function toIndex(v: Val, len: number, what: string, line?: number): number {
+    const n = num(v, what, line);
+    const r = Math.round(n);
+    if (Math.abs(n - r) > 1e-9)
+      throw new NeedlescriptError(
+        `${what}: index ${formatNum(n)} isn't a whole number — use floor() deliberately`,
+        line,
+      );
+    const i = r < 0 ? r + len : r;
+    if (i < 0 || i >= len)
+      throw new NeedlescriptError(
+        `${what}: index ${r} is out of range (the list has ${len} element${len === 1 ? '' : 's'})`,
+        line,
+      );
+    return i;
+  }
+
+  /** The value must be a list. */
+  function list(v: Val, what: string, line?: number): NsList {
+    if (!isList(v))
+      throw new NeedlescriptError(`"${what}" expected a list, got a number`, line);
+    return v;
+  }
+
+  /** Check that nesting an element one level deeper stays within the cap. */
+  function checkDepth(v: Val, line?: number) {
+    if (isList(v) && valDepth(v) + 1 > LIMITS.maxListDepth)
+      throw new NeedlescriptError(
+        `list nesting deeper than ${LIMITS.maxListDepth}`,
+        line,
+      );
+  }
+
+  function listFunc(
+    name: string,
+    args: Val[],
+    line: number | undefined,
+  ): Val {
+    switch (name) {
+      case 'range': {
+        const a = args.length === 1 ? 0 : num(args[0], 'range', line);
+        const b = args.length === 1 ? num(args[0], 'range', line) : num(args[1], 'range', line);
+        const s = args.length === 3 ? num(args[2], 'range', line) : 1;
+        if (s === 0) throw new NeedlescriptError("range step can't be 0", line);
+        const count = Math.max(0, Math.ceil((b - a) / s - 1e-9));
+        if (count > LIMITS.maxListLen)
+          throw new NeedlescriptError(
+            `List too long (${count.toLocaleString()} elements, limit ${LIMITS.maxListLen.toLocaleString()})`,
+            line,
+          );
+        const out: Val[] = [];
+        for (let k = 0; k < count; k++) out.push(a + k * s);
+        return allocList(out, line);
+      }
+      case 'filled': {
+        const n = num(args[0], 'filled', line);
+        const r = Math.round(n);
+        if (Math.abs(n - r) > 1e-9 || r < 0)
+          throw new NeedlescriptError(
+            `filled expected a whole number of elements, got ${formatNum(n)}`,
+            line,
+          );
+        if (r > LIMITS.maxListLen)
+          throw new NeedlescriptError(
+            `List too long (${r.toLocaleString()} elements, limit ${LIMITS.maxListLen.toLocaleString()})`,
+            line,
+          );
+        const out: Val[] = [];
+        for (let k = 0; k < r; k++) out.push(deepCopy(args[1], () => charge(1, line)));
+        return allocList(out, line);
+      }
+      case 'len': return list(args[0], 'len', line).items.length;
+      case 'islist': return isList(args[0]) ? 1 : 0;
+      case 'first': {
+        const xs = list(args[0], 'first', line);
+        if (xs.items.length === 0)
+          throw new NeedlescriptError('first of an empty list', line);
+        return xs.items[0];
+      }
+      case 'last': {
+        const xs = list(args[0], 'last', line);
+        if (xs.items.length === 0)
+          throw new NeedlescriptError('last of an empty list', line);
+        return xs.items[xs.items.length - 1];
+      }
+      case 'concat': {
+        const a = list(args[0], 'concat', line);
+        const b = list(args[1], 'concat', line);
+        // shallow: elements are shared references
+        return allocList([...a.items, ...b.items], line);
+      }
+      case 'slice': {
+        const xs = list(args[0], 'slice', line);
+        const len = xs.items.length;
+        // Python window semantics: negatives from the end, then clamped —
+        // slice is the one place clamping is fine (a window, not an address).
+        const norm = (v: Val | undefined, dflt: number) => {
+          if (v === undefined) return dflt;
+          const n = Math.trunc(num(v, 'slice', line));
+          return Math.min(len, Math.max(0, n < 0 ? n + len : n));
+        };
+        const a = norm(args[1], 0);
+        const b = norm(args[2], len);
+        return allocList(xs.items.slice(a, b), line);
+      }
+      case 'reverse': {
+        const xs = list(args[0], 'reverse', line);
+        return allocList([...xs.items].reverse(), line);
+      }
+      case 'sort': {
+        const xs = list(args[0], 'sort', line);
+        xs.items.forEach((v, i) => {
+          if (isList(v))
+            throw new NeedlescriptError(
+              `sort can only sort numbers — element ${i} is a list`,
+              line,
+            );
+        });
+        return allocList(
+          [...(xs.items as number[])].sort((a, b) => a - b),
+          line,
+        );
+      }
+      case 'copy': return deepCopy(args[0], () => charge(1, line));
+      case 'indexof': {
+        const xs = list(args[0], 'indexof', line);
+        for (let i = 0; i < xs.items.length; i++) {
+          tick(line);
+          if (deepEqual(xs.items[i], args[1])) return i;
+        }
+        return -1;
+      }
+      case 'contains': {
+        const xs = list(args[0], 'contains', line);
+        for (const x of xs.items) {
+          tick(line);
+          if (deepEqual(x, args[1])) return 1;
+        }
+        return 0;
+      }
+      case 'sum': case 'mean': case 'minof': case 'maxof': {
+        const xs = list(args[0], name, line);
+        if (xs.items.length === 0) {
+          if (name === 'sum') return 0;
+          throw new NeedlescriptError(`${name} of an empty list`, line);
+        }
+        tickN(xs.items.length, line);
+        let acc = num(xs.items[0], name, line);
+        for (let i = 1; i < xs.items.length; i++) {
+          const v = num(xs.items[i], name, line);
+          if (name === 'minof') acc = Math.min(acc, v);
+          else if (name === 'maxof') acc = Math.max(acc, v);
+          else acc += v;
+        }
+        return name === 'mean' ? acc / xs.items.length : acc;
+      }
+      case 'pick': {
+        const xs = list(args[0], 'pick', line);
+        if (xs.items.length === 0)
+          throw new NeedlescriptError('pick of an empty list', line);
+        return xs.items[Math.floor(rng() * xs.items.length)]; // one RNG draw
+      }
+      case 'shuffle': {
+        const xs = list(args[0], 'shuffle', line);
+        const out = [...xs.items];
+        // Fisher–Yates, exactly len−1 draws, high index down to 1 — this
+        // draw order is specified so the same seed gives the same order
+        // forever.
+        for (let i = out.length - 1; i >= 1; i--) {
+          const j = Math.floor(rng() * (i + 1));
+          const t = out[i]; out[i] = out[j]; out[j] = t;
+        }
+        return allocList(out, line);
+      }
+      case 'pos': return allocList([m.x, m.y], line);
+      case 'removeat': {
+        const xs = list(args[0], 'removeat', line);
+        const i = toIndex(args[1], xs.items.length, 'removeat', line);
+        const removed = xs.items.splice(i, 1)[0];
+        cells -= 1;
+        tick(line);
+        return removed;
+      }
+    }
+    throw new NeedlescriptError(`Unknown function ${name}`, line);
+  }
+
   function evalExpr(
     node: ExprNode,
-    env: Record<string, number> | null,
+    env: Record<string, Val> | null,
     repcount: number,
     depth: number,
-  ): number {
+  ): Val {
     tick((node as { line?: number }).line);
     switch (node.k) {
       case 'num': return node.v;
@@ -72,17 +309,63 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           node.line,
         );
       }
-      case 'neg': return -evalExpr(node.val, env, repcount, depth);
+      case 'neg':
+        return -num(evalExpr(node.val, env, repcount, depth), '-', node.line);
+      case 'list': {
+        const items: Val[] = [];
+        for (const it of node.items) items.push(evalExpr(it, env, repcount, depth));
+        const out = allocList(items, node.line);
+        if (valDepth(out) > LIMITS.maxListDepth)
+          throw new NeedlescriptError(
+            `list nesting deeper than ${LIMITS.maxListDepth}`,
+            node.line,
+          );
+        return out;
+      }
+      case 'index': {
+        const obj = evalExpr(node.obj, env, repcount, depth);
+        if (!isList(obj))
+          throw new NeedlescriptError(
+            `only lists can be indexed with [ ] — this is a number`,
+            node.line,
+          );
+        const i = toIndex(
+          evalExpr(node.idx, env, repcount, depth),
+          obj.items.length, 'indexing', node.line,
+        );
+        return obj.items[i];
+      }
+      case 'callval': {
+        evalExpr(node.obj, env, repcount, depth);
+        throw new NeedlescriptError(
+          "a list value can't be called like a procedure",
+          node.line,
+        );
+      }
+      case 'listfunc': {
+        const args = node.args.map(a => evalExpr(a, env, repcount, depth));
+        return listFunc(node.name, args, node.line);
+      }
       case 'bin': {
         // and / or short-circuit so guards like  :i > 0 and 10 / :i > 2  are safe
         if (node.op === 'and')
-          return evalExpr(node.left, env, repcount, depth) !== 0 &&
-            evalExpr(node.right, env, repcount, depth) !== 0 ? 1 : 0;
+          return truthy(evalExpr(node.left, env, repcount, depth), 'and', undefined) !== 0 &&
+            truthy(evalExpr(node.right, env, repcount, depth), 'and', undefined) !== 0 ? 1 : 0;
         if (node.op === 'or')
-          return evalExpr(node.left, env, repcount, depth) !== 0 ||
-            evalExpr(node.right, env, repcount, depth) !== 0 ? 1 : 0;
-        const a = evalExpr(node.left, env, repcount, depth);
-        const b = evalExpr(node.right, env, repcount, depth);
+          return truthy(evalExpr(node.left, env, repcount, depth), 'or', undefined) !== 0 ||
+            truthy(evalExpr(node.right, env, repcount, depth), 'or', undefined) !== 0 ? 1 : 0;
+        const av = evalExpr(node.left, env, repcount, depth);
+        const bv = evalExpr(node.right, env, repcount, depth);
+        // Equality on lists is deep; mixed number/list compares unequal
+        // (equality is a question, not a type assertion).
+        if (node.op === '=' || node.op === '!=') {
+          if (isList(av) || isList(bv)) {
+            const eq = deepEqual(av, bv);
+            return node.op === '=' ? (eq ? 1 : 0) : (eq ? 0 : 1);
+          }
+        }
+        const a = num(av, node.op, undefined, 'on the left');
+        const b = num(bv, node.op, undefined, 'on the right');
         switch (node.op) {
           case '+': return a + b;
           case '-': return a - b;
@@ -98,7 +381,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         throw new NeedlescriptError('Unknown operator');
       }
       case 'func': {
-        const args = node.args.map(a => evalExpr(a, env, repcount, depth));
+        if (node.name === 'not')
+          return truthy(evalExpr(node.args[0], env, repcount, depth), 'not', node.line) === 0 ? 1 : 0;
+        // Every legacy function is scalar — a list operand is a type error
+        // naming the function (RFC-2 §2).
+        const args = node.args.map(a =>
+          num(evalExpr(a, env, repcount, depth), node.name, node.line));
         switch (node.name) {
           case 'random': return rng() * args[0];
           case 'sin': return Math.sin(args[0] * Math.PI / 180);
@@ -122,7 +410,6 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return v;
           }
           case 'mod': return ((args[0] % args[1]) + args[1]) % args[1];
-          case 'not': return args[0] === 0 ? 1 : 0;
           // heading-convention angle of the vector (x, y): 0 = up/north, clockwise
           case 'atan': return (Math.atan2(args[0], args[1]) * 180 / Math.PI + 360) % 360;
           case 'noise': return noise(args[0]);
@@ -152,17 +439,17 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   function callProc(
     name: string,
     argNodes: ExprNode[],
-    env: Record<string, number> | null,
+    env: Record<string, Val> | null,
     repcount: number,
     depth: number,
     line?: number,
-  ): number | undefined {
+  ): Val | undefined {
     const proc = procs[name];
     if (!proc)
       throw new NeedlescriptError(`Procedure "${name}" is used before it is defined`, line);
     if (depth >= LIMITS.maxCallDepth)
       throw new NeedlescriptError(`Too much recursion in "${name}"`, line);
-    const newEnv: Record<string, number> = Object.create(null);
+    const newEnv: Record<string, Val> = Object.create(null);
     proc.params.forEach((p, i) => { newEnv[p] = evalExpr(argNodes[i], env, repcount, depth); });
     try {
       execBlock(proc.body, newEnv, repcount, depth + 1);
@@ -175,7 +462,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   function execBlock(
     stmts: ASTNode[],
-    env: Record<string, number> | null,
+    env: Record<string, Val> | null,
     repcount: number,
     depth: number,
   ) {
@@ -184,7 +471,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   function execStmt(
     st: ASTNode,
-    env: Record<string, number> | null,
+    env: Record<string, Val> | null,
     repcount: number,
     depth: number,
   ) {
@@ -207,23 +494,82 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         env[st.name] = evalExpr(st.value, env, repcount, depth);
         return;
       }
+      case 'letlist': {
+        // let [x, y] = p — fixed-arity destructuring, flat only (RFC-2 §3.3)
+        const v = evalExpr(st.value, env, repcount, depth);
+        if (!isList(v))
+          throw new NeedlescriptError(
+            `let [${st.names.join(', ')}] expected a list, got a number`,
+            st.line,
+          );
+        if (v.items.length !== st.names.length)
+          throw new NeedlescriptError(
+            `let [${st.names.join(', ')}] expected a list of ${st.names.length}, got ${v.items.length}`,
+            st.line,
+          );
+        const scope = st.isLocal && env ? env : globals;
+        st.names.forEach((n, i) => { scope[n] = v.items[i]; });
+        return;
+      }
+      case 'setindex': {
+        // xs[i] = v   |   grid[i][j] += v — lvalue chains (RFC-2 §3.3)
+        let target: Val;
+        if (env && st.name in env) target = env[st.name];
+        else if (st.name in globals) target = globals[st.name];
+        else
+          throw new NeedlescriptError(
+            `Variable "${st.name}" was never assigned on this path`,
+            st.line,
+          );
+        for (let k = 0; ; k++) {
+          if (!isList(target))
+            throw new NeedlescriptError(
+              `only lists can be indexed with [ ] — "${st.name}" leads to a number here`,
+              st.line,
+            );
+          const i = toIndex(
+            evalExpr(st.indices[k], env, repcount, depth),
+            target.items.length, 'indexing', st.line,
+          );
+          tick(st.line);
+          if (k === st.indices.length - 1) {
+            let v = evalExpr(st.value, env, repcount, depth);
+            if (st.op !== '=') {
+              const op = st.op[0];
+              const old = num(target.items[i], op, st.line, 'on the left');
+              const rhs = num(v, op, st.line, 'on the right');
+              if (op === '+') v = old + rhs;
+              else if (op === '-') v = old - rhs;
+              else if (op === '*') v = old * rhs;
+              else {
+                if (rhs === 0) throw new NeedlescriptError('Division by zero', st.line);
+                v = old / rhs;
+              }
+            }
+            checkDepth(v, st.line);
+            target.items[i] = v;
+            return;
+          }
+          target = target.items[i];
+        }
+      }
       case 'repeat': {
-        const n = Math.floor(evalExpr(st.count, env, repcount, depth));
+        const n = Math.floor(num(evalExpr(st.count, env, repcount, depth), 'repeat', st.line));
         if (n > 200000) throw new NeedlescriptError(`repeat count too large (${n})`, st.line);
         for (let i = 1; i <= n; i++) execBlock(st.body, env, i, depth);
         return;
       }
       case 'while': {
-        while (evalExpr(st.cond, env, repcount, depth) !== 0) {
+        while (truthy(evalExpr(st.cond, env, repcount, depth), 'while', st.line) !== 0) {
           tick(st.line); // ops budget catches endless loops
           execBlock(st.body, env, repcount, depth);
         }
         return;
       }
       case 'for': {
-        const from = evalExpr(st.from, env, repcount, depth);
-        const to = evalExpr(st.to, env, repcount, depth);
-        const step = evalExpr(st.step, env, repcount, depth);
+        const from = num(evalExpr(st.from, env, repcount, depth), 'for', st.line);
+        const to = num(evalExpr(st.to, env, repcount, depth), 'for', st.line);
+        const step = num(evalExpr(st.step, env, repcount, depth), 'for', st.line);
         if (step === 0) throw new NeedlescriptError('for step can\u2019t be 0', st.line);
         if ((to - from) / step > 200000)
           throw new NeedlescriptError('for runs too many times (over 200,000)', st.line);
@@ -239,8 +585,31 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         else delete scope[st.varName];
         return;
       }
+      case 'forin': {
+        // for x in xs — length captured at loop entry, elements read live
+        // (reference semantics, documented), loop variable doesn't leak.
+        const v = evalExpr(st.list, env, repcount, depth);
+        if (!isList(v))
+          throw new NeedlescriptError(
+            `for ${st.varName} in … expected a list, got a number`,
+            st.line,
+          );
+        const n = v.items.length;
+        const scope = env ?? globals;
+        const had = st.varName in scope;
+        const prev = scope[st.varName];
+        for (let i = 0; i < n; i++) {
+          tick(st.line);
+          scope[st.varName] = v.items[i];
+          execBlock(st.body, env, repcount, depth);
+        }
+        if (had) scope[st.varName] = prev;
+        else delete scope[st.varName];
+        return;
+      }
       case 'if': {
-        if (evalExpr(st.cond, env, repcount, depth) !== 0) execBlock(st.body, env, repcount, depth);
+        if (truthy(evalExpr(st.cond, env, repcount, depth), 'if', st.line) !== 0)
+          execBlock(st.body, env, repcount, depth);
         else if (st.elseBody) execBlock(st.elseBody, env, repcount, depth);
         return;
       }
@@ -258,9 +627,83 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         callProc(st.name, st.args, env, repcount, depth, st.line);
         return;
       }
-      case 'cmd': {
+      case 'listcmd': {
         m.currentLine = st.line;
         const a = st.args.map(x => evalExpr(x, env, repcount, depth));
+        switch (st.name) {
+          case 'append': case 'prepend': {
+            const xs = list(a[0], st.name, st.line);
+            if (xs.items.length + 1 > LIMITS.maxListLen)
+              throw new NeedlescriptError(
+                `List too long (limit ${LIMITS.maxListLen.toLocaleString()} elements)`,
+                st.line,
+              );
+            checkDepth(a[1], st.line);
+            charge(1, st.line);
+            if (st.name === 'append') xs.items.push(a[1]);
+            else xs.items.unshift(a[1]);
+            return;
+          }
+          case 'insertat': {
+            const xs = list(a[0], 'insertat', st.line);
+            if (xs.items.length + 1 > LIMITS.maxListLen)
+              throw new NeedlescriptError(
+                `List too long (limit ${LIMITS.maxListLen.toLocaleString()} elements)`,
+                st.line,
+              );
+            // 0…len allowed: inserting at len appends.
+            const n = num(a[1], 'insertat', st.line);
+            const r = Math.round(n);
+            if (Math.abs(n - r) > 1e-9)
+              throw new NeedlescriptError(
+                `insertat: index ${formatNum(n)} isn't a whole number — use floor() deliberately`,
+                st.line,
+              );
+            const i = r < 0 ? r + xs.items.length : r;
+            if (i < 0 || i > xs.items.length)
+              throw new NeedlescriptError(
+                `insertat: index ${r} is out of range (0…${xs.items.length} allowed)`,
+                st.line,
+              );
+            checkDepth(a[2], st.line);
+            charge(1, st.line);
+            xs.items.splice(i, 0, a[2]);
+            return;
+          }
+          case 'removeat': {
+            listFunc('removeat', a, st.line); // return value discarded
+            return;
+          }
+          case 'setpos': {
+            const p = list(a[0], 'setpos', st.line);
+            if (p.items.length < 2)
+              throw new NeedlescriptError(
+                `setpos expected [x, y], got a list of ${p.items.length}`,
+                st.line,
+              );
+            const x = num(p.items[0], 'setpos', st.line);
+            const y = num(p.items[1], 'setpos', st.line);
+            m.setXY(x, y);
+            return;
+          }
+        }
+        throw new NeedlescriptError(`Unhandled command ${st.name}`, st.line);
+      }
+      case 'cmd': {
+        m.currentLine = st.line;
+        const vals = st.args.map(x => evalExpr(x, env, repcount, depth));
+        if (st.name === 'print') {
+          printed.push((st.label ? st.label + ': ' : '') + formatVal(vals[0]));
+          return;
+        }
+        if (st.name === 'assert') {
+          if (truthy(vals[0], 'assert', st.line) === 0)
+            throw new NeedlescriptError('assert failed — the condition is 0 (false)', st.line);
+          return;
+        }
+        // Every other command is scalar — a list argument is a type error
+        // naming the command (RFC-2 §2).
+        const a = vals.map(v => num(v, st.name, st.line));
         switch (st.name) {
           case 'fd': m.forward(a[0]); return;
           case 'bk': m.forward(-a[0]); return;
@@ -384,14 +827,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             noise = makeNoise(s);
             return;
           }
-          case 'print':
-            printed.push((st.label ? st.label + ': ' : '') + formatNum(a[0]));
-            return;
           case 'mark': m.markHere(); return;
-          case 'assert':
-            if (a[0] === 0)
-              throw new NeedlescriptError('assert failed — the condition is 0 (false)', st.line);
-            return;
         }
         throw new NeedlescriptError(`Unhandled command ${st.name}`, st.line);
       }

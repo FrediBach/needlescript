@@ -6,6 +6,10 @@ export const LIMITS = {
   maxCallDepth: 200,
   minStitch: 0.4,
   maxStitch: 12.0,
+  // Lists (RFC-2) — these protect the browser tab, like the op cap.
+  maxListLen: 100000,
+  maxListCells: 1000000,
+  maxListDepth: 16,
 };
 
 // ---------- Stitch machine ----------

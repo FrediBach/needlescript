@@ -55,6 +55,53 @@ export const FUNC_ARITY: Record<string, number> = {
 
 export const ZERO_FUNCS = new Set(['repcount', 'xcor', 'ycor', 'heading']);
 
+// ---------- List builtins (RFC-2) ----------
+//
+// All list builtins are glued-call only: `len(xs)`, never `len xs`. Legacy
+// prefix parsing is arity-driven and can never host variadic functions —
+// call-paren-only builtins can take optional arguments (range, slice)
+// without touching the legacy grammar.
+//
+// Soft reservation: these names are NOT in RESERVED. They resolve only at
+// glued-call position; variables and parameters may freely share the names
+// (builtins are call-only, variables are never callable), and user
+// procedures with the same name shadow the builtin at call sites. This
+// keeps every pre-RFC-2 program running unchanged.
+
+/** List functions usable in expressions, with min/max argument counts. */
+export const LIST_FUNCS: Record<string, { min: number; max: number }> = {
+  range: { min: 1, max: 3 },
+  filled: { min: 2, max: 2 },
+  len: { min: 1, max: 1 },
+  islist: { min: 1, max: 1 },
+  first: { min: 1, max: 1 },
+  last: { min: 1, max: 1 },
+  concat: { min: 2, max: 2 },
+  slice: { min: 2, max: 3 },
+  reverse: { min: 1, max: 1 },
+  sort: { min: 1, max: 1 },
+  copy: { min: 1, max: 1 },
+  indexof: { min: 2, max: 2 },
+  contains: { min: 2, max: 2 },
+  sum: { min: 1, max: 1 },
+  mean: { min: 1, max: 1 },
+  minof: { min: 1, max: 1 },
+  maxof: { min: 1, max: 1 },
+  pick: { min: 1, max: 1 },
+  shuffle: { min: 1, max: 1 },
+  pos: { min: 0, max: 0 },
+  removeat: { min: 2, max: 2 },
+};
+
+/** List commands usable as statements (mutators + setpos). */
+export const LIST_CMDS: Record<string, { min: number; max: number }> = {
+  append: { min: 2, max: 2 },
+  prepend: { min: 2, max: 2 },
+  insertat: { min: 3, max: 3 },
+  removeat: { min: 2, max: 2 }, // returns the removed value; discarded here
+  setpos: { min: 1, max: 1 },
+};
+
 /** Words with special meaning that user procedures must not shadow. */
 export const RESERVED = new Set<string>([
   'to', 'end', 'repeat', 'if', 'else', 'make', 'local',

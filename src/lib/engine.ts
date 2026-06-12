@@ -11,10 +11,11 @@
 //   types.ts        — shared types and interfaces
 //   errors.ts       — NeedlescriptError
 //   prng.ts         — makeRNG, makeNoise
-//   commands.ts     — ALIASES, BUILTIN_ARITY, QWORD_BUILTINS, FABRICS, FUNC_ARITY, ZERO_FUNCS, RESERVED
+//   commands.ts     — ALIASES, BUILTIN_ARITY, QWORD_BUILTINS, FABRICS, FUNC_ARITY, ZERO_FUNCS, LIST_FUNCS, LIST_CMDS, RESERVED
 //   suggestions.ts  — suggest
 //   tokenizer.ts    — tokenize
 //   parser.ts       — parse
+//   list.ts         — NsList and the list value helpers (RFC-2)
 //   machine.ts      — LIMITS, Machine (internal stitch machine + fill engine)
 //   postprocess.ts  — applyLocks, applyAutoTrim, densityMap, designStats
 //   interpreter.ts  — run
@@ -22,10 +23,12 @@
 export type { TokenType, Token, EventType, StitchEvent, RunResult, DesignStats, ASTNode, ExprNode, DensityCell, DensityHotspot, DensityResult, RunOptions } from './types.ts';
 export { NeedlescriptError } from './errors.ts';
 export { makeRNG, makeNoise } from './prng.ts';
-export { ALIASES, BUILTIN_ARITY, QWORD_BUILTINS, FABRICS, FUNC_ARITY, ZERO_FUNCS, RESERVED } from './commands.ts';
+export { ALIASES, BUILTIN_ARITY, QWORD_BUILTINS, FABRICS, FUNC_ARITY, ZERO_FUNCS, LIST_FUNCS, LIST_CMDS, RESERVED } from './commands.ts';
 export { suggest } from './suggestions.ts';
 export { tokenize } from './tokenizer.ts';
 export { parse } from './parser.ts';
+export { NsList, isList } from './list.ts';
+export type { Val } from './list.ts';
 export { LIMITS } from './machine.ts';
 export { applyLocks, applyAutoTrim, densityMap, designStats } from './postprocess.ts';
 export { run } from './interpreter.ts';

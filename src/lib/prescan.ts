@@ -159,12 +159,26 @@ export function prescan(tokens: Token[]): PreScan {
       case 'let':
         if (nxt && nxt.t === 'word' && isAssignOp(tokens[i + 2]))
           register(nxt.v as string, inProc, true);
+        // Destructuring:  let [x, y] = e  — register each name.
+        else if (nxt && nxt.t === '[') {
+          let p = i + 2;
+          while (p < tokens.length && tokens[p].t !== ']') {
+            if (tokens[p].t === 'word') register(tokens[p].v as string, inProc, true);
+            p++;
+          }
+        }
         break;
       case 'for':
         // Counters live in the enclosing scope while the loop runs (and are
         // restored afterwards) — register so bare reads in the body resolve.
         if (nxt && nxt.t === 'qword') register(nxt.v as string, inProc, true);
         else if (nxt && nxt.t === 'word' && isAssignOp(tokens[i + 2]))
+          register(nxt.v as string, inProc, true);
+        // for-in (RFC-2):  for x in xs [ … ]
+        else if (
+          nxt && nxt.t === 'word' &&
+          tokens[i + 2] && tokens[i + 2].t === 'word' && tokens[i + 2].v === 'in'
+        )
           register(nxt.v as string, inProc, true);
         break;
     }

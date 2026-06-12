@@ -56,11 +56,15 @@ export type ASTNode =
   | { k: 'repeat'; count: ExprNode; body: ASTNode[]; line: number }
   | { k: 'while'; cond: ExprNode; body: ASTNode[]; line: number }
   | { k: 'for'; varName: string; from: ExprNode; to: ExprNode; step: ExprNode; body: ASTNode[]; line: number }
+  | { k: 'forin'; varName: string; list: ExprNode; body: ASTNode[]; line: number }
   | { k: 'if'; cond: ExprNode; body: ASTNode[]; elseBody: ASTNode[] | null; line: number }
   | { k: 'make'; name: string; value: ExprNode; line: number }
   | { k: 'local'; name: string; value: ExprNode; line: number }
+  | { k: 'letlist'; names: string[]; value: ExprNode; line: number; isLocal: boolean }
+  | { k: 'setindex'; name: string; indices: ExprNode[]; op: string; value: ExprNode; line: number }
   | { k: 'output'; value: ExprNode | null; line: number } // value null = "exit"
   | { k: 'cmd'; name: string; args: ExprNode[]; line: number; label?: string; word?: string }
+  | { k: 'listcmd'; name: string; args: ExprNode[]; line: number }
   | { k: 'call'; name: string; args: ExprNode[]; line: number };
 
 export type ExprNode =
@@ -69,6 +73,10 @@ export type ExprNode =
   | { k: 'neg'; val: ExprNode; line: number }
   | { k: 'bin'; op: string; left: ExprNode; right: ExprNode }
   | { k: 'func'; name: string; args: ExprNode[]; line: number }
+  | { k: 'listfunc'; name: string; args: ExprNode[]; line: number }
+  | { k: 'list'; items: ExprNode[]; line: number }
+  | { k: 'index'; obj: ExprNode; idx: ExprNode; line: number }
+  | { k: 'callval'; obj: ExprNode; args: ExprNode[]; line: number }
   | { k: 'callexpr'; name: string; args: ExprNode[]; line: number };
 
 // ---------- Density analysis types ----------

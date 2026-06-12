@@ -216,6 +216,7 @@ Travels of 7 mm or more (configurable 3–30, `autotrim 0` off) automatically ge
 | `for i = from to to [ … ]` | counted loop, inclusive of *to*; the step defaults to 1 |
 | `for i = from to to step s [ … ]` | …with an explicit (possibly negative) step: `for i = 10 to 1 step -2 [ … ]` |
 | `for "i from to step [ … ]` | the classic spelling; the step is required, read the counter with `:i` |
+| `for x in xs [ … ]` | iterate the elements of a [list](#lists); the loop variable doesn't leak |
 | `if cond [ … ]` | run the block if the condition is non-zero |
 | `if cond [ … ] else if cond2 [ … ] else [ … ]` | chains of alternatives, any depth |
 
@@ -361,9 +362,69 @@ seth ( noise2 xcor / 16 ycor / 16 ) * 720
 | `heading` | the needle's heading in degrees |
 | `repcount` | 1-based counter of the innermost `repeat` |
 
+## Lists
+
+A second value type alongside numbers: ordered, nestable, ragged lists of numbers (and other lists). A point is `[x, y]`, a path is a list of points, a palette is a list of thread numbers. Lists live entirely in the program — they never reach the stitch stream.
+
+```text
+let palette = [2, 3, 5, 7]      // literal; nesting and trailing commas allowed
+let path = []                   // empty list
+
+print palette[0]                // 2  — indexing is 0-based
+print palette[-1]               // 7  — negatives count from the end
+palette[1] = 4                  // index assignment (+= -= *= /= work too)
+let [x, y] = pos()              // destructuring (fixed arity, flat)
+
+for p in path [                 // iterate elements; length is captured at
+  setpos(p)                     // loop entry, elements are read live
+]
+```
+
+**Reference semantics, like Python/JS.** Assignment shares the list; mutate through any alias and every alias sees it. `copy(xs)` makes an independent deep copy:
+
+```text
+let a = [1, 2, 3]
+let b = a            // same list
+b[0] = 9
+print a              // [9, 2, 3]
+let c = copy(a)      // deep copy — c is independent
+```
+
+**The `[` rule.** Brackets already delimit blocks; position decides the meaning. After a header with a space (`repeat 4 [ … ]`) or glued to a number or `:var` (`repeat 4[…]`, `repeat :n[…]`) a `[` is a **block** — classic programs are untouched. At the start of an expression it's a **list literal**. Glued to a bare name, `)` or `]` it's an **index**: `xs[0]`, `pos()[1]`, `grid[i][j]`. The one sharp edge: `repeat n[ fd 10 ]` with a modern bare name reads as indexing — the error tells you to add the space.
+
+**Loud over convenient.** A non-integer index, an out-of-range index (either direction), a list in a condition (`if xs [ … ]` → *use `len(xs) > 0`*), a list in arithmetic (`[1, 2] + 1`), or a list fed to a scalar command (`fd [1, 2]`) are all errors that name the operation and the line — a wrong index in embroidery is a wrong stitch. Equality is the exception: `=`/`==` compare lists **deeply** (with the usual 1e-9 tolerance) and a number never equals a list (that's `0`, not an error).
+
+### List functions
+
+All list functions are **call-syntax only**: `len(xs)`, never `len xs` (this is what lets `range` and `slice` take optional arguments).
+
+| Function | Returns / effect |
+|---|---|
+| `range(n)` · `range(a, b)` · `range(a, b, s)` | new list `[0…n-1]` / `[a…b-1]` / stepped — 0-based, end-exclusive, like Python |
+| `filled(n, v)` | new list of *n* deep copies of *v* |
+| `len(xs)` · `islist(v)` | element count · `1`/`0` |
+| `first(xs)` · `last(xs)` | `xs[0]` · `xs[-1]` (the Logo heritage names) |
+| `append(xs, v)` · `prepend(xs, v)` | **mutates**: adds *v* at the end / front (statement) |
+| `insertat(xs, i, v)` | **mutates**: inserts at index *i* (0…len allowed) |
+| `removeat(xs, i)` | **mutates**: removes index *i* and **returns** the removed value |
+| `concat(a, b)` | new list (shallow — elements are shared references) |
+| `slice(xs, a)` · `slice(xs, a, b)` | new list, Python semantics incl. negative bounds, clamped |
+| `reverse(xs)` · `sort(xs)` | **new** lists (pure on purpose — they compose in expressions); `sort` is numbers-only, ascending, stable |
+| `copy(xs)` | deep copy |
+| `indexof(xs, v)` · `contains(xs, v)` | first index of *v* (deep, tolerant compare) or −1 · `1`/`0` |
+| `sum(xs)` · `mean(xs)` · `minof(xs)` · `maxof(xs)` | aggregates, numbers only; `sum([])` is 0, the rest error on an empty list |
+| `pick(xs)` | random element — **seeded**, exactly one RNG draw |
+| `shuffle(xs)` | new shuffled list — **seeded** Fisher–Yates, exactly len−1 draws: same seed, same order, forever |
+| `pos()` | the needle's position as `[xcor, ycor]` |
+| `setpos(p)` | command: like `setxy p[0] p[1]` — makes record/replay symmetric: `append(path, pos())` … `setpos(p)` |
+
+> **`push`/`pop` are taken.** They save and restore the *turtle state* (see Movement) and keep that meaning. To grow a list, use `append(xs, v)` — the `push` arity error will remind you.
+
+`print` formats lists as `[1, 2, 3]` (nested as `[[0, 1], [2, 3]]`, capped at 64 elements with `… +n more`). List builtin names are resolved only at call position, so classic programs that use names like `:len` for parameters keep working, and a `def` of the same name shadows the builtin.
+
 ## Randomness & determinism
 
-Every run is deterministic: `random` and `noise` are driven by a seed (default 42). Reseed with:
+Every run is deterministic: `random`, `noise`, `pick` and `shuffle` are driven by a seed (default 42). Reseed with:
 
 ```text
 seed 7
@@ -390,9 +451,12 @@ Needlescript guards both your browser and your machine:
 | Limit | Value |
 |---|---|
 | Max stitches per design | 60,000 |
-| Max interpreter operations | 2,000,000 (catches infinite `while`/recursion) |
+| Max interpreter operations | 2,000,000 (catches infinite `while`/recursion; list element reads and writes count too) |
 | Max call depth | 200 |
 | Max `repeat` / `for` iterations | 200,000 |
+| Max list length | 100,000 elements |
+| Max total live list cells | 1,000,000 |
+| Max list nesting depth | 16 |
 | Stitch length | clamped to 0.4–12 mm |
 | Sub-0.4 mm moves | merged into neighbours (too short to sew safely), with a warning |
 
