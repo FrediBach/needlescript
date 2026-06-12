@@ -8,7 +8,7 @@ import styles from './App.module.css';
 import Header from './components/Header.tsx';
 import EditorPane from './components/EditorPane.tsx';
 import StagePane from './components/StagePane.tsx';
-import LanguageReference from './components/LanguageReference.tsx';
+import ReferenceDialog from './components/ReferenceDialog.tsx';
 
 export interface DebugMark {
   x: number;
@@ -75,6 +75,7 @@ export default function App() {
   const [fitMM, setFitMM] = useState(80);
   const [isDragging, setIsDragging] = useState(false);
   const [showDensity, setShowDensity] = useState(false);
+  const [showReference, setShowReference] = useState(false);
   const [program, dispatch] = useReducer(programReducer, { design: INITIAL_DESIGN, messages: [], scrubPos: 0 });
   const { design, messages, scrubPos } = program;
   const svgFileRef = useRef<HTMLInputElement>(null);
@@ -246,6 +247,7 @@ export default function App() {
         onExampleSelect={handleExampleSelect}
         onRun={handleRun}
         onDownloadDST={handleDownloadDST}
+        onOpenReference={() => setShowReference(true)}
       />
 
       <main className={styles.main}>
@@ -267,7 +269,7 @@ export default function App() {
         />
       </main>
 
-      <LanguageReference />
+      <ReferenceDialog open={showReference} onClose={() => setShowReference(false)} />
 
       <input
         ref={svgFileRef}

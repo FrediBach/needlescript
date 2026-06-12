@@ -9,10 +9,11 @@ interface Props {
   onExampleSelect: (key: string) => void;
   onRun: () => void;
   onDownloadDST: () => void;
+  onOpenReference: () => void;
 }
 
 export default function Header({
-  fitMM, onFitMMChange, onSVGImport, onExampleSelect, onRun, onDownloadDST,
+  fitMM, onFitMMChange, onSVGImport, onExampleSelect, onRun, onDownloadDST, onOpenReference,
 }: Props) {
   const selectRef = useRef<HTMLSelectElement>(null);
 
@@ -63,6 +64,8 @@ export default function Header({
       </button>
 
       <button type="button" className={styles.dlBtn} onClick={onDownloadDST}>Download .DST</button>
+
+      <button type="button" className={styles.helpBtn} onClick={onOpenReference} aria-label="Language reference">?</button>
     </header>
   );
 }
