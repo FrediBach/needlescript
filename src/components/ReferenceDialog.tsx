@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import type { ReactNode } from 'react';
 import styles from './ReferenceDialog.module.css';
+import tutorialMd from '../../needlescript-tutorial.md?raw';
 
 interface RefEntry {
   cmd: string;
@@ -251,22 +253,282 @@ const SECTIONS: RefSection[] = [
   },
 ];
 
+// ── Markdown renderer ─────────────────────────────────────────────────────────
+// Covers the subset used in needlescript-tutorial.md:
+// h1/h2/h3, paragraphs, code fences, inline code/bold/italic/links,
+// blockquotes, tables, unordered/ordered lists, horizontal rules.
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[`*[\]().]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function renderInline(text: string): ReactNode[] {
+  // Order matters: backtick code first, then **bold** before *italic*, then links.
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\n]+\*|\[[^\]]+\]\([^)]*\))/g;
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    const token = match[0];
+    if (token[0] === '`') {
+      parts.push(<code key={key++} className={styles.inlineCode}>{token.slice(1, -1)}</code>);
+    } else if (token.startsWith('**')) {
+      parts.push(<strong key={key++}>{renderInline(token.slice(2, -2))}</strong>);
+    } else if (token[0] === '*') {
+      parts.push(<em key={key++}>{renderInline(token.slice(1, -1))}</em>);
+    } else {
+      // Link: [text](url)
+      const lm = token.match(/\[([^\]]+)\]\(([^)]*)\)/);
+      if (lm) {
+        const href = lm[2];
+        if (href.startsWith('#')) {
+          const targetId = 'tut-' + href.slice(1);
+          parts.push(
+            <a key={key++} className={styles.tutLink} href={href}
+               onClick={(e) => {
+                 e.preventDefault();
+                 document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+               }}>
+              {renderInline(lm[1])}
+            </a>
+          );
+        } else {
+          parts.push(<span key={key++}>{renderInline(lm[1])}</span>);
+        }
+      } else {
+        parts.push(token);
+      }
+    }
+    lastIndex = match.index + token.length;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
+
+function parseMarkdown(md: string): ReactNode[] {
+  const lines = md.split('\n');
+  const blocks: ReactNode[] = [];
+  let i = 0;
+  let bk = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Horizontal rule
+    if (line.trim() === '---') {
+      blocks.push(<hr key={bk++} className={styles.tutHr} />);
+      i++;
+      continue;
+    }
+
+    // Fenced code block
+    if (line.startsWith('```')) {
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) codeLines.push(lines[i++]);
+      i++; // skip closing fence
+      blocks.push(
+        <pre key={bk++} className={styles.tutPre}>
+          <code>{codeLines.join('\n')}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    // Headings — check ### before ## before #
+    const h3 = line.match(/^###\s+(.*)/);
+    if (h3) {
+      const txt = h3[1];
+      blocks.push(<h3 key={bk++} id={'tut-' + slugify(txt)} className={styles.tutH3}>{renderInline(txt)}</h3>);
+      i++; continue;
+    }
+    const h2 = line.match(/^##\s+(.*)/);
+    if (h2) {
+      const txt = h2[1];
+      blocks.push(<h2 key={bk++} id={'tut-' + slugify(txt)} className={styles.tutH2}>{renderInline(txt)}</h2>);
+      i++; continue;
+    }
+    const h1 = line.match(/^#\s+(.*)/);
+    if (h1) {
+      blocks.push(<h1 key={bk++} className={styles.tutH1}>{renderInline(h1[1])}</h1>);
+      i++; continue;
+    }
+
+    // Blockquote
+    if (line.startsWith('> ')) {
+      const qLines: string[] = [];
+      while (i < lines.length && lines[i].startsWith('> ')) qLines.push(lines[i++].slice(2));
+      blocks.push(
+        <blockquote key={bk++} className={styles.tutBlockquote}>
+          {renderInline(qLines.join(' '))}
+        </blockquote>
+      );
+      continue;
+    }
+
+    // Table (rows start with |)
+    if (line.startsWith('|')) {
+      const tLines: string[] = [];
+      while (i < lines.length && lines[i].startsWith('|')) tLines.push(lines[i++]);
+      const isSep = (s: string) => /^\|[-|: ]+\|$/.test(s.trim());
+      const dataStart = tLines.length > 1 && isSep(tLines[1]) ? 2 : 1;
+      const splitCells = (l: string) => l.split('|').slice(1, -1).map(c => c.trim());
+      blocks.push(
+        <div key={bk++} className={styles.tutTableWrap}>
+          <table className={styles.tutTable}>
+            <thead>
+              <tr>
+                {splitCells(tLines[0]).map((c, ci) => (
+                  <th key={ci} className={styles.tutTh}>{renderInline(c)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tLines.slice(dataStart).map((l, j) => (
+                <tr key={j}>
+                  {splitCells(l).map((c, ci) => (
+                    <td key={ci} className={styles.tutTd}>{renderInline(c)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    // Unordered list
+    if (/^[-*] /.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*] /.test(lines[i])) items.push(lines[i++].slice(2));
+      blocks.push(
+        <ul key={bk++} className={styles.tutUl}>
+          {items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}
+        </ul>
+      );
+      continue;
+    }
+
+    // Ordered list
+    if (/^\d+\. /.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\. /.test(lines[i])) items.push(lines[i++].replace(/^\d+\. /, ''));
+      blocks.push(
+        <ol key={bk++} className={styles.tutOl}>
+          {items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}
+        </ol>
+      );
+      continue;
+    }
+
+    // Skip blank lines
+    if (line.trim() === '') { i++; continue; }
+
+    // Paragraph — gather until a block-level boundary
+    const pLines: string[] = [];
+    while (
+      i < lines.length &&
+      lines[i].trim() !== '' &&
+      !lines[i].startsWith('#') &&
+      !lines[i].startsWith('```') &&
+      !lines[i].startsWith('|') &&
+      !lines[i].startsWith('> ') &&
+      !/^[-*] /.test(lines[i]) &&
+      !/^\d+\. /.test(lines[i]) &&
+      lines[i].trim() !== '---'
+    ) {
+      pLines.push(lines[i++]);
+    }
+    if (pLines.length > 0) {
+      blocks.push(<p key={bk++} className={styles.tutP}>{renderInline(pLines.join(' '))}</p>);
+    }
+  }
+
+  return blocks;
+}
+
+// ── About content ─────────────────────────────────────────────────────────────
+
+function AboutContent() {
+  return (
+    <div className={styles.about}>
+      <h2 className={styles.aboutTitle}>Needlescript</h2>
+
+      <p className={styles.aboutPara}>
+        Needlescript inherits its skeleton from <strong>Logo</strong> — the programming language created by Seymour
+        Papert, Wally Feurzeig, and Cynthia Solomon at MIT in 1967. Logo introduced the <em>turtle</em>: an imaginary
+        agent that moves through a plane, carrying a pen. Move it forward, turn it, repeat — and the pen traces
+        geometry. The idea was radical for its time: make mathematics tangible and discoverable by having the learner
+        act it out.
+      </p>
+
+      <p className={styles.aboutPara}>
+        In Needlescript the turtle carries a needle instead of a pen.{' '}
+        <code className={styles.inlineCode}>fd 20</code> sews twenty millimetres of running stitch.{' '}
+        <code className={styles.inlineCode}>arc 360 15</code> sews a closed circle.{' '}
+        <code className={styles.inlineCode}>satin 3</code> turns the path into a glossy three-millimetre column. The
+        classic Logo vocabulary —{' '}
+        <code className={styles.inlineCode}>fd</code>,{' '}
+        <code className={styles.inlineCode}>bk</code>,{' '}
+        <code className={styles.inlineCode}>rt</code>,{' '}
+        <code className={styles.inlineCode}>lt</code>,{' '}
+        <code className={styles.inlineCode}>push</code>,{' '}
+        <code className={styles.inlineCode}>pop</code>,{' '}
+        <code className={styles.inlineCode}>repeat</code>,{' '}
+        <code className={styles.inlineCode}>to&nbsp;…&nbsp;end</code> — works unchanged; every Logo movement program
+        is valid Needlescript.
+      </p>
+
+      <p className={styles.aboutPara}>
+        On top of that foundation sits the toolkit that generative design requires today: seeded simplex noise fields
+        for organic drift, Poisson-disc scattering and Voronoi tessellation for structured randomness, Catmull-Rom
+        splines and Bézier curves that resample directly to stitch length, and Clipper2 boolean geometry for precise
+        offsets and cuts. Everything compiles to a machine-ready Tajima DST file.
+      </p>
+
+      <p className={styles.aboutPara}>
+        The goal is the one Papert had for Logo: collapse the distance between the idea and the physical result.
+        In Needlescript, that result is embroidery you can sew on a real machine and wear.
+      </p>
+
+      <p className={styles.aboutCopyright}>© 2026 Fredi Bach</p>
+    </div>
+  );
+}
+
+// ── Dialog ────────────────────────────────────────────────────────────────────
+
+type TabId = 'reference' | 'tutorial' | 'about';
+
 interface Props {
   open: boolean;
   onClose: () => void;
 }
 
 export default function ReferenceDialog({ open, onClose }: Props) {
+  const [tab, setTab] = useState<TabId>('reference');
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const tutorialNodes = useMemo(() => parseMarkdown(tutorialMd), []);
 
+  // Focus the search field when the dialog opens on the reference tab,
+  // or when the user switches to the reference tab while the dialog is open.
   useEffect(() => {
-    if (open) {
+    if (open && tab === 'reference') {
       setTimeout(() => inputRef.current?.focus(), 40);
-    } else {
+    } else if (!open) {
       setQuery('');
     }
-  }, [open]);
+  }, [open, tab]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -279,7 +541,6 @@ export default function ReferenceDialog({ open, onClose }: Props) {
   if (!open) return null;
 
   const q = query.trim().toLowerCase();
-
   const filtered = q
     ? SECTIONS.map(s => ({
         ...s,
@@ -289,46 +550,83 @@ export default function ReferenceDialog({ open, onClose }: Props) {
       })).filter(s => s.entries.length > 0)
     : SECTIONS;
 
+  const TAB_LABELS: Record<TabId, string> = {
+    reference: 'Language Reference',
+    tutorial:  'Tutorial',
+    about:     'About',
+  };
+
   return (
     <div
       className={styles.overlay}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Language reference">
+      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Needlescript help">
+
         <div className={styles.header}>
-          <span className={styles.title}>✣ Language Reference</span>
-          <input
-            ref={inputRef}
-            className={styles.search}
-            type="text"
-            placeholder="filter commands…"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            spellCheck={false}
-            aria-label="Filter language reference"
-          />
+          <span className={styles.title}>✣ Needlescript</span>
+
+          <div className={styles.headerMid}>
+            <div className={styles.tabs} role="tablist">
+              {(Object.keys(TAB_LABELS) as TabId[]).map(t => (
+                <button
+                  key={t}
+                  role="tab"
+                  aria-selected={tab === t}
+                  className={`${styles.tab}${tab === t ? ` ${styles.tabActive}` : ''}`}
+                  onClick={() => setTab(t)}
+                >
+                  {TAB_LABELS[t]}
+                </button>
+              ))}
+            </div>
+
+            {tab === 'reference' && (
+              <input
+                ref={inputRef}
+                className={styles.search}
+                type="text"
+                placeholder="filter commands…"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                spellCheck={false}
+                aria-label="Filter language reference"
+              />
+            )}
+          </div>
+
           <button className={styles.close} onClick={onClose} aria-label="Close reference">✕</button>
         </div>
+
         <div className={styles.body}>
-          {filtered.length === 0 ? (
-            <div className={styles.empty}>no matches for &ldquo;{query}&rdquo;</div>
-          ) : (
-            filtered.map(section => (
-              <section key={section.title} className={styles.section}>
-                <h3 className={styles.sectionTitle}>{section.title}</h3>
-                {section.note && <p className={styles.sectionNote}>{section.note}</p>}
-                <div className={styles.entries}>
-                  {section.entries.map((e, i) => (
-                    <div key={i} className={styles.entry}>
-                      <code className={styles.cmd}>{e.cmd}</code>
-                      <span className={styles.desc}>{e.desc}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))
+          {tab === 'reference' && (
+            filtered.length === 0 ? (
+              <div className={styles.empty}>no matches for &ldquo;{query}&rdquo;</div>
+            ) : (
+              filtered.map(section => (
+                <section key={section.title} className={styles.section}>
+                  <h3 className={styles.sectionTitle}>{section.title}</h3>
+                  {section.note && <p className={styles.sectionNote}>{section.note}</p>}
+                  <div className={styles.entries}>
+                    {section.entries.map((e, i) => (
+                      <div key={i} className={styles.entry}>
+                        <code className={styles.cmd}>{e.cmd}</code>
+                        <span className={styles.desc}>{e.desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))
+            )
           )}
+
+          {tab === 'tutorial' && (
+            <div className={styles.tutContent}>{tutorialNodes}</div>
+          )}
+
+          {tab === 'about' && <AboutContent />}
         </div>
+
       </div>
     </div>
   );
