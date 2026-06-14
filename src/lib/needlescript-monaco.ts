@@ -142,7 +142,7 @@ export function registerNeedlescript(monaco: Monaco): void {
       { token: '',              foreground: 'EDE7DA' },
       { token: 'ns-identifier', foreground: 'EDE7DA' },
       // Comments — muted, italic
-      { token: 'ns-comment',    foreground: '5E6585', fontStyle: 'italic' },
+      { token: 'ns-comment',    foreground: '6E7595', fontStyle: 'italic' },
       // Control flow & definition keywords — brand gold, bold
       { token: 'ns-keyword',    foreground: 'D9A441', fontStyle: 'bold' },
       // Turtle movement + reporters — sky teal
