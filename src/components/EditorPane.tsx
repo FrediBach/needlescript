@@ -127,8 +127,6 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
   // ─────────────────────────────────────────────────────────────────────
   return (
     <section className={`${styles.pane} ${isDragging ? styles.dragging : ''}`}>
-      <div className={styles.paneLabel}>pattern</div>
-
       <div className={styles.editorWrap}>
         <Editor
           language="needlescript"
