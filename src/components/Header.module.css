@@ -11,9 +11,10 @@
 
 .wordmark {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   margin-right: auto;
+  color: var(--pale); /* currentColor for the inline LogoIcon SVG */
 }
 
 .wordmark h1 {

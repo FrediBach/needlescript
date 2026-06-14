@@ -14,6 +14,34 @@ interface Props {
   onOpenReference: () => void;
 }
 
+// Inline version of needlescript-logo-icon.svg with:
+//   - background rect removed (transparent)
+//   - all fills set to currentColor so it inherits the wordmark text colour
+// The original public/needlescript-logo-icon.svg (black on white) is used
+// unchanged as the favicon.
+function LogoIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 34 34"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="4" y="7" width="4" height="32" rx="2"
+        transform="rotate(-45 4 7)" fill="currentColor" />
+      <rect x="1.41421" width="6" height="34" rx="3"
+        transform="matrix(-0.707107 -0.707107 -0.707107 0.707107 31.8701 8)"
+        fill="currentColor" />
+      <path fill="currentColor" d="M6.43671 1.00684C7.73249 1.07242 8.90599 1.59913 9.79901 2.4248L8.383 3.84082C7.79053 3.3182 7.01341 3.00002 6.16132 3C4.30495 3 2.79999 4.50496 2.79999 6.36133C2.80001 7.21343 3.11819 7.99054 3.64081 8.58301L2.22382 10C1.39816 9.10694 0.872404 7.93251 0.806824 6.63672L0.799988 6.36133C0.799988 3.40039 3.20038 1 6.16132 1L6.43671 1.00684Z"/>
+      <path fill="currentColor" d="M27.1623 1.00684C25.8665 1.07242 24.693 1.59913 23.8 2.4248L25.216 3.84082C25.8085 3.3182 26.5856 3.00002 27.4377 3C29.2941 3 30.799 4.50496 30.799 6.36133C30.799 7.21343 30.4808 7.99054 29.9582 8.58301L31.3752 10C32.2008 9.10694 32.7266 7.93251 32.7922 6.63672L32.799 6.36133C32.799 3.40039 30.3986 1 27.4377 1L27.1623 1.00684Z"/>
+      <path fill="currentColor" d="M6.43671 32.9932C7.73249 32.9276 8.90599 32.4009 9.79901 31.5752L8.383 30.1592C7.79053 30.6818 7.01341 31 6.16132 31C4.30495 31 2.79999 29.495 2.79999 27.6387C2.80001 26.7866 3.11819 26.0095 3.64081 25.417L2.22382 24C1.39816 24.8931 0.872404 26.0675 0.806824 27.3633L0.799988 27.6387C0.799988 30.5996 3.20038 33 6.16132 33L6.43671 32.9932Z"/>
+      <path fill="currentColor" d="M27.1623 32.9932C25.8665 32.9276 24.693 32.4009 23.8 31.5752L25.216 30.1592C25.8085 30.6818 26.5856 31 27.4377 31C29.2941 31 30.799 29.495 30.799 27.6387C30.799 26.7866 30.4808 26.0095 29.9582 25.417L31.3752 24C32.2008 24.8931 32.7266 26.0675 32.7922 27.3633L32.799 27.6387C32.799 30.5996 30.3986 33 27.4377 33L27.1623 32.9932Z"/>
+    </svg>
+  );
+}
+
 // Strip the " — description" suffix from built-in example keys,
 // leaving only the short name: "bloom — rose of circles" → "bloom"
 function shortName(key: string): string {
@@ -33,9 +61,8 @@ export default function Header({
   return (
     <header className={styles.header}>
       <div className={styles.wordmark}>
-        <h1>
-          Needlescript
-        </h1>
+        <LogoIcon size={24} />
+        <h1>Needlescript</h1>
         <span className={styles.tag}>Logo inspired programming language for generative embroidery</span>
       </div>
 
