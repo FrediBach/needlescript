@@ -74,6 +74,7 @@
 
 .err  { color: #E98A77; }
 .ok   { color: #9DC08B; }
+.warn { color: var(--gold); }
 .print { color: var(--pale); }
 
 .replRow {

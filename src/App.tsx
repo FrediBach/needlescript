@@ -1,4 +1,4 @@
-import { useReducer, useState, useCallback, useRef, useMemo } from 'react';
+import { useReducer, useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { run, designStats, NeedlescriptError } from './lib/engine.ts';
 import type { StitchEvent, DesignStats, DensityResult } from './lib/engine.ts';
 import { toDST } from './lib/dst.ts';
@@ -32,7 +32,7 @@ export interface DesignState {
 export interface ConsoleMessage {
   id: number;
   text: string;
-  type: 'info' | 'ok' | 'err' | 'print';
+  type: 'info' | 'ok' | 'err' | 'print' | 'warn';
 }
 
 const INITIAL_DESIGN: DesignState = {
@@ -115,6 +115,7 @@ export default function App() {
         (result.locks ? ` · secured ${result.locks} thread end${result.locks === 1 ? '' : 's'}` : ''),
         'ok',
       );
+      warnings.forEach(w => addMsg(w, 'warn'));
 
       const newDesign: DesignState = {
         events: result.events, pts, marks, density: result.density, stats, warnings, name: designName, ok: true,
@@ -140,6 +141,22 @@ export default function App() {
     }
     return design;
   }, [design, selectedHoop]);
+
+  // Push the hoop-fit warning into the console whenever it appears or changes
+  // (e.g. user switches to a smaller hoop). Use a ref so we only dispatch when
+  // the warning text actually changes, not on every render.
+  const prevHoopWarningRef = useRef<string | null>(null);
+  useEffect(() => {
+    const hoopWarning = displayDesign.warnings.length > design.warnings.length
+      ? displayDesign.warnings[displayDesign.warnings.length - 1]
+      : null;
+    if (hoopWarning !== prevHoopWarningRef.current) {
+      prevHoopWarningRef.current = hoopWarning;
+      if (hoopWarning) {
+        dispatch({ type: 'msg/add', text: hoopWarning, msgType: 'warn' });
+      }
+    }
+  }, [displayDesign.warnings, design.warnings]);
 
   const handleRun = useCallback(() => {
     runProgram(source, design.name);

@@ -6,7 +6,7 @@ interface Props {
 }
 
 export default function StatsChips({ design }: Props) {
-  if (!design.stats && design.warnings.length === 0) return null;
+  if (!design.stats) return null;
 
   const s = design.stats;
   const chips: { text: string; type?: 'warn' | 'err' }[] = [];
@@ -20,7 +20,6 @@ export default function StatsChips({ design }: Props) {
     chips.push({ text: `${s.width.toFixed(1)} × ${s.height.toFixed(1)} mm` });
     if (design.density && design.density.peak > 0.5)
       chips.push({ text: `peak ${design.density.peak.toFixed(1)} layers` });
-    design.warnings.forEach(w => chips.push({ text: w, type: 'warn' }));
   }
 
   return (

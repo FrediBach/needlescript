@@ -35,6 +35,8 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   // Holds the decoration collection for the playback active-line highlight.
   const decoCollRef = useRef<editor.IEditorDecorationsCollection | null>(null);
+  // Ref for the console panel — used to auto-scroll to the latest message.
+  const consoleRef = useRef<HTMLDivElement>(null);
 
   // Stable ref so the keyboard-shortcut handler always calls the latest onRun
   // even after source/design state changes rebuild the callback.
@@ -78,6 +80,12 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
       coll.clear();
     }
   }, [activeLine, monaco]);
+
+  // Auto-scroll the console to the bottom whenever a new message arrives.
+  useEffect(() => {
+    const el = consoleRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   // ── REPL ─────────────────────────────────────────────────────────────
   const handleReplKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -174,7 +182,7 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
         />
       </div>
 
-      <div className={styles.console} aria-live="polite">
+      <div ref={consoleRef} className={styles.console} aria-live="polite">
         {messages.map(msg => (
           <div key={msg.id} className={styles[msg.type] || ''}>
             {msg.text}
