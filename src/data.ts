@@ -1,4 +1,4 @@
-// Shared constants for the Needlescript playground UI
+// Shared constants for the NeedleScript playground UI
 
 import lorenzRaw        from '../examples/lorenz-attractor.ns?raw';
 import meanderRaw       from '../examples/meandering-spiral.ns?raw';
@@ -207,7 +207,7 @@ export const EXAMPLES: Record<string, string> = {
     'satin 0',
   ].join('\n'),
   'meadow — modern syntax tour': [
-    '// meadow — a tour of the modern Needlescript syntax.',
+    '// meadow — a tour of the modern NeedleScript syntax.',
     '//',
     '// let / assignment / +=, call parens & commas, def/return, recursion,',
     '// else-if, keyword for (with and without step), %, !, ==, true/false,',

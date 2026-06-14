@@ -229,14 +229,14 @@ const SECTIONS: RefSection[] = [
   {
     title: 'SVG import',
     entries: [
-      { cmd: 'Import SVG button · drag & drop', desc: 'converts an SVG into editable Needlescript code. Filled shapes → beginfill blocks (subpaths → holes), strokes → outlines, shapes with both get a procedure for fill then border. Colours map to nearest thread' },
+      { cmd: 'Import SVG button · drag & drop', desc: 'converts an SVG into editable NeedleScript code. Filled shapes → beginfill blocks (subpaths → holes), strokes → outlines, shapes with both get a procedure for fill then border. Colours map to nearest thread' },
       { cmd: 'supported elements', desc: '<path> (M L H V C S Q T A Z), rect, circle, ellipse, line, polyline/polygon, groups and transforms. Text, images, and gradients are skipped' },
       { cmd: 'fit __ mm', desc: 'scale the imported SVG to fit within this many millimetres before converting. Adjustable in the toolbar (10–190 mm)' },
     ],
   },
   {
     title: 'Safety limits',
-    note: 'Needlescript guards both your browser and your machine. Exceeding a limit stops the program with an error and a line number.',
+    note: 'NeedleScript guards both your browser and your machine. Exceeding a limit stops the program with an error and a line number.',
     entries: [
       { cmd: 'max stitches', desc: '60,000 per design' },
       { cmd: 'max interpreter operations', desc: '2,000,000 — catches infinite while loops and unbounded recursion; list reads and writes count too' },
@@ -461,10 +461,10 @@ function parseMarkdown(md: string): ReactNode[] {
 function AboutContent() {
   return (
     <div className={styles.about}>
-      <h2 className={styles.aboutTitle}>Needlescript</h2>
+      <h2 className={styles.aboutTitle}>NeedleScript</h2>
 
       <p className={styles.aboutPara}>
-        Needlescript inherits its skeleton from <strong>Logo</strong> — the programming language created by Seymour
+        NeedleScript inherits its skeleton from <strong>Logo</strong> — the programming language created by Seymour
         Papert, Wally Feurzeig, and Cynthia Solomon at MIT in 1967. Logo introduced the <em>turtle</em>: an imaginary
         agent that moves through a plane, carrying a pen. Move it forward, turn it, repeat — and the pen traces
         geometry. The idea was radical for its time: make mathematics tangible and discoverable by having the learner
@@ -472,7 +472,7 @@ function AboutContent() {
       </p>
 
       <p className={styles.aboutPara}>
-        In Needlescript the turtle carries a needle instead of a pen.{' '}
+        In NeedleScript the turtle carries a needle instead of a pen.{' '}
         <code className={styles.inlineCode}>fd 20</code> sews twenty millimetres of running stitch.{' '}
         <code className={styles.inlineCode}>arc 360 15</code> sews a closed circle.{' '}
         <code className={styles.inlineCode}>satin 3</code> turns the path into a glossy three-millimetre column. The
@@ -485,7 +485,7 @@ function AboutContent() {
         <code className={styles.inlineCode}>pop</code>,{' '}
         <code className={styles.inlineCode}>repeat</code>,{' '}
         <code className={styles.inlineCode}>to&nbsp;…&nbsp;end</code> — works unchanged; every Logo movement program
-        is valid Needlescript.
+        is valid NeedleScript.
       </p>
 
       <p className={styles.aboutPara}>
@@ -497,7 +497,7 @@ function AboutContent() {
 
       <p className={styles.aboutPara}>
         The goal is the one Papert had for Logo: collapse the distance between the idea and the physical result.
-        In Needlescript, that result is embroidery you can sew on a real machine and wear.
+        In NeedleScript, that result is embroidery you can sew on a real machine and wear.
       </p>
 
       <p className={styles.aboutCopyright}>© 2026 Fredi Bach</p>
@@ -561,10 +561,10 @@ export default function ReferenceDialog({ open, onClose }: Props) {
       className={styles.overlay}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Needlescript help">
+      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="NeedleScript help">
 
         <div className={styles.header}>
-          <span className={styles.title}>✣ Needlescript</span>
+          <span className={styles.title}>✣ NeedleScript</span>
 
           <div className={styles.headerMid}>
             <div className={styles.tabs} role="tablist">

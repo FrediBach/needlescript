@@ -1,8 +1,8 @@
-# Needlescript: A Complete Tutorial
+# NeedleScript: A Complete Tutorial
 
 *From your first stitch to seeded generative fields*
 
-Needlescript is a Logo-inspired programming language for **generative embroidery**. You write turtle-graphics code — moving a virtual needle around a hoop — and Needlescript turns your path into machine-ready stitches, previews them, and exports a Tajima `.DST` file you can sew on a real machine.
+NeedleScript is a Logo-inspired programming language for **generative embroidery**. You write turtle-graphics code — moving a virtual needle around a hoop — and NeedleScript turns your path into machine-ready stitches, previews them, and exports a Tajima `.DST` file you can sew on a real machine.
 
 This tutorial walks you from the absolute basics up to seeded noise fields, Voronoi tessellation, and polygon geometry. Work through it in order; each section builds on the last. Type the examples into the playground (`npm run dev`, then open `http://localhost:5173`) and run them with `⌘`/`Ctrl`+`Enter`.
 
@@ -36,7 +36,7 @@ This tutorial walks you from the absolute basics up to seeded noise fields, Voro
 
 ## 1. The mental model
 
-Needlescript gives you a **turtle**: an imaginary needle that carries thread. You don't draw shapes directly — you tell the turtle to move, and a line of stitches follows it. Turn the turtle and move again, and you've sewn a corner.
+NeedleScript gives you a **turtle**: an imaginary needle that carries thread. You don't draw shapes directly — you tell the turtle to move, and a line of stitches follows it. Turn the turtle and move again, and you've sewn a corner.
 
 A few facts to anchor everything else:
 
@@ -58,7 +58,7 @@ The most basic command is `fd` (forward). It sews a line of stitches in the dire
 fd 20
 ```
 
-That sews a 20 mm line heading north from the centre. Notice you didn't have to place individual stitches — Needlescript automatically splits a long move into stitches of the current stitch length (default 2.5 mm). One `fd 20` becomes a tidy row of eight stitches.
+That sews a 20 mm line heading north from the centre. Notice you didn't have to place individual stitches — NeedleScript automatically splits a long move into stitches of the current stitch length (default 2.5 mm). One `fd 20` becomes a tidy row of eight stitches.
 
 To sew backward without turning, use `bk`:
 
@@ -184,7 +184,7 @@ repeat 5 [
 
 ## 5. Stitch types: the thread vocabulary
 
-Real embroidery isn't one kind of stitch. Needlescript gives you several, and you switch between them with mode commands. Whatever mode is active applies to subsequent moves.
+Real embroidery isn't one kind of stitch. NeedleScript gives you several, and you switch between them with mode commands. Whatever mode is active applies to subsequent moves.
 
 **Running stitch** is the default — a simple dashed line. Control its stitch length:
 
@@ -314,7 +314,7 @@ Two gotchas worth internalising early:
 
 ### The function toolkit
 
-Needlescript ships a full set of math functions. The ones you'll reach for constantly:
+NeedleScript ships a full set of math functions. The ones you'll reach for constantly:
 
 | Function | What it gives you |
 |---|---|
@@ -483,7 +483,7 @@ def wobble(len) [
 
 ## 10. The two dialects, and call syntax
 
-Needlescript has two dialects that **mix freely in the same program** and compile to identical stitches:
+NeedleScript has two dialects that **mix freely in the same program** and compile to identical stitches:
 
 - **Modern syntax** — `let x = 5`, `setxy(a, b)`, `def leaf(size) [ … ]`, `return`, `for i = 1 to 10`, `else if`, `%`, `!`, `==`, `true`/`false`, `//` comments.
 - **Classic Logo syntax** — `make "x 5`, `setxy :a :b`, `to leaf :size … end`, `output`, `for "i 1 10 1`, `;` comments. This remains valid forever.
@@ -519,7 +519,7 @@ For anything beyond a simple `fd 10 rt 90`, the parenthesised form is far easier
 
 ## 11. Randomness and determinism
 
-Generative work needs randomness, but embroidery needs *reproducibility* — what you previewed must be exactly what the machine sews. Needlescript resolves this: **every run is deterministic.** `random`, `gauss`, `noise`, `snoise2/3`, `pick`, `shuffle`, and `scatter` are all driven by a seed (default 42). Reseed at the top of your program:
+Generative work needs randomness, but embroidery needs *reproducibility* — what you previewed must be exactly what the machine sews. NeedleScript resolves this: **every run is deterministic.** `random`, `gauss`, `noise`, `snoise2/3`, `pick`, `shuffle`, and `scatter` are all driven by a seed (default 42). Reseed at the top of your program:
 
 ```text
 seed 7
@@ -754,7 +754,7 @@ For organic stippling, run `relax` on your scattered points first — a few roun
 
 ## 16. Geometry: offsets and booleans
 
-For precise shape manipulation, Needlescript wraps the Clipper2 library on integer micro-coordinates, so results are exact and platform-stable.
+For precise shape manipulation, NeedleScript wraps the Clipper2 library on integer micro-coordinates, so results are exact and platform-stable.
 
 | Function | Returns |
 |---|---|
@@ -818,7 +818,7 @@ A satin column is buffered while you draw it and sewn — underlay first, then t
 
 ### Short stitches on curves — `shortstitch 0/1`
 
-On a tight satin curve the inner edge gets the same number of penetrations as the outer edge in a fraction of the space — they bunch up, break thread, and chew the fabric. Needlescript detects local curvature and pulls **alternate inner-edge stitches in to 60% width**. It's on by default; `shortstitch 0` disables it. If a column is wider than the curve's radius you'll get a warning — that geometry can't sew cleanly at any setting.
+On a tight satin curve the inner edge gets the same number of penetrations as the outer edge in a fraction of the space — they bunch up, break thread, and chew the fabric. NeedleScript detects local curvature and pulls **alternate inner-edge stitches in to 60% width**. It's on by default; `shortstitch 0` disables it. If a column is wider than the curve's radius you'll get a warning — that geometry can't sew cleanly at any setting.
 
 ### Local density — `maxdensity n` plus the heatmap
 
@@ -865,7 +865,7 @@ repeat 50 [
 
 ## 19. Safety limits
 
-Needlescript guards both your browser and your machine. Hit one of these and you'll get a clear error rather than a hang or a damaged garment:
+NeedleScript guards both your browser and your machine. Hit one of these and you'll get a clear error rather than a hang or a damaged garment:
 
 | Limit | Value |
 |---|---|
@@ -888,7 +888,7 @@ Needlescript guards both your browser and your machine. Hit one of these and you
 
 When a design is ready, **Download .DST** produces a standard Tajima file: 3-byte ternary delta records, moves longer than 12.1 mm split automatically, colour changes as stop records, trims as triple jumps, and a correct 512-byte header. Load it onto any machine, or into commercial software for a final check.
 
-You can also bring artwork *in*: **Import SVG** (a button, or drag and drop) converts an SVG into *editable* Needlescript code. Filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, and colours map to the nearest thread. It supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, plus groups and transforms — a great way to start from a logo and then make it generative.
+You can also bring artwork *in*: **Import SVG** (a button, or drag and drop) converts an SVG into *editable* NeedleScript code. Filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, and colours map to the nearest thread. It supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, plus groups and transforms — a great way to start from a logo and then make it generative.
 
 ### Using the engine as a library
 
@@ -957,7 +957,7 @@ Read it top to bottom:
 - `stem` walks step by step, reading a heading from `snoise2` sampled slowly (coordinates over 18) so neighbouring stems flow coherently, and bails out with `return` if it reaches the hoop edge.
 - The scene sets a fabric (so underlay and pull compensation come along for free), seeds the RNG for reproducibility, and sews eighteen stems from random low starting points, trimming the connector thread after each.
 
-Change `seed 11` to any other number and you get a completely different — but equally coherent, and equally reproducible — meadow. That is the whole promise of Needlescript: designs that genuinely *generate*, while sewing out exactly as previewed.
+Change `seed 11` to any other number and you get a completely different — but equally coherent, and equally reproducible — meadow. That is the whole promise of NeedleScript: designs that genuinely *generate*, while sewing out exactly as previewed.
 
 ### Where to go next
 

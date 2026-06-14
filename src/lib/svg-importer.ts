@@ -1,6 +1,6 @@
 // ============================================================
-// SVG importer for Needlescript.
-// Converts SVG elements to Needlescript source code.
+// SVG importer for NeedleScript.
+// Converts SVG elements to NeedleScript source code.
 // Supported: <path> (M L H V C S Q T A Z), <rect>, <circle>,
 // <ellipse>, <line>, <polyline>, <polygon>, <g>, transforms.
 // No external dependencies.

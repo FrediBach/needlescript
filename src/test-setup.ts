@@ -14,7 +14,7 @@ const realRandom = Math.random;
 beforeEach(() => {
   Math.random = () => {
     throw new Error(
-      'Math.random was called — the Needlescript engine must be fully deterministic (RFC-3 §5)',
+      'Math.random was called — the NeedleScript engine must be fully deterministic (RFC-3 §5)',
     );
   };
 });

@@ -62,7 +62,7 @@ export default function Header({
     <header className={styles.header}>
       <div className={styles.wordmark}>
         <LogoIcon size={24} />
-        <h1>Needlescript</h1>
+        <h1>NeedleScript</h1>
         <span className={styles.tag}>Logo inspired programming language for generative embroidery</span>
       </div>
 

@@ -1,5 +1,5 @@
 // ============================================================
-// Needlescript core language engine
+// NeedleScript core language engine
 // Tokenizer, parser, stitch machine, fill engine, and interpreter.
 // No DOM dependencies — usable as a standalone library.
 //
@@ -9,7 +9,7 @@
 // This file re-exports everything from the individual modules.
 // See the individual files for implementation details:
 //   types.ts        — shared types and interfaces
-//   errors.ts       — NeedlescriptError
+//   errors.ts       — NeedlecriptError
 //   prng.ts         — makeRNG, makeNoise
 //   commands.ts     — ALIASES, BUILTIN_ARITY, QWORD_BUILTINS, FABRICS, FUNC_ARITY, ZERO_FUNCS, LIST_FUNCS, LIST_CMDS, RESERVED
 //   suggestions.ts  — suggest

@@ -13,7 +13,7 @@ import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 
 // Point Monaco's worker infrastructure at the Vite-bundled worker file.
 // We only need the base editor worker; language-specific workers (TS, JSON,
-// CSS…) are not required because Needlescript uses a Monarch tokenizer only.
+// CSS…) are not required because NeedleScript uses a Monarch tokenizer only.
 (globalThis as Record<string, unknown>).MonacoEnvironment = {
   getWorker(_moduleId: string, _label: string): Worker {
     return new editorWorker();

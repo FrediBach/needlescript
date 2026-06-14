@@ -1,6 +1,6 @@
-# Needlescript
+# NeedleScript
 
-A Logo-inspired programming language and playground for **generative embroidery**. You write turtle-graphics code, Needlescript turns it into machine-ready stitches — running stitch, satin, bean, blanket and tatami fills — previews them in a virtual hoop, and exports a Tajima `.DST` file you can sew on a real embroidery machine.
+A Logo-inspired programming language and playground for **generative embroidery**. You write turtle-graphics code, NeedleScript turns it into machine-ready stitches — running stitch, satin, bean, blanket and tatami fills — previews them in a virtual hoop, and exports a Tajima `.DST` file you can sew on a real embroidery machine.
 
 The goal: let creatives make embroidery that can't easily be drawn in traditional embroidery software — noise fields, recursion, parametric curves, randomness with a seed.
 
@@ -63,7 +63,7 @@ src/
 │   ├── machine.ts        stitch machine: satin, fills, underlay, limits
 │   ├── postprocess.ts    locks, autotrim, density analysis, stats
 │   ├── dst.ts            Tajima .DST binary encoder
-│   ├── svg-importer.ts   SVG → Needlescript source converter
+│   ├── svg-importer.ts   SVG → NeedleScript source converter
 │   └── __tests__/        Vitest suites (the de-facto behavioural spec)
 ├── components/           playground UI (editor, stage, playback, reference)
 ├── data.ts               thread palette, hoop constants, bundled examples
@@ -74,20 +74,20 @@ src/
 
 ## The playground
 
-- **Editor** — write Needlescript; `⌘`/`Ctrl`+`Enter` runs, `Tab` inserts two spaces.
+- **Editor** — write NeedleScript; `⌘`/`Ctrl`+`Enter` runs, `Tab` inserts two spaces.
 - **REPL** — type a single command below the console; it's appended to the program and re-run (`↑`/`↓` for history). Great for nudging a design live.
 - **Console** — run results, warnings, `print` output, and errors with line numbers.
 - **Stage** — a 100 mm virtual hoop rendered on canvas: thread per colour, underlay drawn thinner and lighter, dashed jump lines, needle penetration points when zoomed, hoop-overflow and density warnings as chips, plus a **density heatmap toggle** (thread coverage in layers) for spotting bulletproof patches before they pucker.
 - **Playback** — play (~7 s) or scrub the stitch sequence stitch by stitch. While scrubbed, the **source line currently sewing is highlighted in the editor** and shown next to the counter — the fastest way to answer "which line made this stitch?"
 - **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch, meadow, echo, shatter).
 - **Download .DST** — export the current design as a Tajima stitch file.
-- **Import SVG** — convert an SVG (button or drag & drop) into *editable* Needlescript code: filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, colours map to the nearest thread. Supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, groups and transforms.
+- **Import SVG** — convert an SVG (button or drag & drop) into *editable* NeedleScript code: filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, colours map to the nearest thread. Supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, groups and transforms.
 
 ---
 
 # Language guide
 
-Needlescript has two dialects that **mix freely in the same program** and compile to exactly the same stitches:
+NeedleScript has two dialects that **mix freely in the same program** and compile to exactly the same stitches:
 
 - the **modern syntax** — `let x = 5`, `setxy(a, b)`, `def leaf(size) [ … ]`, `return`, `for i = 1 to 10`, `else if`, `%`, `!`, `==`, `true`/`false`, `//` comments;
 - the **classic Logo syntax** — `make "x 5`, `setxy :a :b`, `to leaf :size … end`, `output`, `for "i 1 10 1`, `;` comments — which remains valid forever.
@@ -201,7 +201,7 @@ A satin column is buffered while you draw it and sewn — underlay first, then t
 
 ### Short stitches on curves — `shortstitch 0/1`
 
-On a tight satin curve the inner edge receives the same number of penetrations as the outer edge in a fraction of the space — they bunch up, break thread, and chew the fabric. Needlescript detects local curvature (chord length ÷ turn angle) and pulls **alternate inner-edge stitches in to 60% width**. On by default; `shortstitch 0` disables. If a column is wider than the curve's radius you get a warning — that geometry can't sew cleanly at any setting.
+On a tight satin curve the inner edge receives the same number of penetrations as the outer edge in a fraction of the space — they bunch up, break thread, and chew the fabric. NeedleScript detects local curvature (chord length ÷ turn angle) and pulls **alternate inner-edge stitches in to 60% width**. On by default; `shortstitch 0` disables. If a column is wider than the curve's radius you get a warning — that geometry can't sew cleanly at any setting.
 
 ### Local density — `maxdensity n` + heatmap
 
@@ -568,7 +568,7 @@ Result: inserting a `scatter(6)` shifts a later `random 10` by exactly one draw 
 
 ## Safety limits
 
-Needlescript guards both your browser and your machine:
+NeedleScript guards both your browser and your machine:
 
 | Limit | Value |
 |---|---|
@@ -609,7 +609,7 @@ const stats = designStats(result.events);  // counts, bounding box, max stitch�
 const bytes = toDST(result.events, 'rose'); // Uint8Array, ready to save
 ```
 
-Also exported: `tokenize`, `parse`, `applyLocks`, `applyAutoTrim`, `densityMap`, `makeRNG`, `makeNoise`, `fork`, `gauss`, `suggest`, `svgToCode`, the command tables (`BUILTIN_ARITY`, `QWORD_BUILTINS`, `FABRICS`, `FUNC_ARITY`, `ALIASES`, `RESERVED`, `ZERO_FUNCS`, `LIST_FUNCS`, `LIST_CMDS`, `GEN_FUNCS`, `GEN_CMDS`, `LIBRARY_FUNCS`), `LIMITS`, and `NeedlescriptError` (which carries the source line in `slLine`).
+Also exported: `tokenize`, `parse`, `applyLocks`, `applyAutoTrim`, `densityMap`, `makeRNG`, `makeNoise`, `fork`, `gauss`, `suggest`, `svgToCode`, the command tables (`BUILTIN_ARITY`, `QWORD_BUILTINS`, `FABRICS`, `FUNC_ARITY`, `ALIASES`, `RESERVED`, `ZERO_FUNCS`, `LIST_FUNCS`, `LIST_CMDS`, `GEN_FUNCS`, `GEN_CMDS`, `LIBRARY_FUNCS`), `LIMITS`, and `NeedleScriptError` (which carries the source line in `slLine`).
 
 The engine's only runtime dependencies are three exactly-pinned libraries that each do something genuinely hard: `simplex-noise` (seeded noise tables), `delaunator` (Delaunay triangulation) and `clipper2-ts` (polygon offsetting & booleans). Everything else — `lerp` through `catmull`, even Bridson's Poisson-disc — is hand-rolled, because owning the code is cheaper than auditing a dependency for determinism. None of them touch `Math.random` (the test suite proves it).
 
