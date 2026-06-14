@@ -1,0 +1,113 @@
+// =============================================================
+//  WAVEFORMS — the four classic analog-synth oscillator shapes
+//  sine · triangle · sawtooth · square, stacked as labelled rows
+//
+//  Each waveform is a reporter phase->displacement in -1..1.
+//  One plotter samples it across the field and sews the row,
+//  so all four share exactly the same drawing routine — the way
+//  a synth's shape selector swaps one wavetable for another.
+// =============================================================
+
+// ---- layout -------------------------------------------------
+let SPAN  = 60      // total width of each wave, mm  (fits the 94 mm field)
+let AMP   = 7       // peak height of a wave, mm
+let CYC   = 3       // cycles drawn per row
+let samplingStep  = 1.5     // sampling step along x, mm (running-stitch grain)
+
+// ---- the four oscillators -----------------------------------
+// p is phase in 0..1; each returns displacement in -1..1.
+
+def w_sine(p) [
+  return sin(p * 360)
+]
+
+def w_triangle(p) [
+  // up 0..0.5, down 0.5..1  -> a clean linear peak
+  if p < 0.5 [ return remap(p, 0, 0.5, -1, 1) ]
+  return remap(p, 0.5, 1, 1, -1)
+]
+
+def w_saw(p) [
+  // ramp up across the whole cycle, then drop (the drop is sewn
+  // as an explicit vertical edge by the plotter below)
+  return remap(p, 0, 1, -1, 1)
+]
+
+def w_square(p) [
+  // high for the first half, low for the second
+  if p < 0.5 [ return 1 ]
+  return -1
+]
+
+// ---- sample one oscillator into a path of points ------------
+// kind: 1=sine 2=triangle 3=saw 4=square. cy = row centre-line y.
+// Builds the polyline left to right; for saw and square it injects
+// the vertical jump edges so the needle traces the true waveform
+// instead of cutting a diagonal across the discontinuity.
+def buildwave(kind, cy) [
+  let pts  = []
+  let x0   = -SPAN / 2
+  let n    = round(SPAN / samplingStep)
+  let last = 0                       // previous displacement, for edge detection
+
+  for i = 0 to n [
+    let x  = x0 + i * samplingStep
+    // phase 0..1 within the current cycle
+    let ph = (i / n) * CYC
+    let p  = ph - floor(ph)
+
+    let d = 0
+    if kind == 1 [ d = w_sine(p) ]
+    if kind == 2 [ d = w_triangle(p) ]
+    if kind == 3 [ d = w_saw(p) ]
+    if kind == 4 [ d = w_square(p) ]
+
+    // a big jump between consecutive samples is a true vertical edge
+    // (saw reset / square transition): plant a point at the same x on
+    // the old level first, so the segment to the new level is vertical.
+    if i > 0 and abs(d - last) > 1.2 [
+      append(pts, [x, cy + last * AMP])
+    ]
+
+    append(pts, [x, cy + d * AMP])
+    last = d
+  ]
+  return pts
+]
+
+// ---- draw one labelled row ----------------------------------
+def plotrow(kind, cy, thread) [
+  color thread
+
+  // faint centre (zero) line first, in running stitch, as a baseline
+  stitchlen 3
+  up setxy(-SPAN / 2 - 4, cy) down
+  fd 0                                   // ensure pen is planted
+  seth 90
+  fd SPAN + 8
+  trim
+
+  // the waveform itself, in satin for a bold glossy trace
+  let path = buildwave(kind, cy)
+  satin 1.4
+  density 0.45
+  up setpos(path[0]) down
+  sewpath(path)
+  satin 0                                // flush the satin column + underlay
+  trim
+]
+
+// =============================================================
+//  THE SCENE
+// =============================================================
+fabric "woven        // sensible underlay + pull compensation, for free
+seed 7
+shortstitch 1        // keep the sine/triangle peaks from crowding
+
+// rows top to bottom, evenly spaced; amplitude leaves a gap between them
+plotrow(1, 30, 1)    // sine      — thread 1
+plotrow(2, 10, 2)    // triangle  — thread 2
+plotrow(3, -10, 3)   // sawtooth  — thread 3
+plotrow(4, -30, 4)   // square    — thread 4
+
+home

@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { EXAMPLES } from '../data.ts';
+import { EXAMPLES, GALLERY_EXAMPLES } from '../data.ts';
 import type { HoopConfig } from '../data.ts';
 import { HoopIcon } from './HoopDialog.tsx';
 import styles from './Header.module.css';
@@ -12,6 +12,13 @@ interface Props {
   onRun: () => void;
   onDownloadDST: () => void;
   onOpenReference: () => void;
+}
+
+// Strip the " — description" suffix from built-in example keys,
+// leaving only the short name: "bloom — rose of circles" → "bloom"
+function shortName(key: string): string {
+  const sep = key.indexOf(' — ');
+  return sep >= 0 ? key.slice(0, sep) : key;
 }
 
 export default function Header({
@@ -54,8 +61,13 @@ export default function Header({
       >
         <option value="" disabled>examples</option>
         {Object.keys(EXAMPLES).map(k => (
-          <option key={k} value={k}>{k}</option>
+          <option key={k} value={k}>{shortName(k)}</option>
         ))}
+        <optgroup label="gallery">
+          {Object.keys(GALLERY_EXAMPLES).map(k => (
+            <option key={k} value={k}>{k}</option>
+          ))}
+        </optgroup>
       </select>
 
       <button type="button" className={styles.runBtn} onClick={onRun}>

@@ -1,5 +1,11 @@
 // Shared constants for the Needlescript playground UI
 
+import lorenzRaw        from '../examples/lorenz-attractor.ns?raw';
+import meanderRaw       from '../examples/meandering-spiral.ns?raw';
+import snowflakeRaw     from '../examples/snowflake.ns?raw';
+import orbitsRaw        from '../examples/threaded-orbits.ns?raw';
+import waveformsRaw     from '../examples/waveforms.ns?raw';
+
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
   '#31604F', // 1 — forest
@@ -383,10 +389,21 @@ export const EXAMPLES: Record<string, string> = {
     '      seth(snoise2(xcor / 14, ycor / 14) * 180)',
     '      let nxt = vadd(pos(), vfromheading(heading, 1.8))',
     '      if !inpath(nxt, cell) [ break ]',
-    '      fd 1.8',
-    '    ]',
-    '    trim',
-    '  ]',
-    ']',
+      '      fd 1.8',
+      '    ]',
+      '    trim',
+      '  ]',
+      ']',
   ].join('\n'),
+};
+
+// Examples loaded from .ns files in /examples — shown in a separate group
+// in the dropdown. Keys are the short display names used as labels and as
+// lookup keys in App.tsx.
+export const GALLERY_EXAMPLES: Record<string, string> = {
+  'lorenz':     lorenzRaw,
+  'meander':    meanderRaw,
+  'snowflake':  snowflakeRaw,
+  'orbits':     orbitsRaw,
+  'waveforms':  waveformsRaw,
 };

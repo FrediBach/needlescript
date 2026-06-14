@@ -1,0 +1,90 @@
+// ============================================================
+//  MEANDERING SPIRAL
+//  Smooth at the core, increasingly wild toward the rim.
+//
+//  A steadily growing radius gives a dense, evenly-spaced
+//  spiral. On top of it we layer a noise-driven wobble whose
+//  strength ramps from zero at the centre to full force at the
+//  edge — so the line starts as a clean spiral and dissolves
+//  into organic meandering as it travels outward.
+// ============================================================
+
+// --- spiral shape ---
+let maxradius  = 36      // outer radius of the smooth spiral, mm. Keep
+                         // maxradius + wobbleamp < 47 so the meander
+                         // never spills past the sewable edge.
+let spacing    = 2.0     // gap between successive rings, mm — controls DENSITY
+let stepdist   = 1.5     // distance sewn per step, mm (smaller = smoother curve)
+
+// --- meander ---
+let wobbleamp  = 9       // max radial wander at the rim, mm (try 4 calm … 14 wild)
+let wobblefreq = 7       // noise frequency — higher = tighter, busier wiggles
+let rampexp    = 2.4     // chaos ramp: 1 = linear, >1 = calm core + sudden wild edge
+let tangle     = 1       // 1 = also wobble the heading sideways (looser, tangled)
+                         // 0 = wander only in/out (rings stay roughly concentric)
+
+// --- stitch quality ---
+seed 7
+stitchlen 1.8
+
+
+// ------------------------------------------------------------
+//  Archimedean spiral: radius r = b * theta, where one full
+//  turn (360°) adds exactly `spacing` to r.  So b = spacing/360.
+//  The number of turns needed to reach maxradius falls out of
+//  that — we just sweep theta until r passes maxradius, so the
+//  density and the size can never contradict each other.
+//
+//  We advance by arc-length `stepdist` each step and convert it
+//  to an angle increment dtheta = stepdist / r, keeping the
+//  stitch length roughly constant as the radius grows.
+// ------------------------------------------------------------
+
+let b = spacing / 360            // mm of radius per degree of sweep
+let theta = 0                    // sweep angle, degrees
+let deg = 180 / 3.141592653589793  // radians -> degrees
+
+up home down
+
+while true [
+  // smooth spiral radius for this sweep angle
+  let r = b * theta
+  if r > maxradius [ break ]
+
+  // ideal point on the clean spiral (0 = north, clockwise)
+  let px = r * sin(theta)
+  let py = r * cos(theta)
+
+  // ramp: 0 at the centre, 1 at the rim, shaped by rampexp
+  let ramp = pow(r / maxradius, rampexp)
+
+  // smooth wander in -1..1, sampled ALONG the arm so it drifts
+  // rather than flickers. theta drives motion down the spiral;
+  // a second axis on r decorrelates neighbouring rings.
+  let wob = snoise2(theta / (360 / wobblefreq), r / 5)
+
+  // radial offset: push the point in/out along its own radius
+  let offset = wob * wobbleamp * ramp
+  let dir = atan(px, py)                  // heading from origin to this point
+  let ox = px + offset * sin(dir)
+  let oy = py + offset * cos(dir)
+
+  // optional sideways (tangential) wobble for a looser, tangled look.
+  // a second noise channel (offset z via large coordinate shift) keeps
+  // it independent of the radial wander.
+  if tangle == 1 [
+    let wob2 = snoise2(theta / (360 / wobblefreq) + 50, r / 5 + 50)
+    let side = wob2 * wobbleamp * ramp * 0.7
+    ox += side * sin(dir + 90)
+    oy += side * cos(dir + 90)
+  ]
+
+  setxy(ox, oy)
+
+  // step forward along the spiral by ~stepdist mm.
+  // clamp r away from 0 so the first step near the centre is sane.
+  let rsafe = max(r, stepdist)
+  theta += stepdist / rsafe * deg
+]
+
+trim

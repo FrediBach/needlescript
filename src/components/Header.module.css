@@ -52,6 +52,13 @@
   cursor: pointer;
 }
 
+.select {
+  /* Keep the dropdown narrow — option text is intentionally short (≤ 9 chars)
+     so the select sizes naturally to about half its old width. The max-width
+     caps it if new entries are ever added with longer labels. */
+  max-width: 140px;
+}
+
 .btn:hover,
 .select:hover {
   border-color: var(--dim);

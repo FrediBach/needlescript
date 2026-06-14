@@ -1,0 +1,110 @@
+// ============================================================
+//  LORENZ ATTRACTOR
+//
+//  The famous "butterfly". Three coupled equations are
+//  integrated step by step; the 3-D trajectory is projected
+//  onto a plane and sewn as one continuous wandering thread.
+//
+//      dx/dt = sigma * (y - x)
+//      dy/dt = x * (rho - z) - y
+//      dz/dt = x * y - beta * z
+//
+//  The path is auto-fitted to the hoop, so you can change the
+//  constants or the integration time and it re-centres and
+//  re-scales itself to fill the field without spilling over.
+// ============================================================
+
+// --- the system (classic chaotic values) ---
+let sigma   = 10        // try 10
+let rho     = 28        // the bifurcation knob — 28 is classic chaos;
+                        //   ~14 collapses to a point, >99 gets wild
+let beta    = 2.6667    // 8/3
+
+// --- integration ---
+let dt      = 0.006     // time step (smaller = smoother, longer path)
+let steps   = 3500      // number of integration steps = trajectory length
+let x0      = 0.1       // initial conditions (tiny seed kicks it off)
+let y0      = 0
+let z0      = 0
+
+// --- projection: which 2-D view of the 3-D curve ---
+//   1 = "xz", the classic butterfly (wings spread)
+//   2 = "xy", top-down view
+//   3 = "yz", side-on view
+let view    = 1
+
+// --- fit & quality ---
+let fitradius = 44      // scale so the farthest point sits here, mm (<47)
+let stitch    = 1.8     // even stitch spacing along the curve, mm
+
+seed 7
+stitchlen 1.8
+// Running stitch (no bean) keeps the fine filaments legible and avoids
+// piling thread where the two wings cross. If you want a bolder line,
+// add `bean 3` — but raise the density limit, the crossing runs hot.
+
+
+// ------------------------------------------------------------
+//  1. INTEGRATE  — Euler's method, collecting projected points
+// ------------------------------------------------------------
+let x = x0
+let y = y0
+let z = z0
+let raw = []            // the projected path as [px, py] points
+
+for i = 1 to steps [
+  // derivatives at the current point
+  let dx = sigma * (y - x)
+  let dy = x * (rho - z) - y
+  let dz = x * y - beta * z
+
+  // step forward
+  x += dx * dt
+  y += dy * dt
+  z += dz * dt
+
+  // project the 3-D point onto the chosen plane
+  let px = x
+  let py = z
+  if view == 2 [ py = y ]
+  if view == 3 [ px = y  py = z ]
+
+  append(raw, [px, py])
+]
+
+
+// ------------------------------------------------------------
+//  2. AUTO-FIT  — centre on the bounding box, then scale so the
+//     single farthest point lands exactly on `fitradius`.
+// ------------------------------------------------------------
+let box = bbox(raw)                 // [minx, miny, maxx, maxy]
+let cx  = (box[0] + box[2]) / 2
+let cy  = (box[1] + box[3]) / 2
+
+// find the largest distance from the centre (true radius, not bbox)
+let rmax = 0
+for p in raw [
+  let d = vdist([cx, cy], p)
+  if d > rmax [ rmax = d ]
+]
+let scale = fitradius / rmax
+
+// build the fitted path: centre, then scale
+let fit = []
+for p in raw [
+  append(fit, [ (p[0] - cx) * scale, (p[1] - cy) * scale ])
+]
+
+
+// ------------------------------------------------------------
+//  3. SEW  — resample to even stitch spacing and lay the thread
+// ------------------------------------------------------------
+let pathline = resample(fit, stitch)
+
+color 1
+up
+setpos(pathline[0])     // jump to the start without sewing
+down
+sewpath(pathline)       // one continuous butterfly
+
+trim

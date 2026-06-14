@@ -3,7 +3,7 @@ import { run, designStats, NeedlescriptError } from './lib/engine.ts';
 import type { StitchEvent, DesignStats, DensityResult } from './lib/engine.ts';
 import { toDST } from './lib/dst.ts';
 import { svgToCode } from './lib/svg-importer.ts';
-import { THREADS, EXAMPLES, DEFAULT_HOOP } from './data.ts';
+import { THREADS, EXAMPLES, GALLERY_EXAMPLES, DEFAULT_HOOP } from './data.ts';
 import type { HoopConfig } from './data.ts';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
@@ -163,7 +163,7 @@ export default function App() {
   }, [source, design.name, runProgram]);
 
   const handleExampleSelect = useCallback((key: string) => {
-    const src = EXAMPLES[key];
+    const src = EXAMPLES[key] ?? GALLERY_EXAMPLES[key];
     const name = key.split(' ')[0];
     setSource(src);
     runProgram(src, name);

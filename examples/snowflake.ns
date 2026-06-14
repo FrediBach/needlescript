@@ -1,0 +1,105 @@
+// ============================================================
+//  PARAMETRIC SNOWFLAKE
+//  Change the variables below to reshape the whole crystal.
+// ============================================================
+
+// --- form ---
+let arms        = 6      // number of arms (6 = a real snowflake; try 5 or 8)
+let complexity  = 5      // branch PAIRS along each arm — the main detail knob (1–9)
+let armlen      = 34     // length of each arm, mm (keep arms*0 + armlen < 47)
+
+// --- branches ---
+let branchangle = 55     // splay of branches off the spine, degrees
+let branchbase  = 0.30   // first branch starts this far along the arm (0–1)
+let branchspan  = 0.55   // branches spread across this much of the arm (0–1)
+let branchscale = 0.42   // branch length as a fraction of the arm length
+let branchtaper = 1      // 1 = branches shrink toward the tip, 0 = all equal
+
+// --- decoration ---
+let tipsize     = 3.5    // little V at the very end of each arm, mm (0 = none)
+let centersize  = 5      // hexagon/polygon at the centre, mm (0 = none)
+
+// --- stitch quality ---
+seed 7
+stitchlen 1.8
+bean 3                   // bold, hand-drawn line — each stitch sewn 3x
+
+
+// ------------------------------------------------------------
+//  one branch: a straight spur of a given length
+// ------------------------------------------------------------
+def branch(blen) [
+  fd blen
+  bk blen                // sew back out to the spine
+]
+
+// ------------------------------------------------------------
+//  one arm: spine + symmetric branch pairs + a tip
+// ------------------------------------------------------------
+def arm() [
+  // walk the spine in `complexity` steps, dropping a branch pair at each
+  let seg = armlen / complexity
+
+  for i = 1 to complexity [
+    fd seg               // advance one segment along the spine
+
+    // how far along the arm are we, 0..1 ?
+    let t = i / complexity
+
+    // only place branches inside the [base, base+span] band
+    if t >= branchbase and t <= branchbase + branchspan [
+      // branch length: optionally taper toward the tip
+      let grow = 1
+      if branchtaper == 1 [ grow = 1 - t * 0.6 ]
+      let blen = armlen * branchscale * grow
+
+      // right branch
+      push
+      rt branchangle
+      branch(blen)
+      pop
+
+      // left branch (mirror)
+      push
+      lt branchangle
+      branch(blen)
+      pop
+    ]
+  ]
+
+  // decorative V at the tip
+  if tipsize > 0 [
+    push rt 30 fd tipsize pop
+    push lt 30 fd tipsize pop
+  ]
+
+  bk armlen              // retrace the spine back to the centre
+]
+
+
+// ============================================================
+//  draw it
+// ============================================================
+color 1
+
+// optional centre polygon
+if centersize > 0 [
+  up
+  setxy(0, centersize)   // start at the top vertex
+  seth 90 + 180 / arms   // orient so the polygon sits flat
+  down
+  let side = 2 * centersize * sin(180 / arms)
+  repeat arms [
+    fd side
+    rt 360 / arms
+  ]
+  up home down
+]
+
+// the arms, rotated evenly around the centre
+repeat arms [
+  arm()
+  rt 360 / arms
+]
+
+trim

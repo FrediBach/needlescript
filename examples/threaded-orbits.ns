@@ -1,0 +1,105 @@
+// ============================================================
+//  THREADED ORBITS  —  string-art caustics
+//
+//  A reproduction of the classic two-pole string-art pattern:
+//  straight threads fan from four points on a circle (the poles)
+//  across to the opposite arc. No curves are ever drawn — the
+//  bright spindle, the diagonal X-wings and the parabolic
+//  envelopes all EMERGE from where the straight lines bunch.
+//
+//  Each thread is sewn as one straight chord: jump to one end
+//  with the needle up, drop it, and stitch across to the other.
+// ============================================================
+
+// --- frame ---
+let R          = 44      // circle radius, mm (sewable max is 47)
+
+// --- the vertical spindle (top + bottom poles) ---
+//   These two fans make the bright central diamond/lens.
+let vcount     = 24     // threads per vertical pole (density of the spindle).
+                         //   More threads = a brighter, denser lens.
+let vspan      = 100     // arc swept on the far side, degrees.
+                         //   180 = full opposite semicircle (a wide diamond);
+                         //   ~100 packs the threads into a slim, bright vertical
+                         //   lens like the original. Smaller still = narrower.
+// --- the diagonal X-wings (left + right poles) ---
+//   A second, lighter pair of fans crossing the first.
+let hcount     = 24      // threads per horizontal pole (fewer = fainter wings)
+let hspan      = 165     // arc swept, degrees
+
+// --- thread / quality ---
+let stitch     = 2.8     // stitch length along each chord, mm (long straight
+                         //   runs read best a touch longer than the 2.5 default)
+
+seed 7
+stitchlen stitch
+maxdensity 0             // the poles are convergence points by design — every
+                         //   thread meets there, so coverage is intentionally
+                         //   high. Silence the heatmap warning for this piece.
+
+
+// ------------------------------------------------------------
+//  helper: the point on the circle at a given angle (degrees).
+//  Turtle convention — 0 = north, clockwise — so this maps
+//  0 -> top, 90 -> right (E), 180 -> bottom, 270 -> left.
+// ------------------------------------------------------------
+def circlept(deg) [
+  return [ R * sin(deg), R * cos(deg) ]
+]
+
+// ------------------------------------------------------------
+//  helper: sew one straight thread between two circle points,
+//  given as angles. Needle up to travel, down to stitch across.
+// ------------------------------------------------------------
+def thread(deg_a, deg_b) [
+  let a = circlept(deg_a)
+  let b = circlept(deg_b)
+  up
+  setpos(a)              // jump to the first endpoint (no stitching)
+  down
+  setpos(b)              // stitch straight across to the second
+]
+
+// ------------------------------------------------------------
+//  helper: a FAN of threads from one pole.
+//    pole   — the apex angle (where all threads of this fan meet)
+//    target — the centre of the arc they sweep on the far side
+//    span   — how wide that arc is, degrees
+//    n      — number of threads
+// ------------------------------------------------------------
+def fan(pole, target, span, n) [
+  for i = 1 to n [
+    let f = (i - 1) / (n - 1)          // 0 .. 1 across the fan
+    let deg = target - span / 2 + f * span
+    thread(pole, deg)
+  ]
+]
+
+
+// ============================================================
+//  draw
+// ============================================================
+color 1
+
+// --- vertical spindle: top pole sweeps the bottom arc, and
+//     bottom pole sweeps the top arc. Their overlap is the
+//     bright central lens. ---
+fan(0,   180, vspan, vcount)     // top pole  (0°)   -> bottom arc
+fan(180, 0,   vspan, vcount)     // bottom pole(180°) -> top arc
+trim
+
+// --- diagonal X-wings: left and right poles, lighter, crossing
+//     the spindle to weave the cross-hatch and the X. ---
+fan(270, 90,  hspan, hcount)     // left pole (270°) -> right arc
+fan(90,  270, hspan, hcount)     // right pole(90°)  -> left arc
+trim
+
+// --- the enclosing circle, drawn last as one clean ring ---
+up
+setpos(circlept(0))
+down
+let segs = 240
+for i = 1 to segs [
+  setpos(circlept(i / segs * 360))
+]
+trim
