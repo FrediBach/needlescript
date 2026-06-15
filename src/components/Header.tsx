@@ -1,8 +1,10 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { EXAMPLES, GALLERY_EXAMPLES } from '../data.ts';
 import type { HoopConfig } from '../data.ts';
 import { HoopIcon } from './HoopDialog.tsx';
 import styles from './Header.module.css';
+
+export type ExportFormat = 'dst' | 'pes' | 'exp';
 
 interface Props {
   hoop: HoopConfig;
@@ -10,7 +12,7 @@ interface Props {
   onSVGImport: () => void;
   onExampleSelect: (key: string) => void;
   onRun: () => void;
-  onDownloadDST: () => void;
+  onDownload: (format: ExportFormat) => void;
   onOpenReference: () => void;
 }
 
@@ -46,8 +48,72 @@ function shortName(key: string): string {
   return sep >= 0 ? key.slice(0, sep) : key;
 }
 
+const FORMAT_LABELS: Record<ExportFormat, string> = {
+  dst: 'Download .DST',
+  pes: 'Download .PES',
+  exp: 'Download .EXP',
+};
+
+/** Dropdown export button — opens a small menu with three format options. */
+function ExportDropdown({ onDownload }: { onDownload: (fmt: ExportFormat) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    function onOutside(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, [open]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className={styles.exportDropdown}>
+      <button
+        type="button"
+        className={styles.dlBtn}
+        onClick={() => setOpen(v => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Export embroidery file"
+      >
+        Export&nbsp;&nbsp;<span className={styles.dlArrow} aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <div role="menu" className={styles.dlMenu}>
+          {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map(fmt => (
+            <button
+              key={fmt}
+              type="button"
+              role="menuitem"
+              className={styles.dlMenuItem}
+              onClick={() => { setOpen(false); onDownload(fmt); }}
+            >
+              {FORMAT_LABELS[fmt]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Header({
-  hoop, onOpenHoopDialog, onSVGImport, onExampleSelect, onRun, onDownloadDST, onOpenReference,
+  hoop, onOpenHoopDialog, onSVGImport, onExampleSelect, onRun, onDownload, onOpenReference,
 }: Props) {
   const selectRef = useRef<HTMLSelectElement>(null);
 
@@ -98,7 +164,7 @@ export default function Header({
         Run&nbsp;&nbsp;<kbd>⌘↵</kbd>
       </button>
 
-      <button type="button" className={styles.dlBtn} onClick={onDownloadDST}>Download .DST</button>
+      <ExportDropdown onDownload={onDownload} />
 
       <button type="button" className={styles.helpBtn} onClick={onOpenReference} aria-label="Language reference">?</button>
     </header>

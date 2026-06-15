@@ -2,9 +2,12 @@ import { useReducer, useState, useCallback, useRef, useMemo, useEffect } from 'r
 import { run, designStats, NeedlescriptError } from './lib/engine.ts';
 import type { StitchEvent, DesignStats, DensityResult } from './lib/engine.ts';
 import { toDST } from './lib/dst.ts';
+import { toPES } from './lib/pes.ts';
+import { toEXP } from './lib/exp.ts';
 import { svgToCode } from './lib/svg-importer.ts';
 import { THREADS, EXAMPLES, GALLERY_EXAMPLES, DEFAULT_HOOP } from './data.ts';
 import type { HoopConfig } from './data.ts';
+import type { ExportFormat } from './components/Header.tsx';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
 import EditorPane from './components/EditorPane.tsx';
@@ -200,24 +203,32 @@ export default function App() {
     runProgram(src, name);
   }, [runProgram]);
 
-  const handleDownloadDST = useCallback(() => {
+  const handleDownload = useCallback((format: ExportFormat) => {
     if (!design.ok || design.pts.length === 0) {
       addMsg('nothing to export — run a program with at least one stitch first', 'err');
       return;
     }
     try {
-      const bytes = toDST(design.events, design.name);
+      const slug = design.name.replace(/[^a-z0-9_-]+/gi, '_').toLowerCase();
+      let bytes: Uint8Array;
+      if (format === 'pes') {
+        bytes = toPES(design.events, design.name);
+      } else if (format === 'exp') {
+        bytes = toEXP(design.events, design.name);
+      } else {
+        bytes = toDST(design.events, design.name);
+      }
       const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/octet-stream' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = design.name.replace(/[^a-z0-9_-]+/gi, '_').toLowerCase() + '.dst';
+      a.download = `${slug}.${format}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       addMsg(`exported ${a.download} (${bytes.length.toLocaleString()} bytes)`, 'ok');
     } catch (e) {
-      addMsg(`DST export failed: ${e instanceof Error ? e.message : e}`, 'err');
+      addMsg(`${format.toUpperCase()} export failed: ${e instanceof Error ? e.message : e}`, 'err');
     }
   }, [design]);
 
@@ -310,7 +321,7 @@ export default function App() {
         onSVGImport={handleSVGImport}
         onExampleSelect={handleExampleSelect}
         onRun={handleRun}
-        onDownloadDST={handleDownloadDST}
+        onDownload={handleDownload}
         onOpenReference={() => setShowReference(true)}
       />
 
