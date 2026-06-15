@@ -5,15 +5,22 @@
   min-height: 0;
 }
 
+/* Desktop: row flex — EditorPane gets an inline width from JS, Splitter
+   is 5 px, StagePane takes the rest via flex: 1 (set in StagePane.module.css). */
 .main {
   flex: 1;
-  display: grid;
-  grid-template-columns: minmax(330px, 44%) 1fr;
+  display: flex;
+  flex-direction: row;
   min-height: 0;
+  overflow: hidden;
 }
 
+/* Mobile: revert to CSS Grid so the two panels stack vertically without
+   requiring any JS-controlled sizing. The horizontal Splitter is hidden
+   at this breakpoint, so the grid fully owns the layout. */
 @media (max-width: 880px) {
   .main {
+    display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: minmax(280px, 45%) 1fr;
   }

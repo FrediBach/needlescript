@@ -1,0 +1,71 @@
+.splitter {
+  flex-shrink: 0;
+  position: relative;
+  transition: background-color 0.1s ease;
+  z-index: 2;
+}
+
+/* ── Grip pip — a short centred tick mark ─────────────────────────── */
+.splitter::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.18);
+  transition: background-color 0.1s ease;
+  pointer-events: none;
+}
+
+/* ── Horizontal variant: separates left and right panels ──────────── */
+.horizontal {
+  width: 5px;
+  align-self: stretch;
+  cursor: col-resize;
+  background: var(--line, #3A4163);
+}
+
+.horizontal::after {
+  width: 1.5px;
+  height: 24px;
+}
+
+/* ── Vertical variant: separates code and console ─────────────────── */
+.vertical {
+  height: 5px;
+  align-self: stretch;
+  cursor: row-resize;
+  background: var(--line, #3A4163);
+}
+
+.vertical::after {
+  width: 24px;
+  height: 1.5px;
+}
+
+/* ── Hover ─────────────────────────────────────────────────────────── */
+.horizontal:hover {
+  background: rgba(217, 164, 65, 0.55);
+}
+
+.horizontal:hover::after {
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.vertical:hover {
+  background: rgba(217, 164, 65, 0.55);
+}
+
+.vertical:hover::after {
+  background: rgba(255, 255, 255, 0.38);
+}
+
+/* ── Active (while dragging) ─────────────────────────────────────── */
+.active {
+  background: rgba(217, 164, 65, 0.75) !important;
+}
+
+.active::after {
+  background: rgba(255, 255, 255, 0.55) !important;
+}

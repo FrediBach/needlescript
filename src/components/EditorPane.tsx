@@ -4,6 +4,7 @@ import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
 import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
+import Splitter from './Splitter.tsx';
 import styles from './EditorPane.module.css';
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
   messages: ConsoleMessage[];
   isDragging: boolean;
   activeLine: number | null; // source line currently sewing (playback), 1-based
+  style?: React.CSSProperties;
 }
 
 // Font settings match the rest of the app (--mono, 13 px, line-height 1.55)
@@ -26,10 +28,22 @@ const EDITOR_LINE_HEIGHT  = Math.round(EDITOR_FONT_SIZE * 1.55); // 20 px
 // :global block.
 const ACTIVE_LINE_CLASS = 'ns-playback-line';
 
-export default function EditorPane({ source, onSourceChange, onRun, messages, isDragging, activeLine }: Props) {
+export default function EditorPane({ source, onSourceChange, onRun, messages, isDragging, activeLine, style }: Props) {
   const [replValue, setReplValue] = useState('');
   const replHistoryRef = useRef<string[]>([]);
   const replIdxRef     = useRef(-1);
+
+  // ── Console panel height (vertical split) ──────────────────────────
+  const CONSOLE_DEFAULT = 96;
+  const CONSOLE_MIN     = 40;
+  const CONSOLE_MAX     = 360;
+
+  const [consoleHeight, setConsoleHeight] = useState(CONSOLE_DEFAULT);
+
+  const handleConsoleDrag = useCallback((delta: number) => {
+    // Positive delta = dragging the handle down = Monaco grows, console shrinks.
+    setConsoleHeight(h => Math.max(CONSOLE_MIN, Math.min(CONSOLE_MAX, h - delta)));
+  }, []);
 
   // Holds the live Monaco editor instance once mounted.
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -126,7 +140,7 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
 
   // ─────────────────────────────────────────────────────────────────────
   return (
-    <section className={`${styles.pane} ${isDragging ? styles.dragging : ''}`}>
+    <section className={`${styles.pane} ${isDragging ? styles.dragging : ''}`} style={style}>
       <div className={styles.editorWrap}>
         <Editor
           language="needlescript"
@@ -180,7 +194,14 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
         />
       </div>
 
-      <div ref={consoleRef} className={styles.console} aria-live="polite">
+      <Splitter
+        orientation="vertical"
+        onDrag={handleConsoleDrag}
+        onReset={() => setConsoleHeight(CONSOLE_DEFAULT)}
+      />
+
+      <div ref={consoleRef} className={styles.console} aria-live="polite"
+           style={{ height: consoleHeight }}>
         {messages.map(msg => (
           <div key={msg.id} className={styles[msg.type] || ''}>
             {msg.text}

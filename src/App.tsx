@@ -9,6 +9,7 @@ import styles from './App.module.css';
 import Header from './components/Header.tsx';
 import EditorPane from './components/EditorPane.tsx';
 import StagePane from './components/StagePane.tsx';
+import Splitter from './components/Splitter.tsx';
 import ReferenceDialog from './components/ReferenceDialog.tsx';
 import HoopDialog from './components/HoopDialog.tsx';
 
@@ -82,6 +83,36 @@ export default function App() {
   const [program, dispatch] = useReducer(programReducer, { design: INITIAL_DESIGN, messages: [], scrubPos: 0 });
   const { design, messages, scrubPos } = program;
   const svgFileRef = useRef<HTMLInputElement>(null);
+
+  // ── Horizontal panel split ────────────────────────────────────────
+  // leftWidth is in pixels; default ≈ 44 % of the viewport on first render.
+  const [leftWidth, setLeftWidth] = useState<number>(() =>
+    Math.max(330, Math.round(window.innerWidth * 0.44))
+  );
+
+  // Track the mobile breakpoint so we skip inline-width on small screens
+  // (mobile uses CSS Grid, which owns sizing without any JS state).
+  const [isMobile, setIsMobile] = useState(() =>
+    window.matchMedia('(max-width: 880px)').matches
+  );
+  useEffect(() => {
+    const mq      = window.matchMedia('(max-width: 880px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const mainRef = useRef<HTMLDivElement>(null);
+
+  const handleHorizDrag = useCallback((delta: number) => {
+    const total = mainRef.current?.offsetWidth ?? window.innerWidth;
+    setLeftWidth(w => Math.max(240, Math.min(w + delta, total - 240)));
+  }, []);
+
+  const handleHorizReset = useCallback(() => {
+    const total = mainRef.current?.offsetWidth ?? window.innerWidth;
+    setLeftWidth(Math.max(330, Math.round(total * 0.44)));
+  }, []);
 
   // SVG import size derived from current hoop (fits within the sewable area)
   const fitMM = Math.min(selectedHoop.widthMM, selectedHoop.heightMM) - 10;
@@ -283,7 +314,7 @@ export default function App() {
         onOpenReference={() => setShowReference(true)}
       />
 
-      <main className={styles.main}>
+      <main className={styles.main} ref={mainRef}>
         <EditorPane
           source={source}
           onSourceChange={setSource}
@@ -291,7 +322,15 @@ export default function App() {
           messages={messages}
           isDragging={isDragging}
           activeLine={activeLine}
+          style={!isMobile ? { width: leftWidth, flexShrink: 0 } : undefined}
         />
+        {!isMobile && (
+          <Splitter
+            orientation="horizontal"
+            onDrag={handleHorizDrag}
+            onReset={handleHorizReset}
+          />
+        )}
         <StagePane
           design={displayDesign}
           hoop={selectedHoop}
