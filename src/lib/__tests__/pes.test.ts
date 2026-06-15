@@ -231,7 +231,6 @@ describe('toPES', () => {
     it('uses short (1-byte) encoding for small deltas (−63..62)', () => {
       // A 5mm stitch = 50 units; should use short encoding (1 byte per coord)
       const out = toPES([stitch(0, 0), stitch(5, 0)]);
-      const records = parsePecRecords(out).filter(r => r.type === 'stitch');
       // 50 is in range (−64, 63), so short encoding: high bit of x byte should be 0
       const xByte = out[PEC_STITCH_OFFSET];
       expect(xByte & 0x80).toBe(0); // bit 7 clear → short encoding
