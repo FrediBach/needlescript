@@ -890,25 +890,6 @@ When a design is ready, **Download .DST** produces a standard Tajima file: 3-byt
 
 You can also bring artwork *in*: **Import SVG** (a button, or drag and drop) converts an SVG into *editable* NeedleScript code. Filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, and colours map to the nearest thread. It supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, plus groups and transforms — a great way to start from a logo and then make it generative.
 
-### Using the engine as a library
-
-The language engine in `src/lib/` has no DOM dependencies, so you can script it directly:
-
-```ts
-import { run, designStats, toDST } from './lib/engine.ts';
-
-const result = run('repeat 36 [ fd 4 rt 10 ]', { seed: 7 });
-// result.events   — the stitch/jump/color/trim/mark stream
-// result.warnings — non-fatal issues
-// result.printed  — output of print
-// result.density  — local density grid, peak, and hotspot list
-
-const stats = designStats(result.events);   // counts, bounding box, max stitch…
-const bytes = toDST(result.events, 'rose');  // Uint8Array, ready to save
-```
-
-When you're unsure how any feature behaves, the Vitest suites in `src/lib/__tests__/` are the de-facto specification — they pin every documented behaviour, including identical output between the modern and classic dialects.
-
 ---
 
 ## 21. A capstone project
