@@ -169,13 +169,13 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
               horizontalScrollbarSize:  8,
               useShadows:              false,
             },
-            // Suppress language-intelligence popups (we provide highlighting only)
-            quickSuggestions:      false,
-            suggestOnTriggerCharacters: false,
-            parameterHints:        { enabled: false },
-            wordBasedSuggestions:  'off',
-            links:                 false,
-            hover:                 { enabled: false }
+            // IntelliSense — completions, hover docs, signature hints
+            quickSuggestions:           { other: true, comments: false, strings: false },
+            suggestOnTriggerCharacters: true,
+            parameterHints:             { enabled: true },
+            wordBasedSuggestions:       'off',
+            links:                      false,
+            hover:                      { enabled: true }
           }}
         />
       </div>
