@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DesignState } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import { THREADS } from '../data.ts';
@@ -10,25 +10,51 @@ interface Props {
   showDensity: boolean;
 }
 
+/** Viewport in mm-space. When null the view auto-fits the hoop. */
+type Viewport = {
+  centerX: number;
+  centerY: number;
+  halfW: number;
+  halfH: number;
+};
+
+/** Cached rendering transform so pointer handlers can convert CSS px → mm. */
+type RenderTransform = {
+  scale: number;  // physical px per mm (current, possibly zoomed)
+  cx: number;     // canvas center x in physical px
+  cy: number;     // canvas center y in physical px
+  viewCX: number; // viewport center x in mm
+  viewCY: number; // viewport center y in mm
+};
+
+type DragState = {
+  startX: number;   // CSS px, relative to canvas top-left
+  startY: number;
+  currentX: number;
+  currentY: number;
+};
+
 export default function StageCanvas({ design, hoop, scrubPos, showDensity }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const transformRef = useRef<RenderTransform | null>(null);
 
+  const [viewport, setViewport] = useState<Viewport | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
+
+  // ── draw on prop / viewport change ──────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    // Resize canvas to match physical pixel size
     const container = canvas.parentElement;
     if (!container) return;
     const box = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.round(box.width * dpr));
+    canvas.width  = Math.max(1, Math.round(box.width  * dpr));
     canvas.height = Math.max(1, Math.round(box.height * dpr));
+    transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, viewport);
+  }, [design, hoop, scrubPos, showDensity, viewport]);
 
-    draw(canvas, design, hoop, scrubPos, dpr, showDensity);
-  }, [design, hoop, scrubPos, showDensity]);
-
-  // Also redraw on resize
+  // ── redraw on container resize ───────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -37,21 +63,160 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity }: Pro
       if (!container) return;
       const box = container.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.max(1, Math.round(box.width * dpr));
+      canvas.width  = Math.max(1, Math.round(box.width  * dpr));
       canvas.height = Math.max(1, Math.round(box.height * dpr));
-      draw(canvas, design, hoop, scrubPos, dpr, showDensity);
+      transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, viewport);
     });
     ro.observe(canvas.parentElement!);
     return () => ro.disconnect();
-  }, [design, hoop, scrubPos, showDensity]);
+  }, [design, hoop, scrubPos, showDensity, viewport]);
+
+  // ── pointer handlers ─────────────────────────────────────────────────────
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setDragState({ startX: x, startY: y, currentX: x, currentY: y });
+    canvas.setPointerCapture(e.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!dragState) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setDragState(prev => prev ? { ...prev, currentX: x, currentY: y } : null);
+  }, [dragState]);
+
+  const handlePointerUp = useCallback((_e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!dragState) return;
+
+    const { startX, startY, currentX, currentY } = dragState;
+    setDragState(null);
+
+    const dx = currentX - startX;
+    const dy = currentY - startY;
+
+    // Ignore tiny drags (accidental clicks, double-click pair)
+    if (Math.abs(dx) < 10 || Math.abs(dy) < 10) return;
+
+    const t = transformRef.current;
+    if (!t) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const { scale, cx, cy, viewCX, viewCY } = t;
+
+    // CSS pixels → mm using current (possibly zoomed) transform
+    const cssToMmX = (cssX: number) => viewCX + (cssX * dpr - cx) / scale;
+    const cssToMmY = (cssY: number) => viewCY - (cssY * dpr - cy) / scale;
+
+    const mmX1 = cssToMmX(startX);
+    const mmY1 = cssToMmY(startY);
+    const mmX2 = cssToMmX(currentX);
+    const mmY2 = cssToMmY(currentY);
+
+    const halfW = Math.abs(mmX2 - mmX1) / 2;
+    const halfH = Math.abs(mmY2 - mmY1) / 2;
+    if (halfW < 0.01 || halfH < 0.01) return;
+
+    setViewport({
+      centerX: (mmX1 + mmX2) / 2,
+      centerY: (mmY1 + mmY2) / 2,
+      halfW,
+      halfH,
+    });
+  }, [dragState]);
+
+  const handleDoubleClick = useCallback(() => {
+    // Only reset if currently zoomed in; no-op when already at default view
+    if (viewport !== null) {
+      setViewport(null);
+    }
+  }, [viewport]);
+
+  // ── derive zoom level for indicator ─────────────────────────────────────
+  // Computed directly from canvasRef + viewport during render so the badge
+  // always reflects the new viewport in the same render pass that sets it
+  // (no stale-ref lag).
+  const zoomLevel = (() => {
+    if (!viewport) return null;
+    const canvas = canvasRef.current;
+    if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
+    const autoFit = computeAutoFitScale(canvas.width, canvas.height, design, hoop);
+    if (autoFit === 0) return null;
+    const zoomed = Math.min(
+      canvas.width  / (2 * viewport.halfW),
+      canvas.height / (2 * viewport.halfH),
+    );
+    return zoomed / autoFit;
+  })();
+
+  // Drag rectangle in CSS px
+  const dragRect = dragState && (
+    Math.abs(dragState.currentX - dragState.startX) > 2 ||
+    Math.abs(dragState.currentY - dragState.startY) > 2
+  ) ? dragState : null;
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onDoubleClick={handleDoubleClick}
+        style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          display: 'block', cursor: 'crosshair',
+        }}
+      />
+
+      {/* Drag-to-zoom selection rectangle */}
+      {dragRect && (
+        <div
+          style={{
+            position: 'absolute',
+            left:   Math.min(dragRect.startX,   dragRect.currentX),
+            top:    Math.min(dragRect.startY,   dragRect.currentY),
+            width:  Math.abs(dragRect.currentX - dragRect.startX),
+            height: Math.abs(dragRect.currentY - dragRect.startY),
+            border: '1.5px solid rgba(255, 255, 255, 0.80)',
+            background: 'rgba(255, 255, 255, 0.07)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {/* Zoom level indicator — lower-right corner, only when zoomed in */}
+      {zoomLevel !== null && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 10,
+            right: 10,
+            padding: '2px 7px',
+            borderRadius: 4,
+            background: 'rgba(20, 15, 10, 0.55)',
+            color: 'rgba(255, 245, 230, 0.90)',
+            fontFamily: 'monospace',
+            fontSize: 11,
+            letterSpacing: '0.04em',
+            pointerEvents: 'none',
+            userSelect: 'none',
+          }}
+        >
+          {zoomLevel.toFixed(1)}×
+        </div>
+      )}
+    </>
   );
 }
+
+// ── rendering ────────────────────────────────────────────────────────────────
 
 function draw(
   canvas: HTMLCanvasElement,
@@ -60,35 +225,42 @@ function draw(
   scrubPos: number,
   dpr: number,
   showDensity: boolean,
-) {
+  viewport: Viewport | null,
+): RenderTransform {
   const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  if (!ctx) return { scale: 1, cx: 0, cy: 0, viewCX: 0, viewCY: 0 };
   const w = canvas.width, h = canvas.height;
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  // Fit hoop + design — maintain separate per-axis extents for non-square hoops
-  const hoopHalfW = hoop.widthMM / 2;
-  const hoopHalfH = hoop.heightMM / 2;
-  let extX = hoopHalfW + 6;
-  let extY = hoopHalfH + 6;
-  if (design.stats) {
-    const neededX = Math.max(Math.abs(design.stats.minX), Math.abs(design.stats.maxX));
-    const neededY = Math.max(Math.abs(design.stats.minY), Math.abs(design.stats.maxY));
-    extX = Math.max(extX, neededX + 6);
-    extY = Math.max(extY, neededY + 6);
-  }
-  const scale = Math.min(w / (2 * extX), h / (2 * extY));
-  const cx = w / 2, cy = h / 2;
-  const X = (mx: number) => cx + mx * scale;
-  const Y = (my: number) => cy - my * scale; // y-up in mm
+  // Auto-fit scale (shared logic with computeAutoFitScale helper)
+  const autoFitScale = computeAutoFitScale(w, h, design, hoop);
 
-  drawHoop(ctx, hoop, scale, cx, cy, w, h);
+  // Active scale and viewport center
+  let scale: number;
+  let viewCX: number;
+  let viewCY: number;
+
+  if (viewport) {
+    scale  = Math.min(w / (2 * viewport.halfW), h / (2 * viewport.halfH));
+    viewCX = viewport.centerX;
+    viewCY = viewport.centerY;
+  } else {
+    scale  = autoFitScale;
+    viewCX = 0;
+    viewCY = 0;
+  }
+
+  const cx = w / 2, cy = h / 2;
+  const X = (mx: number) => cx + (mx - viewCX) * scale;
+  const Y = (my: number) => cy - (my - viewCY) * scale; // y-up in mm
+
+  drawHoop(ctx, hoop, scale, cx, cy, viewCX, viewCY, w, h);
 
   const pts = design.pts;
   const upto = Math.min(pts.length, scrubPos || 0);
-  if (pts.length === 0) return;
+  if (pts.length === 0) return { scale, cx, cy, viewCX, viewCY };
 
   // Jumps (under the thread)
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -99,14 +271,13 @@ function draw(
   for (let i = 1; i < upto; i++) {
     if (pts[i].t === 'jump') {
       ctx.moveTo(X(pts[i - 1].x), Y(pts[i - 1].y));
-      ctx.lineTo(X(pts[i].x), Y(pts[i].y));
+      ctx.lineTo(X(pts[i].x),     Y(pts[i].y));
     }
   }
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Thread, batched per colour/underlay run. Underlay (u) is drawn thinner
-  // and lighter so the construction shows through the topping.
+  // Thread, batched per colour/underlay run
   const tw = Math.max(1.1 * dpr, Math.min(0.45 * scale, 4.5 * dpr));
   let runColor: number | null = null;
   let runU = false;
@@ -130,7 +301,7 @@ function draw(
   if (runColor !== null) ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Needle penetration points when zoomed in
+  // Needle penetration points (visible when zoomed enough)
   if (scale > 2.4 * dpr) {
     ctx.fillStyle = 'rgba(40,30,20,0.45)';
     const r = Math.max(0.8 * dpr, 0.09 * scale);
@@ -142,7 +313,7 @@ function draw(
     }
   }
 
-  // Density heatmap overlay (thread coverage in layers)
+  // Density heatmap overlay
   if (showDensity && design.density) {
     const { cellMM, cells } = design.density;
     for (const c of cells) {
@@ -167,7 +338,7 @@ function draw(
     ctx.stroke();
   }
 
-  // Debug pins from the `mark` command (render-only, never exported)
+  // Debug pins from the `mark` command
   const visibleMarks = design.marks.filter(mk => mk.at <= upto);
   if (visibleMarks.length) {
     const r = 6 * dpr;
@@ -187,43 +358,67 @@ function draw(
       ctx.fillText(String(i + 1), mx, my + 0.5 * dpr);
     });
   }
+
+  return { scale, cx, cy, viewCX, viewCY };
 }
 
-// Draws the hoop as a flat, minimalistic overlay:
-//   – outside the hoop: slight dark tint so the embroiderable area reads clearly
-//   – hoop edge: thin warm border line
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+/** Auto-fit scale in physical px/mm — used by draw() and the render-time zoom
+ *  level indicator so both always agree without a stale-ref round-trip. */
+function computeAutoFitScale(w: number, h: number, design: DesignState, hoop: HoopConfig): number {
+  const hoopHalfW = hoop.widthMM / 2;
+  const hoopHalfH = hoop.heightMM / 2;
+  let extX = hoopHalfW + 6;
+  let extY = hoopHalfH + 6;
+  if (design.stats) {
+    const neededX = Math.max(Math.abs(design.stats.minX), Math.abs(design.stats.maxX));
+    const neededY = Math.max(Math.abs(design.stats.minY), Math.abs(design.stats.maxY));
+    extX = Math.max(extX, neededX + 6);
+    extY = Math.max(extY, neededY + 6);
+  }
+  return Math.min(w / (2 * extX), h / (2 * extY));
+}
+
+// ── hoop rendering ───────────────────────────────────────────────────────────
+
 function drawHoop(
   ctx: CanvasRenderingContext2D,
   hoop: HoopConfig,
   scale: number,
   cx: number,
   cy: number,
+  viewCX: number,
+  viewCY: number,
   canvasW: number,
   canvasH: number,
 ) {
-  const rx = (hoop.widthMM / 2) * scale;
+  const rx = (hoop.widthMM  / 2) * scale;
   const ry = (hoop.heightMM / 2) * scale;
 
-  // --- dark overlay outside the hoop using even-odd fill ---
+  // Hoop center in canvas-pixel space (may be off-center when zoomed)
+  const hcx = cx + (0 - viewCX) * scale;
+  const hcy = cy - (0 - viewCY) * scale;
+
+  // Dark overlay outside the hoop (even-odd fill)
   ctx.save();
   ctx.fillStyle = 'rgba(8, 6, 4, 0.1)';
   ctx.beginPath();
-  ctx.rect(0, 0, canvasW, canvasH);          // outer rectangle (whole canvas)
-  addHoopPath(ctx, hoop, rx, ry, cx, cy, scale);  // inner hoop shape (creates the hole)
+  ctx.rect(0, 0, canvasW, canvasH);
+  addHoopPath(ctx, hoop, rx, ry, hcx, hcy, scale);
   ctx.fill('evenodd');
   ctx.restore();
 
-  // --- hoop boundary line ---
+  // Hoop boundary line
   ctx.save();
   ctx.beginPath();
-  addHoopPath(ctx, hoop, rx, ry, cx, cy, scale);
+  addHoopPath(ctx, hoop, rx, ry, hcx, hcy, scale);
   ctx.strokeStyle = 'rgba(90, 75, 55, 0.55)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
 }
 
-// Adds the hoop shape as a canvas sub-path (no stroke/fill — caller decides).
 function addHoopPath(
   ctx: CanvasRenderingContext2D,
   hoop: HoopConfig,
@@ -238,18 +433,17 @@ function addHoopPath(
   } else if (hoop.shape === 'oval') {
     ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   } else {
-    // Rectangle with gently rounded corners proportional to the hoop size
     const r = Math.min(5 * scale, rx * 0.12, ry * 0.12);
     const x = cx - rx, y = cy - ry, w = rx * 2, h = ry * 2;
     ctx.moveTo(x + r, y);
     ctx.lineTo(x + w - r, y);
-    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.arcTo(x + w, y,       x + w, y + r,     r);
     ctx.lineTo(x + w, y + h - r);
-    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.arcTo(x + w, y + h,   x + w - r, y + h, r);
     ctx.lineTo(x + r, y + h);
-    ctx.arcTo(x, y + h, x, y + h - r, r);
-    ctx.lineTo(x, y + r);
-    ctx.arcTo(x, y, x + r, y, r);
+    ctx.arcTo(x,     y + h,   x,     y + h - r, r);
+    ctx.lineTo(x,     y + r);
+    ctx.arcTo(x,     y,       x + r, y,          r);
     ctx.closePath();
   }
 }
