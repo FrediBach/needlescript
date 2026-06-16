@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // ── JSONBin.io config ──────────────────────────────────────────────────────
 const JSONBIN_BASE = 'https://api.jsonbin.io/v3';
+const MASTER_KEY = process.env.JSON_BIN_MASTER_KEY;
 const API_KEY = process.env.JSON_BIN_API_KEY;
 const COLLECTION_ID = process.env.JSON_BIN_COLLECTION_ID;
 
@@ -49,7 +50,7 @@ async function readBody(req: VercelRequest): Promise<unknown> {
 // Body: { source: string }
 // Returns: { id: string }
 async function handleCreate(req: VercelRequest, res: VercelResponse) {
-  if (!API_KEY || !COLLECTION_ID) {
+  if (!API_KEY || !COLLECTION_ID || !MASTER_KEY) {
     return res.status(500).json({ error: 'Share service not configured' });
   }
 
@@ -84,7 +85,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Master-Key': API_KEY,
+      'X-Master-Key': MASTER_KEY,
       'X-Collection-Id': COLLECTION_ID,
       'X-Bin-Private': 'false',
     },
