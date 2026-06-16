@@ -153,11 +153,9 @@ export default function Header({
         {Object.keys(EXAMPLES).map(k => (
           <option key={k} value={k}>{shortName(k)}</option>
         ))}
-        <optgroup label="gallery">
-          {Object.keys(GALLERY_EXAMPLES).map(k => (
-            <option key={k} value={k}>{k}</option>
-          ))}
-        </optgroup>
+        {Object.keys(GALLERY_EXAMPLES).map(k => (
+          <option key={k} value={k}>{k}</option>
+        ))}
       </select>
 
       <button type="button" className={styles.runBtn} onClick={onRun}>

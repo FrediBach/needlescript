@@ -1,0 +1,258 @@
+// ============================================================
+//  LINE SAMPLER  —  12 decorative stitch treatments
+//
+//  A stack of sample lines, each a different way to draw a
+//  "line" in thread. Two ideas are combined:
+//    * STITCH MODES the engine provides — running, bean (bold,
+//      multi-pass), satin (a zigzag ribbon of some width),
+//      blanket/estitch (prongs along one side);
+//    * PATH SHAPES we build ourselves — sine waves, zigzags,
+//      spikes, loops, figure-eight braids, scallops.
+//  The interesting ones come from crossing the two: satin
+//  following a wave is a flowing ribbon; bean on a zigzag is a
+//  bold chevron; and so on.
+//
+//  Each row is centred on its own baseline and spans the hoop.
+// ============================================================
+
+// --- layout ---
+let HW     = 26        // half-width of each line, mm (line spans -HW..+HW)
+let ytop   = 33        // top baseline, mm
+let rows   = 12        // number of sample rows
+let stitch = 1.8
+
+seed 7
+stitchlen stitch
+
+// vertical spacing between baselines
+let dy = (ytop * 2) / (rows - 1)
+
+
+// ------------------------------------------------------------
+//  one straight stitched segment (used by the path builders).
+//  Respects the current stitch mode (running / bean / satin…).
+// ------------------------------------------------------------
+def seg(ax, ay, bx, by) [
+  up
+  setpos([ax, ay])
+  down
+  setpos([bx, by])
+]
+
+// Walk a continuous path by sampling a shape function. We sew the
+// whole polyline with one pen-down so the active mode (satin, bean)
+// applies along its length. Each builder lifts the pen, moves to the
+// start, drops it, then steps along.
+
+
+// ------------------------------------------------------------
+//  STRAIGHT line on baseline y
+// ------------------------------------------------------------
+def line_straight(y) [
+  up
+  setpos([-HW, y])
+  down
+  setpos([HW, y])
+]
+
+// ------------------------------------------------------------
+//  SINE wave: amplitude `amp`, `cycles` full periods
+// ------------------------------------------------------------
+def line_sine(y, amp, cycles) [
+  let n = 48
+  up
+  setpos([-HW, y])
+  down
+  for i = 1 to n [
+    let x = -HW + 2 * HW * i / n
+    let yy = y + amp * sin(cycles * 360 * (i / n))
+    setpos([x, yy])
+  ]
+]
+
+// ------------------------------------------------------------
+//  ZIGZAG: `teeth` up-down peaks of amplitude `amp`
+// ------------------------------------------------------------
+def line_zigzag(y, amp, teeth) [
+  let pts = teeth * 2
+  up
+  setpos([-HW, y])
+  down
+  for k = 1 to pts [
+    let x = -HW + 2 * HW * k / pts
+    let up_down = amp
+    if mod(k, 2) == 0 [ up_down = -amp ]
+    setpos([x, y + up_down])
+  ]
+]
+
+// ------------------------------------------------------------
+//  SPIKES: sawtooth — up to a point, straight back down to baseline
+// ------------------------------------------------------------
+def line_spikes(y, amp, count) [
+  up
+  setpos([-HW, y])
+  down
+  for k = 0 to count - 1 [
+    let xm = -HW + 2 * HW * (k + 0.5) / count
+    let x1 = -HW + 2 * HW * (k + 1) / count
+    setpos([xm, y + amp])
+    setpos([x1, y])
+  ]
+]
+
+// ------------------------------------------------------------
+//  LOOP-DE-LOOP: a curtate cycloid that curls into loops
+// ------------------------------------------------------------
+def line_loops(y, r, count) [
+  let n = 120
+  up
+  setpos([-HW + r * sin(0), y + r - r * cos(0)])
+  down
+  for i = 1 to n [
+    let t = count * 360 * (i / n)
+    let x = -HW + 2 * HW * i / n + r * sin(t)
+    let yy = y + r - r * cos(t)
+    setpos([x, yy])
+  ]
+]
+
+// ------------------------------------------------------------
+//  FIGURE-8 BRAID: two sine strands a half-cycle out of phase
+// ------------------------------------------------------------
+def line_braid(y, amp, cycles) [
+  let n = 48
+  // strand A
+  up
+  setpos([-HW, y])
+  down
+  for i = 1 to n [
+    let xa = -HW + 2 * HW * i / n
+    setpos([xa, y + amp * sin(cycles * 360 * (i / n))])
+  ]
+  // strand B (phase + 180)
+  up
+  setpos([-HW, y])
+  down
+  for i = 1 to n [
+    let xb = -HW + 2 * HW * i / n
+    setpos([xb, y + amp * sin(cycles * 360 * (i / n) + 180)])
+  ]
+]
+
+// ------------------------------------------------------------
+//  SCALLOPS: a row of half-circle arcs sitting on the baseline
+// ------------------------------------------------------------
+def line_scallops(y, count) [
+  let rr = HW / count
+  for k = 0 to count - 1 [
+    let xm = -HW + 2 * HW * (k + 0.5) / count
+    // half circle from left to right, bulging up
+    up
+    setpos([xm - rr, y])
+    down
+    let m = 12
+    for i = 1 to m [
+      let a = 180 - 180 * (i / m)          // 180° -> 0°
+      setpos([xm + rr * cos(a), y + rr * sin(a)])
+    ]
+  ]
+]
+
+// ------------------------------------------------------------
+//  DASHED: short stitched dashes with gaps (pen up between)
+// ------------------------------------------------------------
+def line_dashed(y, dashlen, gaplen) [
+  let x = -HW
+  while x < HW [
+    let x2 = x + dashlen
+    if x2 > HW [ x2 = HW ]
+    up
+    setpos([x, y])
+    down
+    setpos([x2, y])
+    x = x2 + gaplen
+  ]
+]
+
+// ------------------------------------------------------------
+//  TAPERED SATIN: a straight line whose satin width grows then
+//  shrinks, sewn as short segments each at its own width.
+// ------------------------------------------------------------
+def line_satin_taper(y, wmin, wmax) [
+  let n = 16
+  for i = 0 to n - 1 [
+    let x0 = -HW + 2 * HW * i / n
+    let x1 = -HW + 2 * HW * (i + 1) / n
+    // width follows a sine hump: 0 at ends, max in the middle
+    let f = sin(180 * ((i + 0.5) / n))
+    satin wmin + (wmax - wmin) * f
+    seg(x0, y, x1, y)
+  ]
+  satin 0
+]
+
+
+// ============================================================
+//  draw the sampler — one row per treatment
+//  baseline of row r:  y = ytop - r * dy
+// ============================================================
+color 1
+
+// row 0 — plain running stitch
+line_straight(ytop - 0 * dy)
+trim
+
+// row 1 — bean (bold, each stitch tripled)
+bean 3
+line_straight(ytop - 1 * dy)
+bean 1
+trim
+
+// row 2 — satin ribbon, fixed width
+satin 3
+line_straight(ytop - 2 * dy)
+satin 0
+trim
+
+// row 3 — tapered satin (width swells in the middle)
+line_satin_taper(ytop - 3 * dy, 0.8, 3.5)
+trim
+
+// row 4 — blanket / estitch (prongs along one side)
+estitch 2.2
+line_straight(ytop - 4 * dy)
+estitch 0
+trim
+
+// row 5 — sine wave sewn as a satin ribbon (a flowing band)
+satin 2
+line_sine(ytop - 5 * dy, 1.3, 5)
+satin 0
+trim
+
+// row 6 — zigzag in bean stitch (bold chevron)
+bean 3
+line_zigzag(ytop - 6 * dy, 2.0, 8)
+bean 1
+trim
+
+// row 7 — spikes (sawtooth)
+line_spikes(ytop - 7 * dy, 2.6, 13)
+trim
+
+// row 8 — loop-de-loop
+line_loops(ytop - 8 * dy, 1.8, 9)
+trim
+
+// row 9 — figure-8 braid (two interwoven strands)
+line_braid(ytop - 9 * dy, 1.8, 6)
+trim
+
+// row 10 — scallops (arc edging)
+line_scallops(ytop - 10 * dy, 9)
+trim
+
+// row 11 — dashed line
+line_dashed(ytop - 11 * dy, 3, 2)
+trim

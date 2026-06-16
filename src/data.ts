@@ -5,6 +5,9 @@ import meanderRaw       from '../examples/meandering-spiral.ns?raw';
 import snowflakeRaw     from '../examples/snowflake.ns?raw';
 import orbitsRaw        from '../examples/threaded-orbits.ns?raw';
 import waveformsRaw     from '../examples/waveforms.ns?raw';
+import fillRaw          from '../examples/fill.ns?raw';
+import linesRaw         from '../examples/lines.ns?raw';
+import vennRaw          from '../examples/venn.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -406,4 +409,7 @@ export const GALLERY_EXAMPLES: Record<string, string> = {
   'snowflake':  snowflakeRaw,
   'orbits':     orbitsRaw,
   'waveforms':  waveformsRaw,
+  'fill':       fillRaw,
+  'lines':      linesRaw,
+  'venn':       vennRaw,
 };

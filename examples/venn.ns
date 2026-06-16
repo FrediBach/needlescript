@@ -1,0 +1,102 @@
+// ============================================================
+//  VENN DIAGRAM  —  fills that combine where circles meet
+//
+//  Three overlapping circles, each hatched in its own direction.
+//  We DON'T compute the overlap regions — we just hatch each
+//  whole circle and let the stitches interfere on the fabric.
+//  Where two circles cross, both hatch directions are physically
+//  present, so it reads as a cross-hatch; where all three cross,
+//  all three directions weave together. The set logic emerges
+//  from superposition, for free.
+//
+//  (An earlier version of this carved each of the seven regions
+//  analytically with line–circle interval clipping. It produced
+//  exactly this picture with ten times the code — the overlap is
+//  already a physical fact, so there's nothing to reconstruct.)
+// ============================================================
+
+// --- geometry ---
+let r   = 20       // circle radius, mm
+let off = 11       // how far each centre sits from the middle, mm
+                   //   smaller off = more overlap; larger = circles drift apart
+
+// --- fill ---
+let gap = 2.2      // hatch line spacing, mm (larger = sparser = lower density)
+let stitch = 2.0
+
+seed 7
+stitchlen stitch
+maxdensity 5       // the triple-overlap centre stacks three hatch directions and
+                   //   runs ~4.6 layers — that density IS the design's focal point.
+                   //   Raise the warn threshold above it. (Sew on denim/canvas, or
+                   //   widen `gap`, if you want the centre lighter for real fabric.)
+
+// the three circle centres, at 90°, 210°, 330° around the origin
+let CX = [ off * cos(90), off * cos(210), off * cos(330) ]
+let CY = [ off * sin(90), off * sin(210), off * sin(330) ]
+
+
+// ------------------------------------------------------------
+//  one straight stitched segment.
+// ------------------------------------------------------------
+def seg(ax, ay, bx, by) [
+  up
+  setpos([ax, ay])
+  down
+  setpos([bx, by])
+]
+
+// ------------------------------------------------------------
+//  hatch the whole of circle `ci` with parallel lines at `angle`.
+//  For each swept line we find where it enters and exits the
+//  circle (a quadratic) and sew just that chord. Lines that miss
+//  the circle contribute nothing. Three of these, at different
+//  angles, give the whole Venn — the overlaps take care of
+//  themselves.
+// ------------------------------------------------------------
+def hatch_circle(ci, angle) [
+  let cx = CX[ci]
+  let cy = CY[ci]
+  let dx = cos(angle)              // direction along the hatch lines
+  let dy = sin(angle)
+  let nx = cos(angle + 90)         // perpendicular (sweep) direction
+  let ny = sin(angle + 90)
+
+  // sweep the offset from one edge of the circle to the other
+  let d = 0 - r
+  while d < r [
+    // a point on this line, offset d from the circle's centre
+    let lx = cx + nx * d
+    let ly = cy + ny * d
+    // half-chord length at this offset: sqrt(r^2 - d^2)
+    // (guard the sqrt; d is always within (-r, r) so it stays positive)
+    let h = sqrt(max(0, r * r - d * d))
+    seg(lx - dx * h, ly - dy * h, lx + dx * h, ly + dy * h)
+    d += gap
+  ]
+]
+
+
+// ============================================================
+//  draw
+//  Circle A = 0°, B = 60°, C = 120°. Overlaps combine on their own.
+// ============================================================
+color 1
+
+hatch_circle(0, 0)       // A — horizontal
+hatch_circle(1, 120)      // B — first diagonal
+hatch_circle(2, 240)     // C — second diagonal
+trim
+
+// the three circle outlines on top, each one clean ring
+for ci = 0 to 2 [
+  up
+  setpos([CX[ci] + r, CY[ci]])
+  down
+  let n = 160
+  for i = 1 to n [
+    let ang = i / n * 360
+    setpos([CX[ci] + r * cos(ang), CY[ci] + r * sin(ang)])
+  ]
+]
+trim

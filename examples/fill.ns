@@ -1,0 +1,352 @@
+// ============================================================
+//  FILL-PATTERN SAMPLER  —  9 x 9 = 81 custom fills
+//
+//  A grid of 81 squares, each filled with a different stitched
+//  texture built from scratch (no built-in tatami fill). Each
+//  row is a pattern FAMILY; across the nine columns a parameter
+//  varies — angle, density, turn count, frequency — so every
+//  one of the 81 cells reads differently.
+//
+//  Rows, top to bottom:
+//    0  hatching at nine angles
+//    1  cross-hatch, varying density
+//    2  concentric squares, 3..9 rings
+//    3  spirals, 2..8 turns
+//    4  zigzag, 4..9 rows
+//    5  cross-dots, 3..8 grid
+//    6  sine waves, 1..5 cycles
+//    7  diamonds / radial bursts, varying count
+//    8  basket-weave, varying block count
+// ============================================================
+
+// --- layout ---
+let GRID   = 9         // 9 x 9
+let margin = 0.96      // shrink so the square grid clears the round hoop
+let inset  = 0.12      // blank border inside each cell (fraction of cell)
+
+// --- quality ---
+let stitch = 1.8
+seed 7
+stitchlen stitch
+
+
+// ------------------------------------------------------------
+//  fit: the square grid's corner must sit inside radius ~44.
+//  half-diagonal = (GRID * cell / 2) * sqrt(2)  <=  44
+// ------------------------------------------------------------
+let cell = (44 * 2) / (GRID * 1.4142) * margin
+let g0 = -cell * GRID / 2     // bottom-left corner of the whole grid, mm
+
+
+// ------------------------------------------------------------
+//  one straight stitched segment between two absolute points.
+//  Needle up to travel, down to sew.
+// ------------------------------------------------------------
+def seg(ax, ay, bx, by) [
+  up
+  setpos([ax, ay])
+  down
+  setpos([bx, by])
+]
+
+// Cells are addressed by their bottom-left corner (cxmm, cymm) and span `cell`.
+// Pattern procedures receive that corner plus the usable interior (after inset),
+// working in interior coordinates 0..s on each axis, where s = cell * (1 - 2*inset).
+
+
+// ============================================================
+//  PATTERN FAMILIES
+//  Each fills the cell at corner (px, py) with side `s`,
+//  where the interior origin is offset by `pad` on each axis.
+// ============================================================
+
+// --- parallel hatching at a given angle (degrees) ---
+def pat_hatch(px, py, s, pad, angle, gap) [
+  // step a sweep line across the cell; for each, clip to the square.
+  // Implement by walking offsets and drawing the chord where it crosses.
+  // Simpler robust approach: rotate a dense set of parallel segments and
+  // clip against the axis-aligned square analytically is heavy; instead we
+  // draw lines by scanning one axis and intersecting the slanted line.
+  let ox = px + pad
+  let oy = py + pad
+  // direction of the lines
+  let dx = cos(angle)
+  let dy = sin(angle)
+  // perpendicular (offset) direction
+  let nx = cos(angle + 90)
+  let ny = sin(angle + 90)
+  // sweep offset from -s..s in gap steps; center the family on the cell middle
+  let cxm = ox + s / 2
+  let cym = oy + s / 2
+  let d = -s
+  while d < s [
+    // a point on this line
+    let lx = cxm + nx * d
+    let ly = cym + ny * d
+    // find where the line (through (lx,ly) dir (dx,dy)) enters/exits the square
+    // by clipping parameter t against the four edges, robustly.
+    drawclip(ox, oy, s, lx, ly, dx, dy)
+    d += gap
+  ]
+]
+
+// Clip the infinite line {(lx,ly) + t (dx,dy)} to square [ox,ox+s] x [oy,oy+s]
+// and sew the contained chord, if any. Liang-Barsky style.
+def drawclip(ox, oy, s, lx, ly, dx, dy) [
+  // we collect the parametric interval [t0,t1]
+  let t0 = -100000
+  let t1 = 100000
+  // x in [ox, ox+s]
+  if dx > 0.000001 or dx < -0.000001 [
+    let xa = (ox - lx) / dx
+    let xb = (ox + s - lx) / dx
+    let xlo = min(xa, xb)
+    let xhi = max(xa, xb)
+    if xlo > t0 [ t0 = xlo ]
+    if xhi < t1 [ t1 = xhi ]
+  ]
+  // y in [oy, oy+s]
+  if dy > 0.000001 or dy < -0.000001 [
+    let ya = (oy - ly) / dy
+    let yb = (oy + s - ly) / dy
+    let ylo = min(ya, yb)
+    let yhi = max(ya, yb)
+    if ylo > t0 [ t0 = ylo ]
+    if yhi < t1 [ t1 = yhi ]
+  ]
+  if t1 > t0 [
+    seg(lx + dx * t0, ly + dy * t0, lx + dx * t1, ly + dy * t1)
+  ]
+]
+
+// --- cross-hatch: two perpendicular hatch families ---
+def pat_cross(px, py, s, pad, angle, gap) [
+  pat_hatch(px, py, s, pad, angle, gap)
+  pat_hatch(px, py, s, pad, angle + 90, gap)
+]
+
+// --- concentric squares: n nested rings ---
+def pat_concentric(px, py, s, pad, n) [
+  let ox = px + pad
+  let oy = py + pad
+  let cxm = ox + s / 2
+  let cym = oy + s / 2
+  for i = 1 to n [
+    let r = (i / (n + 1)) * (s / 2)
+    // four sides of the ring
+    seg(cxm - r, cym - r, cxm + r, cym - r)
+    seg(cxm + r, cym - r, cxm + r, cym + r)
+    seg(cxm + r, cym + r, cxm - r, cym + r)
+    seg(cxm - r, cym + r, cxm - r, cym - r)
+  ]
+]
+
+// --- spiral: an Archimedean spiral of `turns` revolutions ---
+def pat_spiral(px, py, s, pad, turns) [
+  let ox = px + pad
+  let oy = py + pad
+  let cxm = ox + s / 2
+  let cym = oy + s / 2
+  let rmax = s / 2
+  let steps = turns * 24
+  up
+  setpos([cxm, cym])
+  down
+  for i = 1 to steps [
+    let t = i / steps
+    let r = rmax * t
+    let ang = turns * 360 * t
+    setpos([cxm + r * cos(ang), cym + r * sin(ang)])
+  ]
+]
+
+// --- zigzag: `rows` horizontal zigzag lines ---
+def pat_zigzag(px, py, s, pad, rows) [
+  let ox = px + pad
+  let oy = py + pad
+  let cols = 8
+  let amp = (s / rows) * 0.4
+  for r = 0 to rows - 1 [
+    let y = oy + (r + 0.5) / rows * s
+    up
+    setpos([ox, y])
+    down
+    for c = 1 to cols [
+      let x = ox + c / cols * s
+      let up_or_down = amp
+      if mod(c, 2) == 0 [ up_or_down = -amp ]
+      setpos([x, y + up_or_down])
+    ]
+  ]
+]
+
+// --- cross-dots: an n x n grid of little plus marks ---
+def pat_dots(px, py, s, pad, n) [
+  let ox = px + pad
+  let oy = py + pad
+  let r = (s / n) * 0.22
+  for i = 0 to n - 1 [
+    for j = 0 to n - 1 [
+      let x = ox + (i + 0.5) / n * s
+      let y = oy + (j + 0.5) / n * s
+      seg(x - r, y, x + r, y)
+      seg(x, y - r, x, y + r)
+    ]
+  ]
+]
+
+// --- sine waves: `rows` wavy lines with `cycles` periods ---
+def pat_wave(px, py, s, pad, rows, cycles) [
+  let ox = px + pad
+  let oy = py + pad
+  let amp = (s / rows) * 0.35
+  let nseg = 24
+  for r = 0 to rows - 1 [
+    let y = oy + (r + 0.5) / rows * s
+    up
+    setpos([ox, y])
+    down
+    for c = 1 to nseg [
+      let x = ox + c / nseg * s
+      let yy = y + amp * sin(cycles * 360 * (c / nseg))
+      setpos([x, yy])
+    ]
+  ]
+]
+
+// --- diamonds: n nested diamonds (rotated squares) ---
+def pat_diamond(px, py, s, pad, n) [
+  let ox = px + pad
+  let oy = py + pad
+  let cxm = ox + s / 2
+  let cym = oy + s / 2
+  for i = 1 to n [
+    let r = (i / (n + 1)) * (s / 2)
+    seg(cxm, cym - r, cxm + r, cym)
+    seg(cxm + r, cym, cxm, cym + r)
+    seg(cxm, cym + r, cxm - r, cym)
+    seg(cxm - r, cym, cxm, cym - r)
+  ]
+]
+
+// --- radial burst: n spokes from the centre ---
+def pat_radial(px, py, s, pad, n) [
+  let ox = px + pad
+  let oy = py + pad
+  let cxm = ox + s / 2
+  let cym = oy + s / 2
+  let r = s / 2
+  for k = 0 to n - 1 [
+    let ang = 360 * k / n
+    seg(cxm, cym, cxm + r * cos(ang), cym + r * sin(ang))
+  ]
+]
+
+// --- basket-weave: alternating blocks of horizontal / vertical lines ---
+def pat_basket(px, py, s, pad, n) [
+  let ox = px + pad
+  let oy = py + pad
+  let bs = s / n          // block size
+  for i = 0 to n - 1 [
+    for j = 0 to n - 1 [
+      let bx = ox + i * bs
+      let by = oy + j * bs
+      // horizontal block if (i+j) even, else vertical
+      if mod(i + j, 2) == 0 [
+        let kh = 1
+        while kh <= 3 [
+          let yy = by + kh / 4 * bs
+          seg(bx, yy, bx + bs, yy)
+          kh += 1
+        ]
+      ] else [
+        let kv = 1
+        while kv <= 3 [
+          let xx = bx + kv / 4 * bs
+          seg(xx, by, xx, by + bs)
+          kv += 1
+        ]
+      ]
+    ]
+  ]
+]
+
+
+// ============================================================
+//  DISPATCH: fill the cell at (row, col) with its pattern.
+//  row picks the family; col (0..8) varies the parameter.
+// ============================================================
+def fill_cell(row, col, px, py) [
+  let pad = cell * inset
+  let s = cell * (1 - 2 * inset)
+
+  // row 0: hatching at nine angles
+  if row == 0 [
+    let angles = [0, 20, 40, 60, 90, 110, 135, 160, 75]
+    pat_hatch(px, py, s, pad, angles[col], cell * 0.16)
+  ]
+  // row 1: cross-hatch, density varies with column
+  if row == 1 [
+    let a = col * 10
+    pat_cross(px, py, s, pad, a, cell * (0.14 + 0.03 * mod(col, 3)))
+  ]
+  // row 2: concentric squares, 3..9 rings
+  if row == 2 [
+    pat_concentric(px, py, s, pad, col + 3)
+  ]
+  // row 3: spirals, 2..8 turns
+  if row == 3 [
+    pat_spiral(px, py, s, pad, col + 2)
+  ]
+  // row 4: zigzag, 4..9 rows
+  if row == 4 [
+    pat_zigzag(px, py, s, pad, col + 4)
+  ]
+  // row 5: cross-dots, 3..8 grid (cap so they stay legible)
+  if row == 5 [
+    let nd = col + 3
+    if nd > 8 [ nd = 8 ]
+    pat_dots(px, py, s, pad, nd)
+  ]
+  // row 6: sine waves, 1..5 cycles over a fixed row count
+  if row == 6 [
+    let cyc = mod(col, 5) + 1
+    pat_wave(px, py, s, pad, 6, cyc)
+  ]
+  // row 7: diamonds (cols 0-4) then radial bursts (cols 5-8)
+  if row == 7 [
+    if col < 5 [
+      pat_diamond(px, py, s, pad, col + 3)
+    ] else [
+      pat_radial(px, py, s, pad, (col - 4) * 5 + 3)
+    ]
+  ]
+  // row 8: basket-weave, 2..5 blocks (repeating)
+  if row == 8 [
+    pat_basket(px, py, s, pad, mod(col, 4) + 2)
+  ]
+]
+
+
+// ============================================================
+//  draw everything
+// ============================================================
+color 1
+
+// the 81 filled cells
+for row = 0 to GRID - 1 [
+  for col = 0 to GRID - 1 [
+    let px = g0 + col * cell
+    let py = g0 + row * cell
+    fill_cell(row, col, px, py)
+    trim
+  ]
+]
+
+// the grid lines on top, as clean continuous passes
+for i = 0 to GRID [
+  let t = g0 + i * cell
+  seg(g0, t, g0 + GRID * cell, t)        // horizontal line i
+  seg(t, g0, t, g0 + GRID * cell)        // vertical line i
+]
+trim
