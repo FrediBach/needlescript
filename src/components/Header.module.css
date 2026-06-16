@@ -212,6 +212,8 @@ kbd {
   padding: 7px 11px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
+  width: 80px;
+  text-align: center;
 }
 
 .shareBtn:hover {
