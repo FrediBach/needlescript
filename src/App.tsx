@@ -86,6 +86,7 @@ export default function App() {
   const [program, dispatch] = useReducer(programReducer, { design: INITIAL_DESIGN, messages: [], scrubPos: 0 });
   const { design, messages, scrubPos } = program;
   const svgFileRef = useRef<HTMLInputElement>(null);
+  const shareLoadedRef = useRef(false);
 
   // ── Horizontal panel split ────────────────────────────────────────
   // leftWidth is in pixels; default ≈ 44 % of the viewport on first render.
@@ -293,12 +294,55 @@ export default function App() {
     }
   }, [importSVGText]);
 
+  // ── Share: load from ?share=<binId> on mount ─────────────────────────────
+  useEffect(() => {
+    if (shareLoadedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get('share');
+    if (!shareId) return;
+    shareLoadedRef.current = true;
+    addMsg('loading shared snippet…', 'info');
+    fetch(`/api/share?id=${encodeURIComponent(shareId)}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then((data: { source: string }) => {
+        setSource(data.source);
+        runProgram(data.source, 'shared');
+      })
+      .catch(err => {
+        addMsg(`could not load share: ${err instanceof Error ? err.message : err}`, 'err');
+        // Fall back to default example
+        runProgram(EXAMPLES[firstKey], 'bloom');
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Share: create a share URL and copy it to the clipboard ───────────────
+  const handleShare = useCallback(async (): Promise<void> => {
+    const res = await fetch('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
+    }
+    const { id } = await res.json() as { id: string };
+    const url = `${window.location.origin}/?share=${id}`;
+    await navigator.clipboard.writeText(url);
+  }, [source]);
+
   // Kick off initial render
   const initialised = useRef(false);
   if (!initialised.current) {
     initialised.current = true;
-    // Run on first paint via a microtask so state is settled
-    Promise.resolve().then(() => runProgram(EXAMPLES[firstKey], 'bloom'));
+    // Only run the default example if there's no ?share= param —
+    // the share effect above handles that case.
+    const hasShare = new URLSearchParams(window.location.search).has('share');
+    if (!hasShare) {
+      // Run on first paint via a microtask so state is settled
+      Promise.resolve().then(() => runProgram(EXAMPLES[firstKey], 'bloom'));
+    }
   }
 
   // Source line currently sewing (only meaningful while scrubbed back / playing)
@@ -322,6 +366,7 @@ export default function App() {
         onExampleSelect={handleExampleSelect}
         onRun={handleRun}
         onDownload={handleDownload}
+        onShare={handleShare}
         onOpenReference={() => setShowReference(true)}
       />
 

@@ -13,6 +13,7 @@ interface Props {
   onExampleSelect: (key: string) => void;
   onRun: () => void;
   onDownload: (format: ExportFormat) => void;
+  onShare: () => Promise<void>;
   onOpenReference: () => void;
 }
 
@@ -112,8 +113,44 @@ function ExportDropdown({ onDownload }: { onDownload: (fmt: ExportFormat) => voi
   );
 }
 
+/** Share button — calls onShare, briefly shows "Copied!" on success, "Failed" on error. */
+function ShareButton({ onShare }: { onShare: () => Promise<void> }) {
+  const [state, setState] = useState<'idle' | 'pending' | 'copied' | 'error'>('idle');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function handleClick() {
+    if (state === 'pending') return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setState('pending');
+    try {
+      await onShare();
+      setState('copied');
+    } catch {
+      setState('error');
+    }
+    timerRef.current = setTimeout(() => setState('idle'), 2000);
+  }
+
+  const label = state === 'pending' ? '…'
+    : state === 'copied' ? 'Copied!'
+    : state === 'error'  ? 'Failed'
+    : 'Share';
+
+  return (
+    <button
+      type="button"
+      className={`${styles.shareBtn} ${state === 'copied' ? styles.shareBtnCopied : ''} ${state === 'error' ? styles.shareBtnError : ''}`}
+      onClick={handleClick}
+      disabled={state === 'pending'}
+      aria-label="Copy shareable link to clipboard"
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function Header({
-  hoop, onOpenHoopDialog, onSVGImport, onExampleSelect, onRun, onDownload, onOpenReference,
+  hoop, onOpenHoopDialog, onSVGImport, onExampleSelect, onRun, onDownload, onShare, onOpenReference,
 }: Props) {
   const selectRef = useRef<HTMLSelectElement>(null);
 
@@ -163,6 +200,8 @@ export default function Header({
       </button>
 
       <ExportDropdown onDownload={onDownload} />
+
+      <ShareButton onShare={onShare} />
 
       <button type="button" className={styles.helpBtn} onClick={onOpenReference} aria-label="Language reference">?</button>
     </header>
