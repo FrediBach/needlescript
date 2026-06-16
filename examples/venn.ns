@@ -21,7 +21,7 @@ let off = 11       // how far each centre sits from the middle, mm
                    //   smaller off = more overlap; larger = circles drift apart
 
 // --- fill ---
-let gap = 2.2      // hatch line spacing, mm (larger = sparser = lower density)
+let gap = 2.0      // hatch line spacing, mm (larger = sparser = lower density)
 let stitch = 2.0
 
 seed 7
