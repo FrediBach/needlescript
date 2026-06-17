@@ -8,6 +8,7 @@ import waveformsRaw     from '../examples/waveforms.ns?raw';
 import fillRaw          from '../examples/fill.ns?raw';
 import linesRaw         from '../examples/lines.ns?raw';
 import vennRaw          from '../examples/venn.ns?raw';
+import contourRaw       from '../examples/contour.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -412,4 +413,5 @@ export const GALLERY_EXAMPLES: Record<string, string> = {
   'fill':       fillRaw,
   'lines':      linesRaw,
   'venn':       vennRaw,
+  'contour':    contourRaw,
 };

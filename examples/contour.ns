@@ -1,0 +1,230 @@
+// ============================================================
+//  CONTOUR MAP  —  topographic lines from noise
+//
+//  A seeded fractal-noise "landscape" is sampled on a grid, and
+//  marching squares traces the elevation contours. Major contours
+//  are sewn solid; the minor contours between them are dashed,
+//  just like a real topographic map. Everything is clipped to the
+//  round hoop.
+//
+//  HILLINESS is shaped by two knobs:
+//    freq    — how many hills span the field (more = smaller,
+//              busier terrain; fewer = broad, calm hills)
+//    octaves — how rough/detailed each hill is (1 = smooth domes,
+//              up to 6 = craggy, fractal relief)
+//  And `seed` picks which landscape you get.
+// ============================================================
+
+// --- terrain ---
+let landseed = 28
+let freq    = 2.5     // hills across the field (try 1.5 calm … 4 busy)
+let octaves = 3       // roughness / detail (1..6)
+
+// --- contours ---
+let G        = 28     // sampling grid resolution (G x G). Higher = smoother
+                      //   lines but more stitches. 22–32 is a good range.
+let levels   = 7      // number of elevation contours
+let majorEvery = 2    // every Nth contour is a solid "major" line; the rest
+                      //   are dashed "minor" lines
+
+// --- look ---
+let dashlen = 1.6     // dash length on minor contours, mm
+let gaplen  = 1.3     // gap length on minor contours, mm
+let stitch  = 1.8
+let RF      = 43      // clip radius — keep contours inside the hoop, mm
+
+seed landseed
+stitchlen stitch
+
+
+// the grid spans the square [-RF, RF] x [-RF, RF]; we keep only the disc.
+let span = RF * 2
+
+
+// ------------------------------------------------------------
+//  sample the noise field once into a flat list, F[j*G + i].
+//  fbm2 = fractal Brownian motion (summed octaves of simplex
+//  noise), in roughly -1..1. We divide grid coordinates so the
+//  whole grid covers `freq` units of noise space.
+// ------------------------------------------------------------
+let F = filled(G * G, 0)
+for j = 0 to G - 1 [
+  for i = 0 to G - 1 [
+    let nx = (i / (G - 1)) * freq
+    let ny = (j / (G - 1)) * freq
+    F[(j * G) + i] = fbm2(nx, ny, octaves)
+  ]
+]
+
+// field value at grid node (i, j)
+def fval(i, j) [ return F[(j * G) + i] ]
+
+// grid node (i, j) -> mm coordinates
+def gx(i) [ return 0 - RF + (i / (G - 1)) * span ]
+def gy(j) [ return 0 - RF + (j / (G - 1)) * span ]
+
+// is a point inside the clip disc?
+def in_disc(x, y) [ return (x * x + y * y) <= (RF - 1) * (RF - 1) ]
+
+
+// ------------------------------------------------------------
+//  sew one straight segment, SOLID.
+// ------------------------------------------------------------
+def seg_solid(ax, ay, bx, by) [
+  // skip any segment that pokes outside the hoop
+  if in_disc(ax, ay) == 0 [ return ]
+  if in_disc(bx, by) == 0 [ return ]
+  up
+  setpos([ax, ay])
+  down
+  setpos([bx, by])
+]
+
+// ------------------------------------------------------------
+//  sew one straight segment, DASHED (used for minor contours).
+//  We march along the segment laying dashes of `dashlen` with
+//  `gaplen` gaps. (Each contour segment restarts the dash phase;
+//  the segments are short, so this still reads as a dashed line.)
+// ------------------------------------------------------------
+def seg_dashed(ax, ay, bx, by) [
+  if in_disc(ax, ay) == 0 [ return ]
+  if in_disc(bx, by) == 0 [ return ]
+  let L = sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay))
+  if L < 0.0001 [ return ]
+  let ux = (bx - ax) / L
+  let uy = (by - ay) / L
+  let s = 0
+  while s < L [
+    let dl = dashlen
+    if s + dl > L [ dl = L - s ]
+    seg_solid(ax + ux * s, ay + uy * s, ax + ux * (s + dl), ay + uy * (s + dl))
+    s = s + dashlen + gaplen
+  ]
+]
+
+// dispatch: draw a contour segment solid or dashed
+def emit(ax, ay, bx, by, major) [
+  if major == 1 [ seg_solid(ax, ay, bx, by) ]
+  if major == 0 [ seg_dashed(ax, ay, bx, by) ]
+]
+
+
+// ------------------------------------------------------------
+//  linear interpolation of the crossing point on an edge between
+//  two grid nodes whose values straddle `lev`.
+//  Returns the crossing as [x, y] in mm.
+// ------------------------------------------------------------
+def crossing(xa, ya, va, xb, yb, vb, lev) [
+  let denom = vb - va
+  let t = 0.5
+  if denom > 0.000001 or denom < -0.000001 [ t = (lev - va) / denom ]
+  return [ xa + (xb - xa) * t, ya + (yb - ya) * t ]
+]
+
+
+// ============================================================
+//  marching squares
+//
+//  For each cell with corners (i,j)=0 bottom-left, going CCW:
+//     0 = (i,   j  )      1 = (i+1, j  )
+//     3 = (i,   j+1)      2 = (i+1, j+1)
+//  Build a 4-bit index from which corners exceed the level, then
+//  connect the crossing points on the appropriate edges.
+//  Edges:  e0 = 0-1 (bottom), e1 = 1-2 (right),
+//          e2 = 2-3 (top),    e3 = 3-0 (left)
+// ============================================================
+def march_cell(i, j, lev, major) [
+  let x0 = gx(i)
+  let y0 = gy(j)
+  let x1 = gx(i + 1)
+  let y1 = gy(j + 1)
+
+  let v0 = fval(i, j)
+  let v1 = fval(i + 1, j)
+  let v2 = fval(i + 1, j + 1)
+  let v3 = fval(i, j + 1)
+
+  // 4-bit case index
+  let idx = 0
+  if v0 > lev [ idx = idx + 1 ]
+  if v1 > lev [ idx = idx + 2 ]
+  if v2 > lev [ idx = idx + 4 ]
+  if v3 > lev [ idx = idx + 8 ]
+
+  if idx == 0 [ return ]
+  if idx == 15 [ return ]
+
+  // crossing points on each edge (only the ones we use are needed,
+  // but computing all four keeps the logic simple and readable)
+  let e0 = crossing(x0, y0, v0, x1, y0, v1, lev)   // bottom
+  let e1 = crossing(x1, y0, v1, x1, y1, v2, lev)   // right
+  let e2 = crossing(x1, y1, v2, x0, y1, v3, lev)   // top
+  let e3 = crossing(x0, y1, v3, x0, y0, v0, lev)   // left
+
+  // connect edges per case
+  if idx == 1 [ emit(e3[0], e3[1], e0[0], e0[1], major) ]
+  if idx == 2 [ emit(e0[0], e0[1], e1[0], e1[1], major) ]
+  if idx == 3 [ emit(e3[0], e3[1], e1[0], e1[1], major) ]
+  if idx == 4 [ emit(e1[0], e1[1], e2[0], e2[1], major) ]
+  if idx == 5 [
+    emit(e3[0], e3[1], e0[0], e0[1], major)
+    emit(e1[0], e1[1], e2[0], e2[1], major)
+  ]
+  if idx == 6 [ emit(e0[0], e0[1], e2[0], e2[1], major) ]
+  if idx == 7 [ emit(e3[0], e3[1], e2[0], e2[1], major) ]
+  if idx == 8 [ emit(e2[0], e2[1], e3[0], e3[1], major) ]
+  if idx == 9 [ emit(e2[0], e2[1], e0[0], e0[1], major) ]
+  if idx == 10 [
+    emit(e0[0], e0[1], e1[0], e1[1], major)
+    emit(e2[0], e2[1], e3[0], e3[1], major)
+  ]
+  if idx == 11 [ emit(e2[0], e2[1], e1[0], e1[1], major) ]
+  if idx == 12 [ emit(e1[0], e1[1], e3[0], e3[1], major) ]
+  if idx == 13 [ emit(e1[0], e1[1], e0[0], e0[1], major) ]
+  if idx == 14 [ emit(e0[0], e0[1], e3[0], e3[1], major) ]
+]
+
+
+// ============================================================
+//  draw all the contours
+//
+//  Find the field's min/max, place `levels` evenly between them,
+//  and march each. major contours solid, minor contours dashed.
+// ============================================================
+color 1
+
+// find min and max of the sampled field
+let fmin = F[0]
+let fmax = F[0]
+for k = 0 to G * G - 1 [
+  if F[k] < fmin [ fmin = F[k] ]
+  if F[k] > fmax [ fmax = F[k] ]
+]
+// pull the extremes in slightly so the very-tip contours aren't tiny dots
+let lo = fmin + (fmax - fmin) * 0.04
+let hi = fmax - (fmax - fmin) * 0.04
+
+for n = 0 to levels - 1 [
+  let lev = lo + (hi - lo) * (n / (levels - 1))
+  // major if this level index is a multiple of majorEvery
+  let major = 0
+  if mod(n, majorEvery) == 0 [ major = 1 ]
+
+  for j = 0 to G - 2 [
+    for i = 0 to G - 2 [
+      march_cell(i, j, lev, major)
+    ]
+  ]
+  trim
+]
+
+// the hoop boundary, as one clean ring
+up
+setpos([RF, 0])
+down
+let cn = 200
+for i = 1 to cn [
+  let a = i / cn * 360
+  setpos([RF * cos(a), RF * sin(a)])
+]
+trim
