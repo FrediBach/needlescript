@@ -10,6 +10,7 @@ import linesRaw         from '../examples/lines.ns?raw';
 import vennRaw          from '../examples/venn.ns?raw';
 import contourRaw       from '../examples/contour.ns?raw';
 import spirographRaw    from '../examples/spirograph.ns?raw';
+import complexspirographRaw    from '../examples/complex-spirograph.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -416,4 +417,5 @@ export const GALLERY_EXAMPLES: Record<string, string> = {
   'venn':       vennRaw,
   'contour':    contourRaw,
   'spirograph':    spirographRaw,
+  'complex spirograph': complexspirographRaw,
 };

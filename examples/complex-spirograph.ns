@@ -1,0 +1,128 @@
+// ============================================================
+//  COMPLEX SPIROGRAPH  —  layered epicycle mandala
+//
+//  The simple spirograph is two rotating arms (a wheel on a
+//  ring). This generalises it to N arms — a little Fourier
+//  machine: each arm spins at its own radius, frequency and
+//  phase, and the pen rides the tip of the last one. A few arms
+//  already make intricate knot-and-flower curves.
+//
+//  Then the whole curve is LAYERED: drawn K times, each copy
+//  rotated a step further around, so the arms build into a dense
+//  rosette with K-fold symmetry — the mesmerising lacework that
+//  makes spirograph art worth framing. Optionally each layer
+//  uses the next thread colour.
+//
+//  With integer frequencies the curve closes after one turn, so
+//  every layer is a clean, complete loop. It auto-scales to the
+//  hoop whatever arms you choose.
+// ============================================================
+
+// --- the arms (parallel lists: radius, frequency, phase°) ---
+//   Arm 0 is the big slow carrier; later arms are smaller and
+//   faster. Mixing positive and negative frequencies (opposite
+//   spins) is what makes petals and cusps. Try editing these.
+let armR = [ 12, 6,  4 ]      // radii
+let armF = [  8, -1.6,  3 ]      // frequencies (sign = spin direction)
+let armP = [  12,  8,  16 ]      // phases, degrees
+
+// --- layering ---
+let layers   = 12        // how many rotated copies (the symmetry order)
+let layStep  = 0        // extra rotation per layer, degrees.
+                        //   0 = spread evenly (360/layers apart);
+                        //   nonzero = a deliberate spiral drift between layers
+let multicolor = 1      // 1 = each layer uses the next thread colour;
+                        //   0 = all one colour
+
+// --- detail & look ---
+let fit     = 43        // scale the rosette to this radius, mm (< 47)
+let smooth  = 900       // sample points per layer (higher = smoother)
+let stitch  = 1.8
+
+seed 7
+stitchlen stitch
+maxdensity 5       // the layers overlap toward the centre (~4 layers of thread) —
+                   //   that density is the mandala's woven core. Raise the warn
+                   //   threshold; sew on denim/canvas, or use fewer `layers`, if
+                   //   you want it lighter for fine fabric.
+
+
+// ------------------------------------------------------------
+//  the raw epicycle point at parameter t (degrees), summing all
+//  arms. Returned pre-scale, pre-rotation, as [x, y].
+// ------------------------------------------------------------
+def epi(t) [
+  let x = 0
+  let y = 0
+  let k = 0
+  let na = len(armR)
+  while k < na [
+    let a = armF[k] * t + armP[k]
+    x = x + armR[k] * cos(a)
+    y = y + armR[k] * sin(a)
+    k = k + 1
+  ]
+  return [x, y]
+]
+
+
+// ------------------------------------------------------------
+//  auto-scale: find the curve's maximum radius over one turn so
+//  we can scale it to `fit`. (One coarse pass is plenty.)
+// ------------------------------------------------------------
+let rmax = 0.0001
+let probe = 0
+while probe < 360 [
+  let p = epi(probe)
+  let rr = sqrt(p[0] * p[0] + p[1] * p[1])
+  if rr > rmax [ rmax = rr ]
+  probe = probe + 2
+]
+let scale = fit / rmax
+
+
+// ------------------------------------------------------------
+//  one layer: the whole curve, scaled, and rotated by `rot`°.
+//  Rotation is applied to the output point:
+//     x' = x cosR - y sinR
+//     y' = x sinR + y cosR
+// ------------------------------------------------------------
+def draw_layer(rot) [
+  let cr = cos(rot)
+  let sr = sin(rot)
+
+  // start point (t = 0)
+  let p0 = epi(0)
+  let sx0 = scale * (p0[0] * cr - p0[1] * sr)
+  let sy0 = scale * (p0[0] * sr + p0[1] * cr)
+  up
+  setpos([sx0, sy0])
+  down
+
+  let i = 1
+  while i <= smooth [
+    let t = 360 * (i / smooth)        // one full turn closes the curve
+    let p = epi(t)
+    let sx = scale * (p[0] * cr - p[1] * sr)
+    let sy = scale * (p[0] * sr + p[1] * cr)
+    setpos([sx, sy])
+    i = i + 1
+  ]
+]
+
+
+// ============================================================
+//  draw all layers
+// ============================================================
+
+// even spacing between layers, plus any deliberate drift
+let baseStep = 360 / layers
+
+for L = 0 to layers - 1 [
+  if multicolor == 1 [ color mod(L, 6) + 1 ]
+  if multicolor == 0 [ color 1 ]
+
+  let rot = L * baseStep + L * layStep
+  draw_layer(rot)
+  trim
+]
