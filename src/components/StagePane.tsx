@@ -1,4 +1,4 @@
-import type { DesignState } from '../App.tsx';
+import type { DesignState, LineSegment } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import StageCanvas from './StageCanvas.tsx';
 import PlaybackBar from './PlaybackBar.tsx';
@@ -11,11 +11,12 @@ interface Props {
   scrubPos: number;
   onScrubChange: (v: number) => void;
   activeLine: number | null;
+  lineSegments: LineSegment[];
   showDensity: boolean;
   onToggleDensity: () => void;
 }
 
-export default function StagePane({ design, hoop, scrubPos, onScrubChange, activeLine, showDensity, onToggleDensity }: Props) {
+export default function StagePane({ design, hoop, scrubPos, onScrubChange, activeLine, lineSegments, showDensity, onToggleDensity }: Props) {
   return (
     <section className={styles.pane}>
       <div className={styles.fabric}>
@@ -36,6 +37,7 @@ export default function StagePane({ design, hoop, scrubPos, onScrubChange, activ
         scrubPos={scrubPos}
         onScrubChange={onScrubChange}
         activeLine={activeLine}
+        lineSegments={lineSegments}
       />
     </section>
   );

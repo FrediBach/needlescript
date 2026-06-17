@@ -16,6 +16,11 @@ import Splitter from './components/Splitter.tsx';
 import ReferenceDialog from './components/ReferenceDialog.tsx';
 import HoopDialog from './components/HoopDialog.tsx';
 
+export interface LineSegment {
+  line: number;
+  start: number; // 0-based index into pts[] where this line's stitches begin
+}
+
 export interface DebugMark {
   x: number;
   y: number;
@@ -351,6 +356,21 @@ export default function App() {
       ? design.pts[Math.min(scrubPos, design.pts.length) - 1].line ?? null
       : null;
 
+  // Compact list of source-line runs: one entry per consecutive block of stitches
+  // sharing the same line number. Recomputed only when the compiled design changes.
+  const lineSegments = useMemo((): LineSegment[] => {
+    const segs: LineSegment[] = [];
+    let currentLine: number | undefined = undefined;
+    for (let i = 0; i < design.pts.length; i++) {
+      const ln = design.pts[i].line;
+      if (ln !== currentLine) {
+        segs.push({ line: ln ?? 0, start: i });
+        currentLine = ln;
+      }
+    }
+    return segs;
+  }, [design.pts]);
+
   return (
     <div
       className={styles.app}
@@ -393,6 +413,7 @@ export default function App() {
           scrubPos={scrubPos}
           onScrubChange={(pos) => dispatch({ type: 'scrub', pos })}
           activeLine={activeLine}
+          lineSegments={lineSegments}
           showDensity={showDensity}
           onToggleDensity={() => setShowDensity(v => !v)}
         />
