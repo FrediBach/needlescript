@@ -15,6 +15,8 @@ export default function StatsChips({ design }: Props) {
     chips.push({ text: 'program error — see console', type: 'err' });
   } else if (s) {
     chips.push({ text: `${s.stitches.toLocaleString()} stitches` });
+    const yarnM = s.yarnLength / 1000;
+    chips.push({ text: yarnM >= 1 ? `${yarnM.toFixed(1)} m yarn` : `${Math.round(s.yarnLength)} mm yarn` });
     if (s.jumps) chips.push({ text: `${s.jumps} jump${s.jumps > 1 ? 's' : ''}` });
     chips.push({ text: `${s.colorsUsed} colour${s.colorsUsed > 1 ? 's' : ''}` });
     chips.push({ text: `${s.width.toFixed(1)} × ${s.height.toFixed(1)} mm` });

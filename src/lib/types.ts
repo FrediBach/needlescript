@@ -47,6 +47,7 @@ export interface DesignStats {
   maxY: number;
   maxStitchLen: number;
   maxRadius: number;
+  yarnLength: number; // total sewn thread length in mm (stitches only, not jumps)
 }
 
 // ---------- AST node types ----------

@@ -230,7 +230,7 @@ export function densityMap(
 export function designStats(events: StitchEvent[]): DesignStats {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   let stitches = 0, jumps = 0, colors = 0, trims = 0;
-  let maxLen = 0, maxR = 0;
+  let maxLen = 0, maxR = 0, yarnLength = 0;
   let px: number | null = null, py: number | null = null;
   const colorSet = new Set<number>();
   for (const e of events) {
@@ -243,8 +243,11 @@ export function designStats(events: StitchEvent[]): DesignStats {
     if (e.t === 'stitch') {
       stitches++;
       colorSet.add(e.c);
-      if (px !== null && py !== null)
-        maxLen = Math.max(maxLen, Math.hypot(e.x - px, e.y - py));
+      if (px !== null && py !== null) {
+        const d = Math.hypot(e.x - px, e.y - py);
+        maxLen = Math.max(maxLen, d);
+        yarnLength += d;
+      }
     } else {
       jumps++;
     }
@@ -257,5 +260,6 @@ export function designStats(events: StitchEvent[]): DesignStats {
     colorsUsed: Math.max(1, colorSet.size),
     width: maxX - minX, height: maxY - minY,
     minX, maxX, minY, maxY, maxStitchLen: maxLen, maxRadius: maxR,
+    yarnLength,
   };
 }
