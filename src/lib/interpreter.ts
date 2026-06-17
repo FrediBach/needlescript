@@ -659,7 +659,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     const newEnv: Record<string, Val> = Object.create(null);
     proc.params.forEach((p, i) => { newEnv[p] = evalExpr(argNodes[i], env, repcount, depth); });
     try {
-      execBlock(proc.body, newEnv, repcount, depth + 1);
+      // Pass the call-site line as contextLine so that machine commands
+      // inside the procedure stamp the caller's source line onto stitches
+      // rather than their own internal line number within the proc body.
+      execBlock(proc.body, newEnv, repcount, depth + 1, line);
     } catch (e) {
       if (e instanceof ReturnSignal) return e.value;
       if (e instanceof LoopSignal)
@@ -677,8 +680,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     env: Record<string, Val> | null,
     repcount: number,
     depth: number,
+    contextLine?: number,
   ) {
-    for (const st of stmts) execStmt(st, env, repcount, depth);
+    for (const st of stmts) execStmt(st, env, repcount, depth, contextLine);
   }
 
   /**
@@ -691,9 +695,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     env: Record<string, Val> | null,
     repcount: number,
     depth: number,
+    contextLine?: number,
   ): boolean {
     try {
-      execBlock(body, env, repcount, depth);
+      execBlock(body, env, repcount, depth, contextLine);
     } catch (e) {
       if (e instanceof LoopSignal) return e.kind !== 'break';
       throw e;
@@ -706,6 +711,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     env: Record<string, Val> | null,
     repcount: number,
     depth: number,
+    contextLine?: number,
   ) {
     tick(st.line);
     switch (st.k) {
@@ -789,13 +795,13 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const n = Math.floor(num(evalExpr(st.count, env, repcount, depth), 'repeat', st.line));
         if (n > 200000) throw new NeedlescriptError(`repeat count too large (${n})`, st.line);
         for (let i = 1; i <= n; i++)
-          if (!runLoopBody(st.body, env, i, depth)) break;
+          if (!runLoopBody(st.body, env, i, depth, contextLine)) break;
         return;
       }
       case 'while': {
         while (truthy(evalExpr(st.cond, env, repcount, depth), 'while', st.line) !== 0) {
           tick(st.line); // ops budget catches endless loops
-          if (!runLoopBody(st.body, env, repcount, depth)) break;
+          if (!runLoopBody(st.body, env, repcount, depth, contextLine)) break;
         }
         return;
       }
@@ -812,7 +818,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         for (let v = from; step > 0 ? v <= to + 1e-9 : v >= to - 1e-9; v += step) {
           tick(st.line);
           scope[st.varName] = v;
-          if (!runLoopBody(st.body, env, repcount, depth)) break;
+          if (!runLoopBody(st.body, env, repcount, depth, contextLine)) break;
         }
         if (had) scope[st.varName] = prev;
         else delete scope[st.varName];
@@ -834,7 +840,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         for (let i = 0; i < n; i++) {
           tick(st.line);
           scope[st.varName] = v.items[i];
-          if (!runLoopBody(st.body, env, repcount, depth)) break;
+          if (!runLoopBody(st.body, env, repcount, depth, contextLine)) break;
         }
         if (had) scope[st.varName] = prev;
         else delete scope[st.varName];
@@ -842,8 +848,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'if': {
         if (truthy(evalExpr(st.cond, env, repcount, depth), 'if', st.line) !== 0)
-          execBlock(st.body, env, repcount, depth);
-        else if (st.elseBody) execBlock(st.elseBody, env, repcount, depth);
+          execBlock(st.body, env, repcount, depth, contextLine);
+        else if (st.elseBody) execBlock(st.elseBody, env, repcount, depth, contextLine);
         return;
       }
       case 'output': {
@@ -861,11 +867,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       case 'break': throw new LoopSignal('break', st.line);
       case 'continue': throw new LoopSignal('continue', st.line);
       case 'call': {
-        callProc(st.name, st.args, env, repcount, depth, st.line);
+        callProc(st.name, st.args, env, repcount, depth, contextLine ?? st.line);
         return;
       }
       case 'listcmd': {
-        m.currentLine = st.line;
+        m.currentLine = contextLine ?? st.line;
         const a = st.args.map(x => evalExpr(x, env, repcount, depth));
         switch (st.name) {
           case 'append': case 'prepend': {
@@ -935,7 +941,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         throw new NeedlescriptError(`Unhandled command ${st.name}`, st.line);
       }
       case 'cmd': {
-        m.currentLine = st.line;
+        m.currentLine = contextLine ?? st.line;
         const vals = st.args.map(x => evalExpr(x, env, repcount, depth));
         if (st.name === 'print') {
           printed.push((st.label ? st.label + ': ' : '') + formatVal(vals[0]));
