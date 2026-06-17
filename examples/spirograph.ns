@@ -1,0 +1,117 @@
+// ============================================================
+//  SPIROGRAPH  —  the classic roulette curve
+//
+//  A small circle (radius `r`) rolls around a big fixed circle
+//  (radius `R`) with a pen held at offset `d` from the rolling
+//  circle's centre. Inside = a hypotrochoid (flower/rosette);
+//  outside = an epitrochoid (looping star). The three numbers
+//  R, r, d are the whole toy — change them for endless patterns.
+//
+//  The curve auto-closes: it figures out how many times the
+//  small gear must travel around (r / gcd(R,r) revolutions) to
+//  return to the start, so you never get a half-drawn figure.
+//  It also auto-scales to fill the hoop, whatever R, r, d you pick.
+// ============================================================
+
+// --- the three spirograph dials ---
+let bigR  = 96     // fixed (outer) circle radius — "teeth" of the ring
+let rollR = 22     // rolling circle radius — "teeth" of the wheel
+let pen   = 40     // pen offset from the rolling circle's centre
+                   //   pen < rollR stays inside the wheel; pen > rollR loops out
+
+// --- mode ---
+let inside = 1     // 1 = hypotrochoid (wheel rolls INSIDE the ring)
+                   // 0 = epitrochoid  (wheel rolls OUTSIDE the ring)
+
+// --- detail & look ---
+let fit    = 43    // scale the finished curve to this radius, mm (< 47)
+let smooth = 240    // sample points per revolution (higher = smoother)
+let stitch = 1.8
+
+seed 7
+stitchlen stitch
+
+
+// ------------------------------------------------------------
+//  gcd by Euclid's algorithm, on the (rounded) radii. The curve
+//  closes after  rollR / gcd(bigR, rollR)  revolutions.
+// ------------------------------------------------------------
+def gcd(a, b) [
+  let x = a
+  let y = b
+  while y > 0 [
+    let t = mod(x, y)
+    x = y
+    y = t
+  ]
+  return x
+]
+
+// round to nearest integer (gcd needs whole numbers; gear teeth are integers)
+let Ri = round(bigR)
+let rit = round(rollR)
+let g = gcd(Ri, rit)
+let revs = rit / g                  // revolutions of the drive angle to close
+
+
+// ------------------------------------------------------------
+//  the curve point at drive angle t (degrees).
+//
+//  Hypotrochoid (inside):
+//    x = (R - r) cos t + d cos(((R - r)/r) t)
+//    y = (R - r) sin t - d sin(((R - r)/r) t)
+//  Epitrochoid (outside): R + r, and the inner term flips sign.
+// ------------------------------------------------------------
+def spiro_x(t) [
+  // base radius and inner-term ratio depend on inside/outside
+  let base = bigR - rollR
+  let k = (bigR - rollR) / rollR
+  if inside == 0 [
+    base = bigR + rollR
+    k = (bigR + rollR) / rollR
+  ]
+  // hypotrochoid uses +pen*cos(k t); epitrochoid uses -pen*cos(k t)
+  let sgn = 1
+  if inside == 0 [ sgn = -1 ]
+  return base * cos(t) + sgn * pen * cos(k * t)
+]
+
+def spiro_y(t) [
+  let base = bigR - rollR
+  let k = (bigR - rollR) / rollR
+  if inside == 0 [
+    base = bigR + rollR
+    k = (bigR + rollR) / rollR
+  ]
+  // both forms use - pen * sin(k t)
+  return base * sin(t) - pen * sin(k * t)
+]
+
+
+// ------------------------------------------------------------
+//  work out the scale so the curve fills the hoop. The extent
+//  (max distance from centre) is (R ∓ r) + d, so scale to `fit`.
+// ------------------------------------------------------------
+let reach = bigR - rollR + pen           // hypotrochoid extent
+if inside == 0 [ reach = bigR + rollR + pen ]   // epitrochoid extent
+let scale = fit / reach
+
+
+// ============================================================
+//  draw the curve as one continuous, closed path
+// ============================================================
+color 1
+
+let total = smooth * revs          // total sample points around the whole curve
+let turn = 360 * revs              // total drive-angle sweep, degrees
+
+// start point
+up
+setpos([ scale * spiro_x(0), scale * spiro_y(0) ])
+down
+for i = 1 to total [
+  let t = turn * (i / total)
+  setpos([ scale * spiro_x(t), scale * spiro_y(t) ])
+]
+
+trim
