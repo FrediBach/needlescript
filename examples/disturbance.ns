@@ -1,0 +1,95 @@
+// ============================================================
+//  FAULT LINE  —  order, suddenly broken
+//
+//  A field of perfectly parallel lines. Everywhere they run
+//  ruler-straight... except in one off-centre zone, where they
+//  fracture: a patch of fractal noise shoves them out of true,
+//  jagged and turbulent, before they settle back into formation.
+//  The calm makes the break; the break makes the calm.
+//
+//  The disturbance is local — its strength falls smoothly to zero
+//  at the edge of the zone (a smoothstep falloff), so it reads as
+//  a contained event rather than a smudge. Seeded, so the exact
+//  break is reproducible.
+// ============================================================
+
+// --- the line field ---
+let nlines  = 42       // how many parallel lines
+let RF      = 43       // fill a disc of this radius, mm (< 47)
+
+// --- the break ---
+let breakX  =  9       // centre of the disturbance, mm (off-centre)
+let breakY  = -5
+let breakR  = 26       // radius of the disturbed zone, mm
+let amp     = 3.0      // how far the lines are thrown, mm (the drama dial)
+let nfreq   = 0.59     // noise frequency — higher = finer, more jagged fracture
+let octaves = 1        // fractal detail (1 = smooth heave, up to 8 = shattered)
+
+// --- detail & look ---
+let stepx   = 1.4      // sampling step along each line, mm (var renamed from step, which is reserved) (smaller = smoother)
+let stitch  = 1.9
+
+seed 7
+stitchlen stitch
+
+
+// ------------------------------------------------------------
+//  vertical position of line number i: evenly spaced across the
+//  diameter, from near the bottom to near the top.
+// ------------------------------------------------------------
+def line_y(i) [
+  return 0 - RF + (i + 0.5) / nlines * (RF * 2)
+]
+
+// ------------------------------------------------------------
+//  the displaced y of a point (x, baseY) on a line: base height
+//  plus noise, scaled by how deep inside the break zone it is.
+// ------------------------------------------------------------
+def disturb(x, baseY) [
+  // distance from the break centre, normalised to the zone radius
+  let dxb = x - breakX
+  let dyb = baseY - breakY
+  let dist = sqrt(dxb * dxb + dyb * dyb)
+  // 1 at the centre of the zone, easing to 0 at its edge
+  let amount = 1 - smoothstep(0, breakR, dist)
+  if amount <= 0 [ return baseY ]      // outside the zone: dead straight
+  // fractal noise displacement; shift the sample per line so lines differ
+  let nz = fbm2(x * nfreq, baseY * nfreq + 100, octaves)
+  return baseY + nz * amp * amount
+]
+
+
+// ============================================================
+//  draw the lines
+//
+//  Each line is horizontal at height y, clipped to the disc:
+//  it runs from x = -halfchord to +halfchord, where
+//  halfchord = sqrt(RF^2 - y^2). We walk it in `step` increments,
+//  displacing y as we go.
+// ============================================================
+color 1
+
+for i = 0 to nlines - 1 [
+  let y = line_y(i)
+
+  // half-length of this line's chord inside the disc
+  let inside = RF * RF - y * y
+  if inside > 1 [                        // skip lines that barely clip the disc
+    let half = sqrt(inside)
+
+    // start at the left end
+    up
+    setpos([ 0 - half, disturb(0 - half, y) ])
+    down
+
+    // walk across to the right end
+    let x = 0 - half + stepx
+    while x < half [
+      setpos([ x, disturb(x, y) ])
+      x = x + stepx
+    ]
+    // finish exactly on the right edge
+    setpos([ half, disturb(half, y) ])
+  ]
+  trim
+]
