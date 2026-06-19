@@ -70,24 +70,40 @@ export const EXAMPLES: Record<string, string> = {
   'badge':         badgeRaw,
   'sampler':       samplerRaw,
   'waves':         wavesRaw,
+  'shell':         shellRaw,
   'tree':          treeRaw,
   'fern':          fernRaw,
   'flow':          flowRaw,
-  'shell':         shellRaw,
   'patch':         patchRaw,
-  'meadow':        meadowRaw,
-  'echo':          echoRaw,
-  'shatter':       shatterRaw,
   'lorenz':        lorenzRaw,
   'meander':       meanderRaw,
   'snowflake':     snowflakeRaw,
   'orbits':        orbitsRaw,
   'waveforms':     waveformsRaw,
-  'fill':          fillRaw,
-  'lines':         linesRaw,
   'venn':          vennRaw,
-  'contour':       contourRaw,
   'spirograph 1':  spirographRaw,
   'spirograph 2':  complexspirographRaw,
   'disturbance':   disturbanceRaw,
+  'echo':          echoRaw,
+  'shatter':       shatterRaw,
+  'meadow':        meadowRaw,
+  'contour':       contourRaw,
+  'lines':         linesRaw,
+  'fill':          fillRaw,
 };
+
+// Complexity tiers — used to group examples in the UI picker.
+export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
+  {
+    label: 'intro',
+    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell'],
+  },
+  {
+    label: 'intermediate',
+    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'disturbance'],
+  },
+  {
+    label: 'advanced',
+    keys: ['echo', 'shatter', 'meadow', 'contour', 'lines', 'fill'],
+  },
+];

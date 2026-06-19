@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { EXAMPLES } from '../data.ts';
+import { EXAMPLE_TIERS } from '../data.ts';
 import type { HoopConfig } from '../data.ts';
 import { HoopIcon } from './HoopDialog.tsx';
 import styles from './Header.module.css';
@@ -22,6 +22,9 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  SelectGroup,
+  SelectLabel,
+  SelectSeparator,
 } from '@/components/ui/select.tsx';
 import {
   Tooltip,
@@ -101,8 +104,18 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
         <SelectValue placeholder="examples" />
       </SelectTrigger>
       <SelectContent className="font-mono text-[12.5px]">
-        {Object.keys(EXAMPLES).map(k => (
-          <SelectItem key={k} value={k}>{k}</SelectItem>
+        {EXAMPLE_TIERS.map((tier, i) => (
+          <>
+            {i > 0 && <SelectSeparator key={`sep-${tier.label}`} />}
+            <SelectGroup key={tier.label}>
+              <SelectLabel className="text-[10px] tracking-[0.13em] uppercase text-[#6E7494]">
+                {tier.label}
+              </SelectLabel>
+              {tier.keys.map(k => (
+                <SelectItem key={k} value={k}>{k}</SelectItem>
+              ))}
+            </SelectGroup>
+          </>
         ))}
       </SelectContent>
     </Select>
@@ -230,14 +243,22 @@ function HamburgerMenu({
             <span className="ml-auto text-[10.5px] text-muted-foreground">{hoop.label}</span>
           </DropdownMenuItem>
 
-          {/* Examples — sub-menu with all examples */}
+          {/* Examples — sub-menu with all examples grouped by tier */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Examples</DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="min-w-[172px] max-h-[320px] overflow-y-auto font-mono text-[12.5px]">
-              {Object.keys(EXAMPLES).map(k => (
-                <DropdownMenuItem key={k} onClick={() => onExampleSelect(k)}>
-                  {k}
-                </DropdownMenuItem>
+              {EXAMPLE_TIERS.map((tier, i) => (
+                <>
+                  {i > 0 && <DropdownMenuSeparator key={`sep-${tier.label}`} />}
+                  <DropdownMenuLabel key={`lbl-${tier.label}`} className="text-[10px] tracking-[0.13em] uppercase text-[#6E7494]">
+                    {tier.label}
+                  </DropdownMenuLabel>
+                  {tier.keys.map(k => (
+                    <DropdownMenuItem key={k} onClick={() => onExampleSelect(k)}>
+                      {k}
+                    </DropdownMenuItem>
+                  ))}
+                </>
               ))}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
