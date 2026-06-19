@@ -46,44 +46,19 @@
 
 .entry {
   display: flex;
-  gap: 10px;
-  padding: 3px 0;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 0;
   font-size: 12px;
-  align-items: baseline;
-}
-
-/* On small screens stack command above description */
-@media (max-width: 500px) {
-  .entry {
-    flex-direction: column;
-    gap: 2px;
-    padding: 5px 0;
-  }
 }
 
 .cmd {
   color: var(--gold);
-  min-width: 0;
-  flex-shrink: 0;
-  /* Responsive max-width: never wider than half the container */
-  max-width: min(260px, 50%);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* When stacked on mobile, cmd can take full width and wrap */
-@media (max-width: 500px) {
-  .cmd {
-    max-width: 100%;
-    white-space: normal;
-  }
 }
 
 .desc {
   color: var(--dim);
   line-height: 1.5;
-  min-width: 0;
 }
 
 .empty {
