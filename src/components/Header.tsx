@@ -99,7 +99,7 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
     <Select onValueChange={(val: string | null) => { if (val) onExampleSelect(val); }}>
       <SelectTrigger
         aria-label="Example programs"
-        className={cn(hdrBtn, "w-[240px] bg-secondary gap-1 pr-1.5")}
+        className={cn(hdrBtn, "w-[180px] bg-secondary gap-1 pr-1.5")}
       >
         <SelectValue placeholder="examples" />
       </SelectTrigger>
