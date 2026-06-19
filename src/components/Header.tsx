@@ -379,7 +379,7 @@ export default function Header({
           "after:absolute after:inset-[3px] after:border after:border-dashed after:border-white/55 after:rounded-[3px] after:pointer-events-none",
         )}
       >
-        Run&nbsp;⌘&nbsp;↵
+        Run [cmd+enter]
       </button>
 
       {/* Export + Share — secondary output actions visible at lg+ */}
