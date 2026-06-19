@@ -319,11 +319,11 @@ export default function Header({
         <span className={cn(styles.tag, "hidden xl:block")}>
           Logo inspired programming language for generative embroidery
         </span>
+        <span>&nbsp;</span>
       </div>
 
       {/* ══ DESIGN GROUP (Hoop + Examples visible at md+) ═══════════════════ */}
       {/* Group separator — only when the group is visible */}
-      <VSep className="hidden md:flex" />
 
       <div className="hidden md:flex items-center gap-1.5">
         {/* Hoop selector */}
@@ -346,7 +346,6 @@ export default function Header({
 
       {/* ══ IMPORT SVG (lg+ only — less frequently used) ════════════════════ */}
       <div className="hidden lg:flex items-center gap-1.5">
-        <VSep />
         <Tooltip>
           <TooltipTrigger
             onClick={onSVGImport}
@@ -389,7 +388,6 @@ export default function Header({
       </div>
 
       {/* ══ META GROUP (Help + Hamburger) ═══════════════════════════════════ */}
-      <VSep />
 
       {/* Help — always visible */}
       <Tooltip>
