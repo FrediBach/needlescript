@@ -389,9 +389,13 @@ export default function Header({
           onClick={onOpenReference}
           aria-label="Language reference"
           className={cn(
-            buttonVariants({ variant: 'outline' }),
-            "flex size-[30px] rounded-full p-0 flex-shrink-0",
-            "text-[13.5px] font-semibold font-mono text-muted-foreground hover:text-foreground",
+            "flex items-center justify-center size-[30px] rounded-full p-0 flex-shrink-0 relative",
+            "cursor-pointer select-none font-mono font-semibold text-[13.5px]",
+            "bg-transparent border border-white/50 text-[var(--pale)]",
+            "hover:bg-white/10 hover:border-white/75",
+            "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+            "after:absolute after:inset-[3px] after:border after:border-dashed after:border-white/35 after:rounded-full after:pointer-events-none",
+            styles.helpBtn,
           )}
         >
           ?
