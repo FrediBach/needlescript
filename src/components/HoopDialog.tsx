@@ -1,7 +1,13 @@
 import { useEffect } from 'react';
 import type { HoopConfig } from '../data.ts';
 import { HOOPS } from '../data.ts';
-import styles from './HoopDialog.module.css';
+import {
+  Dialog,
+  DialogContent,
+  DialogClose,
+} from '@/components/ui/dialog.tsx';
+import { buttonVariants } from '@/components/ui/button.tsx';
+import { cn } from '@/lib/utils.ts';
 
 // Hoop shape icon — used in both the dialog and the header button
 export function HoopIcon({ hoop, size = 20 }: { hoop: HoopConfig; size?: number }) {
@@ -61,6 +67,8 @@ interface Props {
 }
 
 export default function HoopDialog({ open, current, onSelect, onClose }: Props) {
+  // Keep keyboard shortcut for Escape (also handled natively by base-ui Dialog,
+  // but we keep this for belt-and-suspenders consistency)
   useEffect(() => {
     if (!open) return;
     const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -68,29 +76,45 @@ export default function HoopDialog({ open, current, onSelect, onClose }: Props) 
     return () => document.removeEventListener('keydown', handle);
   }, [open, onClose]);
 
-  if (!open) return null;
-
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.dialog} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Hoop size and shape">
-        <div className={styles.header}>
-          <span className={styles.title}>Hoop size &amp; shape</span>
-          <button className={styles.close} onClick={onClose} aria-label="Close">✕</button>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-[460px] w-full p-0 gap-0 rounded-xl overflow-hidden bg-card border border-border"
+        aria-label="Hoop size and shape"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-[14px] py-[11px] border-b border-dashed border-border">
+          <span className="text-[11px] tracking-[0.16em] uppercase text-[var(--gold)] select-none">
+            Hoop size &amp; shape
+          </span>
+          <DialogClose className="text-[14px] font-mono text-muted-foreground bg-transparent border-none cursor-pointer px-[6px] py-[3px] rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            ✕
+          </DialogClose>
         </div>
-        <div className={styles.grid}>
+
+        {/* Grid of hoop options */}
+        <div className="grid grid-cols-4 gap-2 p-[14px]">
           {HOOPS.map(hoop => (
             <button
               key={hoop.id}
-              className={`${styles.option}${hoop.id === current.id ? ' ' + styles.selected : ''}`}
+              type="button"
+              className={cn(
+                buttonVariants({ variant: 'outline' }),
+                "flex flex-col items-center gap-2 py-[13px] pb-[11px] px-2 h-auto",
+                "font-mono text-[10px] text-muted-foreground",
+                "border-[1.5px] transition-colors duration-100",
+                hoop.id === current.id && "border-[var(--gold)] text-foreground",
+              )}
               onClick={() => { onSelect(hoop); onClose(); }}
               aria-pressed={hoop.id === current.id}
             >
               <HoopIcon hoop={hoop} size={38} />
-              <span className={styles.optionLabel}>{hoop.label}</span>
+              <span className="text-center leading-[1.4] text-inherit">{hoop.label}</span>
             </button>
           ))}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

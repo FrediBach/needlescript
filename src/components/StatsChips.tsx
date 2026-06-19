@@ -1,4 +1,6 @@
 import type { DesignState } from '../App.tsx';
+import { Badge } from '@/components/ui/badge.tsx';
+import { cn } from '@/lib/utils.ts';
 import styles from './StatsChips.module.css';
 
 interface Props {
@@ -27,12 +29,18 @@ export default function StatsChips({ design }: Props) {
   return (
     <div className={styles.stats}>
       {chips.map((chip) => (
-        <span
+        <Badge
           key={chip.text}
-          className={`${styles.chip}${chip.type ? ' ' + styles[chip.type] : ''}`}
+          variant={chip.type === 'err' ? 'destructive' : 'outline'}
+          className={cn(
+            "font-mono text-[10.5px] h-auto py-[3px] px-[8px] rounded-[5px]",
+            "bg-[rgba(27,32,48,0.80)] border-[rgba(200,190,160,0.25)] text-[var(--pale)]",
+            chip.type === 'warn' && "border-[rgba(217,164,65,0.6)] text-[var(--gold)]",
+            chip.type === 'err' && "bg-[rgba(200,71,47,0.25)] border-[rgba(200,71,47,0.5)] text-[#E98A77]",
+          )}
         >
           {chip.text}
-        </span>
+        </Badge>
       ))}
     </div>
   );

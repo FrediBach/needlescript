@@ -2,6 +2,19 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import styles from './ReferenceDialog.module.css';
 import tutorialMd from '../../needlescript-tutorial.md?raw';
+import {
+  Dialog,
+  DialogContent,
+  DialogClose,
+} from '@/components/ui/dialog.tsx';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs.tsx';
+import { Input } from '@/components/ui/input.tsx';
+import { ScrollArea } from '@/components/ui/scroll-area.tsx';
+import { cn } from '@/lib/utils.ts';
 
 interface RefEntry {
   cmd: string;
@@ -254,9 +267,6 @@ const SECTIONS: RefSection[] = [
 ];
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
-// Covers the subset used in needlescript-tutorial.md:
-// h1/h2/h3, paragraphs, code fences, inline code/bold/italic/links,
-// blockquotes, tables, unordered/ordered lists, horizontal rules.
 
 function slugify(text: string): string {
   return text
@@ -268,7 +278,6 @@ function slugify(text: string): string {
 }
 
 function renderInline(text: string): ReactNode[] {
-  // Order matters: backtick code first, then **bold** before *italic*, then links.
   const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\n]+\*|\[[^\]]+\]\([^)]*\))/g;
   const parts: ReactNode[] = [];
   let lastIndex = 0;
@@ -285,7 +294,6 @@ function renderInline(text: string): ReactNode[] {
     } else if (token[0] === '*') {
       parts.push(<em key={key++}>{renderInline(token.slice(1, -1))}</em>);
     } else {
-      // Link: [text](url)
       const lm = token.match(/\[([^\]]+)\]\(([^)]*)\)/);
       if (lm) {
         const href = lm[2];
@@ -322,28 +330,22 @@ function parseMarkdown(md: string): ReactNode[] {
   while (i < lines.length) {
     const line = lines[i];
 
-    // Horizontal rule
     if (line.trim() === '---') {
       blocks.push(<hr key={bk++} className={styles.tutHr} />);
-      i++;
-      continue;
+      i++; continue;
     }
 
-    // Fenced code block
     if (line.startsWith('```')) {
       const codeLines: string[] = [];
       i++;
       while (i < lines.length && !lines[i].startsWith('```')) codeLines.push(lines[i++]);
-      i++; // skip closing fence
+      i++;
       blocks.push(
-        <pre key={bk++} className={styles.tutPre}>
-          <code>{codeLines.join('\n')}</code>
-        </pre>
+        <pre key={bk++} className={styles.tutPre}><code>{codeLines.join('\n')}</code></pre>
       );
       continue;
     }
 
-    // Headings — check ### before ## before #
     const h3 = line.match(/^###\s+(.*)/);
     if (h3) {
       const txt = h3[1];
@@ -362,19 +364,15 @@ function parseMarkdown(md: string): ReactNode[] {
       i++; continue;
     }
 
-    // Blockquote
     if (line.startsWith('> ')) {
       const qLines: string[] = [];
       while (i < lines.length && lines[i].startsWith('> ')) qLines.push(lines[i++].slice(2));
       blocks.push(
-        <blockquote key={bk++} className={styles.tutBlockquote}>
-          {renderInline(qLines.join(' '))}
-        </blockquote>
+        <blockquote key={bk++} className={styles.tutBlockquote}>{renderInline(qLines.join(' '))}</blockquote>
       );
       continue;
     }
 
-    // Table (rows start with |)
     if (line.startsWith('|')) {
       const tLines: string[] = [];
       while (i < lines.length && lines[i].startsWith('|')) tLines.push(lines[i++]);
@@ -385,19 +383,11 @@ function parseMarkdown(md: string): ReactNode[] {
         <div key={bk++} className={styles.tutTableWrap}>
           <table className={styles.tutTable}>
             <thead>
-              <tr>
-                {splitCells(tLines[0]).map((c, ci) => (
-                  <th key={ci} className={styles.tutTh}>{renderInline(c)}</th>
-                ))}
-              </tr>
+              <tr>{splitCells(tLines[0]).map((c, ci) => <th key={ci} className={styles.tutTh}>{renderInline(c)}</th>)}</tr>
             </thead>
             <tbody>
               {tLines.slice(dataStart).map((l, j) => (
-                <tr key={j}>
-                  {splitCells(l).map((c, ci) => (
-                    <td key={ci} className={styles.tutTd}>{renderInline(c)}</td>
-                  ))}
-                </tr>
+                <tr key={j}>{splitCells(l).map((c, ci) => <td key={ci} className={styles.tutTd}>{renderInline(c)}</td>)}</tr>
               ))}
             </tbody>
           </table>
@@ -406,7 +396,6 @@ function parseMarkdown(md: string): ReactNode[] {
       continue;
     }
 
-    // Unordered list
     if (/^[-*] /.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^[-*] /.test(lines[i])) items.push(lines[i++].slice(2));
@@ -418,7 +407,6 @@ function parseMarkdown(md: string): ReactNode[] {
       continue;
     }
 
-    // Ordered list
     if (/^\d+\. /.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^\d+\. /.test(lines[i])) items.push(lines[i++].replace(/^\d+\. /, ''));
@@ -430,10 +418,8 @@ function parseMarkdown(md: string): ReactNode[] {
       continue;
     }
 
-    // Skip blank lines
     if (line.trim() === '') { i++; continue; }
 
-    // Paragraph — gather until a block-level boundary
     const pLines: string[] = [];
     while (
       i < lines.length &&
@@ -520,8 +506,6 @@ export default function ReferenceDialog({ open, onClose }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const tutorialNodes = useMemo(() => parseMarkdown(tutorialMd), []);
 
-  // Focus the search field when the dialog opens on the reference tab,
-  // or when the user switches to the reference tab while the dialog is open.
   useEffect(() => {
     if (open && tab === 'reference') {
       setTimeout(() => inputRef.current?.focus(), 40);
@@ -530,6 +514,7 @@ export default function ReferenceDialog({ open, onClose }: Props) {
     }
   }, [open, tab]);
 
+  // Escape handled natively by base-ui Dialog; this is belt-and-suspenders
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && open) onClose();
@@ -537,8 +522,6 @@ export default function ReferenceDialog({ open, onClose }: Props) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
-
-  if (!open) return null;
 
   const q = query.trim().toLowerCase();
   const filtered = q
@@ -557,77 +540,99 @@ export default function ReferenceDialog({ open, onClose }: Props) {
   };
 
   return (
-    <div
-      className={styles.overlay}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="NeedleScript help">
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          "max-w-[900px] w-full max-h-[84vh] p-0 gap-0",
+          "rounded-xl overflow-hidden flex flex-col bg-card border border-border",
+        )}
+        aria-label="NeedleScript help"
+      >
+        {/* Header with tabs + search + close */}
+        <div className="flex items-center gap-2.5 px-[14px] h-11 border-b border-dashed border-border flex-shrink-0">
+          {/* Title */}
+          <span className="text-[11px] tracking-[0.16em] uppercase text-[var(--gold)] whitespace-nowrap select-none flex-shrink-0">
+            ✣ NeedleScript
+          </span>
 
-        <div className={styles.header}>
-          <span className={styles.title}>✣ NeedleScript</span>
-
-          <div className={styles.headerMid}>
-            <div className={styles.tabs} role="tablist">
-              {(Object.keys(TAB_LABELS) as TabId[]).map(t => (
-                <button
-                  key={t}
-                  role="tab"
-                  aria-selected={tab === t}
-                  className={`${styles.tab}${tab === t ? ` ${styles.tabActive}` : ''}`}
-                  onClick={() => setTab(t)}
-                >
-                  {TAB_LABELS[t]}
-                </button>
-              ))}
-            </div>
+          {/* Tabs + optional search */}
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="flex-shrink-0">
+              <TabsList variant="line" className="h-auto p-0 bg-transparent gap-0.5">
+                {(Object.keys(TAB_LABELS) as TabId[]).map(t => (
+                  <TabsTrigger
+                    key={t}
+                    value={t}
+                    className={cn(
+                      "font-mono text-[11px] tracking-[0.07em] px-2.5 py-[5px] h-auto rounded-[5px]",
+                      "text-muted-foreground hover:text-foreground",
+                      "data-active:text-[var(--gold)] data-active:bg-[rgba(217,164,65,0.10)]",
+                      "focus-visible:ring-2 focus-visible:ring-ring",
+                    )}
+                  >
+                    {TAB_LABELS[t]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
 
             {tab === 'reference' && (
-              <input
+              <Input
                 ref={inputRef}
-                className={styles.search}
                 type="text"
                 placeholder="filter commands…"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 spellCheck={false}
                 aria-label="Filter language reference"
+                className={cn(
+                  "flex-1 h-7 text-[12.5px] font-mono",
+                  "bg-secondary border-border text-foreground",
+                  "placeholder:text-muted-foreground",
+                )}
               />
             )}
           </div>
 
-          <button className={styles.close} onClick={onClose} aria-label="Close reference">✕</button>
+          {/* Close button */}
+          <DialogClose className="text-[14px] font-mono text-muted-foreground bg-transparent border-none cursor-pointer px-[6px] py-[3px] rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex-shrink-0">
+            ✕
+          </DialogClose>
         </div>
 
-        <div className={styles.body}>
-          {tab === 'reference' && (
-            filtered.length === 0 ? (
-              <div className={styles.empty}>no matches for &ldquo;{query}&rdquo;</div>
-            ) : (
-              filtered.map(section => (
-                <section key={section.title} className={styles.section}>
-                  <h3 className={styles.sectionTitle}>{section.title}</h3>
-                  {section.note && <p className={styles.sectionNote}>{section.note}</p>}
-                  <div className={styles.entries}>
-                    {section.entries.map((e, i) => (
-                      <div key={i} className={styles.entry}>
-                        <code className={styles.cmd}>{e.cmd}</code>
-                        <span className={styles.desc}>{e.desc}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ))
-            )
-          )}
+        {/* Scrollable body */}
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="pb-4">
+            {tab === 'reference' && (
+              filtered.length === 0 ? (
+                <div className={styles.empty}>no matches for &ldquo;{query}&rdquo;</div>
+              ) : (
+                filtered.map(section => (
+                  <section key={section.title} className={styles.section}>
+                    <h3 className={styles.sectionTitle}>{section.title}</h3>
+                    {section.note && <p className={styles.sectionNote}>{section.note}</p>}
+                    <div className={styles.entries}>
+                      {section.entries.map((e, i) => (
+                        <div key={i} className={styles.entry}>
+                          <code className={styles.cmd}>{e.cmd}</code>
+                          <span className={styles.desc}>{e.desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ))
+              )
+            )}
 
-          {tab === 'tutorial' && (
-            <div className={styles.tutContent}>{tutorialNodes}</div>
-          )}
+            {tab === 'tutorial' && (
+              <div className={styles.tutContent}>{tutorialNodes}</div>
+            )}
 
-          {tab === 'about' && <AboutContent />}
-        </div>
-
-      </div>
-    </div>
+            {tab === 'about' && <AboutContent />}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 }

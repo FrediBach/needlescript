@@ -1,31 +1,10 @@
 .stats {
   position: absolute;
-  left: 10px;
   top: 10px;
+  left: 10px;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
+  max-width: calc(100% - 90px); /* leave room for the density toggle */
   pointer-events: none;
-  max-width: calc(100% - 20px);
-}
-
-.chip {
-  background: rgba(255, 253, 247, 0.88);
-  border: 1px solid rgba(125, 100, 60, 0.35);
-  color: #4A3F2C;
-  border-radius: 999px;
-  padding: 3px 10px;
-  font-size: 11px;
-}
-
-.warn {
-  background: rgba(217, 164, 65, 0.18);
-  border-color: var(--gold);
-  color: #7A5A14;
-}
-
-.err {
-  background: rgba(200, 71, 47, 0.12);
-  border-color: var(--red);
-  color: #8F2D1B;
 }

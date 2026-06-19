@@ -1,21 +1,101 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,640&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  /* Use IBM Plex Mono as the app's default "sans" so shadcn base layer applies it */
+  --font-sans: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height, auto); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height, auto); }
+    to { height: 0; }
+  }
+}
 
 :root {
-  --night:   #1B2030;
-  --desk:    #252B41;
-  --desk-2:  #2D3450;
-  --line:    #3A4163;
-  --pale:    #EDE7DA;
-  --dim:     #9BA1BD;
-  --muslin:  #EFE8D8;
-  --muslin-2:#E5DCC7;
-  --hoop:    #B98B4E;
-  --hoop-d:  #7E5C2E;
-  --red:     #C8472F;
-  --red-d:   #A33823;
-  --gold:    #D9A441;
-  --mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --serif:   "Fraunces", Georgia, "Times New Roman", serif;
+  /* App design tokens */
+  --night:    #1B2030;
+  --desk:     #252B41;
+  --desk-2:   #2D3450;
+  --line:     #3A4163;
+  --pale:     #EDE7DA;
+  --dim:      #9BA1BD;
+  --muslin:   #EFE8D8;
+  --muslin-2: #E5DCC7;
+  --hoop:     #B98B4E;
+  --hoop-d:   #7E5C2E;
+  --red:      #C8472F;
+  --red-d:    #A33823;
+  --gold:     #D9A441;
+  --mono:     "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --serif:    "Fraunces", Georgia, "Times New Roman", serif;
+
+  /* shadcn/ui variables — always dark (the app has no light mode) */
+  --background:              oklch(0.19 0.024 255);   /* --night  #1B2030 */
+  --foreground:              oklch(0.93 0.016 80);    /* --pale   #EDE7DA */
+  --card:                    oklch(0.22 0.030 255);   /* --desk   #252B41 */
+  --card-foreground:         oklch(0.93 0.016 80);
+  --popover:                 oklch(0.26 0.035 255);   /* --desk-2 #2D3450 */
+  --popover-foreground:      oklch(0.93 0.016 80);
+  --primary:                 oklch(0.54 0.165 27);    /* --red    #C8472F */
+  --primary-foreground:      oklch(0.98 0.008 80);
+  --secondary:               oklch(0.26 0.035 255);   /* --desk-2 */
+  --secondary-foreground:    oklch(0.93 0.016 80);
+  --muted:                   oklch(0.26 0.035 255);   /* --desk-2 */
+  --muted-foreground:        oklch(0.67 0.030 255);   /* --dim    #9BA1BD */
+  --accent:                  oklch(0.33 0.044 255);   /* --line   #3A4163 */
+  --accent-foreground:       oklch(0.93 0.016 80);
+  --destructive:             oklch(0.54 0.165 27);    /* --red */
+  --destructive-foreground:  oklch(0.98 0.008 80);
+  --border:                  oklch(0.33 0.044 255);   /* --line */
+  --input:                   oklch(0.33 0.044 255);   /* --line */
+  --ring:                    oklch(0.73 0.130 70);    /* --gold   #D9A441 */
+  --radius:                  0.375rem;                /* 6px */
+
+  --chart-1: oklch(0.87 0.04 255);
+  --chart-2: oklch(0.67 0.030 255);
+  --chart-3: oklch(0.44 0.040 255);
+  --chart-4: oklch(0.37 0.044 255);
+  --chart-5: oklch(0.27 0.035 255);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -30,6 +110,15 @@ body {
   color: var(--pale);
   font-family: var(--mono);
   font-size: 13px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -6,6 +6,7 @@ import type { ConsoleMessage } from '../App.tsx';
 import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
 import Splitter from './Splitter.tsx';
 import styles from './EditorPane.module.css';
+import { Input } from '@/components/ui/input.tsx';
 
 interface Props {
   source: string;
@@ -211,15 +212,15 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
 
       <div className={styles.replRow}>
         <span className={styles.prompt}>›</span>
-        <input
+        <Input
           type="text"
-          className={styles.repl}
           value={replValue}
           onChange={e => setReplValue(e.target.value)}
           onKeyDown={handleReplKeyDown}
           autoComplete="off"
           placeholder="type a command and press Enter — it's appended to the pattern (↑ history)"
           aria-label="REPL input"
+          className="flex-1 h-auto py-[7px] px-[10px] text-[12.5px] font-mono bg-secondary border-border text-foreground placeholder:text-[#6E7494] focus-visible:ring-ring/50"
         />
       </div>
 

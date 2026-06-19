@@ -9,42 +9,7 @@
   color: #5A4D35;
 }
 
-.playBtn {
-  background: #FFFDF7;
-  border: 1px solid rgba(125, 100, 60, 0.45);
-  color: #4A3F2C;
-  width: 34px;
-  height: 30px;
-  padding: 0;
-  font-size: 13px;
-  cursor: pointer;
-  border-radius: 6px;
-  font-family: var(--mono);
-  flex-shrink: 0;
-}
-
-.playBtn:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 1px;
-}
-
-.speedSelect {
-  background: #FFFDF7;
-  border: 1px solid rgba(125, 100, 60, 0.45);
-  color: #4A3F2C;
-  height: 30px;
-  padding: 0 4px;
-  font-size: 11px;
-  cursor: pointer;
-  border-radius: 6px;
-  font-family: var(--mono);
-  flex-shrink: 0;
-}
-
-.speedSelect:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 1px;
-}
+/* play button and speed select are now shadcn components */
 
 .scrubArea {
   flex: 1;

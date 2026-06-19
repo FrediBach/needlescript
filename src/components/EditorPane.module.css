@@ -93,25 +93,7 @@
   font-weight: 600;
 }
 
-.repl {
-  flex: 1;
-  background: var(--desk-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 7px 10px;
-  color: var(--pale);
-  font-family: var(--mono);
-  font-size: 12.5px;
-}
-
-.repl::placeholder {
-  color: #6E7494;
-}
-
-.repl:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 1px;
-}
+/* .repl replaced by shadcn Input component */
 
 .dropOverlay {
   position: absolute;
