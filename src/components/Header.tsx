@@ -136,7 +136,7 @@ function ExportDropdown({ onDownload }: { onDownload: (fmt: ExportFormat) => voi
       >
         Export <ChevronDownIcon className="size-[11px] opacity-75 -ml-0.5" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[156px] font-mono text-[12.5px]">
+      <DropdownMenuContent align="end" className="min-w-[176px] font-mono text-[12.5px]">
         {(['dst', 'pes', 'exp'] as ExportFormat[]).map(fmt => (
           <DropdownMenuItem key={fmt} onClick={() => onDownload(fmt)}>
             <DownloadIcon className="size-3.5 opacity-55" />
