@@ -3,7 +3,7 @@ import { EXAMPLE_TIERS } from '../data.ts';
 import type { HoopConfig } from '../data.ts';
 import { HoopIcon } from './HoopDialog.tsx';
 import styles from './Header.module.css';
-import { Button, buttonVariants } from '@/components/ui/button.tsx';
+import { buttonVariants } from '@/components/ui/button.tsx';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -31,7 +31,6 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip.tsx';
-import { Separator } from '@/components/ui/separator.tsx';
 import {
   MenuIcon,
   ChevronDownIcon,
@@ -80,18 +79,26 @@ function LogoIcon({ size = 22 }: { size?: number }) {
 // Shared sizing token for all header buttons
 const hdrBtn = "h-[30px] text-[12.5px] font-mono cursor-pointer flex-shrink-0";
 
-// ── Thin vertical group separator ─────────────────────────────────────────────
-// No height override — the base-ui Separator's data-vertical:self-stretch lets
-// it fill the container height naturally (matches the 48px header row).
-// opacity-50 keeps it subtle against the dark background.
-function VSep({ className }: { className?: string }) {
-  return (
-    <Separator
-      orientation="vertical"
-      className={cn("flex-shrink-0 mx-1.5 opacity-50", className)}
-    />
-  );
-}
+// Red primary style — Run and Export share this look
+const redBtn = cn(
+  hdrBtn, "px-3.5 relative rounded-[6px] border",
+  "inline-flex items-center font-semibold select-none",
+  "bg-[var(--red)] border-[var(--red-d)] text-[#FFF4EA]",
+  "hover:bg-[#D55036]",
+  "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:border-ring",
+  "after:absolute after:inset-[3px] after:border after:border-dashed after:border-white/55 after:rounded-[3px] after:pointer-events-none",
+  "disabled:pointer-events-none disabled:opacity-50",
+);
+
+// Blue secondary style — Hoop, Import SVG, Share
+const blueBtn = cn(
+  hdrBtn, "px-2.5 rounded-[6px] border",
+  "inline-flex items-center gap-1.5",
+  "bg-[#1E2A42] border-[#3A5090] text-[#7AAFE0]",
+  "hover:bg-[#243255] hover:border-[#4460A8] hover:text-[#8FC8F0]",
+  "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:border-ring",
+  "disabled:pointer-events-none disabled:opacity-50",
+);
 
 // ── Examples select — reused in header ────────────────────────────────────────
 function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) => void }) {
@@ -99,7 +106,7 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
     <Select onValueChange={(val: string | null) => { if (val) onExampleSelect(val); }}>
       <SelectTrigger
         aria-label="Example programs"
-        className={cn(hdrBtn, "w-[180px] bg-secondary gap-1 pr-1.5")}
+        className={cn(hdrBtn, "w-[180px] bg-secondary border-[#3A5090] gap-1 pr-1.5")}
       >
         <SelectValue placeholder="examples" />
       </SelectTrigger>
@@ -127,11 +134,7 @@ function ExportDropdown({ onDownload }: { onDownload: (fmt: ExportFormat) => voi
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className={cn(
-          buttonVariants({ variant: 'default' }),
-          hdrBtn, "px-3.5 gap-1 relative",
-          "after:absolute after:inset-[3px] after:border after:border-dashed after:border-white/55 after:rounded-sm after:pointer-events-none",
-        )}
+        className={cn(redBtn, "gap-1")}
         aria-label="Export embroidery file"
       >
         Export <ChevronDownIcon className="size-[11px] opacity-75 -ml-0.5" />
@@ -172,19 +175,19 @@ function ShareButton({ onShare }: { onShare: () => Promise<void> }) {
     : 'Share';
 
   return (
-    <Button
-      variant="outline"
+    <button
+      type="button"
       onClick={handleClick}
       disabled={state === 'pending'}
       aria-label="Copy shareable link to clipboard"
       className={cn(
-        hdrBtn, "w-[72px] justify-center",
+        blueBtn, "w-[72px] justify-center",
         state === 'copied' && "bg-[#1e4030] border-[#2e6048] text-[#7ddaab] hover:bg-[#1e4030] hover:border-[#2e6048]",
         state === 'error'  && "bg-[#3d1e1e] border-[#6a2a2a] text-[#f08080] hover:bg-[#3d1e1e] hover:border-[#6a2a2a]",
       )}
     >
       {label}
-    </Button>
+    </button>
   );
 }
 
@@ -331,7 +334,7 @@ export default function Header({
           <TooltipTrigger
             onClick={onOpenHoopDialog}
             aria-label={`Hoop: ${hoop.label}`}
-            className={cn(buttonVariants({ variant: 'outline' }), hdrBtn, "gap-1.5 px-2.5")}
+            className={blueBtn}
           >
             <HoopIcon hoop={hoop} size={14} />
             {/* Hoop label visible only at lg+ to save space at md */}
@@ -349,7 +352,7 @@ export default function Header({
         <Tooltip>
           <TooltipTrigger
             onClick={onSVGImport}
-            className={cn(buttonVariants({ variant: 'outline' }), hdrBtn, "gap-1.5 px-2.5")}
+            className={blueBtn}
             aria-label="Import an SVG file"
           >
             <UploadIcon className="size-3.5 opacity-65" />
@@ -367,16 +370,7 @@ export default function Header({
       <button
         type="button"
         onClick={onRun}
-        className={cn(
-          "inline-flex items-center gap-1.5 flex-shrink-0 cursor-pointer select-none",
-          "font-mono font-semibold",
-          hdrBtn, "px-3.5 relative rounded-[6px]",
-          "bg-[var(--red)] border border-[var(--red-d)] text-[#FFF4EA]",
-          "hover:bg-[#D55036]",
-          "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:border-ring",
-          // Dashed inner border — the signature visual of the primary action
-          "after:absolute after:inset-[3px] after:border after:border-dashed after:border-white/55 after:rounded-[3px] after:pointer-events-none",
-        )}
+        className={cn(redBtn, "gap-1.5")}
       >
         Run [cmd+enter]
       </button>
