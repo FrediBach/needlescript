@@ -1,7 +1,13 @@
 /* ── Language Reference content ── */
 
 .section {
-  padding: 10px 20px 6px;
+  padding: 10px 16px 6px;
+}
+
+@media (min-width: 640px) {
+  .section {
+    padding: 10px 20px 6px;
+  }
 }
 
 .section + .section {
@@ -24,10 +30,18 @@
   line-height: 1.55;
 }
 
+/* Responsive two-column grid: single column below ~740px, two columns above */
 .entries {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 1px 28px;
+  grid-template-columns: 1fr;
+  gap: 2px 28px;
+}
+
+@media (min-width: 740px) {
+  .entries {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1px 28px;
+  }
 }
 
 .entry {
@@ -38,14 +52,32 @@
   align-items: baseline;
 }
 
+/* On small screens stack command above description */
+@media (max-width: 500px) {
+  .entry {
+    flex-direction: column;
+    gap: 2px;
+    padding: 5px 0;
+  }
+}
+
 .cmd {
   color: var(--gold);
-  white-space: nowrap;
   min-width: 0;
   flex-shrink: 0;
-  max-width: 260px;
+  /* Responsive max-width: never wider than half the container */
+  max-width: min(260px, 50%);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* When stacked on mobile, cmd can take full width and wrap */
+@media (max-width: 500px) {
+  .cmd {
+    max-width: 100%;
+    white-space: normal;
+  }
 }
 
 .desc {
@@ -55,7 +87,7 @@
 }
 
 .empty {
-  padding: 40px 20px;
+  padding: 40px 16px;
   color: var(--dim);
   font-size: 13px;
   text-align: center;
@@ -75,8 +107,14 @@
 /* ── Tutorial content ── */
 
 .tutContent {
-  padding: 20px 28px 32px;
+  padding: 16px 16px 28px;
   max-width: 780px;
+}
+
+@media (min-width: 640px) {
+  .tutContent {
+    padding: 20px 28px 32px;
+  }
 }
 
 .tutH1 {
@@ -133,12 +171,18 @@
   border: 1px solid var(--line);
   border-left: 3px solid rgba(217, 164, 65, 0.35);
   border-radius: 0 6px 6px 0;
-  padding: 12px 16px;
+  padding: 10px 14px;
   overflow-x: auto;
   margin: 8px 0 14px;
   font-size: 12px;
   line-height: 1.6;
   color: var(--pale);
+}
+
+@media (min-width: 640px) {
+  .tutPre {
+    padding: 12px 16px;
+  }
 }
 
 .tutPre code {
@@ -148,7 +192,7 @@
 
 .tutBlockquote {
   border-left: 3px solid rgba(217, 164, 65, 0.5);
-  padding: 8px 14px;
+  padding: 8px 12px;
   margin: 10px 0 12px;
   background: rgba(217, 164, 65, 0.05);
   border-radius: 0 5px 5px 0;
@@ -174,12 +218,14 @@
 .tutTableWrap {
   overflow-x: auto;
   margin: 8px 0 14px;
+  /* Negative margin to allow table to use full available width on mobile */
+  -webkit-overflow-scrolling: touch;
 }
 
 .tutTable {
   border-collapse: collapse;
   font-size: 12px;
-  width: 100%;
+  min-width: 100%;
 }
 
 .tutTh {
@@ -213,8 +259,14 @@
 /* ── About content ── */
 
 .about {
-  padding: 32px 32px 40px;
+  padding: 24px 16px 32px;
   max-width: 640px;
+}
+
+@media (min-width: 640px) {
+  .about {
+    padding: 32px 32px 40px;
+  }
 }
 
 .aboutTitle {

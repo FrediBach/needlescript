@@ -11,6 +11,7 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  TabsContent,
 } from '@/components/ui/tabs.tsx';
 import { Input } from '@/components/ui/input.tsx';
 import { ScrollArea } from '@/components/ui/scroll-area.tsx';
@@ -495,6 +496,12 @@ function AboutContent() {
 
 type TabId = 'reference' | 'tutorial' | 'about';
 
+const TAB_LABELS: Record<TabId, string> = {
+  reference: 'Language Reference',
+  tutorial:  'Tutorial',
+  about:     'About',
+};
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -506,6 +513,7 @@ export default function ReferenceDialog({ open, onClose }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const tutorialNodes = useMemo(() => parseMarkdown(tutorialMd), []);
 
+  // Auto-focus search when dialog opens on reference tab, clear on close
   useEffect(() => {
     if (open && tab === 'reference') {
       setTimeout(() => inputRef.current?.focus(), 40);
@@ -514,11 +522,9 @@ export default function ReferenceDialog({ open, onClose }: Props) {
     }
   }, [open, tab]);
 
-  // Escape handled natively by base-ui Dialog; this is belt-and-suspenders
+  // Escape handled natively by base-ui Dialog; belt-and-suspenders
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && open) onClose();
-    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape' && open) onClose(); }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
@@ -533,49 +539,58 @@ export default function ReferenceDialog({ open, onClose }: Props) {
       })).filter(s => s.entries.length > 0)
     : SECTIONS;
 
-  const TAB_LABELS: Record<TabId, string> = {
-    reference: 'Language Reference',
-    tutorial:  'Tutorial',
-    about:     'About',
-  };
+  // Shared TabsTrigger className
+  const triggerCls = cn(
+    "font-mono text-[11px] tracking-[0.07em] px-2.5 py-1.5 h-auto whitespace-nowrap",
+    "rounded-[5px] border-transparent shadow-none bg-transparent",
+    "text-muted-foreground hover:text-foreground transition-colors",
+    "data-active:bg-[rgba(217,164,65,0.10)] data-active:text-[var(--gold)]",
+    "data-active:border-transparent data-active:shadow-none",
+    "after:hidden",  // suppress line-variant underline indicator
+    "focus-visible:ring-2 focus-visible:ring-ring/50",
+  );
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
       <DialogContent
         showCloseButton={false}
         className={cn(
-          "max-w-[900px] w-full max-h-[84vh] p-0 gap-0",
-          "rounded-xl overflow-hidden flex flex-col bg-card border border-border",
+          // Responsive sizing: explicit height anchors the scroll chain;
+          // max-width keeps it comfortable on wide screens.
+          "w-full max-w-[min(900px,calc(100%-1.5rem))]",
+          "h-[min(820px,calc(100dvh-2rem))]",
+          // Custom layout
+          "p-0 gap-0 flex flex-col",
+          // Visual
+          "rounded-xl overflow-hidden bg-card border border-border",
         )}
         aria-label="NeedleScript help"
       >
-        {/* Header with tabs + search + close */}
-        <div className="flex items-center gap-2.5 px-[14px] h-11 border-b border-dashed border-border flex-shrink-0">
-          {/* Title */}
-          <span className="text-[11px] tracking-[0.16em] uppercase text-[var(--gold)] whitespace-nowrap select-none flex-shrink-0">
+        {/* ── Row 1: branding + close ── */}
+        <div className="flex items-center justify-between px-3.5 sm:px-4 h-10 flex-shrink-0 border-b border-dashed border-border">
+          <span className="text-[11px] tracking-[0.16em] uppercase text-[var(--gold)] select-none whitespace-nowrap">
             ✣ NeedleScript
           </span>
+          <DialogClose className="text-[14px] font-mono text-muted-foreground bg-transparent border-none cursor-pointer px-[6px] py-[3px] rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+            ✕
+          </DialogClose>
+        </div>
 
-          {/* Tabs + optional search */}
-          <div className="flex-1 flex items-center gap-2 min-w-0">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="flex-shrink-0">
-              <TabsList variant="line" className="h-auto p-0 bg-transparent gap-0.5">
-                {(Object.keys(TAB_LABELS) as TabId[]).map(t => (
-                  <TabsTrigger
-                    key={t}
-                    value={t}
-                    className={cn(
-                      "font-mono text-[11px] tracking-[0.07em] px-2.5 py-[5px] h-auto rounded-[5px]",
-                      "text-muted-foreground hover:text-foreground",
-                      "data-active:text-[var(--gold)] data-active:bg-[rgba(217,164,65,0.10)]",
-                      "focus-visible:ring-2 focus-visible:ring-ring",
-                    )}
-                  >
-                    {TAB_LABELS[t]}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+        {/* ── Tabs: triggers (row 2) + panels (body) ── */}
+        <Tabs
+          value={tab}
+          onValueChange={(v: string | null) => { if (v) setTab(v as TabId); }}
+          className="flex-1 min-h-0 gap-0 overflow-hidden"
+        >
+          {/* Row 2: tab triggers + optional search */}
+          <div className="flex items-center gap-2 px-3.5 sm:px-4 py-2 flex-shrink-0 border-b border-dashed border-border flex-wrap sm:flex-nowrap">
+            <TabsList className="bg-transparent p-0 h-auto gap-0.5 flex-shrink-0">
+              {(Object.keys(TAB_LABELS) as TabId[]).map(t => (
+                <TabsTrigger key={t} value={t} className={triggerCls}>
+                  {TAB_LABELS[t]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
             {tab === 'reference' && (
               <Input
@@ -587,51 +602,53 @@ export default function ReferenceDialog({ open, onClose }: Props) {
                 spellCheck={false}
                 aria-label="Filter language reference"
                 className={cn(
-                  "flex-1 h-7 text-[12.5px] font-mono",
-                  "bg-secondary border-border text-foreground",
-                  "placeholder:text-muted-foreground",
+                  "h-7 text-[12.5px] font-mono flex-1 min-w-[120px] w-full sm:w-auto",
+                  "bg-secondary border-border text-foreground placeholder:text-muted-foreground",
                 )}
               />
             )}
           </div>
 
-          {/* Close button */}
-          <DialogClose className="text-[14px] font-mono text-muted-foreground bg-transparent border-none cursor-pointer px-[6px] py-[3px] rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex-shrink-0">
-            ✕
-          </DialogClose>
-        </div>
+          {/* ── Language Reference panel ── */}
+          <TabsContent value="reference" className="flex flex-col min-h-0 mt-0 overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="pb-4">
+                {filtered.length === 0 ? (
+                  <div className={styles.empty}>no matches for &ldquo;{query}&rdquo;</div>
+                ) : (
+                  filtered.map(section => (
+                    <section key={section.title} className={styles.section}>
+                      <h3 className={styles.sectionTitle}>{section.title}</h3>
+                      {section.note && <p className={styles.sectionNote}>{section.note}</p>}
+                      <div className={styles.entries}>
+                        {section.entries.map((e, i) => (
+                          <div key={i} className={styles.entry}>
+                            <code className={styles.cmd}>{e.cmd}</code>
+                            <span className={styles.desc}>{e.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
 
-        {/* Scrollable body */}
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="pb-4">
-            {tab === 'reference' && (
-              filtered.length === 0 ? (
-                <div className={styles.empty}>no matches for &ldquo;{query}&rdquo;</div>
-              ) : (
-                filtered.map(section => (
-                  <section key={section.title} className={styles.section}>
-                    <h3 className={styles.sectionTitle}>{section.title}</h3>
-                    {section.note && <p className={styles.sectionNote}>{section.note}</p>}
-                    <div className={styles.entries}>
-                      {section.entries.map((e, i) => (
-                        <div key={i} className={styles.entry}>
-                          <code className={styles.cmd}>{e.cmd}</code>
-                          <span className={styles.desc}>{e.desc}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ))
-              )
-            )}
-
-            {tab === 'tutorial' && (
+          {/* ── Tutorial panel ── */}
+          <TabsContent value="tutorial" className="flex flex-col min-h-0 mt-0 overflow-hidden">
+            <ScrollArea className="h-full">
               <div className={styles.tutContent}>{tutorialNodes}</div>
-            )}
+            </ScrollArea>
+          </TabsContent>
 
-            {tab === 'about' && <AboutContent />}
-          </div>
-        </ScrollArea>
+          {/* ── About panel ── */}
+          <TabsContent value="about" className="flex flex-col min-h-0 mt-0 overflow-hidden">
+            <ScrollArea className="h-full">
+              <AboutContent />
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
