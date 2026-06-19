@@ -105,24 +105,17 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
     <Select onValueChange={(val: string | null) => { if (val) onExampleSelect(val); }}>
       <SelectTrigger
         aria-label="Example programs"
-        className={cn(hdrBtn, "w-[115px] bg-secondary gap-1 pr-1.5")}
+        className={cn(hdrBtn, "w-[240px] bg-secondary gap-1 pr-1.5")}
       >
         <SelectValue placeholder="examples" />
       </SelectTrigger>
       <SelectContent className="font-mono text-[12.5px]">
-        <SelectGroup>
-          <SelectLabel className="text-[10px] tracking-wider uppercase">Built-in</SelectLabel>
-          {Object.keys(EXAMPLES).map(k => (
-            <SelectItem key={k} value={k}>{shortName(k)}</SelectItem>
-          ))}
-        </SelectGroup>
-        <SelectSeparator />
-        <SelectGroup>
-          <SelectLabel className="text-[10px] tracking-wider uppercase">Gallery</SelectLabel>
-          {Object.keys(GALLERY_EXAMPLES).map(k => (
-            <SelectItem key={k} value={k}>{k}</SelectItem>
-          ))}
-        </SelectGroup>
+        {Object.keys(EXAMPLES).map(k => (
+          <SelectItem key={k} value={k}>{shortName(k)}</SelectItem>
+        ))}
+        {Object.keys(GALLERY_EXAMPLES).map(k => (
+          <SelectItem key={k} value={k}>{k}</SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );

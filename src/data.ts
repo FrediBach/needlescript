@@ -417,7 +417,7 @@ export const GALLERY_EXAMPLES: Record<string, string> = {
   'lines':      linesRaw,
   'venn':       vennRaw,
   'contour':    contourRaw,
-  'spirograph':    spirographRaw,
-  'complex spirograph': complexspirographRaw,
+  'spirograph 1':    spirographRaw,
+  'spirograph 2': complexspirographRaw,
   'disturbance':    disturbanceRaw,
 };
