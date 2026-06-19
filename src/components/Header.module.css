@@ -1,44 +1,56 @@
+/* ── Header shell ──────────────────────────────────────────────────────────── */
+
 .header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 10px 16px;
+  /* Small gap; groups add their own internal gap via Tailwind gap-* */
+  gap: 4px;
+  padding: 0 12px;
+  /* Fixed height keeps the toolbar exactly one line on every viewport */
+  height: 48px;
+  flex-shrink: 0;
   background: var(--night);
   border-bottom: 1px dashed var(--line);
-  flex-shrink: 0;
+  /* Belt-and-suspenders: clip anything that could cause a second row */
+  overflow: hidden;
 }
 
-.wordmark {
+/* ── Brand zone ────────────────────────────────────────────────────────────── */
+
+.brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-right: auto;
-  color: var(--pale); /* currentColor for the inline LogoIcon SVG */
+  gap: 8px;
+  flex-shrink: 0;
+  /* currentColor is inherited by the inline LogoIcon SVG */
+  color: var(--pale);
 }
 
-.wordmark h1 {
+/* h1 inside brand — apply class via cn(styles.wordmarkText, "hidden sm:block") */
+.wordmarkText {
   font-family: var(--serif);
   font-weight: 640;
-  font-size: 21px;
+  font-size: 19px;
   margin: 0;
   letter-spacing: 0.04em;
   color: var(--pale);
+  white-space: nowrap;
 }
 
 .tag {
   color: var(--dim);
-  font-size: 11.5px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
-@media (max-width: 1240px) {
-  .tag { display: none; }
-}
+/* ── Keyboard shortcut badge (inside Run button) ───────────────────────────── */
 
 kbd {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.80);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 3px;
   padding: 1px 4px;
+  font-family: inherit;
+  letter-spacing: 0;
 }
