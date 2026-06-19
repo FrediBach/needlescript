@@ -106,7 +106,7 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
     <Select onValueChange={(val: string | null) => { if (val) onExampleSelect(val); }}>
       <SelectTrigger
         aria-label="Example programs"
-        className={cn(hdrBtn, "w-[180px] bg-secondary border-[#3A5090] gap-1 pr-1.5")}
+        className={cn(hdrBtn, "w-[180px] bg-secondary border-[rgba(255,255,255,0.4)] gap-1")}
       >
         <SelectValue placeholder="examples" />
       </SelectTrigger>
