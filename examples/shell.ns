@@ -1,0 +1,13 @@
+// ============================================================
+//  SHELL — WHILE + ARC
+//  Arcs of growing radius until the edge. print traces the
+//  radius in the console.
+// ============================================================
+
+up setxy -12 14 seth 90 down
+make "r 2.2
+while :r < 26 [
+  arc 100 :r
+  make "r :r * 1.16
+  print "radius :r
+]

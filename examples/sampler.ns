@@ -1,0 +1,16 @@
+// ============================================================
+//  SAMPLER — FOUR LINE WEIGHTS
+//  Four rows demonstrate the main stitch types: running,
+//  bean, satin, and blanket (estitch).
+// ============================================================
+
+; running, bean, satin, blanket
+stitchlen 2.5
+up setxy -30 27 seth 90 down
+fd 60
+up setxy -30 10 seth 90 down
+bean 3 fd 60 bean 1
+up setxy -30 -8 seth 90 down
+satin 2.5 fd 60 satin 0
+up setxy -30 -24 seth 90 down
+estitch 4 fd 60 estitch 0

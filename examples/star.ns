@@ -1,0 +1,11 @@
+// ============================================================
+//  STAR — SATIN STITCH
+//  Satin makes a zigzag column 3 mm wide. A five-pointed
+//  star is traced with the needle down.
+// ============================================================
+
+; satin makes a zigzag column 3 mm wide
+up setxy -6 -21 down
+satin 3
+repeat 5 [ fd 42 rt 144 ]
+satin 0

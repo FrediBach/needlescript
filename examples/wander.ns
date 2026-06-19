@@ -1,0 +1,15 @@
+// ============================================================
+//  WANDER — BOUNDED RANDOM WALK
+//  A random walk that turns back at the edge.
+//  Change the seed for a new design.
+// ============================================================
+
+seed 11
+stitchlen 2
+repeat 420 [
+  fd 2.6
+  rt random 70 - 35
+  if sqrt ( xcor * xcor + ycor * ycor ) > 36 [
+    rt 140 + random 80
+  ]
+]

@@ -1,0 +1,12 @@
+// ============================================================
+//  BLOOM — ROSE OF CIRCLES
+//  Twelve overlapping circles make a rose. The small fd
+//  between circles spreads their start points so no hole
+//  is punched twice.
+// ============================================================
+
+stitchlen 2.2
+repeat 12 [
+  repeat 36 [ fd 3.4 rt 10 ]
+  rt 30 fd 0.8
+]

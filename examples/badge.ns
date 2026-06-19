@@ -1,0 +1,18 @@
+// ============================================================
+//  BADGE — TATAMI FILL, BEAN BORDER
+//  Trace a boundary between beginfill/endfill, then retrace
+//  it with a bold triple-run bean stitch line.
+// ============================================================
+
+; trace a boundary between beginfill/endfill,
+; then retrace it with a bold triple-run line
+fillangle 30
+up setxy -26 -15 down
+beginfill
+  repeat 6 [ fd 30 rt 60 ]
+endfill
+
+color 3
+bean 3
+repeat 6 [ fd 30 rt 60 ]
+bean 1

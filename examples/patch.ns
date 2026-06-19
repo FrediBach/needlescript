@@ -1,0 +1,22 @@
+// ============================================================
+//  PATCH — KNIT-READY BADGE
+//  The fabric preset adds pull compensation and automatic
+//  underlay. The fill is inset so the satin border covers
+//  its edge; that border still measures ~4 layers — fine for
+//  a badge, so the limit is raised knowingly.
+//  Toggle "density" on the stage to see it.
+// ============================================================
+
+fabric "knit
+maxdensity 4.5
+fillangle 25
+up setxy -12.8 -14.8 down
+beginfill
+  repeat 4 [ fd 16 arc 90 4.8 ]
+endfill
+
+color 0
+up setxy -14 -16 down
+satin 3
+repeat 4 [ fd 16 arc 90 6 ]
+satin 0

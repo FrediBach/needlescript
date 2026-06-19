@@ -1,0 +1,33 @@
+// shatter — Voronoi tiles with inset outlines and flow-field
+// hatching inside: a tour of the generative math (RFC-3).
+// scatter → voronoi → offsetpath → resample → sewpath compose
+// because a point is [x, y], a path is a list of points, and a
+// region is a closed path.
+
+seed 4
+let pts = scatter(9)              // Poisson-disc over the sewable field
+let tiles = voronoi(pts)
+
+color 1
+for cell in tiles [
+  for ring in offsetpath(cell, -0.9) [   // may be 0, 1, or 2+ rings
+    sewpath(resample(ring, 2.2))
+    setpos(ring[0])                      // close the outline
+  ]
+  trim
+]
+
+color 2
+for cell in tiles [
+  let c = centroid(cell)
+  if inpath(c, cell) [             // concave cells can evict their centroid
+    up setpos(c) down
+    repeat 25 [                    // walk the noise field until we leave the cell
+      seth(snoise2(xcor / 14, ycor / 14) * 180)
+      let nxt = vadd(pos(), vfromheading(heading, 1.8))
+      if !inpath(nxt, cell) [ break ]
+      fd 1.8
+    ]
+    trim
+  ]
+]

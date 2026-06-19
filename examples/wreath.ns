@@ -1,0 +1,15 @@
+// ============================================================
+//  WREATH — LEAF PROCEDURE
+//  A leaf is two 90-degree arcs. Eight leaves sewn around
+//  a centre point form a simple wreath.
+// ============================================================
+
+; a leaf is two 90-degree arcs
+to leaf :s
+  repeat 2 [
+    repeat 30 [ fd :s rt 3 ]
+    rt 90
+  ]
+end
+
+repeat 8 [ leaf 1.2 rt 45 fd 0.6 ]

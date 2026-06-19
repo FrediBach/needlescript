@@ -1,0 +1,20 @@
+// ============================================================
+//  TREE — RECURSION, SEWN OUT AND BACK
+//  Branches retrace themselves (bk) so the whole tree sews
+//  as one unbroken thread with no jumps or trims.
+// ============================================================
+
+to branch :len
+  if :len < 5 [ fd :len bk :len ]
+  else [
+    fd :len / 2
+    lt 28 branch :len * 0.62 rt 28
+    fd :len / 4
+    rt 32 branch :len * 0.62 lt 32
+    fd :len / 4
+    bk :len
+  ]
+end
+
+up setxy 0 -27 down
+branch 34

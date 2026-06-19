@@ -1,0 +1,21 @@
+// ============================================================
+//  FLOW — NOISE FIELD STRANDS
+//  Strands drift through a smooth noise field. exit stops
+//  a strand at the boundary circle.
+// ============================================================
+
+to strand
+  repeat 90 [
+    seth ( noise2 xcor / 16 ycor / 16 ) * 720
+    fd 1.8
+    if distance 0 0 > 40 [ exit ]
+  ]
+end
+
+seed 9
+stitchlen 2
+repeat 14 [
+  up setxy random 64 - 32 random 64 - 32 down
+  strand
+  trim
+]

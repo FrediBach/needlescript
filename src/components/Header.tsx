@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { EXAMPLES, GALLERY_EXAMPLES } from '../data.ts';
+import { EXAMPLES } from '../data.ts';
 import type { HoopConfig } from '../data.ts';
 import { HoopIcon } from './HoopDialog.tsx';
 import styles from './Header.module.css';
@@ -22,9 +22,6 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-  SelectGroup,
-  SelectLabel,
-  SelectSeparator,
 } from '@/components/ui/select.tsx';
 import {
   Tooltip,
@@ -77,12 +74,6 @@ function LogoIcon({ size = 22 }: { size?: number }) {
   );
 }
 
-// Strip " — description" suffix: "bloom — rose of circles" → "bloom"
-function shortName(key: string): string {
-  const sep = key.indexOf(' — ');
-  return sep >= 0 ? key.slice(0, sep) : key;
-}
-
 // Shared sizing token for all header buttons
 const hdrBtn = "h-[30px] text-[12.5px] font-mono cursor-pointer flex-shrink-0";
 
@@ -111,9 +102,6 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
       </SelectTrigger>
       <SelectContent className="font-mono text-[12.5px]">
         {Object.keys(EXAMPLES).map(k => (
-          <SelectItem key={k} value={k}>{shortName(k)}</SelectItem>
-        ))}
-        {Object.keys(GALLERY_EXAMPLES).map(k => (
           <SelectItem key={k} value={k}>{k}</SelectItem>
         ))}
       </SelectContent>
@@ -246,19 +234,7 @@ function HamburgerMenu({
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Examples</DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="min-w-[172px] max-h-[320px] overflow-y-auto font-mono text-[12.5px]">
-              <DropdownMenuLabel className="text-[10px] tracking-[0.13em] uppercase text-[#6E7494]">
-                Built-in
-              </DropdownMenuLabel>
               {Object.keys(EXAMPLES).map(k => (
-                <DropdownMenuItem key={k} onClick={() => onExampleSelect(k)}>
-                  {shortName(k)}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[10px] tracking-[0.13em] uppercase text-[#6E7494]">
-                Gallery
-              </DropdownMenuLabel>
-              {Object.keys(GALLERY_EXAMPLES).map(k => (
                 <DropdownMenuItem key={k} onClick={() => onExampleSelect(k)}>
                   {k}
                 </DropdownMenuItem>
