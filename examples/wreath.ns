@@ -1,10 +1,14 @@
 // ============================================================
 //  WREATH — LEAF PROCEDURE
-//  A leaf is two 90-degree arcs. Eight leaves sewn around
+//  A leaf is two 90-degree arcs. Leaves sewn around
 //  a centre point form a simple wreath.
 // ============================================================
 
-; a leaf is two 90-degree arcs
+// --- shape ---
+let nleaves  = 8    // [3:16] number of leaves
+let leafsize = 1.2  // [0.4:0.1:2.5] arc step length → leaf size
+let spread   = 0.6  // [0:0.1:2] inward fd between leaves, mm
+
 to leaf :s
   repeat 2 [
     repeat 30 [ fd :s rt 3 ]
@@ -12,4 +16,4 @@ to leaf :s
   ]
 end
 
-repeat 8 [ leaf 1.2 rt 45 fd 0.6 ]
+repeat nleaves [ leaf leafsize rt (360 / nleaves) fd spread ]

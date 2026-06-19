@@ -4,12 +4,18 @@
 //  Change the seed for a new design.
 // ============================================================
 
+// --- walk ---
+let nsteps    = 420  // [50:2000] total steps
+let stepsize  = 2.6  // [1:0.2:6] distance per step, mm
+let turnrange = 35   // [5:80] max random turn angle, degrees
+let boundary  = 36   // [15:44] bounce distance from centre, mm
+
 seed 11
 stitchlen 2
-repeat 420 [
-  fd 2.6
-  rt random 70 - 35
-  if sqrt ( xcor * xcor + ycor * ycor ) > 36 [
+repeat nsteps [
+  fd stepsize
+  rt random(turnrange * 2) - turnrange
+  if sqrt(xcor * xcor + ycor * ycor) > boundary [
     rt 140 + random 80
   ]
 ]

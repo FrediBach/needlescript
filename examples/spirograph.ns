@@ -13,20 +13,18 @@
 //  It also auto-scales to fill the hoop, whatever R, r, d you pick.
 // ============================================================
 
-// --- the three spirograph dials ---
-let bigR  = 96     // fixed (outer) circle radius — "teeth" of the ring
-let rollR = 22     // rolling circle radius — "teeth" of the wheel
-let pen   = 40     // pen offset from the rolling circle's centre
-                   //   pen < rollR stays inside the wheel; pen > rollR loops out
+// --- dials ---
+let bigR  = 96     // [10:200] fixed (outer) circle radius — "teeth" of the ring
+let rollR = 22     // [5:80] rolling circle radius — "teeth" of the wheel
+let pen   = 40     // [5:80] pen offset from the rolling circle's centre
 
 // --- mode ---
-let inside = 1     // 1 = hypotrochoid (wheel rolls INSIDE the ring)
-                   // 0 = epitrochoid  (wheel rolls OUTSIDE the ring)
+let inside = 1     // [switch:outside,inside] 1 = hypotrochoid (wheel rolls INSIDE the ring)
 
 // --- detail & look ---
-let fit    = 43    // scale the finished curve to this radius, mm (< 47)
-let smooth = 240    // sample points per revolution (higher = smoother)
-let stitch = 1.8
+let fit    = 43    // [20:46] scale the finished curve to this radius, mm (< 47)
+let smooth = 240   // [60:20:600] sample points per revolution (higher = smoother)
+let stitch = 1.8   // [1:0.1:4]
 
 seed 7
 stitchlen stitch

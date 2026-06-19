@@ -4,13 +4,16 @@
 //  bean, satin, and blanket (estitch).
 // ============================================================
 
-; running, bean, satin, blanket
-stitchlen 2.5
+let stitch = 2.5  // [1.5:0.1:5] stitch length, mm
+let satinw = 2.5  // [1:0.5:6] satin width, mm
+let stitchw = 4   // [2:0.5:8] estitch prong width, mm
+
+stitchlen stitch
 up setxy -30 27 seth 90 down
 fd 60
 up setxy -30 10 seth 90 down
 bean 3 fd 60 bean 1
 up setxy -30 -8 seth 90 down
-satin 2.5 fd 60 satin 0
+satin satinw fd 60 satin 0
 up setxy -30 -24 seth 90 down
-estitch 4 fd 60 estitch 0
+estitch stitchw fd 60 estitch 0

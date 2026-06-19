@@ -4,20 +4,20 @@
 // ============================================================
 
 // --- form ---
-let arms        = 6      // number of arms (6 = a real snowflake; try 5 or 8)
-let complexity  = 5      // branch PAIRS along each arm — the main detail knob (1–9)
-let armlen      = 34     // length of each arm, mm (keep arms*0 + armlen < 47)
+let arms        = 6      // [3:12] number of arms (6 = a real snowflake; try 5 or 8)
+let complexity  = 5      // [1:9] branch PAIRS along each arm — the main detail knob
+let armlen      = 34     // [10:46] length of each arm, mm
 
 // --- branches ---
-let branchangle = 55     // splay of branches off the spine, degrees
-let branchbase  = 0.30   // first branch starts this far along the arm (0–1)
-let branchspan  = 0.55   // branches spread across this much of the arm (0–1)
-let branchscale = 0.42   // branch length as a fraction of the arm length
-let branchtaper = 1      // 1 = branches shrink toward the tip, 0 = all equal
+let branchangle = 55     // [15:85] splay of branches off the spine, degrees
+let branchbase  = 0.30   // [0:0.05:0.9] first branch starts this far along the arm (0–1)
+let branchspan  = 0.55   // [0:0.05:0.9] branches spread across this much of the arm (0–1)
+let branchscale = 0.42   // [0.1:0.02:0.8] branch length as a fraction of the arm length
+let branchtaper = 1      // [switch:no,yes] 1 = branches shrink toward the tip
 
 // --- decoration ---
-let tipsize     = 3.5    // little V at the very end of each arm, mm (0 = none)
-let centersize  = 5      // hexagon/polygon at the centre, mm (0 = none)
+let tipsize     = 3.5    // [0:0.5:8] little V at the very end of each arm, mm (0 = none)
+let centersize  = 5      // [0:0.5:12] hexagon/polygon at the centre, mm (0 = none)
 
 // --- stitch quality ---
 seed 7

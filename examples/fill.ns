@@ -25,7 +25,7 @@ let margin = 0.96      // shrink so the square grid clears the round hoop
 let inset  = 0.12      // blank border inside each cell (fraction of cell)
 
 // --- quality ---
-let stitch = 1.8
+let stitch = 1.8       // [1:0.1:3]
 seed 7
 stitchlen stitch
 

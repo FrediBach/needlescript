@@ -11,7 +11,7 @@ seed 11                  # same seed, same meadow — # comments work too
 stitchlen 2.2
 autotrim 6
 
-let debug = false        // flip to true for pins + console output
+let debug = false        // [switch:no,yes] flip to true for pins + console output
 
 // ---- helper reporters ----------------------------------------
 

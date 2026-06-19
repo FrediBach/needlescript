@@ -12,24 +12,18 @@
 // ============================================================
 
 // --- frame ---
-let R          = 44      // circle radius, mm (sewable max is 47)
+let R          = 44      // [20:46] circle radius, mm
 
 // --- the vertical spindle (top + bottom poles) ---
-//   These two fans make the bright central diamond/lens.
-let vcount     = 24     // threads per vertical pole (density of the spindle).
-                         //   More threads = a brighter, denser lens.
-let vspan      = 100     // arc swept on the far side, degrees.
-                         //   180 = full opposite semicircle (a wide diamond);
-                         //   ~100 packs the threads into a slim, bright vertical
-                         //   lens like the original. Smaller still = narrower.
-// --- the diagonal X-wings (left + right poles) ---
-//   A second, lighter pair of fans crossing the first.
-let hcount     = 24      // threads per horizontal pole (fewer = fainter wings)
-let hspan      = 165     // arc swept, degrees
+let vcount     = 24      // [4:60] threads per vertical pole (density of the spindle)
+let vspan      = 100     // [20:180] arc swept on the far side, degrees
 
-// --- thread / quality ---
-let stitch     = 2.8     // stitch length along each chord, mm (long straight
-                         //   runs read best a touch longer than the 2.5 default)
+// --- the diagonal X-wings (left + right poles) ---
+let hcount     = 24      // [4:60] threads per horizontal pole
+let hspan      = 165     // [20:180] arc swept, degrees
+
+// --- thread quality ---
+let stitch     = 2.8     // [1.5:0.1:5]
 
 seed 7
 stitchlen stitch

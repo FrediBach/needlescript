@@ -16,13 +16,12 @@
 // ============================================================
 
 // --- geometry ---
-let r   = 20       // circle radius, mm
-let off = 11       // how far each centre sits from the middle, mm
-                   //   smaller off = more overlap; larger = circles drift apart
+let r   = 20       // [10:35] circle radius, mm
+let off = 11       // [2:25] centre offset — smaller = more overlap
 
 // --- fill ---
-let gap = 2.0      // hatch line spacing, mm (larger = sparser = lower density)
-let stitch = 2.0
+let gap = 2.0      // [0.5:0.2:5] hatch line spacing, mm
+let stitch = 2.0   // [1:0.1:4]
 
 seed 7
 stitchlen stitch

@@ -4,17 +4,23 @@
 //  a strand at the boundary circle.
 // ============================================================
 
+// --- strands ---
+let nstrands   = 14   // [2:30] number of strands
+let stepsize   = 1.8  // [1:0.2:4] step length per stroke, mm
+let boundary   = 40   // [15:45] strand stops when it reaches this radius, mm
+let noisescale = 16   // [4:1:40] noise field scale — larger = broader turns
+
 to strand
   repeat 90 [
-    seth ( noise2 xcor / 16 ycor / 16 ) * 720
-    fd 1.8
-    if distance 0 0 > 40 [ exit ]
+    seth ( noise2 xcor / noisescale ycor / noisescale ) * 720
+    fd stepsize
+    if distance 0 0 > boundary [ exit ]
   ]
 end
 
 seed 9
 stitchlen 2
-repeat 14 [
+repeat nstrands [
   up setxy random 64 - 32 random 64 - 32 down
   strand
   trim

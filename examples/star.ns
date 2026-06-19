@@ -1,11 +1,15 @@
 // ============================================================
 //  STAR — SATIN STITCH
-//  Satin makes a zigzag column 3 mm wide. A five-pointed
-//  star is traced with the needle down.
+//  Satin makes a zigzag ribbon. A star polygon is traced
+//  with the needle down. Odd point counts give the classic
+//  pointed star; even counts give overlapping shapes.
 // ============================================================
 
-; satin makes a zigzag column 3 mm wide
+let points = 5    // [3:11] number of star points
+let size   = 42   // [15:46] arm length, mm
+let width  = 3    // [1:0.5:6] satin ribbon width, mm
+
 up setxy -6 -21 down
-satin 3
-repeat 5 [ fd 42 rt 144 ]
+satin width
+repeat points [ fd size rt (720 / points) ]
 satin 0

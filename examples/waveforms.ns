@@ -9,10 +9,10 @@
 // =============================================================
 
 // ---- layout -------------------------------------------------
-let SPAN  = 60      // total width of each wave, mm  (fits the 94 mm field)
-let AMP   = 7       // peak height of a wave, mm
-let CYC   = 3       // cycles drawn per row
-let samplingStep  = 1.5     // sampling step along x, mm (running-stitch grain)
+let SPAN  = 60      // [20:80] total width of each wave, mm
+let AMP   = 7       // [2:0.5:15] peak height of a wave, mm
+let CYC   = 3       // [1:8] cycles drawn per row
+let samplingStep  = 1.5     // [0.5:0.1:4] sampling step along x, mm
 
 // ---- the four oscillators -----------------------------------
 // p is phase in 0..1; each returns displacement in -1..1.

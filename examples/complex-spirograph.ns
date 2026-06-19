@@ -27,17 +27,15 @@ let armF = [  8, -1.6,  3 ]      // frequencies (sign = spin direction)
 let armP = [  12,  8,  16 ]      // phases, degrees
 
 // --- layering ---
-let layers   = 12        // how many rotated copies (the symmetry order)
-let layStep  = 0        // extra rotation per layer, degrees.
-                        //   0 = spread evenly (360/layers apart);
-                        //   nonzero = a deliberate spiral drift between layers
-let multicolor = 1      // 1 = each layer uses the next thread colour;
-                        //   0 = all one colour
+let layers   = 12        // [2:30] how many rotated copies (the symmetry order)
+let layStep  = 0         // [-30:1:30] extra rotation per layer, degrees
+                         //   0 = spread evenly; nonzero = deliberate spiral drift
+let multicolor = 1       // [switch:mono,multi] each layer uses the next thread colour
 
 // --- detail & look ---
-let fit     = 43        // scale the rosette to this radius, mm (< 47)
-let smooth  = 900       // sample points per layer (higher = smoother)
-let stitch  = 1.8
+let fit     = 43        // [20:46] scale the rosette to this radius, mm (< 47)
+let smooth  = 900       // [100:100:2000] sample points per layer (higher = smoother)
+let stitch  = 1.8       // [1:0.1:4]
 
 seed 7
 stitchlen stitch

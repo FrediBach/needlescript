@@ -5,15 +5,20 @@
 // literals, append/pos recording, for-in, indexing, setpos,
 // and the seeded shuffle randomness.
 
+// --- walk ---
+let nsteps    = 70   // [10:200] steps in the recorded walk
+let stepsize  = 1.6  // [0.5:0.2:4] step length, mm
+let echospace = 2.5  // [0.5:0.5:8] horizontal drift per echo, mm
+
 seed 5
 let palette = [2, 3, 5, 7]
 let path = []
 
 up setxy(-26, 24) down
-repeat 70 [
+repeat nsteps [
   seth(noise2(xcor / 8, ycor / 8) * 360)
-  fd 1.6
-  append(path, pos())     // pos() is [xcor, ycor]
+  fd stepsize
+  append(path, pos())
 ]
 trim
 
@@ -22,9 +27,9 @@ for c in shuffle(palette) [
   color c
   up setpos([-first(path)[0] + off, first(path)[1]]) down
   for p in path [
-    setpos([-p[0] + off, p[1]])  // mirror across the y axis
+    setpos([-p[0] + off, p[1]])
   ]
   trim
-  off += 2.5                     // drift each echo to the right
+  off += echospace
 ]
 print "points" len(path)

@@ -4,10 +4,16 @@
 //  radius in the console.
 // ============================================================
 
+// --- spiral ---
+let startR   = 2.2   // [0.5:0.2:6] starting arc radius, mm
+let maxR     = 26    // [10:44] stop when radius reaches this, mm
+let growth   = 1.16  // [1.02:0.01:1.5] radius multiplier per arc
+let arcAngle = 100   // [30:180] arc sweep per step, degrees
+
 up setxy -12 14 seth 90 down
-make "r 2.2
-while :r < 26 [
-  arc 100 :r
-  make "r :r * 1.16
+make "r startR
+while :r < maxR [
+  arc arcAngle :r
+  make "r :r * growth
   print "radius :r
 ]

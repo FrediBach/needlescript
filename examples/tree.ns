@@ -4,6 +4,9 @@
 //  as one unbroken thread with no jumps or trims.
 // ============================================================
 
+// --- shape ---
+let length = 34  // [12:46] trunk length, mm
+
 to branch :len
   if :len < 5 [ fd :len bk :len ]
   else [
@@ -17,4 +20,4 @@ to branch :len
 end
 
 up setxy 0 -27 down
-branch 34
+branch length

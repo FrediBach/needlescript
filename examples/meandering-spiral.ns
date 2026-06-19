@@ -10,18 +10,15 @@
 // ============================================================
 
 // --- spiral shape ---
-let maxradius  = 36      // outer radius of the smooth spiral, mm. Keep
-                         // maxradius + wobbleamp < 47 so the meander
-                         // never spills past the sewable edge.
-let spacing    = 2.0     // gap between successive rings, mm — controls DENSITY
-let stepdist   = 1.5     // distance sewn per step, mm (smaller = smoother curve)
+let maxradius  = 36      // [10:46] outer radius of the spiral, mm
+let spacing    = 2.0     // [0.5:0.2:5] gap between rings, mm — controls density
+let stepdist   = 1.5     // [0.5:0.1:4] distance sewn per step, mm
 
 // --- meander ---
-let wobbleamp  = 9       // max radial wander at the rim, mm (try 4 calm … 14 wild)
-let wobblefreq = 7       // noise frequency — higher = tighter, busier wiggles
-let rampexp    = 2.4     // chaos ramp: 1 = linear, >1 = calm core + sudden wild edge
-let tangle     = 1       // 1 = also wobble the heading sideways (looser, tangled)
-                         // 0 = wander only in/out (rings stay roughly concentric)
+let wobbleamp  = 9       // [0:0.5:15] max radial wander at the rim, mm
+let wobblefreq = 7       // [1:20] noise frequency — higher = tighter wiggles
+let rampexp    = 2.4     // [0.5:0.1:5] chaos ramp: 1 = linear, >1 = wild edge
+let tangle     = 1       // [switch:off,on] also wobble the heading sideways
 
 // --- stitch quality ---
 seed 7

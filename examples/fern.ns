@@ -5,6 +5,10 @@
 //  early on the smallest tips.
 // ============================================================
 
+// --- shape ---
+let length = 42   // [15:46] total fern height, mm
+let stitch = 1.8  // [1:0.1:3]
+
 to frond :len
   if :len < 3 [ fd :len exit ]
   fd :len / 3
@@ -13,6 +17,6 @@ to frond :len
   frond :len * 0.62
 end
 
-stitchlen 1.8
+stitchlen stitch
 up setxy 0 -34 down
-frond 42
+frond length

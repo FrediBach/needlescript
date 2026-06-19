@@ -14,28 +14,25 @@
 //  re-scales itself to fill the field without spilling over.
 // ============================================================
 
-// --- the system (classic chaotic values) ---
-let sigma   = 10        // try 10
-let rho     = 28        // the bifurcation knob — 28 is classic chaos;
-                        //   ~14 collapses to a point, >99 gets wild
-let beta    = 2.6667    // 8/3
+// --- the system ---
+let sigma   = 10        // [1:20] try 10
+let rho     = 28        // [1:60] the bifurcation knob — 28 is classic chaos
+let beta    = 2.6667    // [0.5:0.1:5]
 
 // --- integration ---
-let dt      = 0.006     // time step (smaller = smoother, longer path)
-let steps   = 3500      // number of integration steps = trajectory length
-let x0      = 0.1       // initial conditions (tiny seed kicks it off)
-let y0      = 0
-let z0      = 0
+let dt      = 0.006     // [0.001:0.001:0.02] time step (smaller = smoother path)
+let steps   = 3500      // [500:100:8000] trajectory length
+let x0      = 0.1       // [0.01:0.01:2] initial x (tiny seed kicks it off)
+let y0      = 0         // [-2:0.1:2] initial y
+let z0      = 0         // [-2:0.1:2] initial z
 
 // --- projection: which 2-D view of the 3-D curve ---
-//   1 = "xz", the classic butterfly (wings spread)
-//   2 = "xy", top-down view
-//   3 = "yz", side-on view
-let view    = 1
+//   1 = xz view (classic butterfly), 2 = xy top-down, 3 = yz side-on
+let view    = 1         // [1:3]
 
 // --- fit & quality ---
-let fitradius = 44      // scale so the farthest point sits here, mm (<47)
-let stitch    = 1.8     // even stitch spacing along the curve, mm
+let fitradius = 44      // [20:46] scale so farthest point sits here, mm (<47)
+let stitch    = 1.8     // [1:0.1:4]
 
 seed 7
 stitchlen 1.8

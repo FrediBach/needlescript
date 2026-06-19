@@ -5,8 +5,15 @@
 //  is punched twice.
 // ============================================================
 
-stitchlen 2.2
-repeat 12 [
-  repeat 36 [ fd 3.4 rt 10 ]
-  rt 30 fd 0.8
+// --- shape ---
+let petals = 12   // [4:24]
+let radius = 3.4  // [1:0.2:7] circle radius, mm
+let spread = 0.8  // [0:0.2:3] gap between circle starts, mm
+// --- quality ---
+let stitch = 2.2  // [1:0.1:4]
+
+stitchlen stitch
+repeat petals [
+  repeat 36 [ fd radius rt 10 ]
+  rt (360 / petals) fd spread
 ]

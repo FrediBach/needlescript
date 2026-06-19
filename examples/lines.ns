@@ -16,10 +16,10 @@
 // ============================================================
 
 // --- layout ---
-let HW     = 26        // half-width of each line, mm (line spans -HW..+HW)
-let ytop   = 33        // top baseline, mm
-let rows   = 12        // number of sample rows
-let stitch = 1.8
+let HW     = 26        // [10:44] half-width of each line, mm
+let ytop   = 33        // [15:44] top baseline, mm
+let rows   = 12        // number of sample rows (fixed — each row is a different type)
+let stitch = 1.8       // [1:0.1:4]
 
 seed 7
 stitchlen stitch
