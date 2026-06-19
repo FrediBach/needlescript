@@ -4,7 +4,9 @@ import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
 import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
+import { updateParameter } from '../lib/parse-parameters.ts';
 import Splitter from './Splitter.tsx';
+import ParametersPanel from './ParametersPanel.tsx';
 import styles from './EditorPane.module.css';
 import { Input } from '@/components/ui/input.tsx';
 
@@ -57,6 +59,40 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
   // even after source/design state changes rebuild the callback.
   const onRunRef = useRef(onRun);
   onRunRef.current = onRun;
+
+  // Stable ref to source so the parameter-change handler never captures a
+  // stale closure value.
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
+
+  // ── Parameters panel throttle ───────────────────────────────────────
+  // Leading + trailing throttle at 250 ms: fire immediately on first change,
+  // then at most once per 250 ms while the slider is being dragged.
+  const lastRunTimeRef = useRef(0);
+  const runTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleParamChange = useCallback((name: string, line: number, value: number) => {
+    const updated = updateParameter(sourceRef.current, line, name, value);
+    onSourceChange(updated);
+
+    const now     = Date.now();
+    const elapsed = now - lastRunTimeRef.current;
+
+    if (runTimerRef.current !== null) clearTimeout(runTimerRef.current);
+
+    if (elapsed >= 250) {
+      // First event in this burst — fire immediately.
+      lastRunTimeRef.current = now;
+      onRunRef.current();
+    } else {
+      // Mid-burst — schedule a trailing call at the end of the 250 ms window.
+      runTimerRef.current = setTimeout(() => {
+        runTimerRef.current    = null;
+        lastRunTimeRef.current = Date.now();
+        onRunRef.current();
+      }, 250 - elapsed);
+    }
+  }, [onSourceChange]);
 
   // ── Monaco lifecycle callbacks ──────────────────────────────────────
   const handleBeforeMount = useCallback<BeforeMount>((monaco) => {
@@ -194,6 +230,8 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
           }}
         />
       </div>
+
+      <ParametersPanel source={source} onParamChange={handleParamChange} />
 
       <Splitter
         orientation="vertical"
