@@ -21,8 +21,8 @@
 
   /* ── Font size scale ─────────────────────────────────────────────────── */
   /* Use as Tailwind utilities: text-badge, text-label, text-sub… */
-  --text-badge:    9px;    /* very small: badges, bounds labels */
-  --text-label:    10px;   /* labels, group headers, uppercase caps */
+  --text-badge:    10px;    /* very small: badges, bounds labels */
+  --text-label:    11px;   /* labels, group headers, uppercase caps */
   --text-sub:      11px;   /* secondary labels, playback counter */
   --text-param:    11.5px; /* parameter names, section notes */
   --text-code:     12px;   /* console output, code-like text */

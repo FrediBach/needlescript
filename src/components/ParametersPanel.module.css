@@ -42,7 +42,7 @@
   padding: 0 5px;
   border-radius: 99px;
   background: var(--text-warm-faint);
-  color: var(--text-warm-muted);
+  color: var(--text-warm);
   font-size: var(--fs-badge);
   letter-spacing: 0;
   text-transform: none;

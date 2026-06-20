@@ -80,8 +80,8 @@ export const fontMono  = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, 
 export const fontSerif = '"Fraunces", Georgia, "Times New Roman", serif';
 
 /** Font sizes in px — match the --fs-* CSS custom properties in index.css */
-export const fsBadge    =  9;
-export const fsLabel    = 10;
+export const fsBadge    =  10;
+export const fsLabel    = 11;
 export const fsSub      = 11;
 export const fsParam    = 11.5;
 export const fsCode     = 12;
