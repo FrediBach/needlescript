@@ -94,8 +94,8 @@ const redBtn = cn(
 const blueBtn = cn(
   hdrBtn, "px-2.5 rounded-[6px] border",
   "inline-flex items-center gap-1.5",
-  "bg-[#2B1D1B] border-[#5A3C32] text-[#C8A070]",
-  "hover:bg-[#3A2520] hover:border-[#7A5040] hover:text-[#D8B080]",
+  "bg-[#3F2820] border-[#7A4E3C] text-[var(--gold)]",
+  "hover:bg-[#502E24] hover:border-[#9A6450] hover:text-[#F0C060]",
   "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:border-ring",
   "disabled:pointer-events-none disabled:opacity-50",
 );
@@ -106,7 +106,7 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
     <Select onValueChange={(val: string | null) => { if (val) onExampleSelect(val); }}>
       <SelectTrigger
         aria-label="Example programs"
-        className={cn(hdrBtn, "w-[180px] bg-[#2B1D1B] border-[#5A3C32] text-[#C8A070] hover:border-[#7A5040] hover:text-[#D8B080] gap-1")}
+        className={cn(hdrBtn, "w-[180px] bg-[#3F2820] border-[#7A4E3C] text-[var(--gold)] hover:border-[#9A6450] hover:text-[#F0C060] gap-1")}
       >
         <SelectValue placeholder="examples" />
       </SelectTrigger>
@@ -222,8 +222,8 @@ function HamburgerMenu({
         className={cn(
           buttonVariants({ variant: 'outline' }),
           "flex lg:hidden size-[30px] p-0 flex-shrink-0",
-          "bg-[#2B1D1B] border-[#5A3C32] text-[#C8A070]",
-          "hover:bg-[#3A2520] hover:border-[#7A5040] hover:text-[#D8B080]",
+          "bg-[#3F2820] border-[#7A4E3C] text-[var(--gold)]",
+          "hover:bg-[#502E24] hover:border-[#9A6450] hover:text-[#F0C060]",
         )}
         aria-label="More options"
       >
@@ -392,10 +392,10 @@ export default function Header({
           className={cn(
             "flex items-center justify-center size-[30px] rounded-full p-0 flex-shrink-0 relative",
             "cursor-pointer select-none font-mono font-semibold text-[13.5px]",
-            "bg-transparent border border-[#5A3C32] text-[#C8A070]",
-            "hover:bg-[#3A2520] hover:border-[#7A5040] hover:text-[#D8B080]",
+            "bg-transparent border border-[#7A4E3C] text-[var(--gold)]",
+            "hover:bg-[#3F2820] hover:border-[#9A6450] hover:text-[#F0C060]",
             "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-            "after:absolute after:inset-[3px] after:border after:border-dashed after:border-[#C8A070]/40 after:rounded-full after:pointer-events-none",
+            "after:absolute after:inset-[3px] after:border after:border-dashed after:border-[var(--gold)]/50 after:rounded-full after:pointer-events-none",
             styles.helpBtn,
           )}
         >

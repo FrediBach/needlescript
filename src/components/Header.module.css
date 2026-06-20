@@ -10,7 +10,7 @@
   height: 48px;
   flex-shrink: 0;
   background: #291D1C;
-  border-bottom: 1px solid #4A3632;
+  border-bottom: 1px solid #5A3A30;
   /* Belt-and-suspenders: clip anything that could cause a second row */
   overflow: hidden;
 }
@@ -23,7 +23,7 @@
   gap: 8px;
   flex-shrink: 0;
   /* currentColor is inherited by the inline LogoIcon SVG */
-  color: #D0C5B2;
+  color: var(--pale);
 }
 
 /* h1 inside brand — apply class via cn(styles.wordmarkText, "hidden sm:block") */
@@ -33,12 +33,12 @@
   font-size: 19px;
   margin: 0;
   letter-spacing: 0.04em;
-  color: #D0C5B2;
+  color: var(--pale);
   white-space: nowrap;
 }
 
 .tag {
-  color: #7A6E68;
+  color: #B0A090;
   font-size: 11px;
   white-space: nowrap;
 }
