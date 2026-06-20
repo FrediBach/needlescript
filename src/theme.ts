@@ -14,8 +14,8 @@ export const bgPanel       = '#252B41';   /* --bg-panel */
 export const bgPanelRaised = '#2D3450';   /* --bg-panel-raised */
 
 // ── Surfaces — warm sepia ─────────────────────────────────────────────────
-export const bgWarm        = '#291D1C';   /* --bg-warm */
-export const bgWarmDeep    = '#1E1514';   /* --bg-warm-deep */
+export const bgWarm        = '#2E2128';   /* --bg-warm */
+export const bgWarmDeep    = '#1E1118';   /* --bg-warm-deep */
 
 // ── Surfaces — stage / canvas ─────────────────────────────────────────────
 export const bgCanvas      = '#FFFDF7';   /* --bg-canvas */
@@ -49,9 +49,9 @@ export const textOnCanvasDim = '#5A4D35';   /* --text-on-canvas-dim */
 export const textOnRun       = '#FFF4EA';   /* --text-on-run */
 
 // ── Accent — brand gold ───────────────────────────────────────────────────
-export const gold       = '#D9A441';   /* --gold */
-export const goldHi     = '#E8B84A';   /* --gold-hi */
-export const goldLight  = '#F0C060';   /* --gold-light */
+export const gold       = '#CBA16D';   /* --gold */
+export const goldHi     = '#DBB17D';   /* --gold-hi */
+export const goldLight  = '#EBC18D';   /* --gold-light */
 
 // ── Actions — run (primary / red) ─────────────────────────────────────────
 export const run      = '#C8472F';   /* --run */

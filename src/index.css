@@ -133,8 +133,8 @@
   --bg-panel-raised: #2D3450;   /* popover / elevated surfaces */
 
   /* ── Surfaces — warm sepia (header, parameters panel) ───────────────── */
-  --bg-warm:         #291D1C;   /* header bar, parameters panel */
-  --bg-warm-deep:    #1E1514;   /* deeper warm (numeric inputs) */
+  --bg-warm:         #2E2128;   /* header bar, parameters panel */
+  --bg-warm-deep:    #1E1118;   /* deeper warm (numeric inputs) */
 
   /* ── Surfaces — stage, fabric, canvas elements ───────────────────────── */
   --bg-canvas:       #FFFDF7;   /* stage buttons / playback bar */
@@ -167,9 +167,9 @@
   --hoop-color-dark: #7E5C2E;   /* hoop frame shadow */
 
   /* ── Accent — brand gold ──────────────────────────────────────────────── */
-  --gold:       #D9A441;
-  --gold-hi:    #E8B84A;   /* brighter: hover / focus */
-  --gold-light: #F0C060;   /* lightest: text hover */
+  --gold:       #CBA16D;
+  --gold-hi:    #DBB17D;   /* brighter: hover / focus */
+  --gold-light: #EBC18D;   /* lightest: text hover */
 
   /* ── Actions — run (primary, red) ────────────────────────────────────── */
   --run:      #C8472F;
