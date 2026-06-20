@@ -1,10 +1,10 @@
 .pane {
   display: flex;
   flex-direction: column;
-  flex: 1;        /* fill remaining width in the App.tsx desktop flex row */
+  flex: 1;
   min-width: 0;
   min-height: 0;
-  background: var(--muslin);
+  background: var(--fabric);
   position: relative;
   overflow: hidden;
 }
@@ -14,7 +14,7 @@
   flex: 1;
   min-height: 0;
   background:
-    repeating-linear-gradient(0deg,  rgba(120, 100, 70, 0.05) 0 1px, transparent 1px 3px),
-    repeating-linear-gradient(90deg, rgba(120, 100, 70, 0.05) 0 1px, transparent 1px 3px),
-    var(--muslin);
+    repeating-linear-gradient(0deg,  rgba(var(--fabric-grid-rgb), 0.05) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(var(--fabric-grid-rgb), 0.05) 0 1px, transparent 1px 3px),
+    var(--fabric);
 }

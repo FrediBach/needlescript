@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DesignState } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import { THREADS } from '../data.ts';
+import {
+  canvasJumpThread, canvasNeedlePoint, canvasHoopOverlay, canvasHoopBoundary,
+  canvasNeedleMarker, canvasDebugPinFill, canvasDebugPinStroke,
+  canvasDragRectBorder, canvasDragRectFill,
+  canvasZoomBadgeBg, canvasZoomBadgeText,
+  canvasDensityHot, canvasDensityWarm,
+  fontMono, fsBase,
+} from '../theme.ts';
 
 interface Props {
   design: DesignState;
@@ -184,8 +192,8 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity }: Pro
             top:    Math.min(dragRect.startY,   dragRect.currentY),
             width:  Math.abs(dragRect.currentX - dragRect.startX),
             height: Math.abs(dragRect.currentY - dragRect.startY),
-            border: '1.5px solid rgba(255, 255, 255, 0.80)',
-            background: 'rgba(255, 255, 255, 0.07)',
+            border: canvasDragRectBorder,
+            background: canvasDragRectFill,
             pointerEvents: 'none',
           }}
         />
@@ -200,10 +208,10 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity }: Pro
             right: 10,
             padding: '2px 7px',
             borderRadius: 4,
-            background: 'rgba(20, 15, 10, 0.55)',
-            color: 'rgba(255, 245, 230, 0.90)',
-            fontFamily: 'monospace',
-            fontSize: 11,
+            background: canvasZoomBadgeBg,
+            color: canvasZoomBadgeText,
+            fontFamily: fontMono,
+            fontSize: fsBase - 2,
             letterSpacing: '0.04em',
             pointerEvents: 'none',
             userSelect: 'none',
@@ -265,7 +273,7 @@ function draw(
   // Jumps (under the thread)
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.setLineDash([4 * dpr, 4 * dpr]);
-  ctx.strokeStyle = 'rgba(90,80,60,0.5)';
+  ctx.strokeStyle = canvasJumpThread;
   ctx.lineWidth = 1 * dpr;
   ctx.beginPath();
   for (let i = 1; i < upto; i++) {
@@ -303,7 +311,7 @@ function draw(
 
   // Needle penetration points (visible when zoomed enough)
   if (scale > 2.4 * dpr) {
-    ctx.fillStyle = 'rgba(40,30,20,0.45)';
+    ctx.fillStyle = canvasNeedlePoint;
     const r = Math.max(0.8 * dpr, 0.09 * scale);
     for (let k = 0; k < upto; k++) {
       if (pts[k].t !== 'stitch') continue;
@@ -320,8 +328,8 @@ function draw(
       if (c.layers < 1.2) continue;
       const hot = Math.min(1, c.layers / 4);
       ctx.fillStyle = c.layers >= 3
-        ? `rgba(200, 38, 24, ${0.18 + hot * 0.42})`
-        : `rgba(228, 138, 32, ${0.10 + hot * 0.30})`;
+        ? canvasDensityHot(0.18 + hot * 0.42)
+        : canvasDensityWarm(0.10 + hot * 0.30);
       const x0 = X(c.ix * cellMM);
       const y0 = Y((c.iy + 1) * cellMM);
       ctx.fillRect(x0, y0, cellMM * scale + 0.5, cellMM * scale + 0.5);
@@ -331,7 +339,7 @@ function draw(
   // Needle marker while scrubbed back
   if (upto > 0 && upto < pts.length) {
     const n = pts[upto - 1];
-    ctx.strokeStyle = '#1B2030';
+    ctx.strokeStyle = canvasNeedleMarker;
     ctx.lineWidth = 1.4 * dpr;
     ctx.beginPath();
     ctx.arc(X(n.x), Y(n.y), 4.5 * dpr, 0, 6.2832);
@@ -342,19 +350,19 @@ function draw(
   const visibleMarks = design.marks.filter(mk => mk.at <= upto);
   if (visibleMarks.length) {
     const r = 6 * dpr;
-    ctx.font = `${9 * dpr}px monospace`;
+    ctx.font = `${Math.round(fsBase * 0.7) * dpr}px ${fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     visibleMarks.forEach((mk, i) => {
       const mx = X(mk.x), my = Y(mk.y);
       ctx.beginPath();
       ctx.arc(mx, my, r, 0, 6.2832);
-      ctx.fillStyle = 'rgba(255, 253, 247, 0.92)';
+      ctx.fillStyle = canvasDebugPinFill;
       ctx.fill();
-      ctx.strokeStyle = '#C8472F';
+      ctx.strokeStyle = canvasDebugPinStroke;
       ctx.lineWidth = 1.2 * dpr;
       ctx.stroke();
-      ctx.fillStyle = '#C8472F';
+      ctx.fillStyle = canvasDebugPinStroke;
       ctx.fillText(String(i + 1), mx, my + 0.5 * dpr);
     });
   }
@@ -402,7 +410,7 @@ function drawHoop(
 
   // Dark overlay outside the hoop (even-odd fill)
   ctx.save();
-  ctx.fillStyle = 'rgba(8, 6, 4, 0.1)';
+  ctx.fillStyle = canvasHoopOverlay;
   ctx.beginPath();
   ctx.rect(0, 0, canvasW, canvasH);
   addHoopPath(ctx, hoop, rx, ry, hcx, hcy, scale);
@@ -413,7 +421,7 @@ function drawHoop(
   ctx.save();
   ctx.beginPath();
   addHoopPath(ctx, hoop, rx, ry, hcx, hcy, scale);
-  ctx.strokeStyle = 'rgba(90, 75, 55, 0.55)';
+  ctx.strokeStyle = canvasHoopBoundary;
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();

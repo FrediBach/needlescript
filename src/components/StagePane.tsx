@@ -32,12 +32,12 @@ export default function StagePane({ design, hoop, scrubPos, onScrubChange, activ
           className={cn(
             "absolute top-[10px] right-[10px] h-auto py-[5px] px-[9px]",
             "font-mono text-[10px] tracking-[0.12em] uppercase",
-            "bg-[rgba(255,253,247,0.85)] border border-[rgba(125,100,60,0.45)] text-[#4A3F2C]",
-            "hover:bg-[rgba(255,253,247,0.95)] hover:text-[#4A3F2C]",
+            "bg-[rgba(255,253,247,0.85)] border border-[var(--on-canvas-45)] text-on-canvas",
+            "hover:bg-[rgba(255,253,247,0.95)] hover:text-on-canvas",
             "rounded-md",
             // Pressed (density on) state
-            "aria-pressed:bg-[#C8472F] aria-pressed:border-[#A23722] aria-pressed:text-[#FFFDF7]",
-            "aria-pressed:hover:bg-[#D55036] aria-pressed:hover:text-[#FFFDF7]",
+            "aria-pressed:bg-run aria-pressed:border-run-dark aria-pressed:text-on-run",
+            "aria-pressed:hover:bg-run-hi aria-pressed:hover:text-on-run",
           )}
         >
           density

@@ -3,13 +3,11 @@
   align-items: center;
   gap: 10px;
   padding: 9px 14px;
-  background: var(--muslin-2);
-  border-top: 1px dashed rgba(125, 100, 60, 0.45);
+  background: var(--fabric-dark);
+  border-top: 1px dashed var(--on-canvas-45);
   flex-shrink: 0;
-  color: #5A4D35;
+  color: var(--text-on-canvas-dim);
 }
-
-/* play button and speed select are now shadcn components */
 
 .scrubArea {
   flex: 1;
@@ -21,7 +19,7 @@
 
 .scrub {
   width: 100%;
-  accent-color: var(--red);
+  accent-color: var(--run);
   margin: 0;
 }
 
@@ -34,7 +32,7 @@
 }
 
 .counter {
-  font-size: 11px;
+  font-size: var(--fs-sub);
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -42,6 +40,6 @@
 }
 
 .lineInfo {
-  color: var(--red);
+  color: var(--run);
   font-weight: 600;
 }

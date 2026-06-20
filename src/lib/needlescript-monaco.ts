@@ -1,5 +1,14 @@
 import type { Monaco } from '@monaco-editor/react';
 import type { editor as MonacoEditor } from 'monaco-editor';
+import {
+  bgApp, bgPanel, bgPanelRaised, text, textFaint,
+  gold, borderCool,
+  synComment, synKeyword, synMovement, synStitch, synMath, synLib,
+  synNumber, synString, synVariable, synOperator, synBracket,
+  monacoGutter, monacoLineNumber, monacoLineNumberActive, monacoLineHighlight,
+  monacoIndentGuide, monacoIndentGuideActive,
+  m,
+} from '../theme.ts';
 
 // Minimal position interface — structurally compatible with monaco.Position / IPosition.
 type IPos = { readonly lineNumber: number; readonly column: number };
@@ -1584,102 +1593,98 @@ export function registerNeedlescript(monaco: Monaco): void {
   } as Monaco['languages']['IMonarchLanguage']);
 
   // ── Custom dark theme ─────────────────────────────────────────────
-  // Colour palette mirrors the app's CSS custom properties but is
-  // provided as hex strings (no CSS variables available here).
-  //
-  // --night  #1B2030  --desk   #252B41  --desk-2 #2D3450
-  // --line   #3A4163  --pale   #EDE7DA  --dim    #9BA1BD
-  // --gold   #D9A441  --red    #C8472F
+  // All colours sourced from src/theme.ts to stay in sync with the
+  // global design system defined in src/index.css.
   monaco.editor.defineTheme('needlescript-dark', {
     base: 'vs-dark',
     inherit: false,
     rules: [
       // Default / plain identifiers
-      { token: '',              foreground: 'EDE7DA' },
-      { token: 'ns-identifier', foreground: 'EDE7DA' },
+      { token: '',              foreground: m(text) },
+      { token: 'ns-identifier', foreground: m(text) },
       // Comments — muted, italic
-      { token: 'ns-comment',    foreground: '6E7595', fontStyle: 'italic' },
+      { token: 'ns-comment',    foreground: m(synComment),  fontStyle: 'italic' },
       // Control flow & definition keywords — brand gold, bold
-      { token: 'ns-keyword',    foreground: 'D9A441', fontStyle: 'bold' },
+      { token: 'ns-keyword',    foreground: m(synKeyword),  fontStyle: 'bold' },
       // Turtle movement + reporters — sky teal
-      { token: 'ns-movement',   foreground: '62C4D4' },
+      { token: 'ns-movement',   foreground: m(synMovement) },
       // Stitch / thread / fabric commands — warm amber
-      { token: 'ns-stitch',     foreground: 'C87C3C' },
+      { token: 'ns-stitch',     foreground: m(synStitch) },
       // Core math functions — soft lavender
-      { token: 'ns-math',       foreground: '9888CC' },
+      { token: 'ns-math',       foreground: m(synMath) },
       // Library functions (list + generative) — mint green
-      { token: 'ns-lib',        foreground: '6AB898' },
+      { token: 'ns-lib',        foreground: m(synLib) },
       // Numbers
-      { token: 'ns-number',     foreground: 'D4B04A' },
+      { token: 'ns-number',     foreground: m(synNumber) },
       // Quoted words / Logo "strings"
-      { token: 'ns-string',     foreground: '80B864' },
+      { token: 'ns-string',     foreground: m(synString) },
       // Classic variable deref :var — steel blue, italic
-      { token: 'ns-variable',   foreground: 'A8C4E0', fontStyle: 'italic' },
+      { token: 'ns-variable',   foreground: m(synVariable), fontStyle: 'italic' },
       // Operators and punctuation — muted
-      { token: 'ns-operator',   foreground: '9BA1BD' },
-      { token: 'ns-bracket',    foreground: '7A80A0' },
-      { token: 'ns-delimiter',  foreground: '7A80A0' },
+      { token: 'ns-operator',   foreground: m(synOperator) },
+      { token: 'ns-bracket',    foreground: m(synBracket) },
+      { token: 'ns-delimiter',  foreground: m(synBracket) },
     ],
     colors: {
       // Editor surface
-      'editor.background':                    '#252B41',
-      'editor.foreground':                    '#EDE7DA',
+      'editor.background':                    bgPanel,
+      'editor.foreground':                    text,
       // Cursor
-      'editorCursor.foreground':              '#D9A441',
+      'editorCursor.foreground':              gold,
       // Selection
-      'editor.selectionBackground':           '#D9A44140',
-      'editor.inactiveSelectionBackground':   '#D9A44122',
+      'editor.selectionBackground':           gold + '40',
+      'editor.inactiveSelectionBackground':   gold + '22',
       // Current-line highlight (cursor line, not the playback line)
-      'editor.lineHighlightBackground':       '#2D3454',
+      'editor.lineHighlightBackground':       monacoLineHighlight,
       'editor.lineHighlightBorder':           '#00000000',
       // Line numbers
-      'editorLineNumber.foreground':          '#454C6E',
-      'editorLineNumber.activeForeground':    '#9BA1BD',
-      // Gutter (slightly darker than editor background)
-      'editorGutter.background':              '#1F253A',
+      'editorLineNumber.foreground':          monacoLineNumber,
+      'editorLineNumber.activeForeground':    monacoLineNumberActive,
+      // Gutter
+      'editorGutter.background':              monacoGutter,
       // Indent guides
-      'editorIndentGuide.background1':        '#3A416333',
-      'editorIndentGuide.activeBackground1':  '#5A618388',
-      // Bracket pair colorization defaults
-      'editorBracketHighlight.foreground1':   '#D9A441',
-      'editorBracketHighlight.foreground2':   '#62C4D4',
-      'editorBracketHighlight.foreground3':   '#9888CC',
+      'editorIndentGuide.background1':        monacoIndentGuide,
+      'editorIndentGuide.activeBackground1':  monacoIndentGuideActive,
+      // Bracket pair colorization
+      'editorBracketHighlight.foreground1':   gold,
+      'editorBracketHighlight.foreground2':   synMovement,
+      'editorBracketHighlight.foreground3':   synMath,
       // Find/match highlight
-      'editor.findMatchBackground':           '#D9A44150',
-      'editor.findMatchHighlightBackground':  '#D9A44128',
+      'editor.findMatchBackground':           gold + '50',
+      'editor.findMatchHighlightBackground':  gold + '28',
       // Scrollbar
-      'scrollbarSlider.background':           '#3A416344',
-      'scrollbarSlider.hoverBackground':      '#5A618388',
-      'scrollbarSlider.activeBackground':     '#7A81A3AA',
+      'scrollbarSlider.background':           borderCool + '44',
+      'scrollbarSlider.hoverBackground':      monacoIndentGuideActive,
+      'scrollbarSlider.activeBackground':     textFaint + 'AA',
       // Overview ruler
       'editorOverviewRuler.border':           '#00000000',
       // Widget popups (find bar, etc.)
-      'editorWidget.background':              '#1B2030',
-      'editorWidget.border':                  '#3A4163',
-      'editorWidget.foreground':              '#EDE7DA',
+      'editorWidget.background':              bgApp,
+      'editorWidget.border':                  borderCool,
+      'editorWidget.foreground':              text,
       // Input boxes inside widgets
-      'input.background':                     '#252B41',
-      'input.foreground':                     '#EDE7DA',
-      'inputOption.activeBorder':             '#D9A441',
-      'inputOption.activeBackground':         '#D9A44130',
+      'input.background':                     bgPanel,
+      'input.foreground':                     text,
+      'inputOption.activeBorder':             gold,
+      'inputOption.activeBackground':         gold + '30',
       // Focus border
-      'focusBorder':                          '#D9A441',
+      'focusBorder':                          gold,
       // ── Suggestion / IntelliSense widget ───────────────────────────
-      'editorSuggestWidget.background':               '#1B2030',
-      'editorSuggestWidget.border':                   '#3A4163',
-      'editorSuggestWidget.foreground':               '#EDE7DA',
-      'editorSuggestWidget.selectedBackground':       '#2D3454',
-      'editorSuggestWidget.selectedForeground':       '#EDE7DA',
-      'editorSuggestWidget.highlightForeground':      '#D9A441',
-      'editorSuggestWidget.focusHighlightForeground': '#D9A441',
+      'editorSuggestWidget.background':               bgApp,
+      'editorSuggestWidget.border':                   borderCool,
+      'editorSuggestWidget.foreground':               text,
+      'editorSuggestWidget.selectedBackground':       bgPanelRaised,
+      'editorSuggestWidget.selectedForeground':       text,
+      'editorSuggestWidget.highlightForeground':      gold,
+      'editorSuggestWidget.focusHighlightForeground': gold,
       // ── Hover widget ───────────────────────────────────────────────
-      'editorHoverWidget.background':         '#1B2030',
-      'editorHoverWidget.border':             '#3A4163',
-      'editorHoverWidget.foreground':         '#EDE7DA',
+      'editorHoverWidget.background':         bgApp,
+      'editorHoverWidget.border':             borderCool,
+      'editorHoverWidget.foreground':         text,
       // ── Parameter hints widget ─────────────────────────────────────
-      'editorHintForeground':                 '#EDE7DA',
-      'parameterHints.background':            '#1B2030',
-      'parameterHints.border':                '#3A4163',
+      'editorHintForeground':                 text,
+      'parameterHints.background':            bgApp,
+      'parameterHints.border':                borderCool,
     },
   });
 

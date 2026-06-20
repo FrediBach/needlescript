@@ -35,8 +35,8 @@ export default function StatsChips({ design }: Props) {
           className={cn(
             "font-mono text-[10.5px] h-auto py-[3px] px-[8px] rounded-[5px]",
             "bg-[rgba(0,0,0,0.05)] border-[rgba(0,0,0,0.1)] text-[rgba(0,0,0,0.4)]",
-            chip.type === 'warn' && "border-[rgba(217,164,65,0.6)] text-[var(--gold)]",
-            chip.type === 'err' && "bg-[rgba(200,71,47,0.25)] border-[rgba(200,71,47,0.5)] text-[#ffffff]",
+            chip.type === 'warn' && "border-[var(--gold-60)] text-gold",
+            chip.type === 'err' && "bg-[var(--run-25)] border-[var(--run-50)] text-white",
           )}
         >
           {chip.text}

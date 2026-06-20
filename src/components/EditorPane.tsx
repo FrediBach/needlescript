@@ -4,6 +4,7 @@ import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
 import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
+import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
 import { updateParameter } from '../lib/parse-parameters.ts';
 import Splitter from './Splitter.tsx';
 import ParametersPanel from './ParametersPanel.tsx';
@@ -20,10 +21,10 @@ interface Props {
   style?: React.CSSProperties;
 }
 
-// Font settings match the rest of the app (--mono, 13 px, line-height 1.55)
-const EDITOR_FONT_FAMILY = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-const EDITOR_FONT_SIZE    = 13;
-const EDITOR_LINE_HEIGHT  = Math.round(EDITOR_FONT_SIZE * 1.55); // 20 px
+// Font settings — sourced from theme.ts to stay in sync with the design system
+const EDITOR_FONT_FAMILY = fontMono;
+const EDITOR_FONT_SIZE    = fsBase;
+const EDITOR_LINE_HEIGHT  = editorLineHeight; // 20 px
 
 // CSS class applied to the whole-line decoration while the playback line is
 // active. Must be a global (non-hashed) name since Monaco injects the class
@@ -258,7 +259,7 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
           autoComplete="off"
           placeholder="type a command and press Enter — it's appended to the pattern (↑ history)"
           aria-label="REPL input"
-          className="flex-1 h-auto py-[7px] px-[10px] text-[12.5px] font-mono bg-secondary border-border text-foreground placeholder:text-[#6E7494] focus-visible:ring-ring/50"
+          className="flex-1 h-auto py-[7px] px-[10px] text-ui font-mono bg-secondary border-border text-foreground placeholder:text-faint focus-visible:ring-ring/50"
         />
       </div>
 

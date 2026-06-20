@@ -3,15 +3,12 @@
 .header {
   display: flex;
   align-items: center;
-  /* Small gap; groups add their own internal gap via Tailwind gap-* */
   gap: 4px;
   padding: 0 12px;
-  /* Fixed height keeps the toolbar exactly one line on every viewport */
   height: 48px;
   flex-shrink: 0;
-  background: #291D1C;
-  border-bottom: 1px solid #5A3A30;
-  /* Belt-and-suspenders: clip anything that could cause a second row */
+  background: var(--bg-warm);
+  border-bottom: 1px solid var(--border-warm);
   overflow: hidden;
 }
 
@@ -22,32 +19,30 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-  /* currentColor is inherited by the inline LogoIcon SVG */
-  color: var(--pale);
+  color: var(--text);
 }
 
-/* h1 inside brand — apply class via cn(styles.wordmarkText, "hidden sm:block") */
 .wordmarkText {
-  font-family: var(--serif);
+  font-family: var(--font-serif);
   font-weight: 640;
-  font-size: 19px;
+  font-size: var(--fs-wordmark);
   margin: 0;
   letter-spacing: 0.04em;
-  color: var(--pale);
+  color: var(--text);
   white-space: nowrap;
 }
 
 .tag {
-  color: #B0A090;
-  font-size: 11px;
+  color: var(--text-tag);
+  font-size: var(--fs-sub);
   white-space: nowrap;
 }
 
 /* ── Keyboard shortcut badge (inside Run button) ───────────────────────────── */
 
 kbd {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.80);
+  font-size: var(--fs-label);
+  color: var(--white-80);
   border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 3px;
   padding: 1px 4px;
@@ -56,13 +51,12 @@ kbd {
 }
 
 /* ── Help button pulse ─────────────────────────────────────────────────────── */
-/* Fires once every 10 s: scale up slightly + warm gold glow, then settles.    */
 
 @keyframes helpPulse {
-  0%   { transform: scale(1);    box-shadow: 0 0  0px rgba(217, 164, 65, 0);   }
-  8%   { transform: scale(1.12); box-shadow: 0 0 14px rgba(217, 164, 65, 0.45);}
-  18%  { transform: scale(1);    box-shadow: 0 0  0px rgba(217, 164, 65, 0);   }
-  100% { transform: scale(1);    box-shadow: 0 0  0px rgba(217, 164, 65, 0);   }
+  0%   { transform: scale(1);    box-shadow: 0 0  0px var(--gold-0,  transparent); }
+  8%   { transform: scale(1.12); box-shadow: 0 0 14px var(--gold-45);              }
+  18%  { transform: scale(1);    box-shadow: 0 0  0px var(--gold-0,  transparent); }
+  100% { transform: scale(1);    box-shadow: 0 0  0px var(--gold-0,  transparent); }
 }
 
 .helpBtn {

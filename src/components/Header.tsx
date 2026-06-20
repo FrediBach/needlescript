@@ -54,8 +54,6 @@ interface Props {
 }
 
 // ── Inline logo SVG ────────────────────────────────────────────────────────────
-// Background removed (transparent), fills set to currentColor so it inherits
-// the wordmark text colour.
 function LogoIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 692 692" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -77,14 +75,14 @@ function LogoIcon({ size = 22 }: { size?: number }) {
 }
 
 // Shared sizing token for all header buttons
-const hdrBtn = "h-[30px] text-[12.5px] font-mono cursor-pointer flex-shrink-0";
+const hdrBtn = "h-[30px] text-ui font-mono cursor-pointer flex-shrink-0";
 
 // Red primary style — Run and Export share this look
 const redBtn = cn(
   hdrBtn, "px-3.5 relative rounded-[6px] border",
   "inline-flex items-center font-semibold select-none",
-  "bg-[var(--red)] border-[var(--red-d)] text-[#FFF4EA]",
-  "hover:bg-[#D55036]",
+  "bg-run border-run-dark text-on-run",
+  "hover:bg-run-hi",
   "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:border-ring",
   "after:absolute after:inset-[3px] after:border after:border-dashed after:border-white/55 after:rounded-[3px] after:pointer-events-none",
   "disabled:pointer-events-none disabled:opacity-50",
@@ -94,8 +92,8 @@ const redBtn = cn(
 const blueBtn = cn(
   hdrBtn, "px-2.5 rounded-[6px] border",
   "inline-flex items-center gap-1.5",
-  "bg-[#3F2820] border-[#7A4E3C] text-[var(--gold)]",
-  "hover:bg-[#502E24] hover:border-[#9A6450] hover:text-[#F0C060]",
+  "bg-warm-btn border-warm-btn-edge text-gold",
+  "hover:bg-warm-btn-hi hover:border-warm-btn-edge-hi hover:text-gold-light",
   "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:border-ring",
   "disabled:pointer-events-none disabled:opacity-50",
 );
@@ -106,16 +104,16 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
     <Select onValueChange={(val: string | null) => { if (val) onExampleSelect(val); }}>
       <SelectTrigger
         aria-label="Example programs"
-        className={cn(hdrBtn, "w-[180px] bg-[#3F2820] border-[#7A4E3C] text-[var(--gold)] hover:border-[#9A6450] hover:text-[#F0C060] gap-1")}
+        className={cn(hdrBtn, "w-[180px] bg-warm-btn border-warm-btn-edge text-gold hover:border-warm-btn-edge-hi hover:text-gold-light gap-1")}
       >
         <SelectValue placeholder="examples" />
       </SelectTrigger>
-      <SelectContent className="font-mono text-[12.5px]">
+      <SelectContent className="font-mono text-ui">
         {EXAMPLE_TIERS.map((tier, i) => (
           <>
             {i > 0 && <SelectSeparator key={`sep-${tier.label}`} />}
             <SelectGroup key={tier.label}>
-              <SelectLabel className="text-[10px] tracking-[0.13em] uppercase text-[#6E7494]">
+              <SelectLabel className="text-label tracking-[0.13em] uppercase text-faint">
                 {tier.label}
               </SelectLabel>
               {tier.keys.map(k => (
@@ -139,7 +137,7 @@ function ExportDropdown({ onDownload }: { onDownload: (fmt: ExportFormat) => voi
       >
         Export <ChevronDownIcon className="size-[11px] opacity-75 -ml-0.5" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[176px] font-mono text-[12.5px]">
+      <DropdownMenuContent align="end" className="min-w-[176px] font-mono text-ui">
         {(['dst', 'pes', 'exp'] as ExportFormat[]).map(fmt => (
           <DropdownMenuItem key={fmt} onClick={() => onDownload(fmt)}>
             <DownloadIcon className="size-3.5 opacity-55" />
@@ -182,8 +180,8 @@ function ShareButton({ onShare }: { onShare: () => Promise<void> }) {
       aria-label="Copy shareable link to clipboard"
       className={cn(
         blueBtn, "w-[72px] justify-center",
-        state === 'copied' && "bg-[#1e4030] border-[#2e6048] text-[#7ddaab] hover:bg-[#1e4030] hover:border-[#2e6048]",
-        state === 'error'  && "bg-[#3d1e1e] border-[#6a2a2a] text-[#f08080] hover:bg-[#3d1e1e] hover:border-[#6a2a2a]",
+        state === 'copied' && "bg-[var(--share-ok-bg)] border-[var(--share-ok-border)] text-[var(--share-ok-text)] hover:bg-[var(--share-ok-bg)] hover:border-[var(--share-ok-border)]",
+        state === 'error'  && "bg-[var(--share-err-bg)] border-[var(--share-err-border)] text-[var(--share-err-text)] hover:bg-[var(--share-err-bg)] hover:border-[var(--share-err-border)]",
       )}
     >
       {label}
@@ -192,16 +190,6 @@ function ShareButton({ onShare }: { onShare: () => Promise<void> }) {
 }
 
 // ── Hamburger menu ─────────────────────────────────────────────────────────────
-// Visible on all screens below lg (< 1024px). Its internal items are
-// conditionally hidden via Tailwind responsive classes so each item only
-// appears when the corresponding header control is NOT visible.
-//
-// Breakpoint collapse map:
-//   xs (<640px)  — Hoop, Examples, Import SVG, Export, Share, Help
-//   sm (640-767px) — Hoop, Examples, Import SVG, Export, Share  [Help in header]
-//   md (768-1023px) — Import SVG, Export, Share  [Hoop+Examples in header]
-//   lg+ (≥1024px): hamburger hidden entirely
-//
 interface HamburgerProps {
   hoop: HoopConfig;
   onOpenHoopDialog: () => void;
@@ -217,28 +205,26 @@ function HamburgerMenu({
 }: HamburgerProps) {
   return (
     <DropdownMenu>
-      {/* Trigger — stays in DOM at all sizes; CSS hides it at lg+ */}
       <DropdownMenuTrigger
         className={cn(
           buttonVariants({ variant: 'outline' }),
           "flex lg:hidden size-[30px] p-0 flex-shrink-0",
-          "bg-[#3F2820] border-[#7A4E3C] text-[var(--gold)]",
-          "hover:bg-[#502E24] hover:border-[#9A6450] hover:text-[#F0C060]",
+          "bg-warm-btn border-warm-btn-edge text-gold",
+          "hover:bg-warm-btn-hi hover:border-warm-btn-edge-hi hover:text-gold-light",
         )}
         aria-label="More options"
       >
         <MenuIcon className="size-4" />
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-52 font-mono text-[12.5px]">
+      <DropdownMenuContent align="end" className="w-52 font-mono text-ui">
 
-        {/* ── Design group: shown when < md (Hoop + Examples not in header) ── */}
+        {/* ── Design group: shown when < md ── */}
         <DropdownMenuGroup className="md:hidden">
-          <DropdownMenuLabel className="text-[10px] tracking-[0.13em] uppercase text-[#6E7494] px-2 py-1">
+          <DropdownMenuLabel className="text-label tracking-[0.13em] uppercase text-faint px-2 py-1">
             Design
           </DropdownMenuLabel>
 
-          {/* Hoop — opens HoopDialog */}
           <DropdownMenuItem onClick={onOpenHoopDialog}>
             <span className="flex-shrink-0">
               <HoopIcon hoop={hoop} size={13} />
@@ -247,14 +233,13 @@ function HamburgerMenu({
             <span className="ml-auto text-[10.5px] text-muted-foreground">{hoop.label}</span>
           </DropdownMenuItem>
 
-          {/* Examples — sub-menu with all examples grouped by tier */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Examples</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="min-w-[172px] max-h-[320px] overflow-y-auto font-mono text-[12.5px]">
+            <DropdownMenuSubContent className="min-w-[172px] max-h-[320px] overflow-y-auto font-mono text-ui">
               {EXAMPLE_TIERS.map((tier, i) => (
                 <>
                   {i > 0 && <DropdownMenuSeparator key={`sep-${tier.label}`} />}
-                  <DropdownMenuLabel key={`lbl-${tier.label}`} className="text-[10px] tracking-[0.13em] uppercase text-[#6E7494]">
+                  <DropdownMenuLabel key={`lbl-${tier.label}`} className="text-label tracking-[0.13em] uppercase text-faint">
                     {tier.label}
                   </DropdownMenuLabel>
                   {tier.keys.map(k => (
@@ -270,9 +255,9 @@ function HamburgerMenu({
 
         <DropdownMenuSeparator className="md:hidden" />
 
-        {/* ── Tools group: shown when < lg (Import SVG not in header) ── */}
+        {/* ── Tools group: shown when < lg ── */}
         <DropdownMenuGroup className="lg:hidden">
-          <DropdownMenuLabel className="text-[10px] tracking-[0.13em] uppercase text-[#6E7494] px-2 py-1">
+          <DropdownMenuLabel className="text-label tracking-[0.13em] uppercase text-faint px-2 py-1">
             Import
           </DropdownMenuLabel>
           <DropdownMenuItem className="lg:hidden" onClick={onSVGImport}>
@@ -283,9 +268,9 @@ function HamburgerMenu({
 
         <DropdownMenuSeparator className="lg:hidden" />
 
-        {/* ── Output group: shown when < lg (Export + Share not in header) ── */}
+        {/* ── Output group: shown when < lg ── */}
         <DropdownMenuGroup className="lg:hidden">
-          <DropdownMenuLabel className="text-[10px] tracking-[0.13em] uppercase text-[#6E7494] px-2 py-1">
+          <DropdownMenuLabel className="text-label tracking-[0.13em] uppercase text-faint px-2 py-1">
             Export &amp; Share
           </DropdownMenuLabel>
           {(['dst', 'pes', 'exp'] as ExportFormat[]).map(fmt => (
@@ -313,24 +298,18 @@ export default function Header({
   return (
     <header className={styles.header}>
 
-      {/* ══ BRAND (always visible) ══════════════════════════════════════════ */}
-      {/* At xl+, add extra right margin after the slogan for visual breathing room */}
+      {/* ══ BRAND ════════════════════════════════════════════════════════════ */}
       <div className={cn(styles.brand, "xl:mr-4")}>
         <LogoIcon size={22} />
-        {/* Wordmark always visible — it's the app identity */}
         <h1 className={styles.wordmarkText}>NeedleScript</h1>
-        {/* Subtitle only at very wide screens */}
         <span className={cn(styles.tag, "hidden xl:block")}>
           Logo inspired programming language for generative embroidery
         </span>
         <span>&nbsp;</span>
       </div>
 
-      {/* ══ DESIGN GROUP (Hoop + Examples visible at md+) ═══════════════════ */}
-      {/* Group separator — only when the group is visible */}
-
+      {/* ══ DESIGN GROUP (Hoop + Examples at md+) ════════════════════════════ */}
       <div className="hidden md:flex items-center gap-1.5">
-        {/* Hoop selector */}
         <Tooltip>
           <TooltipTrigger
             onClick={onOpenHoopDialog}
@@ -338,17 +317,15 @@ export default function Header({
             className={blueBtn}
           >
             <HoopIcon hoop={hoop} size={14} />
-            {/* Hoop label visible only at lg+ to save space at md */}
             <span className="hidden lg:inline">{hoop.label}</span>
           </TooltipTrigger>
           <TooltipContent side="bottom">Change hoop size and shape</TooltipContent>
         </Tooltip>
 
-        {/* Examples picker */}
         <ExamplesSelect onExampleSelect={onExampleSelect} />
       </div>
 
-      {/* ══ IMPORT SVG (lg+ only — less frequently used) ════════════════════ */}
+      {/* ══ IMPORT SVG (lg+ only) ═════════════════════════════════════════════ */}
       <div className="hidden lg:flex items-center gap-1.5">
         <Tooltip>
           <TooltipTrigger
@@ -363,11 +340,10 @@ export default function Header({
         </Tooltip>
       </div>
 
-      {/* ══ FLEX SPACER — pushes action group to the right ═════════════════ */}
+      {/* ══ FLEX SPACER ══════════════════════════════════════════════════════ */}
       <div className="flex-1" />
 
-      {/* ══ ACTION GROUP ════════════════════════════════════════════════════ */}
-      {/* Run — primary action, always visible */}
+      {/* ══ ACTION GROUP ═════════════════════════════════════════════════════ */}
       <button
         type="button"
         onClick={onRun}
@@ -376,26 +352,23 @@ export default function Header({
         Run [cmd+enter]
       </button>
 
-      {/* Export + Share — secondary output actions visible at lg+ */}
       <div className="hidden lg:flex items-center gap-1.5">
         <ExportDropdown onDownload={onDownload} />
         <ShareButton onShare={onShare} />
       </div>
 
-      {/* ══ META GROUP (Help + Hamburger) ═══════════════════════════════════ */}
-
-      {/* Help — always visible */}
+      {/* ══ META GROUP (Help + Hamburger) ════════════════════════════════════ */}
       <Tooltip>
         <TooltipTrigger
           onClick={onOpenReference}
           aria-label="Language reference"
           className={cn(
             "flex items-center justify-center size-[30px] rounded-full p-0 flex-shrink-0 relative",
-            "cursor-pointer select-none font-mono font-semibold text-[13.5px]",
-            "bg-transparent border border-[#7A4E3C] text-[var(--gold)]",
-            "hover:bg-[#3F2820] hover:border-[#9A6450] hover:text-[#F0C060]",
+            "cursor-pointer select-none font-mono font-semibold text-body",
+            "bg-transparent border border-warm-btn-edge text-gold",
+            "hover:bg-warm-btn hover:border-warm-btn-edge-hi hover:text-gold-light",
             "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-            "after:absolute after:inset-[3px] after:border after:border-dashed after:border-[var(--gold)]/50 after:rounded-full after:pointer-events-none",
+            "after:absolute after:inset-[3px] after:border after:border-dashed after:border-gold/50 after:rounded-full after:pointer-events-none",
             styles.helpBtn,
           )}
         >
@@ -404,7 +377,6 @@ export default function Header({
         <TooltipContent side="bottom">Language reference</TooltipContent>
       </Tooltip>
 
-      {/* Hamburger — visible at < lg; content adapts per breakpoint */}
       <HamburgerMenu
         hoop={hoop}
         onOpenHoopDialog={onOpenHoopDialog}

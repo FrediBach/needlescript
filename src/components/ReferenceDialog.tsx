@@ -544,7 +544,7 @@ export default function ReferenceDialog({ open, onClose }: Props) {
     "font-mono text-[11px] tracking-[0.07em] px-2.5 py-1.5 h-auto whitespace-nowrap",
     "rounded-[5px] border-transparent shadow-none bg-transparent",
     "text-muted-foreground hover:text-foreground transition-colors",
-    "data-active:bg-[rgba(217,164,65,0.10)] data-active:text-[var(--gold)]",
+    "data-active:bg-[var(--gold-10)] data-active:text-gold",
     "data-active:border-transparent data-active:shadow-none",
     "after:hidden",  // suppress line-variant underline indicator
     "focus-visible:ring-2 focus-visible:ring-ring/50",
@@ -568,7 +568,7 @@ export default function ReferenceDialog({ open, onClose }: Props) {
       >
         {/* ── Row 1: branding + close ── */}
         <div className="flex items-center justify-between px-3.5 sm:px-4 h-10 flex-shrink-0 border-b border-dashed border-border">
-          <span className="text-[11px] tracking-[0.16em] uppercase text-[var(--gold)] select-none whitespace-nowrap">
+          <span className="text-[11px] tracking-[0.16em] uppercase text-gold select-none whitespace-nowrap">
             ✣ NeedleScript
           </span>
           <DialogClose className="text-[14px] font-mono text-muted-foreground bg-transparent border-none cursor-pointer px-[6px] py-[3px] rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">

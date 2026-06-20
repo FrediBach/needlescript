@@ -11,26 +11,26 @@
 }
 
 .section + .section {
-  border-top: 1px dashed var(--line);
+  border-top: 1px dashed var(--border);
 }
 
 .sectionTitle {
-  font-size: 10px;
+  font-size: var(--fs-label);
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #6E7494;
+  color: var(--text-faint);
   font-weight: 500;
   margin: 6px 0 4px;
 }
 
 .sectionNote {
-  font-size: 11.5px;
-  color: var(--dim);
+  font-size: var(--fs-param);
+  color: var(--text-muted);
   margin: 0 0 7px;
   line-height: 1.55;
 }
 
-/* Responsive two-column grid: single column below ~740px, two columns above */
+/* Responsive two-column grid */
 .entries {
   display: grid;
   grid-template-columns: 1fr;
@@ -49,7 +49,7 @@
   flex-direction: column;
   gap: 2px;
   padding: 5px 0;
-  font-size: 12px;
+  font-size: var(--fs-code);
 }
 
 .cmd {
@@ -57,23 +57,23 @@
 }
 
 .desc {
-  color: var(--dim);
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
 .empty {
   padding: 40px 16px;
-  color: var(--dim);
-  font-size: 13px;
+  color: var(--text-muted);
+  font-size: var(--fs-base);
   text-align: center;
 }
 
-/* ── Shared inline code style (used in Tutorial and About) ── */
+/* ── Shared inline code style ── */
 
 .inlineCode {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 0.9em;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--white-07);
   border-radius: 3px;
   padding: 1px 5px;
   color: var(--gold);
@@ -93,26 +93,25 @@
 }
 
 .tutH1 {
-  font-family: var(--serif);
-  font-size: 22px;
-  color: var(--pale);
+  font-family: var(--font-serif);
+  font-size: var(--fs-display);
+  color: var(--text);
   font-weight: 640;
   margin: 0 0 6px;
   line-height: 1.25;
 }
 
 .tutH2 {
-  font-size: 11px;
+  font-size: var(--fs-sub);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--gold);
   font-weight: 600;
   margin: 30px 0 8px;
   padding-top: 22px;
-  border-top: 1px dashed var(--line);
+  border-top: 1px dashed var(--border);
 }
 
-/* Don't add border before the very first h2 (Table of contents) */
 .tutContent > .tutH2:first-of-type {
   border-top: none;
   padding-top: 0;
@@ -120,38 +119,38 @@
 }
 
 .tutH3 {
-  font-size: 11px;
+  font-size: var(--fs-sub);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--pale);
+  color: var(--text);
   font-weight: 600;
   margin: 20px 0 6px;
 }
 
 .tutP {
-  color: var(--dim);
-  font-size: 12.5px;
+  color: var(--text-muted);
+  font-size: var(--fs-ui);
   line-height: 1.7;
   margin: 0 0 10px;
 }
 
 .tutHr {
   border: none;
-  border-top: 1px dashed var(--line);
+  border-top: 1px dashed var(--border);
   margin: 20px 0;
 }
 
 .tutPre {
-  background: var(--night);
-  border: 1px solid var(--line);
-  border-left: 3px solid rgba(217, 164, 65, 0.35);
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold-35);
   border-radius: 0 6px 6px 0;
   padding: 10px 14px;
   overflow-x: auto;
   margin: 8px 0 14px;
-  font-size: 12px;
+  font-size: var(--fs-code);
   line-height: 1.6;
-  color: var(--pale);
+  color: var(--text);
 }
 
 @media (min-width: 640px) {
@@ -161,25 +160,25 @@
 }
 
 .tutPre code {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: inherit;
 }
 
 .tutBlockquote {
-  border-left: 3px solid rgba(217, 164, 65, 0.5);
+  border-left: 3px solid var(--gold-50);
   padding: 8px 12px;
   margin: 10px 0 12px;
-  background: rgba(217, 164, 65, 0.05);
+  background: var(--gold-5);
   border-radius: 0 5px 5px 0;
-  color: var(--dim);
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: var(--fs-code);
   line-height: 1.65;
 }
 
 .tutUl,
 .tutOl {
-  color: var(--dim);
-  font-size: 12.5px;
+  color: var(--text-muted);
+  font-size: var(--fs-ui);
   line-height: 1.7;
   margin: 0 0 10px;
   padding-left: 22px;
@@ -193,13 +192,12 @@
 .tutTableWrap {
   overflow-x: auto;
   margin: 8px 0 14px;
-  /* Negative margin to allow table to use full available width on mobile */
   -webkit-overflow-scrolling: touch;
 }
 
 .tutTable {
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--fs-code);
   min-width: 100%;
 }
 
@@ -208,14 +206,14 @@
   text-align: left;
   font-weight: 500;
   padding: 5px 16px 5px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 
 .tutTd {
-  color: var(--dim);
+  color: var(--text-muted);
   padding: 4px 16px 4px 0;
-  border-bottom: 1px dashed rgba(58, 65, 99, 0.5);
+  border-bottom: 1px dashed var(--border-50);
   vertical-align: top;
   line-height: 1.55;
 }
@@ -245,8 +243,8 @@
 }
 
 .aboutTitle {
-  font-family: var(--serif);
-  font-size: 22px;
+  font-family: var(--font-serif);
+  font-size: var(--fs-display);
   color: var(--gold);
   font-weight: 640;
   margin: 0 0 22px;
@@ -255,15 +253,15 @@
 }
 
 .aboutPara {
-  color: var(--dim);
-  font-size: 13px;
+  color: var(--text-muted);
+  font-size: var(--fs-base);
   line-height: 1.75;
   margin: 0 0 16px;
 }
 
 .aboutCopyright {
-  color: #6E7494;
-  font-size: 11.5px;
+  color: var(--text-faint);
+  font-size: var(--fs-param);
   margin: 28px 0 0;
   letter-spacing: 0.04em;
 }

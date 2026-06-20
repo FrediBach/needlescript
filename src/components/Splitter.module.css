@@ -13,7 +13,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--white-18);
   transition: background-color 0.1s ease;
   pointer-events: none;
 }
@@ -23,7 +23,7 @@
   width: 5px;
   align-self: stretch;
   cursor: col-resize;
-  background: var(--line, #3A4163);
+  background: var(--border);
 }
 
 .horizontal::after {
@@ -36,7 +36,7 @@
   height: 5px;
   align-self: stretch;
   cursor: row-resize;
-  background: var(--line, #3A4163);
+  background: var(--border);
 }
 
 .vertical::after {
@@ -45,27 +45,21 @@
 }
 
 /* ── Hover ─────────────────────────────────────────────────────────── */
-.horizontal:hover {
-  background: rgba(217, 164, 65, 0.55);
-}
-
-.horizontal:hover::after {
-  background: rgba(255, 255, 255, 0.38);
-}
-
+.horizontal:hover,
 .vertical:hover {
-  background: rgba(217, 164, 65, 0.55);
+  background: var(--gold-55);
 }
 
+.horizontal:hover::after,
 .vertical:hover::after {
-  background: rgba(255, 255, 255, 0.38);
+  background: var(--white-38);
 }
 
 /* ── Active (while dragging) ─────────────────────────────────────── */
 .active {
-  background: rgba(217, 164, 65, 0.75) !important;
+  background: var(--gold-75) !important;
 }
 
 .active::after {
-  background: rgba(255, 255, 255, 0.55) !important;
+  background: var(--white-55) !important;
 }

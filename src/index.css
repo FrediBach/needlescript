@@ -6,11 +6,32 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* ── Font stacks ─────────────────────────────────────────────────────── */
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
   /* Use IBM Plex Mono as the app's default "sans" so shadcn base layer applies it */
   --font-sans: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
+  /* ── Border radius ───────────────────────────────────────────────────── */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  /* ── Font size scale ─────────────────────────────────────────────────── */
+  /* Use as Tailwind utilities: text-badge, text-label, text-sub… */
+  --text-badge:    9px;    /* very small: badges, bounds labels */
+  --text-label:    10px;   /* labels, group headers, uppercase caps */
+  --text-sub:      11px;   /* secondary labels, playback counter */
+  --text-param:    11.5px; /* parameter names, section notes */
+  --text-code:     12px;   /* console output, code-like text */
+  --text-ui:       12.5px; /* dropdowns, selects, reference entries */
+  --text-body:     13px;   /* default body / REPL */
+  --text-wordmark: 19px;   /* header wordmark */
+  --text-display:  22px;   /* tutorial h1, about title */
+
+  /* ── shadcn semantic colors (leave unchanged) ────────────────────────── */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -35,12 +56,55 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
+  /* ── App palette — generates Tailwind color utilities ───────────────── */
+  /* e.g. --color-gold → bg-gold, text-gold, border-gold …              */
 
+  /* Surfaces */
+  --color-panel:             var(--bg-panel);
+  --color-panel-raised:      var(--bg-panel-raised);
+  --color-warm-surface:      var(--bg-warm);
+  --color-warm-deep:         var(--bg-warm-deep);
+  --color-canvas:            var(--bg-canvas);
+  --color-canvas-hover:      var(--bg-canvas-hover);
+  --color-fabric:            var(--fabric);
+  --color-fabric-dark:       var(--fabric-dark);
+  /* Hoop */
+  --color-hoop:              var(--hoop-color);
+  --color-hoop-dark:         var(--hoop-color-dark);
+  /* Text — cool */
+  --color-pale:              var(--text);
+  --color-dim:               var(--text-muted);
+  --color-faint:             var(--text-faint);
+  --color-tag:               var(--text-tag);
+  /* Text — warm */
+  --color-warm-text:         var(--text-warm);
+  --color-warm-text-dim:     var(--text-warm-muted);
+  --color-warm-text-faint:   var(--text-warm-faint);
+  /* Text — canvas */
+  --color-on-canvas:         var(--text-on-canvas);
+  --color-on-canvas-dim:     var(--text-on-canvas-dim);
+  --color-on-run:            var(--text-on-run);
+  /* Borders */
+  --color-warm-edge:         var(--border-warm);
+  --color-warm-edge-sub:     var(--border-warm-sub);
+  /* Gold accent */
+  --color-gold:              var(--gold);
+  --color-gold-hi:           var(--gold-hi);
+  --color-gold-light:        var(--gold-light);
+  /* Run action */
+  --color-run:               var(--run);
+  --color-run-hi:            var(--run-hi);
+  --color-run-dark:          var(--run-dark);
+  /* Warm secondary buttons */
+  --color-warm-btn:          var(--warm-btn-bg);
+  --color-warm-btn-edge:     var(--warm-btn-border);
+  --color-warm-btn-hi:       var(--warm-btn-hover-bg);
+  --color-warm-btn-edge-hi:  var(--warm-btn-hover-border);
+  /* Console status */
+  --color-console-ok:        var(--console-ok);
+  --color-console-err:       var(--console-err);
+
+  /* ── Animations ──────────────────────────────────────────────────────── */
   @keyframes accordion-down {
     from { height: 0; }
     to { height: var(--radix-accordion-content-height, auto); }
@@ -52,43 +116,166 @@
 }
 
 :root {
-  /* App design tokens */
-  --night:    #1B2030;
-  --desk:     #252B41;
-  --desk-2:   #2D3450;
-  --line:     #3A4163;
-  --pale:     #EDE7DA;
-  --dim:      #9BA1BD;
-  --muslin:   #EFE8D8;
-  --muslin-2: #E5DCC7;
-  --hoop:     #B98B4E;
-  --hoop-d:   #7E5C2E;
-  --red:      #C8472F;
-  --red-d:    #A33823;
-  --gold:     #D9A441;
-  --mono:     "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --serif:    "Fraunces", Georgia, "Times New Roman", serif;
+  /* ════════════════════════════════════════════════════════════════════════
+     App design tokens — single source of truth for all colors & typography.
 
-  /* shadcn/ui variables — always dark (the app has no light mode) */
-  --background:              oklch(0.19 0.024 255);   /* --night  #1B2030 */
-  --foreground:              oklch(0.93 0.016 80);    /* --pale   #EDE7DA */
-  --card:                    oklch(0.22 0.030 255);   /* --desk   #252B41 */
+     CSS Modules reference these directly: var(--gold), var(--bg-warm), …
+     Tailwind utilities reference them via --color-* aliases above.
+     Monaco and Canvas mirror these values in src/theme.ts.
+
+     RGB-channel helpers enable opacity variants without listing every shade:
+       rgba(var(--gold-rgb), 0.45)  →  rgba(217, 164, 65, 0.45)
+     ════════════════════════════════════════════════════════════════════════ */
+
+  /* ── Surfaces — cool blue-gray IDE chrome ────────────────────────────── */
+  --bg-app:          #1B2030;   /* outermost app background */
+  --bg-panel:        #252B41;   /* editor, dialog surfaces */
+  --bg-panel-raised: #2D3450;   /* popover / elevated surfaces */
+
+  /* ── Surfaces — warm sepia (header, parameters panel) ───────────────── */
+  --bg-warm:         #291D1C;   /* header bar, parameters panel */
+  --bg-warm-deep:    #1E1514;   /* deeper warm (numeric inputs) */
+
+  /* ── Surfaces — stage, fabric, canvas elements ───────────────────────── */
+  --bg-canvas:       #FFFDF7;   /* stage buttons / playback bar */
+  --bg-canvas-hover: #F5EFE8;   /* hover on canvas-surface elements */
+  --fabric:          #EFE8D8;   /* linen stage background */
+  --fabric-dark:     #E5DCC7;   /* darker linen (playback bar) */
+
+  /* ── Borders ─────────────────────────────────────────────────────────── */
+  --border-warm:     #5A3A30;   /* header border */
+  --border-warm-sub: #4A3632;   /* parameters panel, subtle warm divider */
+
+  /* ── Text — cool blue-gray surfaces ──────────────────────────────────── */
+  --text:            #EDE7DA;   /* primary on dark */
+  --text-muted:      #9BA1BD;   /* secondary / dim on dark */
+  --text-faint:      #6E7494;   /* labels, captions, dropdown headers */
+  --text-tag:        #B0A090;   /* brand tagline */
+
+  /* ── Text — warm sepia surfaces ──────────────────────────────────────── */
+  --text-warm:       #D0C5B2;   /* primary on warm */
+  --text-warm-muted: #7A6E68;   /* secondary on warm */
+  --text-warm-faint: #56433F;   /* faint / decorative on warm */
+
+  /* ── Text — fabric / canvas ───────────────────────────────────────────── */
+  --text-on-canvas:     #4A3F2C;   /* text / icons on the fabric canvas */
+  --text-on-canvas-dim: #5A4D35;   /* dim text on canvas */
+  --text-on-run:        #FFF4EA;   /* text on the primary run button */
+
+  /* ── Embroidery hoop ─────────────────────────────────────────────────── */
+  --hoop-color:      #B98B4E;   /* hoop frame amber */
+  --hoop-color-dark: #7E5C2E;   /* hoop frame shadow */
+
+  /* ── Accent — brand gold ──────────────────────────────────────────────── */
+  --gold:       #D9A441;
+  --gold-hi:    #E8B84A;   /* brighter: hover / focus */
+  --gold-light: #F0C060;   /* lightest: text hover */
+
+  /* ── Actions — run (primary, red) ────────────────────────────────────── */
+  --run:      #C8472F;
+  --run-hi:   #D55036;   /* hover */
+  --run-dark: #A33823;   /* border / pressed */
+
+  /* ── Actions — warm brown secondary buttons ───────────────────────────── */
+  --warm-btn-bg:           #3F2820;
+  --warm-btn-border:       #7A4E3C;
+  --warm-btn-hover-bg:     #502E24;
+  --warm-btn-hover-border: #9A6450;
+
+  /* ── Status ───────────────────────────────────────────────────────────── */
+  --console-ok:  #9DC08B;
+  --console-err: #E98A77;
+
+  --share-ok-bg:     #1E4030;
+  --share-ok-border: #2E6048;
+  --share-ok-text:   #7DDAAB;
+
+  --share-err-bg:     #3D1E1E;
+  --share-err-border: #6A2A2A;
+  --share-err-text:   #F08080;
+
+  /* ── Typography ───────────────────────────────────────────────────────── */
+  --font-mono:  "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+
+  /* Reference in CSS: font-size: var(--fs-label)
+     Tailwind equivalent utilities: text-badge, text-label, text-sub … */
+  --fs-badge:    9px;
+  --fs-label:    10px;
+  --fs-sub:      11px;
+  --fs-param:    11.5px;
+  --fs-code:     12px;
+  --fs-ui:       12.5px;
+  --fs-base:     13px;
+  --fs-lg:       14px;
+  --fs-wordmark: 19px;
+  --fs-display:  22px;
+
+  /* ── RGB channel decompositions (enable rgba opacity variants) ────────── */
+  /* Usage:  rgba(var(--gold-rgb), 0.45)  →  rgba(217, 164, 65, 0.45)      */
+  --gold-rgb:         217, 164,  65;   /* --gold       #D9A441 */
+  --run-rgb:          200,  71,  47;   /* --run        #C8472F */
+  --border-rgb:        58,  65,  99;   /* shadcn --border #3A4163 */
+  --bg-app-rgb:        27,  32,  48;   /* --bg-app     #1B2030 */
+  --on-canvas-rgb:    125, 100,  60;   /* canvas ui accent */
+  --fabric-grid-rgb:  120, 100,  70;   /* fabric weave pattern */
+
+  /* ── Pre-mixed alpha values (used in box-shadow, pseudo-elements) ─────── */
+  /* Gold */
+  --gold-5:   rgba(var(--gold-rgb), 0.05);
+  --gold-10:  rgba(var(--gold-rgb), 0.10);
+  --gold-13:  rgba(var(--gold-rgb), 0.13);
+  --gold-18:  rgba(var(--gold-rgb), 0.18);
+  --gold-20:  rgba(var(--gold-rgb), 0.20);
+  --gold-35:  rgba(var(--gold-rgb), 0.35);
+  --gold-40:  rgba(var(--gold-rgb), 0.40);
+  --gold-45:  rgba(var(--gold-rgb), 0.45);
+  --gold-50:  rgba(var(--gold-rgb), 0.50);
+  --gold-55:  rgba(var(--gold-rgb), 0.55);
+  --gold-60:  rgba(var(--gold-rgb), 0.60);
+  --gold-75:  rgba(var(--gold-rgb), 0.75);
+  /* Run */
+  --run-25:   rgba(var(--run-rgb), 0.25);
+  --run-50:   rgba(var(--run-rgb), 0.50);
+  /* On-canvas tint */
+  --on-canvas-10: rgba(var(--on-canvas-rgb), 0.10);
+  --on-canvas-22: rgba(var(--on-canvas-rgb), 0.22);
+  --on-canvas-45: rgba(var(--on-canvas-rgb), 0.45);
+  /* White overlays */
+  --white-07: rgba(255, 255, 255, 0.07);
+  --white-18: rgba(255, 255, 255, 0.18);
+  --white-38: rgba(255, 255, 255, 0.38);
+  --white-55: rgba(255, 255, 255, 0.55);
+  --white-80: rgba(255, 255, 255, 0.80);
+  /* Border */
+  --border-50: rgba(var(--border-rgb), 0.50);
+  /* App bg tints */
+  --bg-app-60: rgba(var(--bg-app-rgb), 0.60);
+
+  /* ════════════════════════════════════════════════════════════════════════
+     shadcn/ui CSS variables — always dark (no light mode).
+     Kept in oklch for shadcn component compatibility; they approximate
+     the app design tokens above (see comments).
+     ════════════════════════════════════════════════════════════════════════ */
+  --background:              oklch(0.19 0.024 255);   /* ≈ --bg-app    #1B2030 */
+  --foreground:              oklch(0.93 0.016 80);    /* ≈ --text      #EDE7DA */
+  --card:                    oklch(0.22 0.030 255);   /* ≈ --bg-panel  #252B41 */
   --card-foreground:         oklch(0.93 0.016 80);
-  --popover:                 oklch(0.26 0.035 255);   /* --desk-2 #2D3450 */
+  --popover:                 oklch(0.26 0.035 255);   /* ≈ --bg-panel-raised #2D3450 */
   --popover-foreground:      oklch(0.93 0.016 80);
-  --primary:                 oklch(0.54 0.165 27);    /* --red    #C8472F */
+  --primary:                 oklch(0.54 0.165 27);    /* ≈ --run       #C8472F */
   --primary-foreground:      oklch(0.98 0.008 80);
-  --secondary:               oklch(0.26 0.035 255);   /* --desk-2 */
+  --secondary:               oklch(0.26 0.035 255);
   --secondary-foreground:    oklch(0.93 0.016 80);
-  --muted:                   oklch(0.26 0.035 255);   /* --desk-2 */
-  --muted-foreground:        oklch(0.67 0.030 255);   /* --dim    #9BA1BD */
-  --accent:                  oklch(0.33 0.044 255);   /* --line   #3A4163 */
+  --muted:                   oklch(0.26 0.035 255);
+  --muted-foreground:        oklch(0.67 0.030 255);   /* ≈ --text-muted #9BA1BD */
+  --accent:                  oklch(0.33 0.044 255);   /* ≈ border #3A4163 */
   --accent-foreground:       oklch(0.93 0.016 80);
-  --destructive:             oklch(0.54 0.165 27);    /* --red */
+  --destructive:             oklch(0.54 0.165 27);    /* ≈ --run */
   --destructive-foreground:  oklch(0.98 0.008 80);
-  --border:                  oklch(0.33 0.044 255);   /* --line */
-  --input:                   oklch(0.33 0.044 255);   /* --line */
-  --ring:                    oklch(0.73 0.130 70);    /* --gold   #D9A441 */
+  --border:                  oklch(0.33 0.044 255);   /* ≈ #3A4163 */
+  --input:                   oklch(0.33 0.044 255);
+  --ring:                    oklch(0.73 0.130 70);    /* ≈ --gold #D9A441 */
   --radius:                  0.375rem;                /* 6px */
 
   --chart-1: oklch(0.87 0.04 255);
@@ -106,10 +293,10 @@ html, body, #root {
 }
 
 body {
-  background: var(--night);
-  color: var(--pale);
-  font-family: var(--mono);
-  font-size: 13px;
+  background: var(--bg-app);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
 }
 
 @layer base {

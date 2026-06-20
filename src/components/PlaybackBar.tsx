@@ -112,9 +112,9 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
         onClick={handlePlayClick}
         aria-label={playing ? 'Pause stitch sequence' : 'Play stitch sequence'}
         className={cn(
-          "w-[34px] h-[30px] font-mono text-[13px]",
-          "bg-[#FFFDF7] border-[rgba(125,100,60,0.45)] text-[#4A3F2C]",
-          "hover:bg-[#F5EFE8] hover:text-[#4A3F2C]",
+          "w-[34px] h-[30px] font-mono text-body",
+          "bg-canvas border-[var(--on-canvas-45)] text-on-canvas",
+          "hover:bg-canvas-hover hover:text-on-canvas",
         )}
       >
         {playing ? '❚❚' : '▶'}
@@ -126,9 +126,9 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
           aria-label="Playback speed"
           title="Playback speed"
           className={cn(
-            "h-[30px] w-auto font-mono text-[11px] px-1.5",
-            "bg-[#FFFDF7] border-[rgba(125,100,60,0.45)] text-[#4A3F2C]",
-            "hover:bg-[#F5EFE8]",
+            "h-[30px] w-auto font-mono text-sub px-1.5",
+            "bg-canvas border-[var(--on-canvas-45)] text-on-canvas",
+            "hover:bg-canvas-hover",
           )}
         >
           <SelectValue />
@@ -169,10 +169,10 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
                 height={1}
                 fill={
                   isActive
-                    ? 'rgba(217,164,65,0.55)'
+                    ? 'var(--gold-55)'
                     : i % 2 === 0
-                      ? 'rgba(125,100,60,0.10)'
-                      : 'rgba(125,100,60,0.22)'
+                      ? 'var(--on-canvas-10)'
+                      : 'var(--on-canvas-22)'
                 }
               />
             );

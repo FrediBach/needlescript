@@ -1,19 +1,10 @@
-/* ── Design tokens scoped to the panel ───────────────────────────────────────
-   All children inherit these, keeping the warm palette self-contained and
-   cleanly separated from the editor's cool blue-grey.                        */
+/* ── Panel ────────────────────────────────────────────────────────────────
+   All colours come from the global design tokens in index.css so the warm
+   palette stays in sync with the rest of the app.                          */
 
 .panel {
-  /* warm dark sepia — distinct from the editor's --desk (#252B41) */
-  --p-bg:      #291D1C;
-  --p-bg2:     #1E1514;   /* deeper shade for inputs */
-  --p-border:  #4A3632;   /* warm medium border */
-  --p-track:   #4A3632;   /* slider track inactive */
-  --p-text:    #D0C5B2;   /* warm cream — param names, input text */
-  --p-dim:     #7A6E68;   /* muted warm — section titles, bounds */
-  --p-faint:   #56433F;   /* very muted — section lines */
-
-  background:  var(--p-bg);
-  border-top:  1px solid var(--p-border);
+  background:  var(--bg-warm);
+  border-top:  1px solid var(--border-warm-sub);
   flex-shrink: 0;
 }
 
@@ -28,16 +19,16 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  color: var(--p-dim);
+  color: var(--text-warm-muted);
   font: inherit;
-  font-size: 10px;
+  font-size: var(--fs-label);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   text-align: left;
   transition: color 0.15s;
 }
 
-.header:hover { color: var(--p-text); }
+.header:hover { color: var(--text-warm); }
 
 .headerLabel  { flex-shrink: 0; }
 .headerSpacer { flex: 1; }
@@ -50,9 +41,9 @@
   height: 15px;
   padding: 0 5px;
   border-radius: 99px;
-  background: var(--p-faint);
-  color: var(--p-dim);
-  font-size: 9px;
+  background: var(--text-warm-faint);
+  color: var(--text-warm-muted);
+  font-size: var(--fs-badge);
   letter-spacing: 0;
   text-transform: none;
   flex-shrink: 0;
@@ -62,13 +53,13 @@
 
 .body {
   overflow-y: auto;
-  max-height: 260px;  /* a little taller for the roomier rows */
+  max-height: 260px;
   padding: 2px 0 10px;
 }
 
 .body::-webkit-scrollbar       { width: 4px; }
 .body::-webkit-scrollbar-track { background: transparent; }
-.body::-webkit-scrollbar-thumb { background: var(--p-faint); border-radius: 2px; }
+.body::-webkit-scrollbar-thumb { background: var(--text-warm-faint); border-radius: 2px; }
 
 /* ── Section header (inline divider) ─────────────────────────────────────── */
 
@@ -83,14 +74,14 @@
 .sectionLine {
   flex: 1;
   height: 1px;
-  background: var(--p-faint);
+  background: var(--text-warm-faint);
 }
 
 .sectionTitle {
-  font-size: 9px;
+  font-size: var(--fs-badge);
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--p-dim);
+  color: var(--text-warm-muted);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -117,8 +108,8 @@
 /* ── Parameter name label ────────────────────────────────────────────────── */
 
 .paramName {
-  font-size: 11.5px;
-  color: var(--p-text);
+  font-size: var(--fs-param);
+  color: var(--text-warm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -138,7 +129,7 @@
 
 /* Track */
 .slider [data-slot="slider-track"] {
-  background: var(--p-track) !important;
+  background: var(--border-warm-sub) !important;
   height: 3px !important;
 }
 
@@ -153,23 +144,23 @@
   height: 18px !important;
   border-width: 2px !important;
   border-color: var(--gold) !important;
-  background: var(--p-bg) !important;
+  background: var(--bg-warm) !important;
   box-shadow: none !important;
 }
 
 .slider [data-slot="slider-thumb"]:hover,
 .slider [data-slot="slider-thumb"]:focus-visible,
 .slider [data-slot="slider-thumb"]:active {
-  background: var(--p-bg) !important;
-  border-color: #E8B84A !important; /* slightly brighter gold on hover */
-  box-shadow: 0 0 0 4px rgba(217, 164, 65, 0.18) !important;
+  background: var(--bg-warm) !important;
+  border-color: var(--gold-hi) !important;
+  box-shadow: 0 0 0 4px var(--gold-18) !important;
 }
 
 .sliderBounds {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
-  color: var(--p-dim);
+  font-size: var(--fs-badge);
+  color: var(--text-warm-muted);
   letter-spacing: 0.04em;
   padding: 0 2px;
   line-height: 1;
@@ -181,23 +172,23 @@
   width: 54px !important;
   height: 32px !important;
   padding: 4px 7px !important;
-  font-size: 11px !important;
+  font-size: var(--fs-sub) !important;
   text-align: right;
   /* Colours override the shadcn/base-ui input defaults */
-  background: var(--p-bg2) !important;
-  border-color: var(--p-border) !important;
-  color: var(--p-text) !important;
+  background: var(--bg-warm-deep) !important;
+  border-color: var(--border-warm-sub) !important;
+  color: var(--text-warm) !important;
   border-radius: 5px !important;
   /* Hide browser number spinners; arrow keys still work */
   -moz-appearance: textfield;
   flex-shrink: 0;
 }
 
-.valueInput:hover  { border-color: var(--p-dim) !important; }
+.valueInput:hover  { border-color: var(--text-warm-muted) !important; }
 .valueInput:focus-within,
 .valueInput:focus  {
   border-color: var(--gold) !important;
-  box-shadow: 0 0 0 2px rgba(217, 164, 65, 0.20) !important;
+  box-shadow: 0 0 0 2px var(--gold-20) !important;
   outline: none !important;
 }
 
@@ -214,8 +205,8 @@
 }
 
 .switchLabel {
-  font-size: 10px;
-  color: var(--p-faint);
+  font-size: var(--fs-label);
+  color: var(--text-warm-faint);
   letter-spacing: 0.04em;
   white-space: nowrap;
   transition: color 0.15s;
@@ -224,11 +215,11 @@
 
 .switchLabel:first-child { text-align: right; }
 
-.switchLabelActive { color: var(--p-text); }
+.switchLabelActive { color: var(--text-warm); }
 
 /* Override shadcn Switch to use gold + warm palette */
 .switch {
-  background: var(--p-track) !important;
+  background: var(--border-warm-sub) !important;
 }
 
 .switch[data-checked] {
@@ -236,5 +227,5 @@
 }
 
 .switch [data-slot="switch-thumb"] {
-  background: var(--p-text) !important;
+  background: var(--text-warm) !important;
 }
