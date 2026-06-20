@@ -1,8 +1,19 @@
-/* ── Outer panel ──────────────────────────────────────────────────────────── */
+/* ── Design tokens scoped to the panel ───────────────────────────────────────
+   All children inherit these, keeping the warm palette self-contained and
+   cleanly separated from the editor's cool blue-grey.                        */
 
 .panel {
-  background: rgba(0, 0, 0, 0.14);
-  border-top: 1px dashed var(--line);
+  /* warm dark sepia — distinct from the editor's --desk (#252B41) */
+  --p-bg:      #291D1C;
+  --p-bg2:     #1E1514;   /* deeper shade for inputs */
+  --p-border:  #4A3632;   /* warm medium border */
+  --p-track:   #4A3632;   /* slider track inactive */
+  --p-text:    #D0C5B2;   /* warm cream — param names, input text */
+  --p-dim:     #7A6E68;   /* muted warm — section titles, bounds */
+  --p-faint:   #56433F;   /* very muted — section lines */
+
+  background:  var(--p-bg);
+  border-top:  1px solid var(--p-border);
   flex-shrink: 0;
 }
 
@@ -11,13 +22,13 @@
 .header {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   width: 100%;
-  padding: 5px 14px;
+  padding: 7px 16px 6px;
   background: transparent;
   border: none;
   cursor: pointer;
-  color: var(--dim);
+  color: var(--p-dim);
   font: inherit;
   font-size: 10px;
   letter-spacing: 0.18em;
@@ -26,70 +37,60 @@
   transition: color 0.15s;
 }
 
-.header:hover {
-  color: var(--pale);
-}
+.header:hover { color: var(--p-text); }
 
-.headerLabel {
-  flex-shrink: 0;
-}
+.headerLabel  { flex-shrink: 0; }
+.headerSpacer { flex: 1; }
 
 .paramCount {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 16px;
-  height: 14px;
-  padding: 0 4px;
+  min-width: 18px;
+  height: 15px;
+  padding: 0 5px;
   border-radius: 99px;
-  background: var(--line);
-  color: var(--dim);
+  background: var(--p-faint);
+  color: var(--p-dim);
   font-size: 9px;
   letter-spacing: 0;
   text-transform: none;
   flex-shrink: 0;
 }
 
-.headerSpacer {
-  flex: 1;
-}
-
 /* ── Scrollable body ──────────────────────────────────────────────────────── */
 
 .body {
   overflow-y: auto;
-  /* Enough space for ~4 rows before scrolling */
-  max-height: 220px;
-  padding: 4px 0 8px;
+  max-height: 260px;  /* a little taller for the roomier rows */
+  padding: 2px 0 10px;
 }
 
-/* Thin scrollbar to match console */
-.body::-webkit-scrollbar { width: 4px; }
+.body::-webkit-scrollbar       { width: 4px; }
 .body::-webkit-scrollbar-track { background: transparent; }
-.body::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+.body::-webkit-scrollbar-thumb { background: var(--p-faint); border-radius: 2px; }
 
 /* ── Section header (inline divider) ─────────────────────────────────────── */
 
 .sectionHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 14px 3px;
-  margin-top: 2px;
+  gap: 10px;
+  padding: 10px 16px 5px;
+  margin-top: 4px;
 }
 
 .sectionLine {
   flex: 1;
   height: 1px;
-  background: var(--line);
-  opacity: 0.6;
+  background: var(--p-faint);
 }
 
 .sectionTitle {
   font-size: 9px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--dim);
+  color: var(--p-dim);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -99,33 +100,30 @@
 .paramRow {
   display: grid;
   /* name | controls | value-input */
-  grid-template-columns: minmax(60px, 100px) 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 14px;
-  min-height: 36px;
+  grid-template-columns: minmax(64px, 96px) 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 16px 6px;
 }
 
 @media (max-width: 480px) {
   .paramRow {
-    /* On very narrow screens stack name above the rest */
     grid-template-columns: 1fr auto;
     grid-template-rows: auto auto;
   }
-  .paramName {
-    grid-column: 1 / -1;
-  }
+  .paramName { grid-column: 1 / -1; }
 }
 
 /* ── Parameter name label ────────────────────────────────────────────────── */
 
 .paramName {
-  font-size: 11px;
-  color: var(--pale);
+  font-size: 11.5px;
+  color: var(--p-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1;
+  padding-top: 11px;   /* vertically align with slider thumb centre */
   min-width: 0;
 }
 
@@ -134,80 +132,109 @@
 .sliderWrap {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 
-/* Override shadcn Slider colours to match gold accent theme */
+/* Track */
+.slider [data-slot="slider-track"] {
+  background: var(--p-track) !important;
+  height: 3px !important;
+}
+
+/* Filled range */
 .slider [data-slot="slider-range"] {
   background: var(--gold) !important;
 }
 
+/* Thumb — hollow ring, larger hit target */
 .slider [data-slot="slider-thumb"] {
+  width: 18px !important;
+  height: 18px !important;
+  border-width: 2px !important;
   border-color: var(--gold) !important;
-  background: var(--night) !important;
-  width: 14px;
-  height: 14px;
+  background: var(--p-bg) !important;
+  box-shadow: none !important;
 }
 
-.slider [data-slot="slider-track"] {
-  background: var(--line) !important;
-  height: 3px !important;
+.slider [data-slot="slider-thumb"]:hover,
+.slider [data-slot="slider-thumb"]:focus-visible,
+.slider [data-slot="slider-thumb"]:active {
+  background: var(--p-bg) !important;
+  border-color: #E8B84A !important; /* slightly brighter gold on hover */
+  box-shadow: 0 0 0 4px rgba(217, 164, 65, 0.18) !important;
 }
 
 .sliderBounds {
   display: flex;
   justify-content: space-between;
   font-size: 9px;
-  color: var(--dim);
-  opacity: 0.7;
-  letter-spacing: 0.03em;
-  padding: 0 1px;
+  color: var(--p-dim);
+  letter-spacing: 0.04em;
+  padding: 0 2px;
   line-height: 1;
 }
 
 /* ── Number input next to slider ─────────────────────────────────────────── */
 
 .valueInput {
-  width: 58px !important;
-  height: 26px !important;
-  padding: 2px 5px !important;
+  width: 54px !important;
+  height: 32px !important;
+  padding: 4px 7px !important;
   font-size: 11px !important;
   text-align: right;
-  /* Hide browser-default number spinners; arrow keys still work */
+  /* Colours override the shadcn/base-ui input defaults */
+  background: var(--p-bg2) !important;
+  border-color: var(--p-border) !important;
+  color: var(--p-text) !important;
+  border-radius: 5px !important;
+  /* Hide browser number spinners; arrow keys still work */
   -moz-appearance: textfield;
   flex-shrink: 0;
 }
 
-.valueInput::-webkit-outer-spin-button,
-.valueInput::-webkit-inner-spin-button {
-  -webkit-appearance: none;
+.valueInput:hover  { border-color: var(--p-dim) !important; }
+.valueInput:focus-within,
+.valueInput:focus  {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 2px rgba(217, 164, 65, 0.20) !important;
+  outline: none !important;
 }
 
-/* ── Switch row layout ───────────────────────────────────────────────────── */
+.valueInput::-webkit-outer-spin-button,
+.valueInput::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+/* ── Switch row ─────────────────────────────────────────────────────────── */
 
 .switchWrap {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding-top: 8px;   /* align with name label */
 }
 
 .switchLabel {
   font-size: 10px;
-  color: var(--dim);
+  color: var(--p-faint);
   letter-spacing: 0.04em;
   white-space: nowrap;
   transition: color 0.15s;
-  min-width: 20px;
+  min-width: 24px;
 }
 
 .switchLabel:first-child { text-align: right; }
 
-.switchLabelActive {
-  color: var(--pale);
+.switchLabelActive { color: var(--p-text); }
+
+/* Override shadcn Switch to use gold + warm palette */
+.switch {
+  background: var(--p-track) !important;
 }
 
-/* Override shadcn Switch to use gold accent */
 .switch[data-checked] {
   background: var(--gold) !important;
+}
+
+.switch [data-slot="switch-thumb"] {
+  background: var(--p-text) !important;
 }
