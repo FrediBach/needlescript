@@ -13,9 +13,17 @@
 .header {
   display: flex;
   align-items: center;
-  gap: 8px;
   width: 100%;
-  padding: 7px 16px 6px;
+  background: transparent;
+}
+
+.headerToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px 6px 16px;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -28,7 +36,28 @@
   transition: color 0.15s;
 }
 
-.header:hover { color: var(--text-warm); }
+.headerToggle:hover { color: var(--text-warm); }
+
+.randomizeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin: 0 13px 0 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-warm);
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.randomizeBtn:hover {
+  color: var(--text-warm);
+  background-color: var(--text-warm-faint);
+}
 
 .headerLabel  { flex-shrink: 0; }
 .headerSpacer { flex: 1; }

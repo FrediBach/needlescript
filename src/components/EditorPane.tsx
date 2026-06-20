@@ -95,6 +95,20 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
     }
   }, [onSourceChange]);
 
+  const handleAllParamsChange = useCallback((changes: Array<{name: string; line: number; value: number}>) => {
+    // Apply every change sequentially to an accumulating source string so all
+    // updates land in a single onSourceChange call (avoids last-write-wins when
+    // each patched value is read from the same stale sourceRef.current).
+    let src = sourceRef.current;
+    for (const { name, line, value } of changes) {
+      src = updateParameter(src, line, name, value);
+    }
+    onSourceChange(src);
+    if (runTimerRef.current !== null) clearTimeout(runTimerRef.current);
+    lastRunTimeRef.current = Date.now();
+    onRunRef.current();
+  }, [onSourceChange]);
+
   // ── Monaco lifecycle callbacks ──────────────────────────────────────
   const handleBeforeMount = useCallback<BeforeMount>((monaco) => {
     registerNeedlescript(monaco);
@@ -232,7 +246,7 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
         />
       </div>
 
-      <ParametersPanel source={source} onParamChange={handleParamChange} />
+      <ParametersPanel source={source} onParamChange={handleParamChange} onAllParamsChange={handleAllParamsChange} />
 
       <Splitter
         orientation="vertical"

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Shuffle } from 'lucide-react';
 import { parseParameters, snapValue } from '../lib/parse-parameters.ts';
 import type { ParamItem, ParamDef } from '../lib/parse-parameters.ts';
 import { Slider } from '@/components/ui/slider.tsx';
@@ -10,9 +10,16 @@ import styles from './ParametersPanel.module.css';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+interface ParamChange {
+  name: string;
+  line: number;
+  value: number;
+}
+
 interface Props {
   source: string;
   onParamChange: (name: string, line: number, value: number) => void;
+  onAllParamsChange: (changes: ParamChange[]) => void;
 }
 
 // ── Section separator ────────────────────────────────────────────────────────
@@ -154,11 +161,22 @@ function SwitchRow({ def, onChange }: SwitchRowProps) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-export default function ParametersPanel({ source, onParamChange }: Props) {
+export default function ParametersPanel({ source, onParamChange, onAllParamsChange }: Props) {
   const items = useMemo(() => parseParameters(source), [source]);
   const paramCount = items.filter(i => i.kind === 'param').length;
 
   const [open, setOpen] = useState(true);
+
+  const handleRandomize = useCallback(() => {
+    const changes = items
+      .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
+      .map(({ def }) => {
+        const { name, line, min, max, step } = def;
+        const raw = min + Math.random() * (max - min);
+        return { name, line, value: snapValue(raw, min, max, step) };
+      });
+    onAllParamsChange(changes);
+  }, [items, onAllParamsChange]);
 
   // Auto-show the panel whenever parameters appear for the first time, but
   // don't fight the user if they've manually collapsed it.
@@ -176,20 +194,31 @@ export default function ParametersPanel({ source, onParamChange }: Props) {
   return (
     <div className={styles.panel} role="region" aria-label="Parameters">
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <button
-        className={styles.header}
-        onClick={() => setOpen(v => !v)}
-        aria-expanded={open}
-        type="button"
-      >
-        <span className={styles.headerLabel}>Parameters</span>
-        <span className={styles.paramCount}>{paramCount}</span>
-        <span className={styles.headerSpacer} />
-        {open
-          ? <ChevronUp  size={12} aria-hidden="true" />
-          : <ChevronDown size={12} aria-hidden="true" />
-        }
-      </button>
+      <div className={styles.header}>
+        <button
+          className={styles.headerToggle}
+          onClick={() => setOpen(v => !v)}
+          aria-expanded={open}
+          type="button"
+        >
+          <span className={styles.headerLabel}>Parameters</span>
+          <span className={styles.paramCount}>{paramCount}</span>
+          <span className={styles.headerSpacer} />
+          {open
+            ? <ChevronUp  size={12} aria-hidden="true" />
+            : <ChevronDown size={12} aria-hidden="true" />
+          }
+        </button>
+        <button
+          className={styles.randomizeBtn}
+          onClick={handleRandomize}
+          type="button"
+          title="Randomize all parameters"
+          aria-label="Randomize all parameters"
+        >
+          <Shuffle size={11} aria-hidden="true" />
+        </button>
+      </div>
 
       {/* ── Body ────────────────────────────────────────────────────── */}
       {open && (
