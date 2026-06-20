@@ -104,9 +104,9 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
     <Select onValueChange={(val: string | null) => { if (val) onExampleSelect(val); }}>
       <SelectTrigger
         aria-label="Example programs"
-        className={cn(hdrBtn, "w-[180px] bg-warm-btn border-warm-btn-edge text-gold hover:border-warm-btn-edge-hi hover:text-gold-light gap-1")}
+        className="h-[30px] font-mono cursor-pointer flex-shrink-0 w-[180px] bg-warm-btn border-warm-btn-edge text-gold hover:border-warm-btn-edge-hi hover:text-gold-light gap-1"
       >
-        <SelectValue placeholder="examples" />
+        <SelectValue placeholder="Examples" className="text-gold" />
       </SelectTrigger>
       <SelectContent className="font-mono text-ui">
         {EXAMPLE_TIERS.map((tier, i) => (
