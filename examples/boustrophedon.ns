@@ -1,0 +1,26 @@
+// Boustrophedon serpentine fill of a square.
+// One continuous, non-crossing line: up to the top, step right,
+// down to the bottom, step right, repeat until the square is full.
+
+let side = 26       // height of each pass (mm)
+let gap = 2         // spacing between passes (mm) — also the step over
+let passes = 13     // how many vertical passes fill the square
+
+stitchlen 2
+
+// start at the bottom-left of the fill area
+up setxy(-13, -13) down
+seth 0              // face north (up)
+
+repeat passes [
+  fd side           // run to the far edge of this pass
+
+  // the U-turn: step over by one gap, without crossing the line
+  if repcount % 2 == 1 [
+    rt 90  fd gap  rt 90       // turn around to the right
+  ] else [
+    lt 90  fd gap  lt 90       // turn around to the left
+  ]
+]
+
+trim
