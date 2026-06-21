@@ -338,7 +338,39 @@
   background: var(--text-warm) !important;
 }
 
-/* ── Lock button ─────────────────────────────────────────────────────────── */
+/* ── Context menu (portal, anchored to cursor) ──────────────────────────── */
+
+.contextMenu {
+  position: fixed;
+  z-index: 999;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--bg-warm);
+  border: 1px solid var(--border-warm);
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+}
+
+.contextMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-warm);
+  font: inherit;
+  font-size: var(--fs-sub);
+  text-align: left;
+  transition: background-color 0.1s;
+}
+
+.contextMenuItem:hover {
+  background: var(--text-warm-faint);
+}
 
 .lockBtn {
   grid-column: 4;

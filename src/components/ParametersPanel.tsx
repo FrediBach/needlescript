@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp, Shuffle, Lock, LockOpen, Copy } from 'lucide-react';
 import { parseParameters, parsePresets, snapValue } from '../lib/parse-parameters.ts';
 import type { ParamItem, ParamDef, Preset } from '../lib/parse-parameters.ts';
@@ -262,6 +263,26 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
     navigator.clipboard.writeText(`// @preset ${name} : ${assignments}`);
   }, [items, activePreset]);
 
+  // ── Header context menu (right-click → "Copy as preset") ────────────────
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKey  = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown',   onKey);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown',   onKey);
+    };
+  }, [contextMenu]);
+
   // Auto-show the panel whenever parameters appear for the first time, but
   // don't fight the user if they've manually collapsed it.
   const hadParamsRef = useRef(paramCount > 0);
@@ -278,7 +299,7 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
   return (
     <div className={styles.panel} role="region" aria-label="Parameters">
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <div className={styles.header}>
+      <div className={styles.header} onContextMenu={handleContextMenu}>
         <button
           className={styles.headerToggle}
           onClick={() => setOpen(v => !v)}
@@ -363,6 +384,25 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
             );
           })}
         </div>
+      )}
+
+      {/* ── Context menu portal (right-click on header) ───────────────── */}
+      {contextMenu && createPortal(
+        <div
+          className={styles.contextMenu}
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          <button
+            className={styles.contextMenuItem}
+            type="button"
+            onClick={() => { handleCopy(); setContextMenu(null); }}
+          >
+            <Copy size={11} aria-hidden="true" />
+            Copy as preset
+          </button>
+        </div>,
+        document.body,
       )}
     </div>
   );
