@@ -2,14 +2,14 @@
 // One continuous, non-crossing line: up to the top, step right,
 // down to the bottom, step right, repeat until the square is full.
 
-let side = 26       // height of each pass (mm)
-let gap = 2         // spacing between passes (mm) — also the step over
-let passes = 13     // how many vertical passes fill the square
+let side = 60       // height of each pass (mm)
+let gap = 1         // spacing between passes (mm) — also the step over
+let passes = 60     // how many vertical passes fill the square
 
 stitchlen 2
 
 // start at the bottom-left of the fill area
-up setxy(-13, -13) down
+up setxy(- side / 2, - side / 2) down
 seth 0              // face north (up)
 
 repeat passes [
