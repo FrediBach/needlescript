@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Shuffle, Lock, LockOpen } from 'lucide-react';
-import { parseParameters, snapValue } from '../lib/parse-parameters.ts';
-import type { ParamItem, ParamDef } from '../lib/parse-parameters.ts';
+import { ChevronDown, ChevronUp, Shuffle, Lock, LockOpen, Copy } from 'lucide-react';
+import { parseParameters, parsePresets, snapValue } from '../lib/parse-parameters.ts';
+import type { ParamItem, ParamDef, Preset } from '../lib/parse-parameters.ts';
 import { Slider } from '@/components/ui/slider.tsx';
 import { Switch } from '@/components/ui/switch.tsx';
 import { Input } from '@/components/ui/input.tsx';
@@ -192,12 +192,15 @@ function SwitchRow({ def, onChange, isLocked, onToggleLock }: SwitchRowProps) {
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export default function ParametersPanel({ source, onParamChange, onAllParamsChange }: Props) {
-  const items = useMemo(() => parseParameters(source), [source]);
+  const items   = useMemo(() => parseParameters(source), [source]);
+  const presets = useMemo(() => parsePresets(source),    [source]);
   const paramCount = items.filter(i => i.kind === 'param').length;
 
-  const [open, setOpen] = useState(true);
+  const [open, setOpen]               = useState(true);
   const [lockedParams, setLockedParams] = useState<Set<string>>(() => new Set());
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
+  // ── Lock toggle ─────────────────────────────────────────────────────────
   const toggleLock = useCallback((name: string) => {
     setLockedParams(prev => {
       const next = new Set(prev);
@@ -207,6 +210,13 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
     });
   }, []);
 
+  // ── Wrap onParamChange so any manual edit deselects the active preset ───
+  const handleParamChange = useCallback((name: string, line: number, value: number) => {
+    setActivePreset(null);
+    onParamChange(name, line, value);
+  }, [onParamChange]);
+
+  // ── Randomize (respects locks, clears active preset) ────────────────────
   const handleRandomize = useCallback(() => {
     const changes = items
       .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
@@ -216,8 +226,41 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
         const raw = min + Math.random() * (max - min);
         return { name, line, value: snapValue(raw, min, max, step) };
       });
-    if (changes.length > 0) onAllParamsChange(changes);
+    if (changes.length > 0) {
+      setActivePreset(null);
+      onAllParamsChange(changes);
+    }
   }, [items, lockedParams, onAllParamsChange]);
+
+  // ── Apply preset (overrides locks, sets activePreset) ───────────────────
+  const handleApplyPreset = useCallback((presetName: string) => {
+    const preset = presets.find((p: Preset) => p.name === presetName);
+    if (!preset) return;
+    const changes = items
+      .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
+      .filter(({ def }) => def.name in preset.values)
+      .map(({ def }) => ({
+        name:  def.name,
+        line:  def.line,
+        value: snapValue(preset.values[def.name], def.min, def.max, def.step),
+      }));
+    if (changes.length > 0) {
+      setActivePreset(presetName);
+      onAllParamsChange(changes);
+    }
+  }, [presets, items, onAllParamsChange]);
+
+  // ── Copy current param state as a ready-to-paste @preset comment ────────
+  const handleCopy = useCallback(() => {
+    const paramDefs = items
+      .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
+      .map(({ def }) => def);
+    const assignments = paramDefs
+      .map(def => `${def.name}=${formatPresetValue(def.value)}`)
+      .join(', ');
+    const name = activePreset ?? 'My Preset';
+    navigator.clipboard.writeText(`// @preset ${name} : ${assignments}`);
+  }, [items, activePreset]);
 
   // Auto-show the panel whenever parameters appear for the first time, but
   // don't fight the user if they've manually collapsed it.
@@ -261,6 +304,35 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
         </button>
       </div>
 
+      {/* ── Preset bar ──────────────────────────────────────────────── */}
+      {open && presets.length > 0 && (
+        <div className={styles.presetBar}>
+          <div className={styles.presetSelectWrap}>
+            <select
+              className={styles.presetSelect}
+              value={activePreset ?? ''}
+              onChange={e => { if (e.target.value) handleApplyPreset(e.target.value); }}
+              aria-label="Presets"
+            >
+              <option value="" disabled>— preset —</option>
+              {presets.map((p: Preset) => (
+                <option key={p.name} value={p.name}>{p.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={10} className={styles.presetChevron} aria-hidden="true" />
+          </div>
+          <button
+            className={styles.copyBtn}
+            onClick={handleCopy}
+            type="button"
+            title="Copy current values as preset"
+            aria-label="Copy current values as preset"
+          >
+            <Copy size={11} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
       {/* ── Body ────────────────────────────────────────────────────── */}
       {open && (
         <div className={styles.body}>
@@ -275,7 +347,7 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
                   key={`${def.name}-${def.line}`}
                   def={def}
                   isLocked={lockedParams.has(def.name)}
-                  onChange={onParamChange}
+                  onChange={handleParamChange}
                   onToggleLock={() => toggleLock(def.name)}
                 />
               );
@@ -285,7 +357,7 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
                 key={`${def.name}-${def.line}`}
                 def={def}
                 isLocked={lockedParams.has(def.name)}
-                onChange={onParamChange}
+                onChange={handleParamChange}
                 onToggleLock={() => toggleLock(def.name)}
               />
             );
@@ -308,4 +380,10 @@ function formatSliderBound(value: number, kind: ParamDef['sliderKind']): string 
   if (kind === 'integer') return String(Math.round(value));
   // Keep bounds compact
   return parseFloat(value.toPrecision(4)).toString();
+}
+
+/** Format a number for use in a @preset comment — integer or up to 6 sig-figs. */
+function formatPresetValue(value: number): string {
+  if (Number.isFinite(value) && Math.floor(value) === value) return String(Math.round(value));
+  return parseFloat(value.toPrecision(6)).toString();
 }

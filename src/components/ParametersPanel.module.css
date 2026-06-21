@@ -78,6 +78,82 @@
   flex-shrink: 0;
 }
 
+/* ── Preset bar ────────────────────────────────────────────────────────────── */
+
+.presetBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 13px 6px 16px;
+  border-top: 1px solid var(--border-warm-sub);
+}
+
+/* Wrapper so we can overlay a custom chevron over the native <select> */
+.presetSelectWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.presetSelect {
+  width: 100%;
+  height: 26px;
+  padding: 0 20px 0 8px;   /* right room for chevron */
+  background: var(--bg-warm-deep);
+  border: 1px solid var(--border-warm-sub);
+  border-radius: 4px;
+  color: var(--text-warm);
+  font: inherit;
+  font-size: var(--fs-sub);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s;
+}
+
+.presetSelect:hover  { border-color: var(--text-warm-muted); }
+
+.presetSelect:focus  {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-20);
+}
+
+/* Options inherit the warm colour on most platforms, but override dark mode */
+.presetSelect option {
+  background: var(--bg-warm-deep);
+  color: var(--text-warm);
+}
+
+.presetChevron {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-warm-muted);
+}
+
+.copyBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-warm-faint);
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.copyBtn:hover {
+  color: var(--text-warm);
+  background-color: var(--text-warm-faint);
+}
+
 /* ── Scrollable body ──────────────────────────────────────────────────────── */
 
 .body {

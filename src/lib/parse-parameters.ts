@@ -44,6 +44,17 @@ export type ParamItem =
   | { kind: 'section'; title: string }
   | { kind: 'param'; def: ParamDef };
 
+// ── Preset type ────────────────────────────────────────────────────────────
+
+/** A named bundle of parameter values defined in a source comment, e.g.
+ *    // @preset Dense Rosette : bigR=100, rollR=63, pen=50
+ *  Partial presets (fewer keys than total params) are valid and common.    */
+export interface Preset {
+  name: string;
+  /** Keyed by lowercased variable name — same casing as ParamDef.name */
+  values: Record<string, number>;
+}
+
 // ── Regex helpers ──────────────────────────────────────────────────────────
 
 // Matches any of the three declaration forms and captures name + value:
@@ -253,4 +264,40 @@ export function snapValue(value: number, min: number, max: number, step: number)
   const snapped = Math.round((clamped - min) / step) * step + min;
   // Guard against floating-point overshoot after snap
   return Math.min(max, Math.max(min, snapped));
+}
+
+// ── Preset parser ─────────────────────────────────────────────────────────
+
+// Matches a @preset / @snapshot annotation anywhere a comment is valid:
+//   // @preset Dense Rosette : bigR=100, rollR=63, pen=50
+//   // @snapshot Alias       : layers=1
+const PRESET_RE = /^\s*(?:\/\/|;|#)\s*@(?:preset|snapshot)\s+(.+?)\s*:\s*(.+)$/i;
+
+/**
+ * Parse all @preset / @snapshot definitions from the source and return them
+ * in declaration order.  Lines that don't match the pattern are ignored.
+ */
+export function parsePresets(source: string): Preset[] {
+  const presets: Preset[] = [];
+  for (const line of source.split('\n')) {
+    const m = PRESET_RE.exec(line);
+    if (!m) continue;
+
+    const name = m[1].trim();
+    if (!name) continue;
+
+    const values: Record<string, number> = {};
+    for (const pair of m[2].split(',')) {
+      const eq = pair.indexOf('=');
+      if (eq === -1) continue;
+      const key = pair.slice(0, eq).trim().toLowerCase();
+      const val = parseFloat(pair.slice(eq + 1).trim());
+      if (key && Number.isFinite(val)) values[key] = val;
+    }
+
+    if (Object.keys(values).length > 0) {
+      presets.push({ name, values });
+    }
+  }
+  return presets;
 }

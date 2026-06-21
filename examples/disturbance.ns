@@ -29,6 +29,9 @@ let octaves = 1        // [1:6] fractal detail (1 = smooth, 6 = shattered)
 let stepx   = 1.4      // [0.5:0.1:3] sampling step along each line, mm
 let stitch  = 1.9      // [1:0.1:4]
 
+// @preset Earthquake : nlines=14, rf=44, breakx=0, breaky=31, breakr=25, amp=12, nfreq=2.55, octaves=1, stepx=0.9, stitch=1
+// @preset Pacman : nlines=76, rf=37, breakx=-23, breaky=1, breakr=39, amp=11.5, nfreq=1.25, octaves=3, stepx=0.6, stitch=3.6
+
 seed 7
 stitchlen stitch
 
