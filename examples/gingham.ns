@@ -1,0 +1,82 @@
+// ============================================================
+//  GINGHAM  —  optically blended check
+// ============================================================
+//  Real gingham makes a THIRD colour from two translucent yarns:
+//  where coloured warp crosses coloured weft, the eye mixes them.
+//  We reproduce that by hatching, not solid fill:
+//    - a horizontal band = fine HORIZONTAL light lines
+//    - a vertical band   = fine VERTICAL  light lines
+//    - a crossing square gets BOTH directions, in TWO colours,
+//      finely interleaved -> reads as a blended third tone.
+//  Line direction itself encodes warp vs weft, just like cloth.
+// ============================================================
+
+// ---- parameters ----
+let cells     = 7        // squares per side
+let csize     = 8       // square size in mm
+let bandevery = 2        // every Nth row/col is a coloured band
+let hatchgap  = 0.8      // spacing between hatch lines (smaller = denser blend)
+let warpcol   = 4        // colour of the vertical yarn  (e.g. blue)
+let weftcol   = 6        // colour of the horizontal yarn (e.g. red)
+                         //   crossings of these two read as the blend
+let inset     = 0.4      // breathing room around each square
+
+// ---- derived ----
+let span = cells * csize
+let half = span / 2
+let lines = floor((csize - inset * 2) / hatchgap)   // hatch lines per square
+
+def isband(i) [ return i % bandevery == 0 ]
+
+// hatch one square with HORIZONTAL lines (a weft band)
+//   corner (gx, gy), drawn left<->right, walking upward
+def weftsquare(gx, gy) [
+  let x0 = gx + inset
+  let w  = csize - inset * 2
+  for k = 0 to lines [
+    let y = gy + inset + k * hatchgap
+    up setxy(x0, y) down
+    setxy(x0 + w, y)            // one horizontal thread
+  ]
+]
+
+// hatch one square with VERTICAL lines (a warp band)
+def warpsquare(gx, gy) [
+  let y0 = gy + inset
+  let h  = csize - inset * 2
+  for k = 0 to lines [
+    let x = gx + inset + k * hatchgap
+    up setxy(x, y0) down
+    setxy(x, y0 + h)            // one vertical thread
+  ]
+]
+
+fabric "woven
+seed 7
+stitchlen 2.4
+
+// ---- PASS 1: the weft yarn (horizontal lines) ----
+// Every square in a band-ROW gets horizontal lines.
+color weftcol
+for row = 0 to cells - 1 [
+  if isband(row) [
+    for coli = 0 to cells - 1 [
+      weftsquare(-half + coli * csize, -half + row * csize)
+      trim
+    ]
+  ]
+]
+
+// ---- PASS 2: the warp yarn (vertical lines) ----
+// Every square in a band-COLUMN gets vertical lines.
+// Where this lands on a band-row square, the two yarns interleave
+// in the SAME square -> the blended third tone.
+color warpcol
+for coli = 0 to cells - 1 [
+  if isband(coli) [
+    for row = 0 to cells - 1 [
+      warpsquare(-half + coli * csize, -half + row * csize)
+      trim
+    ]
+  ]
+]
