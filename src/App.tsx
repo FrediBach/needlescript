@@ -83,6 +83,11 @@ function programReducer(state: ProgramState, action: ProgramAction): ProgramStat
 export default function App() {
   const firstKey = Object.keys(EXAMPLES)[0];
   const [source, setSource] = useState(EXAMPLES[firstKey]);
+  // Live ref that always holds the current source code.  Used by handleRun so
+  // the Header's Run button never captures a stale closure value — same
+  // principle as sourceRef in EditorPane.
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
   const [selectedHoop, setSelectedHoop] = useState<HoopConfig>(DEFAULT_HOOP);
   const [showHoopDialog, setShowHoopDialog] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -199,8 +204,8 @@ export default function App() {
   }, [displayDesign.warnings, design.warnings]);
 
   const handleRun = useCallback((src?: string) => {
-    runProgram(src ?? source, design.name);
-  }, [source, design.name, runProgram]);
+    runProgram(src ?? sourceRef.current, design.name);
+  }, [design.name, runProgram]);
 
   const handleExampleSelect = useCallback((key: string) => {
     const src = EXAMPLES[key];

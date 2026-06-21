@@ -87,12 +87,12 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
       onRunRef.current(updated);
     } else {
       // Mid-burst — schedule a trailing call at the end of the 250 ms window.
-      // By then React will have re-rendered with the new source, so no need to
-      // pass it explicitly.
+      // Use sourceRef.current (not handleRun's closure) so the latest source
+      // is always used even if the React re-render hasn't committed yet.
       runTimerRef.current = setTimeout(() => {
         runTimerRef.current    = null;
         lastRunTimeRef.current = Date.now();
-        onRunRef.current();
+        onRunRef.current(sourceRef.current);
       }, 250 - elapsed);
     }
   }, [onSourceChange]);
@@ -120,9 +120,11 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
     editorRef.current  = ed;
     decoCollRef.current = ed.createDecorationsCollection();
 
-    // Cmd/Ctrl + Enter → run the program (mirrors the original textarea shortcut)
+    // Cmd/Ctrl + Enter → run the program (mirrors the original textarea shortcut).
+    // Pass sourceRef.current explicitly so the latest source is used even if
+    // React hasn't committed a re-render since the last Monaco onChange.
     ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      onRunRef.current();
+      onRunRef.current(sourceRef.current);
     });
   }, []);
 
@@ -173,7 +175,9 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
           if (model) ed.revealLine(model.getLineCount());
         }
       });
-      onRun();
+      // Pass next explicitly — setSource(next) is async and may not be committed
+      // to React state by the time handleRun fires, so we pass the value directly.
+      onRun(next);
     } else if (e.key === 'ArrowUp') {
       if (replIdxRef.current > 0) {
         replIdxRef.current--;
