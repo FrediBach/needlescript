@@ -346,7 +346,7 @@ export default function Header({
       {/* ══ ACTION GROUP ═════════════════════════════════════════════════════ */}
       <button
         type="button"
-        onClick={onRun}
+        onClick={() => onRun()}
         className={cn(redBtn, "gap-1.5")}
       >
         Run [cmd+enter]
