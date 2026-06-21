@@ -59,7 +59,7 @@ export const runHi    = '#D55036';   /* --run-hi */
 export const runDark  = '#A33823';   /* --run-dark */
 
 // ── Actions — warm secondary buttons ──────────────────────────────────────
-export const warmBtnBg          = '#3F2820';   /* --warm-btn-bg */
+export const warmBtnBg          = '#30262d';   /* --warm-btn-bg */
 export const warmBtnBorder      = '#7A4E3C';   /* --warm-btn-border */
 export const warmBtnHoverBg     = '#502E24';   /* --warm-btn-hover-bg */
 export const warmBtnHoverBorder = '#9A6450';   /* --warm-btn-hover-border */
