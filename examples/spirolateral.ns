@@ -1,0 +1,104 @@
+// ---------------------------- Spirolateral engine ----------------------------
+// segments 1,2,...,n (x unit), turn a fixed angle after each, repeat to close.
+// reverse the turn at chosen segment indices for the classic "reverse" figures.
+
+// greatest common divisor (Euclid) -- used to find the closing period
+def gcd(a, b) [
+  a = abs(round(a))
+  b = abs(round(b))
+  let r = 0
+  while b > 0 [
+    r = a % b
+    a = b
+    b = r
+  ]
+  return a
+]
+
+// cycles until closure: net turn per cycle is angle*(n - 2*reversed),
+// and the figure closes after 360/gcd(360, netturn) cycles.
+def spiro_reps(n, angle, reversals) [
+  let net = round(abs(angle * (n - 2 * len(reversals)))) % 360
+  if net == 0 [ return 1 ]          // net rotation 0 -> open / drifting figure
+  return 360 / gcd(360, net)
+]
+
+// build the polyline in maths-space (unit = 1) without sewing
+def spiro_points(n, angle, reps, reversals) [
+  let pts = [[0, 0]]
+  let p = [0, 0]
+  let h = 0
+  repeat reps [
+    for i = 1 to n [
+      p = vadd(p, vfromheading(h, i))
+      append(pts, p)
+      if contains(reversals, i) [ h = h - angle ] else [ h = h + angle ]
+    ]
+  ]
+  return pts
+]
+
+// centre on the origin and scale so the farthest point sits at radius maxr
+def fit_points(pts, maxr) [
+  let b = bbox(pts)
+  let c = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]
+  let rmax = 0
+  for q in pts [
+    let d = vdist(q, c)
+    if d > rmax [ rmax = d ]
+  ]
+  let s = 1
+  if rmax > 0 [ s = maxr / rmax ]
+  let out = []
+  for q in pts [ append(out, vscale(vsub(q, c), s)) ]
+  return out
+]
+
+// jump to the start, then sew the path in whatever stitch mode is active
+def draw_spiro(pts) [
+  up setpos(pts[0]) down
+  sewpath(pts)
+]
+
+// fitted core: generate -> fit-to-hoop -> sew
+def spirolateral(n, angle, reps, reversals, maxr) [
+  draw_spiro(fit_points(spiro_points(n, angle, reps, reversals), maxr))
+]
+
+// auto-closing, auto-fitting (44 mm radius) -- the everyday entry points
+def spiro(n, angle) [
+  spirolateral(n, angle, spiro_reps(n, angle, []), [], 44)
+]
+def spirorev(n, angle, reversals) [
+  spirolateral(n, angle, spiro_reps(n, angle, reversals), reversals, 44)
+]
+
+// raw: draw from the turtle's current spot, your own unit/reps, no fitting
+def spiroraw(n, angle, unit, reps, reversals) [
+  repeat reps [
+    for i = 1 to n [
+      fd i * unit
+      if contains(reversals, i) [ lt angle ] else [ rt angle ]
+    ]
+  ]
+]
+
+// ----------------------------------- scene -----------------------------------
+fabric "woven        // free underlay + pull compensation
+seed 7
+stitchlen 2
+bean 3               // bold line; try satin 2 for a ribbon, or drop for min density
+
+color 4
+spiro(6, 144) 
+trim
+
+// -- gallery: swap the call above for any of these (all vetted to close) --
+// spiro(3, 90)              4-fold, 12 segments
+// spiro(5, 90)              4-fold, 20 segments
+// spiro(7, 60)              6-fold, 42 segments
+// spiro(8, 108)             5-fold rosette, 40 segments
+// spiro(6, 100)             3-fold, 18 segments
+// spiro(4, 72)              pentagon family
+// spirorev(6, 90, [2, 4])   reversed turns
+// spiroraw(6, 90, 3, 4, [])  exact 3 mm unit, no auto-fit
