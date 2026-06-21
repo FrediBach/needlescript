@@ -1,0 +1,34 @@
+// Amplitude-modulated sine wave wrapped around a circle.
+// Walk angle theta around the ring; the radius is a fast carrier
+// whose amplitude is itself shaped by a slow modulator.
+
+seed 42
+stitchlen 1.6
+
+let baseR    = 28      // mm: radius of the carrier circle
+let carrier  = 120      // carrier cycles per revolution (the fast wiggle)
+let modcycles = 3      // modulator cycles per revolution (the slow swell)
+let depth    = 0.8     // 0..1 modulation depth
+let amp      = 8       // mm: carrier amplitude at full envelope
+let res      = 720     // points around the circle (smoothness)
+
+def amwave() [
+  for i = 0 to res [
+    let theta = i / res * 360
+    // envelope rides between (1-depth) and (1+depth)
+    let env = 1 + depth * sin(theta * modcycles)
+    let r   = baseR + amp * env * sin(theta * carrier)
+    // turtle degrees: 0 = north, clockwise -> (r*sin, r*cos)
+    let x = r * sin(theta)
+    let y = r * cos(theta)
+    if i = 0 [
+      up setxy(x, y) down      // jump to the start, no thread strung across
+    ] else [
+      setxy(x, y)              // sew the next segment of the wave
+    ]
+  ]
+]
+
+color 1
+amwave()
+trim

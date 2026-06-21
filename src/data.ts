@@ -33,6 +33,7 @@ import ngonRaw from '../examples/ngon.ns?raw';
 import ginghamRaw from '../examples/gingham.ns?raw';
 import boustrophedonRaw from '../examples/boustrophedon.ns?raw';
 import doublespiralRaw from '../examples/doublespiral.ns?raw';
+import ampmodRaw from '../examples/ampmod.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -102,6 +103,7 @@ export const EXAMPLES: Record<string, string> = {
   'ngon': ngonRaw,
   'gingham': ginghamRaw,
   'doublespiral': doublespiralRaw,
+  'ampmod': ampmodRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -112,7 +114,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   },
   {
     label: 'intermediate',
-    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'disturbance', 'lfowaves', 'wavefront', 'ngon', 'gingham'],
+    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'disturbance', 'lfowaves', 'wavefront', 'ngon', 'gingham', 'ampmod'],
   },
   {
     label: 'advanced',
