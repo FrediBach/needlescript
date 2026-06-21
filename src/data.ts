@@ -27,6 +27,7 @@ import contourRaw       from '../examples/contour.ns?raw';
 import spirographRaw    from '../examples/spirograph.ns?raw';
 import complexspirographRaw from '../examples/complex-spirograph.ns?raw';
 import disturbanceRaw   from '../examples/disturbance.ns?raw';
+import lfowavesRaw   from '../examples/lfowaves.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -84,6 +85,7 @@ export const EXAMPLES: Record<string, string> = {
   'spirograph 1':  spirographRaw,
   'spirograph 2':  complexspirographRaw,
   'disturbance':   disturbanceRaw,
+  'lfowaves':   lfowavesRaw,
   'echo':          echoRaw,
   'shatter':       shatterRaw,
   'meadow':        meadowRaw,
@@ -100,7 +102,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   },
   {
     label: 'intermediate',
-    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'disturbance'],
+    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'disturbance', 'lfowaves'],
   },
   {
     label: 'advanced',
