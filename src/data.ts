@@ -29,6 +29,7 @@ import complexspirographRaw from '../examples/complex-spirograph.ns?raw';
 import disturbanceRaw   from '../examples/disturbance.ns?raw';
 import lfowavesRaw   from '../examples/lfowaves.ns?raw';
 import wavefrontRaw   from '../examples/wavefront.ns?raw';
+import ngonRaw   from '../examples/ngon.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -94,6 +95,7 @@ export const EXAMPLES: Record<string, string> = {
   'contour':       contourRaw,
   'lines':         linesRaw,
   'fill':          fillRaw,
+  'ngon':          ngonRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -104,7 +106,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   },
   {
     label: 'intermediate',
-    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'disturbance', 'lfowaves', 'wavefront'],
+    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'disturbance', 'lfowaves', 'wavefront', 'ngon'],
   },
   {
     label: 'advanced',

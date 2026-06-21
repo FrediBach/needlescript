@@ -1,0 +1,46 @@
+// triangle -> square -> pentagon -> ... -> circle
+// each ring is a regular N-gon; N grows by one per ring.
+// a high-N polygon is already indistinguishable from a circle,
+// so no blending needed -- just add sides as we move outward.
+
+// radius from center to a regular N-gon's edge at turtle heading h.
+// corners sit at R; edge midpoints pull in by cos(180/N).
+def ngonradius(rad, sides, h) [
+  let seg = 360 / sides
+  let a = (h % seg) - seg / 2          // angle off the nearest edge midpoint
+  return rad * cos(180 / sides) / cos(a)
+]
+
+// a point on ring `rad` with `sides` sides, at heading h
+// turtle 0 = north, clockwise: x = r*sin h, y = r*cos h
+def ngonpoint(rad, sides, h) [
+  let r = ngonradius(rad, sides, h)
+  return [r * sin h, r * cos h]
+]
+
+let rings = 40            // 14 rings: 3,4,5 ... up to 16 sides
+let startsides = 3
+let rmin = 20
+let rmax = 44
+
+color 1
+stitchlen 2
+
+for k = 0 to rings - 1 [
+  let sides = startsides + k
+  let frac = k / (rings - 1)
+  let rad = lerp(rmin, rmax, frac)
+
+  // walk one full revolution in fine steps so corners land sharp,
+  // then resample to even stitch spacing.
+  let ring = []
+  for h = 0 to 360 step 2 [
+    append(ring, ngonpoint(rad, sides, h))
+  ]
+  append(ring, ngonpoint(rad, sides, 0))    // close the ring
+
+  let smooth = resample(ring, 2)
+  up setpos(smooth[0]) down
+  sewpath(smooth)
+  trim
+]
