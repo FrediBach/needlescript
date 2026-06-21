@@ -80,8 +80,50 @@ src/
 - **Stage** — a 100 mm virtual hoop rendered on canvas: thread per colour, underlay drawn thinner and lighter, dashed jump lines, needle penetration points when zoomed, hoop-overflow and density warnings as chips, plus a **density heatmap toggle** (thread coverage in layers) for spotting bulletproof patches before they pucker.
 - **Playback** — play (~7 s) or scrub the stitch sequence stitch by stitch. While scrubbed, the **source line currently sewing is highlighted in the editor** and shown next to the counter — the fastest way to answer "which line made this stitch?"
 - **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch, meadow, echo, shatter).
+- **Parameters** — annotate any variable with a `// [min:max]` comment to expose it as a live slider or toggle in the Parameters panel below the editor. Drag sliders, lock individual parameters, randomize unlocked ones with the shuffle button, and pick named presets from a dropdown — all without re-running the program. See [Customizer](#customizer) below.
 - **Download .DST** — export the current design as a Tajima stitch file.
 - **Import SVG** — convert an SVG (button or drag & drop) into *editable* NeedleScript code: filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, colours map to the nearest thread. Supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, groups and transforms.
+
+---
+
+## Customizer
+
+Annotate variable declarations with comment brackets to expose them as **live controls** in the Parameters panel below the editor. The interpreter never sees the annotations — a program with sliders is still an ordinary program.
+
+### Parameter controls
+
+| Annotation | Control |
+|---|---|
+| `let radius = 15  // [5:30]` | **integer slider** — both bounds are whole numbers and the range spans > 1 |
+| `let smooth = 0.5  // [0:1]` | **smooth slider** — at least one float bound, or range ≤ 1; 100 steps |
+| `let n = 4  // [0.5:0.5:8]` | **stepped slider** — `[min:step:max]`; any positive step including fractional |
+| `let wave = 1  // [switch]` | **toggle** — `0` = off, `1` = on |
+| `let mode = 0  // [switch:hypo,epi]` | **labelled toggle** — label pair shown on each side |
+| `// --- Section ---` | **section divider** — groups controls with a horizontal rule and title |
+
+All three declaration styles work: `let name = value`, `make "name value`, and bare `name = value`.
+
+### Randomize & lock
+
+The **shuffle button** in the panel header randomises all unlocked parameters at once. Each parameter row has a **lock icon** (appears on hover; gold when active). Click it to pin that parameter from randomization without affecting manual slider control.
+
+### Presets (snapshots)
+
+Bundle curated values into named presets defined as comment lines — one per line, anywhere in the source:
+
+```text
+// @preset Classic Flower : bigR=96, rollR=60, pen=40, inside=1, layers=8
+// @preset Dense Rosette  : bigR=100, rollR=63, pen=50, inside=1, layers=12
+// @preset Minimal        : layers=1
+```
+
+`@snapshot` is accepted as an alias for `@preset`.
+
+**Partial presets** (fewer keys than the total parameter count) set only the named parameters and leave the rest at their current values — the most common case. Values are always numbers (including `0`/`1` for switches); they are clamped and snapped to each parameter's configured range on apply.
+
+When at least one `@preset` line exists, a **preset dropdown** appears below the panel header. Selecting a preset applies all its values immediately, overriding any locks. Moving any slider or switch after selecting a preset resets the dropdown to `—` to indicate a custom state.
+
+**Copying a snapshot:** the **copy icon** next to the dropdown writes the current full parameter state as a `// @preset My Preset : …` comment to the clipboard. Before any presets exist, **right-click the panel header** → *Copy as preset* achieves the same thing. Paste the result into the source, rename it, and it appears in the dropdown on the next run.
 
 ---
 

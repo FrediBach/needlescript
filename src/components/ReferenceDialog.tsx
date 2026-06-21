@@ -249,6 +249,22 @@ const SECTIONS: RefSection[] = [
     ],
   },
   {
+    title: 'Customizer — parameters & presets',
+    note: 'Comment annotations expose variable declarations as live controls in the Parameters panel. The interpreter never sees them — a program with sliders is still an ordinary program. All three declaration styles work: let name = val, make "name val, or bare name = val.',
+    entries: [
+      { cmd: 'let x = 15  // [5:50]', desc: 'integer slider — both bounds are whole numbers and the range spans > 1. Value is clamped to [min, max] live' },
+      { cmd: 'let x = 0.5  // [0:1]', desc: 'smooth slider — at least one float bound, or range ≤ 1. 100 steps between min and max' },
+      { cmd: 'let x = 4  // [0.5:0.5:8]', desc: 'stepped slider: [min:step:max]. Any positive step, including fractional' },
+      { cmd: 'let x = 1  // [switch]', desc: 'toggle: 0 = off, 1 = on' },
+      { cmd: 'let x = 0  // [switch:off,on]', desc: 'labelled toggle — custom labels shown on each side of the switch' },
+      { cmd: '// --- Section ---', desc: 'section divider between parameter groups. Any number of dashes; the text between them is the section label' },
+      { cmd: 'shuffle button', desc: 'randomises all unlocked parameters at once. The lock icon on each row (visible on row hover, gold when active) pins that parameter so randomize skips it' },
+      { cmd: '// @preset Name : k=v, k=v, …', desc: 'named snapshot of parameter values. @snapshot is an accepted alias. Partial presets (fewer keys than total params) set only the named parameters and leave the rest unchanged. Values are clamped and snapped to each param\'s range' },
+      { cmd: 'preset dropdown', desc: 'appears below the panel header when at least one @preset line exists. Selecting a preset applies all its values at once, overriding locks. Moving any slider afterwards resets the dropdown to — (custom state)' },
+      { cmd: 'copy button · right-click header', desc: 'copies the current parameter values as a // @preset My Preset : … comment to the clipboard, ready to paste into source. Right-click the panel header works even before any presets are defined' },
+    ],
+  },
+  {
     title: 'Safety limits',
     note: 'NeedleScript guards both your browser and your machine. Exceeding a limit stops the program with an error and a line number.',
     entries: [
