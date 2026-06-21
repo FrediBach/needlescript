@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input.tsx';
 interface Props {
   source: string;
   onSourceChange: (src: string) => void;
-  onRun: () => void;
+  onRun: (src?: string) => void;
   messages: ConsoleMessage[];
   isDragging: boolean;
   activeLine: number | null; // source line currently sewing (playback), 1-based
@@ -82,11 +82,13 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
     if (runTimerRef.current !== null) clearTimeout(runTimerRef.current);
 
     if (elapsed >= 250) {
-      // First event in this burst — fire immediately.
+      // First event in this burst — fire immediately with the fresh source.
       lastRunTimeRef.current = now;
-      onRunRef.current();
+      onRunRef.current(updated);
     } else {
       // Mid-burst — schedule a trailing call at the end of the 250 ms window.
+      // By then React will have re-rendered with the new source, so no need to
+      // pass it explicitly.
       runTimerRef.current = setTimeout(() => {
         runTimerRef.current    = null;
         lastRunTimeRef.current = Date.now();
@@ -106,7 +108,7 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
     onSourceChange(src);
     if (runTimerRef.current !== null) clearTimeout(runTimerRef.current);
     lastRunTimeRef.current = Date.now();
-    onRunRef.current();
+    onRunRef.current(src);
   }, [onSourceChange]);
 
   // ── Monaco lifecycle callbacks ──────────────────────────────────────

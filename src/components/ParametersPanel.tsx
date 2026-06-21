@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Shuffle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Shuffle, Lock, LockOpen } from 'lucide-react';
 import { parseParameters, snapValue } from '../lib/parse-parameters.ts';
 import type { ParamItem, ParamDef } from '../lib/parse-parameters.ts';
 import { Slider } from '@/components/ui/slider.tsx';
@@ -38,10 +38,12 @@ function SectionHeader({ title }: { title: string }) {
 
 interface SliderRowProps {
   def: ParamDef;
+  isLocked: boolean;
   onChange: (name: string, line: number, value: number) => void;
+  onToggleLock: () => void;
 }
 
-function SliderRow({ def, onChange }: SliderRowProps) {
+function SliderRow({ def, onChange, isLocked, onToggleLock }: SliderRowProps) {
   const { name, value, min, max, step, sliderKind, line } = def;
 
   // Local input state so the field is freely editable while typing.
@@ -117,6 +119,19 @@ function SliderRow({ def, onChange }: SliderRowProps) {
         min={min}
         max={max}
       />
+      <button
+        className={cn(styles.lockBtn, isLocked && styles.lockBtnLocked)}
+        onClick={onToggleLock}
+        type="button"
+        title={isLocked ? `Unlock ${name}` : `Lock ${name}`}
+        aria-label={isLocked ? `Unlock ${name}` : `Lock ${name}`}
+        aria-pressed={isLocked}
+      >
+        {isLocked
+          ? <Lock     size={11} aria-hidden="true" />
+          : <LockOpen size={11} aria-hidden="true" />
+        }
+      </button>
     </div>
   );
 }
@@ -125,10 +140,12 @@ function SliderRow({ def, onChange }: SliderRowProps) {
 
 interface SwitchRowProps {
   def: ParamDef;
+  isLocked: boolean;
   onChange: (name: string, line: number, value: number) => void;
+  onToggleLock: () => void;
 }
 
-function SwitchRow({ def, onChange }: SwitchRowProps) {
+function SwitchRow({ def, onChange, isLocked, onToggleLock }: SwitchRowProps) {
   const { name, value, labels, line } = def;
   const isOn = value !== 0;
   const offLabel = labels?.[0] ?? '0';
@@ -155,6 +172,19 @@ function SwitchRow({ def, onChange }: SwitchRowProps) {
           {onLabel}
         </span>
       </div>
+      <button
+        className={cn(styles.lockBtn, isLocked && styles.lockBtnLocked)}
+        onClick={onToggleLock}
+        type="button"
+        title={isLocked ? `Unlock ${name}` : `Lock ${name}`}
+        aria-label={isLocked ? `Unlock ${name}` : `Lock ${name}`}
+        aria-pressed={isLocked}
+      >
+        {isLocked
+          ? <Lock     size={11} aria-hidden="true" />
+          : <LockOpen size={11} aria-hidden="true" />
+        }
+      </button>
     </div>
   );
 }
@@ -166,17 +196,28 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
   const paramCount = items.filter(i => i.kind === 'param').length;
 
   const [open, setOpen] = useState(true);
+  const [lockedParams, setLockedParams] = useState<Set<string>>(() => new Set());
+
+  const toggleLock = useCallback((name: string) => {
+    setLockedParams(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
 
   const handleRandomize = useCallback(() => {
     const changes = items
       .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
+      .filter(({ def }) => !lockedParams.has(def.name))
       .map(({ def }) => {
         const { name, line, min, max, step } = def;
         const raw = min + Math.random() * (max - min);
         return { name, line, value: snapValue(raw, min, max, step) };
       });
-    onAllParamsChange(changes);
-  }, [items, onAllParamsChange]);
+    if (changes.length > 0) onAllParamsChange(changes);
+  }, [items, lockedParams, onAllParamsChange]);
 
   // Auto-show the panel whenever parameters appear for the first time, but
   // don't fight the user if they've manually collapsed it.
@@ -233,7 +274,9 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
                 <SwitchRow
                   key={`${def.name}-${def.line}`}
                   def={def}
+                  isLocked={lockedParams.has(def.name)}
                   onChange={onParamChange}
+                  onToggleLock={() => toggleLock(def.name)}
                 />
               );
             }
@@ -241,7 +284,9 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
               <SliderRow
                 key={`${def.name}-${def.line}`}
                 def={def}
+                isLocked={lockedParams.has(def.name)}
                 onChange={onParamChange}
+                onToggleLock={() => toggleLock(def.name)}
               />
             );
           })}

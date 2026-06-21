@@ -198,8 +198,8 @@ export default function App() {
     }
   }, [displayDesign.warnings, design.warnings]);
 
-  const handleRun = useCallback(() => {
-    runProgram(source, design.name);
+  const handleRun = useCallback((src?: string) => {
+    runProgram(src ?? source, design.name);
   }, [source, design.name, runProgram]);
 
   const handleExampleSelect = useCallback((key: string) => {

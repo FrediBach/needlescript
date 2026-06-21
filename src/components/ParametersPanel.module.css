@@ -119,8 +119,8 @@
 
 .paramRow {
   display: grid;
-  /* name | controls | value-input */
-  grid-template-columns: minmax(64px, 96px) 1fr auto;
+  /* name | controls | value-input | lock */
+  grid-template-columns: minmax(64px, 96px) 1fr auto auto;
   align-items: start;
   gap: 12px;
   padding: 10px 16px 6px;
@@ -128,10 +128,12 @@
 
 @media (max-width: 480px) {
   .paramRow {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
     grid-template-rows: auto auto;
   }
-  .paramName { grid-column: 1 / -1; }
+  .paramName  { grid-column: 1 / -1; }
+  .switchWrap { grid-column: 1 / 3; }
+  .lockBtn    { grid-column: 3; }
 }
 
 /* ── Parameter name label ────────────────────────────────────────────────── */
@@ -227,6 +229,7 @@
 /* ── Switch row ─────────────────────────────────────────────────────────── */
 
 .switchWrap {
+  grid-column: 2 / 4;   /* span controls + value-input columns so lock lands in col 4 */
   display: flex;
   align-items: center;
   gap: 10px;
@@ -257,4 +260,32 @@
 
 .switch [data-slot="switch-thumb"] {
   background: var(--text-warm) !important;
+}
+
+/* ── Lock button ─────────────────────────────────────────────────────────── */
+
+.lockBtn {
+  grid-column: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 10px;  /* align icon with slider thumb / param name */
+  align-self: start;
+  width: 20px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-warm-faint);
+  opacity: 0;
+  transition: color 0.15s, opacity 0.15s;
+}
+
+/* Reveal on row hover so unlocked buttons don't add visual noise at rest */
+.paramRow:hover .lockBtn { opacity: 1; }
+
+/* Locked state — always visible, gold tint */
+.lockBtnLocked {
+  opacity: 1 !important;
+  color: var(--gold);
 }
