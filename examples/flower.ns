@@ -1,0 +1,57 @@
+// ─────────────────────────────────────────────────────────
+//  Parametric flower
+//    petals : how many petals fill one full 360° revolution
+//    layers : how many nested rings of petals to stack
+// ─────────────────────────────────────────────────────────
+
+// One petal as a two-arc "lens": sew an arc out, pivot at the tip,
+// sew a matching arc back, pivot at the base. `len` sets the petal's
+// reach, `fat` (0..1) sets how wide it bulges. The turtle ends facing
+// its start heading so the caller can just turn for the next petal.
+def petal(len, fat) [
+  let sweep = 60 + fat * 80          // arc degrees per side: fatter = more curve
+  let radius = len / 2               // chord ~ len, so radius scales with reach
+  let pivot = 180 - sweep            // sharp turn that closes the lens at each end
+  arc sweep radius                   // out along one side
+  rt pivot                           // pivot at the tip
+  arc sweep radius                   // back along the other side
+  rt pivot                           // pivot at the base, ready for the next petal
+]
+
+// One ring of `count` petals around the centre, all of size `len`.
+// `turn` rotates the whole ring (used to offset alternate layers).
+def ring(count, len, fat, turn) [
+  seth turn
+  let spin = 360 / count
+  repeat count [
+    push                             // remember the centre + heading
+    petal(len, fat)
+    pop                              // jump back to the centre, no sewing
+    rt spin                          // aim at the next petal's slot
+  ]
+]
+
+// The whole flower. Outer layer first, then progressively smaller,
+// inner rings; every other ring is nudged half a slot so the petals
+// of one layer sit in the gaps of the one below.
+def flower(petals, layers) [
+  let baseLen = 42                   // outermost petal reach in mm (< 47 field)
+  let fat = 0.55                     // petal plumpness, 0..1
+  let half = (360 / petals) / 2      // half a petal-slot, for the offset
+
+  for layer = 0 to layers - 1 [
+    let len = baseLen * (1 - layer * 0.22)   // each layer 22% smaller
+    let offset = (layer % 2) * half          // stagger alternate layers
+    color layer + 1                          // a fresh thread per layer
+    ring(petals, len, fat, offset)
+    trim                                      // cut between layers
+  ]
+]
+
+// ─────────────────────────────────────────────────────────
+//  Sew it
+// ─────────────────────────────────────────────────────────
+fabric "woven        // sensible underlay + pull compensation, free
+seed 7
+
+flower(7, 4)         // ← 8 petals per 360°, 3 layers. Change at will.
