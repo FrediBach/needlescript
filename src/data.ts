@@ -32,6 +32,7 @@ import wavefrontRaw from '../examples/wavefront.ns?raw';
 import ngonRaw from '../examples/ngon.ns?raw';
 import ginghamRaw from '../examples/gingham.ns?raw';
 import boustrophedonRaw from '../examples/boustrophedon.ns?raw';
+import doublespiralRaw from '../examples/doublespiral.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -100,13 +101,14 @@ export const EXAMPLES: Record<string, string> = {
   'fill': fillRaw,
   'ngon': ngonRaw,
   'gingham': ginghamRaw,
+  'doublespiral': doublespiralRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
 export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   {
     label: 'intro',
-    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon'],
+    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral'],
   },
   {
     label: 'intermediate',

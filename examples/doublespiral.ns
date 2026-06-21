@@ -1,0 +1,30 @@
+// Interleaved double square spiral: wind in, U-turn at centre, wind out.
+// One continuous, non-crossing line. The inward arms sit 2*g apart so the
+// outward return can thread the channel between them.
+
+def doublespiral(g, n) [
+  // start at the outer top-left corner
+  up setxy(0 - n * g, n * g) down
+  seth 90                       // face east
+
+  // --- inward, clockwise (all right turns), arms spaced 2*g ---
+  for i = n to 2 step -1 [
+    fd 2 * g * i  rt 90
+    fd 2 * g * i  rt 90
+  ]
+  fd 2 * g  rt 90               // innermost single side
+
+  // --- the centre U-turn (the hook that joins the two spirals) ---
+  fd 3 * g  lt 90
+  fd 1 * g  lt 90
+
+  // --- outward, counter-clockwise (all left turns), in the channels ---
+  for i = 2 to n [
+    fd 2 * g * i  lt 90
+    fd 2 * g * i  lt 90
+  ]
+]
+
+stitchlen 2
+doublespiral(1, 24)
+trim
