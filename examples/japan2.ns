@@ -1,0 +1,53 @@
+// --- Crowded-line circle, full cap -------------------------------
+// Base grid is independent of the circle. The dense disc is swept
+// on its own, from the true top (+radius) to the bottom (-radius),
+// so no cap is ever clipped.
+
+let half     = 30
+let rows     = 50
+let gap      = (half * 2) / rows
+let radius   = 22
+let infillsp = 0.6     // spacing between the dense infill chords (mm)
+
+stitchlen 2
+seed 1
+
+def baseline(ly, d) [
+  let x = half
+  if d == 1 [ x = -half ]
+  up setxy(x, ly) down
+  seth 90 * d
+  fd half * 2
+]
+
+def chordline(yy, d) [
+  let hw = sqrt(radius * radius - yy * yy)
+  let x = hw
+  if d == 1 [ x = -hw ]
+  up setxy(x, yy) down
+  seth 90 * d
+  fd hw * 2
+]
+
+// 1) the even base grid across the whole square
+let y = half
+repeat rows + 1 [
+  let dir = 1
+  if repcount % 2 == 0 [ dir = -1 ]
+  baseline(y, dir)
+  y -= gap
+  trim
+]
+
+// 2) the dense disc, swept on its own from top to bottom
+let yy = radius
+let d  = 1
+while yy > -radius [
+  // guard the sqrt: skip the exact rim where hw would be ~0
+  if abs(yy) < radius [
+    chordline(yy, d)
+    d = -d                  // snake the infill too
+    trim
+  ]
+  yy -= infillsp
+]
