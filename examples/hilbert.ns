@@ -1,0 +1,30 @@
+// Hilbert curve via a single self-mirroring procedure.
+// sign = +1 or -1 chooses the chirality at each level.
+def hilbert(order, sign, side) [
+  if order == 0 [ return ]
+  rt sign * 90
+  hilbert(order - 1, -sign, side)
+  fd side
+  lt sign * 90
+  hilbert(order - 1, sign, side)
+  fd side
+  hilbert(order - 1, sign, side)
+  lt sign * 90
+  fd side
+  hilbert(order - 1, -sign, side)
+  rt sign * 90
+]
+
+// --- the scene ---
+seed 42
+stitchlen 2
+
+let order = 4               // 4 → a 15×15 grid of cells (2^order - 1 segments per side)
+let side = 4                // mm per segment
+
+// centre the curve: an order-n curve spans (2^order - 1) * side mm
+let span = (pow(2, order) - 1) * side
+up setxy(-span / 2, -span / 2) down
+
+color 1
+hilbert(order, 1, side)
