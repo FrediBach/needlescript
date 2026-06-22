@@ -1,0 +1,44 @@
+// --- Hidden-circle line art -------------------------------------
+// Parallel horizontal lines crossing a square; each line fattens
+// (wider satin) wherever it crosses an invisible circle in the centre.
+
+let half   = 32        // square spans -34..34 mm  (fits the 47 mm field)
+let rows   = 40        // number of horizontal lines
+let gap    = (half * 2) / rows
+let steps   = 0.5       // walking step along each line
+let radius = 22        // the hidden circle's radius
+let thin   = 0.1      // satin width outside the circle
+let thick  = 0.5       // satin width inside the circle
+
+density 0.4
+seed 1
+
+let y = half
+repeat rows + 1 [
+  // alternate direction each row so we snake instead of jumping back
+  let dir = 1
+  if repcount % 2 == 0 [ dir = -1 ]
+
+  let x = half
+  if dir == 1 [ x = -half ]
+
+  up setxy(x, y) down
+  seth 90 * dir                 // 90 = east, 270 = west
+
+  // walk this row across the square
+  let walked = 0
+  while walked < half * 2 [
+    let d = distance(0, 0)
+    if d < radius [
+      satin thick
+    ] else [
+      satin thin
+    ]
+    fd steps
+    walked += steps
+  ]
+  satin 0                       // flush the satin column for this row
+
+  y -= gap
+  trim
+]

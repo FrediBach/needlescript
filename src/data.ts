@@ -37,6 +37,7 @@ import ampmodRaw from '../examples/ampmod.ns?raw';
 import flowerRaw from '../examples/flower.ns?raw';
 import spirolateralRaw from '../examples/spirolateral.ns?raw';
 import spiderwebRaw from '../examples/spiderweb.ns?raw';
+import japanRaw from '../examples/japan.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -109,14 +110,15 @@ export const EXAMPLES: Record<string, string> = {
   'ampmod': ampmodRaw,
   'flower': flowerRaw,
   'spirolateral': spirolateralRaw,
-  'spiderweb': spiderwebRaw
+  'spiderweb': spiderwebRaw,
+  'japan': japanRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
 export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   {
     label: 'intro',
-    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb'],
+    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan'],
   },
   {
     label: 'intermediate',
