@@ -4,7 +4,6 @@ import StageCanvas from './StageCanvas.tsx';
 import PlaybackBar from './PlaybackBar.tsx';
 import StatsChips from './StatsChips.tsx';
 import styles from './StagePane.module.css';
-import { Toggle } from '@/components/ui/toggle.tsx';
 import { cn } from '@/lib/utils.ts';
 
 interface Props {
@@ -20,47 +19,73 @@ interface Props {
   onToggleHideJumps: () => void;
 }
 
+// ── Small pill switch sized for the canvas toolbar ────────────────────────────
+function CanvasSwitch({
+  checked,
+  onCheckedChange,
+  label,
+  title,
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  label: string;
+  title?: string;
+}) {
+  return (
+    <label
+      className="flex items-center gap-[5px] cursor-pointer select-none"
+      title={title}
+    >
+      <span className={cn(
+        'font-mono text-[10px] tracking-[0.12em] uppercase transition-colors',
+        checked ? 'text-on-canvas' : 'text-on-canvas/55',
+      )}>
+        {label}
+      </span>
+      {/* Track */}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onCheckedChange(!checked)}
+        className={cn(
+          'relative inline-flex h-[14px] w-[26px] shrink-0 rounded-full border transition-colors duration-150',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-run/60',
+          checked
+            ? 'bg-run border-run-dark'
+            : 'bg-[rgba(120,100,70,0.18)] border-[rgba(120,100,70,0.40)]',
+        )}
+      >
+        {/* Thumb */}
+        <span className={cn(
+          'absolute top-[1px] h-[10px] w-[10px] rounded-full bg-[#FFFDF7] shadow-sm transition-transform duration-150',
+          checked ? 'translate-x-[13px]' : 'translate-x-[1px]',
+        )} />
+      </button>
+    </label>
+  );
+}
+
 export default function StagePane({ design, hoop, scrubPos, onScrubChange, activeLine, lineSegments, showDensity, onToggleDensity, hideJumps, onToggleHideJumps }: Props) {
   return (
     <section className={styles.pane}>
       <div className={styles.fabric}>
         <StageCanvas design={design} hoop={hoop} scrubPos={scrubPos} showDensity={showDensity} hideJumps={hideJumps} />
         <StatsChips design={design} />
-        <div className="absolute top-[10px] right-[10px] flex items-center gap-[6px]">
-          <Toggle
-            pressed={hideJumps}
-            onPressedChange={onToggleHideJumps}
-            aria-label="Hide jump threads for a cleaner preview"
+        <div className="absolute top-[10px] right-[10px] flex items-center gap-[10px]">
+          <CanvasSwitch
+            checked={hideJumps}
+            onCheckedChange={() => onToggleHideJumps()}
+            label="jumps"
             title="Hide jump threads for a cleaner preview"
-            className={cn(
-              "h-auto py-[5px] px-[9px]",
-              "font-mono text-[10px] tracking-[0.12em] uppercase",
-              "bg-[rgba(255,253,247,0.85)] border border-[var(--on-canvas-45)] text-on-canvas",
-              "hover:bg-[rgba(255,253,247,0.95)] hover:text-on-canvas",
-              "rounded-md",
-              "aria-pressed:bg-run aria-pressed:border-run-dark aria-pressed:text-on-run",
-              "aria-pressed:hover:bg-run-hi aria-pressed:hover:text-on-run",
-            )}
-          >
-            jumps
-          </Toggle>
-          <Toggle
-            pressed={showDensity}
-            onPressedChange={onToggleDensity}
-            aria-label="Toggle the stitch-density heatmap"
+          />
+          <CanvasSwitch
+            checked={!showDensity}
+            onCheckedChange={onToggleDensity}
+            label="density"
             title="Toggle the stitch-density heatmap"
-            className={cn(
-              "h-auto py-[5px] px-[9px]",
-              "font-mono text-[10px] tracking-[0.12em] uppercase",
-              "bg-[rgba(255,253,247,0.85)] border border-[var(--on-canvas-45)] text-on-canvas",
-              "hover:bg-[rgba(255,253,247,0.95)] hover:text-on-canvas",
-              "rounded-md",
-              "aria-pressed:bg-run aria-pressed:border-run-dark aria-pressed:text-on-run",
-              "aria-pressed:hover:bg-run-hi aria-pressed:hover:text-on-run",
-            )}
-          >
-            density
-          </Toggle>
+          />
         </div>
       </div>
       <PlaybackBar
