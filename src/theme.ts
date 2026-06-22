@@ -131,6 +131,7 @@ export const canvasJumpThread        = 'rgba(90,80,60,0.5)';
 export const canvasNeedlePoint       = 'rgba(40,30,20,0.45)';
 export const canvasHoopOverlay       = 'rgba(8,6,4,0.1)';
 export const canvasHoopBoundary      = 'rgba(90,75,55,0.55)';
+export const canvasGridCm            = 'rgba(120,100,70,0.075)'; // 1 cm grid — slightly darker than CSS fabric weave (0.05)
 export const canvasNeedleMarker      = bgApp;           // '#1B2030'
 export const canvasDebugPinFill      = 'rgba(255,253,247,0.92)';
 export const canvasDebugPinStroke    = run;             // '#C8472F'

@@ -4,7 +4,7 @@ import type { HoopConfig } from '../data.ts';
 import { THREADS } from '../data.ts';
 import {
   canvasJumpThread, canvasNeedlePoint, canvasHoopOverlay, canvasHoopBoundary,
-  canvasNeedleMarker, canvasDebugPinFill, canvasDebugPinStroke,
+  canvasGridCm, canvasNeedleMarker, canvasDebugPinFill, canvasDebugPinStroke,
   canvasDragRectBorder, canvasDragRectFill,
   canvasZoomBadgeBg, canvasZoomBadgeText,
   canvasDensityHot, canvasDensityWarm,
@@ -264,6 +264,7 @@ function draw(
   const X = (mx: number) => cx + (mx - viewCX) * scale;
   const Y = (my: number) => cy - (my - viewCY) * scale; // y-up in mm
 
+  drawGrid(ctx, scale, cx, cy, viewCX, viewCY, w, h, dpr);
   drawHoop(ctx, hoop, scale, cx, cy, viewCX, viewCY, w, h);
 
   const pts = design.pts;
@@ -386,6 +387,55 @@ function computeAutoFitScale(w: number, h: number, design: DesignState, hoop: Ho
     extY = Math.max(extY, neededY + 6);
   }
   return Math.min(w / (2 * extX), h / (2 * extY));
+}
+
+// ── 1 cm grid ────────────────────────────────────────────────────────────────
+
+/** Draws a 1 cm (10 mm) reference grid in mm-space so it scales and pans with
+ *  the viewport. Drawn before the hoop overlay so the overlay naturally dims
+ *  grid lines outside the hoop, matching the CSS fabric weave behaviour.
+ *  Suppressed once lines are closer than 8 physical px (extreme zoom-out). */
+function drawGrid(
+  ctx: CanvasRenderingContext2D,
+  scale: number,
+  cx: number,
+  cy: number,
+  viewCX: number,
+  viewCY: number,
+  w: number,
+  h: number,
+  dpr: number,
+) {
+  const CELL = 10; // mm — 1 cm
+  if (CELL * scale < 8) return;
+
+  // Visible mm extents of the current viewport
+  const minMmX = viewCX - cx / scale;
+  const maxMmX = viewCX + cx / scale;
+  const minMmY = viewCY - cy / scale;
+  const maxMmY = viewCY + cy / scale;
+
+  ctx.save();
+  ctx.strokeStyle = canvasGridCm;
+  ctx.lineWidth   = dpr;
+  ctx.beginPath();
+
+  // Vertical lines at each 10 mm X tick
+  for (let x = Math.ceil(minMmX / CELL) * CELL; x <= maxMmX; x += CELL) {
+    const px = cx + (x - viewCX) * scale;
+    ctx.moveTo(px, 0);
+    ctx.lineTo(px, h);
+  }
+
+  // Horizontal lines at each 10 mm Y tick (Y-up → Y-down flip)
+  for (let y = Math.ceil(minMmY / CELL) * CELL; y <= maxMmY; y += CELL) {
+    const py = cy - (y - viewCY) * scale;
+    ctx.moveTo(0, py);
+    ctx.lineTo(w, py);
+  }
+
+  ctx.stroke();
+  ctx.restore();
 }
 
 // ── hoop rendering ───────────────────────────────────────────────────────────
