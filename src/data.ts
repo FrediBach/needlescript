@@ -33,7 +33,8 @@ import ngonRaw from '../examples/ngon.ns?raw';
 import ginghamRaw from '../examples/gingham.ns?raw';
 import boustrophedonRaw from '../examples/boustrophedon.ns?raw';
 import doublespiralRaw from '../examples/doublespiral.ns?raw';
-import ampmodRaw from '../examples/ampmod.ns?raw';
+import ampmod1Raw from '../examples/ampmod1.ns?raw';
+import ampmod2Raw from '../examples/ampmod2.ns?raw';
 import flowerRaw from '../examples/flower.ns?raw';
 import spirolateralRaw from '../examples/spirolateral.ns?raw';
 import spiderwebRaw from '../examples/spiderweb.ns?raw';
@@ -108,7 +109,8 @@ export const EXAMPLES: Record<string, string> = {
   'ngon': ngonRaw,
   'gingham': ginghamRaw,
   'doublespiral': doublespiralRaw,
-  'ampmod': ampmodRaw,
+  'ampmod1': ampmod1Raw,
+  'ampmod2': ampmod2Raw,
   'flower': flowerRaw,
   'spirolateral': spirolateralRaw,
   'spiderweb': spiderwebRaw,
@@ -124,7 +126,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   },
   {
     label: 'intermediate',
-    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'spirolateral', 'disturbance', 'lfowaves', 'wavefront', 'ngon', 'gingham', 'ampmod'],
+    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'spirolateral', 'disturbance', 'lfowaves', 'wavefront', 'ngon', 'gingham', 'ampmod1', 'ampmod2'],
   },
   {
     label: 'advanced',
