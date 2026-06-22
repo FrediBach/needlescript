@@ -1,0 +1,48 @@
+// Mirrored sine wave; the enclosed space hatched with vertical lines.
+// More lines appear where the two curves are FURTHEST apart -- the
+// horizontal spacing between lines shrinks as the vertical gap widens.
+
+let amp      = 20     // sine amplitude (mm)
+let span     = 80     // total width: x runs -40 .. 40
+let cycles   = 0.61    // sine humps across the span
+let widest   = 2.9      // line spacing (mm) where the gap is widest -> sparse
+let tightest = 1    // line spacing where the curves nearly meet -> dense
+
+// gap(x): half-height of the envelope at x. Floored so columns near the
+// zero-crossings still receive a line.
+def gap(x) [
+  let phase = (x + span / 2) / span * cycles * 360
+  return max(abs(sin(phase)) * amp, 1.2)
+]
+
+// stride(x): horizontal distance to the next line. Wide gap -> small
+// stride (many lines); narrow gap -> large stride (few lines).
+// ("step" would be a reserved word, hence "stride".)
+def stride(x) [
+  let t = gap(x) / amp                  // 0 at a pinch, 1 at the widest
+  return lerp(widest, tightest, t)      // interpolate spacing
+]
+
+seed 7
+stitchlen 2
+color 4
+
+// --- the two mirrored sine outlines ---
+def outline(sign) [
+  up setxy(-span / 2, sign * gap(-span / 2)) down
+  let x = -span / 2
+  while x <= span / 2 [
+    setxy(x, sign * gap(x))
+    x += 1.5
+  ]
+]
+
+// --- vertical hatch, spacing driven by stride(x) ---
+let x = -span / 2 + 1
+while x <= span / 2 - 1 [
+  let g = gap(x)
+  up setxy(x, -g) down
+  setxy(x, g)         // straight vertical line, bottom edge to top edge
+  x += stride(x)
+]
+trim
