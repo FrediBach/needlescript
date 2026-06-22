@@ -75,13 +75,13 @@ export default function StagePane({ design, hoop, scrubPos, onScrubChange, activ
         <StatsChips design={design} />
         <div className="absolute top-[10px] right-[10px] flex items-center gap-[10px]">
           <CanvasSwitch
-            checked={hideJumps}
+            checked={!hideJumps}
             onCheckedChange={() => onToggleHideJumps()}
             label="jumps"
             title="Hide jump threads for a cleaner preview"
           />
           <CanvasSwitch
-            checked={!showDensity}
+            checked={showDensity}
             onCheckedChange={onToggleDensity}
             label="density"
             title="Toggle the stitch-density heatmap"
