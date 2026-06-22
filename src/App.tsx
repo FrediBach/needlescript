@@ -4,6 +4,7 @@ import type { StitchEvent, DesignStats, DensityResult } from './lib/engine.ts';
 import { toDST } from './lib/dst.ts';
 import { toPES } from './lib/pes.ts';
 import { toEXP } from './lib/exp.ts';
+import { toSVG } from './lib/svg.ts';
 import { svgToCode } from './lib/svg-importer.ts';
 import { THREADS, EXAMPLES, DEFAULT_HOOP } from './data.ts';
 import type { HoopConfig } from './data.ts';
@@ -221,6 +222,21 @@ export default function App() {
     }
     try {
       const slug = design.name.replace(/[^a-z0-9_-]+/gi, '_').toLowerCase();
+
+      if (format === 'svg') {
+        const svgStr = toSVG(design.events, design.name, THREADS);
+        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${slug}.svg`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        addMsg(`exported ${a.download} (${svgStr.length.toLocaleString()} bytes)`, 'ok');
+        return;
+      }
+
       let bytes: Uint8Array;
       if (format === 'pes') {
         bytes = toPES(design.events, design.name);

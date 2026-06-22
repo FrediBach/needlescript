@@ -33,3 +33,4 @@ export type { Pt } from './genmath.ts';
 export { LIMITS } from './machine.ts';
 export { applyLocks, applyAutoTrim, densityMap, designStats } from './postprocess.ts';
 export { run } from './interpreter.ts';
+export { toSVG } from './svg.ts';

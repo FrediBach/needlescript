@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils.ts';
 
-export type ExportFormat = 'dst' | 'pes' | 'exp';
+export type ExportFormat = 'dst' | 'pes' | 'exp' | 'svg';
 
 interface Props {
   hoop: HoopConfig;
@@ -144,6 +144,11 @@ function ExportDropdown({ onDownload }: { onDownload: (fmt: ExportFormat) => voi
             {fmt === 'dst' ? '.DST · Tajima' : fmt === 'pes' ? '.PES · Brother' : '.EXP · Melco'}
           </DropdownMenuItem>
         ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => onDownload('svg')}>
+          <DownloadIcon className="size-3.5 opacity-55" />
+          .SVG · Print
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -279,6 +284,11 @@ function HamburgerMenu({
               {fmt === 'dst' ? '.DST · Tajima' : fmt === 'pes' ? '.PES · Brother' : '.EXP · Melco'}
             </DropdownMenuItem>
           ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => onDownload('svg')}>
+            <DownloadIcon className="size-3.5 opacity-55" />
+            .SVG · Print
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => { void onShare(); }}>
             <Share2Icon className="size-3.5 opacity-55" />
