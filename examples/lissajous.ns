@@ -1,0 +1,52 @@
+// =====================================================================
+//  Lissajous engine for Needlescript
+//
+//  A Lissajous figure is the pair
+//      x = ampx * sin(fx * t + phase)
+//      y = ampy * sin(fy * t)
+//  traced as t sweeps one full period.
+//
+//  fx, fy        frequency ratio  (1:2, 3:2, 5:4 ... try small integers)
+//  phase         phase offset in DEGREES (sin/cos here are degrees)
+//  ampx, ampy    half-width / half-height in mm
+//  samples       how many points to build the curve from (resolution)
+//
+//  Build vocabulary:
+//    a point is [x, y], a path is a list of points  -> resample / sew
+// =====================================================================
+
+// --- build a Lissajous curve as a path of [x, y] points -------------
+def lissa_path(fx, fy, phase, ampx, ampy, samples) [
+  let pts = []
+  // sweep t over one full period; sin takes degrees, so 360 deg = 1 cycle
+  let dt = 360 / samples
+  for i = 0 to samples [
+    let t = i * dt
+    let x = ampx * sin(fx * t + phase)
+    let y = ampy * sin(fy * t)
+    append(pts, [x, y])
+  ]
+  return pts
+]
+
+// --- draw a Lissajous figure at the current stitch length -----------
+//  Resamples to `seg` mm so penetrations are evenly spaced regardless
+//  of how many sample points the curve was built from.
+def lissajous(fx, fy, phase, ampx, ampy, samples, seg) [
+  let raw = lissa_path(fx, fy, phase, ampx, ampy, samples)
+  let path = resample(raw, seg)
+  // jump to the start without sewing a connector across the hoop
+  up setpos(path[0]) down
+  sewpath(path)
+]
+
+// =====================================================================
+//  A scene: three classic figures, each in its own colour
+// =====================================================================
+seed 7
+stitchlen 2
+
+// 3:2 ratio, quarter-turn phase  -> the open "pretzel"
+color 1
+lissajous(9, 16, 90, 24, 24, 400, 1)
+trim

@@ -41,6 +41,7 @@ import spiderwebRaw from '../examples/spiderweb.ns?raw';
 import japan1Raw from '../examples/japan1.ns?raw';
 import japan2Raw from '../examples/japan2.ns?raw';
 import hilbertRaw from '../examples/hilbert.ns?raw';
+import lissajousRaw from '../examples/lissajous.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -117,14 +118,15 @@ export const EXAMPLES: Record<string, string> = {
   'spiderweb': spiderwebRaw,
   'japan1': japan1Raw,
   'japan2': japan2Raw,
-  'hilbert': hilbertRaw
+  'hilbert': hilbertRaw,
+  'lissajous': lissajousRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
 export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   {
     label: 'intro',
-    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan1', 'japan2', 'hilbert'],
+    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan1', 'japan2', 'hilbert', 'lissajous'],
   },
   {
     label: 'intermediate',
