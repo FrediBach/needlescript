@@ -1,0 +1,45 @@
+// Smoothed Hilbert curve: walk the raw curve pen-up to capture every
+// vertex, round all corners with Chaikin, then sew the smoothed path.
+
+let path = []
+
+def hilbert(order, sign, side) [
+  if order == 0 [ return ]
+  rt sign * 90
+  hilbert(order - 1, -sign, side)
+  fd side
+  append(path, pos())
+  lt sign * 90
+  hilbert(order - 1, sign, side)
+  fd side
+  append(path, pos())
+  hilbert(order - 1, sign, side)
+  lt sign * 90
+  fd side
+  append(path, pos())
+  hilbert(order - 1, -sign, side)
+  rt sign * 90
+]
+
+// --- the scene ---
+seed 42
+stitchlen 2
+
+let order = 5               // 3 → a 7×7 grid, fits the hoop cleanly
+let side = 2                // mm per segment
+let span = (pow(2, order) - 1) * side
+
+// walk the raw curve WITHOUT sewing, capturing every corner
+up
+setxy(-span / 2, -span / 2)
+append(path, pos())          // the starting corner
+hilbert(order, 1, side)
+
+// round every corner, then resample to even 0.4 mm stitches
+let rounded = resample(chaikin(path, 3), 0.4)
+
+// sew the smoothed curve
+setpos(rounded[0])           // line up on the first point (still pen up)
+down
+color 1
+sewpath(rounded)

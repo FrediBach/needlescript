@@ -40,7 +40,8 @@ import spirolateralRaw from '../examples/spirolateral.ns?raw';
 import spiderwebRaw from '../examples/spiderweb.ns?raw';
 import japan1Raw from '../examples/japan1.ns?raw';
 import japan2Raw from '../examples/japan2.ns?raw';
-import hilbertRaw from '../examples/hilbert.ns?raw';
+import hilbert1Raw from '../examples/hilbert1.ns?raw';
+import hilbert2Raw from '../examples/hilbert2.ns?raw';
 import lissajousRaw from '../examples/lissajous.ns?raw';
 import fishRaw from '../examples/fish.ns?raw';
 
@@ -119,7 +120,8 @@ export const EXAMPLES: Record<string, string> = {
   'spiderweb': spiderwebRaw,
   'japan1': japan1Raw,
   'japan2': japan2Raw,
-  'hilbert': hilbertRaw,
+  'hilbert1': hilbert1Raw,
+  'hilbert2': hilbert2Raw,
   'lissajous': lissajousRaw,
   'fish': fishRaw
 };
@@ -128,7 +130,7 @@ export const EXAMPLES: Record<string, string> = {
 export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   {
     label: 'intro',
-    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan1', 'japan2', 'hilbert', 'lissajous', 'fish'],
+    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan1', 'japan2', 'hilbert1', 'hilbert2', 'lissajous', 'fish'],
   },
   {
     label: 'intermediate',
