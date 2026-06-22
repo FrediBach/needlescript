@@ -93,6 +93,7 @@ export default function App() {
   const [showHoopDialog, setShowHoopDialog] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showDensity, setShowDensity] = useState(false);
+  const [hideJumps, setHideJumps] = useState(false);
   const [showReference, setShowReference] = useState(false);
   const [program, dispatch] = useReducer(programReducer, { design: INITIAL_DESIGN, messages: [], scrubPos: 0 });
   const { design, messages, scrubPos } = program;
@@ -437,6 +438,8 @@ export default function App() {
           lineSegments={lineSegments}
           showDensity={showDensity}
           onToggleDensity={() => setShowDensity(v => !v)}
+          hideJumps={hideJumps}
+          onToggleHideJumps={() => setHideJumps(v => !v)}
         />
       </main>
 

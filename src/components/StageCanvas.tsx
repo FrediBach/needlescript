@@ -16,6 +16,7 @@ interface Props {
   hoop: HoopConfig;
   scrubPos: number;
   showDensity: boolean;
+  hideJumps: boolean;
 }
 
 /** Viewport in mm-space. When null the view auto-fits the hoop. */
@@ -42,7 +43,7 @@ type DragState = {
   currentY: number;
 };
 
-export default function StageCanvas({ design, hoop, scrubPos, showDensity }: Props) {
+export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJumps }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<RenderTransform | null>(null);
 
@@ -59,8 +60,8 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity }: Pro
     const dpr = window.devicePixelRatio || 1;
     canvas.width  = Math.max(1, Math.round(box.width  * dpr));
     canvas.height = Math.max(1, Math.round(box.height * dpr));
-    transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, viewport);
-  }, [design, hoop, scrubPos, showDensity, viewport]);
+    transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, hideJumps, viewport);
+  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport]);
 
   // ── redraw on container resize ───────────────────────────────────────────
   useEffect(() => {
@@ -73,11 +74,11 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity }: Pro
       const dpr = window.devicePixelRatio || 1;
       canvas.width  = Math.max(1, Math.round(box.width  * dpr));
       canvas.height = Math.max(1, Math.round(box.height * dpr));
-      transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, viewport);
+      transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, hideJumps, viewport);
     });
     ro.observe(canvas.parentElement!);
     return () => ro.disconnect();
-  }, [design, hoop, scrubPos, showDensity, viewport]);
+  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport]);
 
   // ── pointer handlers ─────────────────────────────────────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -233,6 +234,7 @@ function draw(
   scrubPos: number,
   dpr: number,
   showDensity: boolean,
+  hideJumps: boolean,
   viewport: Viewport | null,
 ): RenderTransform {
   const ctx = canvas.getContext('2d');
@@ -271,20 +273,22 @@ function draw(
   const upto = Math.min(pts.length, scrubPos || 0);
   if (pts.length === 0) return { scale, cx, cy, viewCX, viewCY };
 
-  // Jumps (under the thread)
+  // Jumps (under the thread) — hidden when hideJumps is active
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.setLineDash([4 * dpr, 4 * dpr]);
-  ctx.strokeStyle = canvasJumpThread;
-  ctx.lineWidth = 1 * dpr;
-  ctx.beginPath();
-  for (let i = 1; i < upto; i++) {
-    if (pts[i].t === 'jump') {
-      ctx.moveTo(X(pts[i - 1].x), Y(pts[i - 1].y));
-      ctx.lineTo(X(pts[i].x),     Y(pts[i].y));
+  if (!hideJumps) {
+    ctx.setLineDash([4 * dpr, 4 * dpr]);
+    ctx.strokeStyle = canvasJumpThread;
+    ctx.lineWidth = 1 * dpr;
+    ctx.beginPath();
+    for (let i = 1; i < upto; i++) {
+      if (pts[i].t === 'jump') {
+        ctx.moveTo(X(pts[i - 1].x), Y(pts[i - 1].y));
+        ctx.lineTo(X(pts[i].x),     Y(pts[i].y));
+      }
     }
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
-  ctx.stroke();
-  ctx.setLineDash([]);
 
   // Thread, batched per colour/underlay run
   const tw = Math.max(1.1 * dpr, Math.min(0.45 * scale, 4.5 * dpr));
@@ -295,6 +299,8 @@ function draw(
     const p = pts[j], q = pts[j - 1];
     if (p.t !== 'stitch') continue;
     const pu = p.u === 1;
+    if (hideJumps && pu) continue;         // skip underlay stitches
+    if (hideJumps && q.u === 1) continue;  // don't draw from an underlay position
     if (p.c !== runColor || pu !== runU) {
       if (runColor !== null) ctx.stroke();
       runColor = p.c;
@@ -316,6 +322,7 @@ function draw(
     const r = Math.max(0.8 * dpr, 0.09 * scale);
     for (let k = 0; k < upto; k++) {
       if (pts[k].t !== 'stitch') continue;
+      if (hideJumps && pts[k].u === 1) continue;
       ctx.beginPath();
       ctx.arc(X(pts[k].x), Y(pts[k].y), r, 0, 6.2832);
       ctx.fill();
