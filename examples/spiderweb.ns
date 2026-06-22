@@ -1,0 +1,54 @@
+// ============================================================
+//  Spiderweb
+//  Radial spokes + a sagging capture spiral.
+//  Seeded jitter keeps it from looking machine-perfect —
+//  real orb-weaver webs are never flawless circles.
+// ============================================================
+
+seed 7
+stitchlen 2
+
+let spokes = 12
+let span   = 360 / spokes        // degrees between adjacent spokes
+let reach  = 42                  // outer radius (inside the 47 mm field)
+
+// ---- precompute spoke tip directions & this run's jittered length ----
+let tips = []
+for i = 0 to spokes - 1 [
+  let ang = i * span
+  let r   = reach - random(5)    // a little ragged at the rim
+  append(tips, vfromheading(ang, r))
+]
+
+// ---- the spokes: out to each tip, snap back to the hub ----
+color 4
+for i = 0 to spokes - 1 [
+  push                           // remember the hub
+  down
+  setpos(tips[i])                // sew the spoke outward
+  pop                            // jump home, no thread laid
+]
+trim
+
+// ---- the capture spiral: ring by ring, sagging chords ----
+let rings = 7
+let inner = 8                    // innermost catch ring
+
+for ring = 1 to rings [
+  let t  = ring / rings
+  let rr = lerp(inner, reach - 4, t)   // this ring's radius
+
+  up setpos(vfromheading(0, rr)) down  // start on spoke 0
+
+  for i = 0 to spokes - 1 [
+    let a0  = i * span
+    let a1  = (i + 1) * span
+    let p0  = vfromheading(a0, rr)
+    let p1  = vfromheading(a1, rr)
+    // sag the chord inward toward the hub for that catenary droop
+    let midDir = vnorm(vadd(p0, p1))
+    let sag    = vscale(midDir, rr * 0.82)
+    sewpath(catmull([p0, sag, p1], 1.5))
+  ]
+  trim
+]
