@@ -1,0 +1,158 @@
+// =====================================================================
+//  TURTLE  —  a tribute to Needlescript's Logo heritage
+//
+//  An imaginary needle drawing the very creature that guides it.
+//  Carapace built from satin "scutes" (the plates on a real shell),
+//  a tatami-filled body, four paddle-legs, head, and a seeded
+//  speckle of stipple dots on the shell — change the seed, change
+//  the markings, while the turtle herself stays put.
+// =====================================================================
+
+seed 7
+stitchlen 2
+fabric "woven          // free underlay + pull compensation, sews as previewed
+
+// ---------------------------------------------------------------------
+//  helpers
+// ---------------------------------------------------------------------
+
+// an oval as a closed region (path of points), centred at (cx, cy),
+// half-width rx, half-height ry. steps points around the ellipse.
+def oval(cx, cy, rx, ry, steps) [
+  let p = []
+  for i = 0 to steps - 1 [
+    let a = i / steps * 360          // sweep a full turn, in degrees
+    append(p, [cx + rx * sin(a), cy + ry * cos(a)])
+  ]
+  return p
+]
+
+// a single shell plate (scute): a small satin-outlined diamond,
+// traced from the current spot, pointing outward along `heading`.
+def scute(size) [
+  satin 1.2
+  push
+  repeat 4 [
+    fd size
+    rt 90
+  ]
+  pop
+  satin 0
+]
+
+// ---------------------------------------------------------------------
+//  1. the body  —  a broad tatami-filled oval underneath everything
+// ---------------------------------------------------------------------
+
+color 1
+fillangle 30
+fillspacing 0.45
+let body = oval(0, -2, 17, 22, 48)
+up setpos(body[0]) down
+beginfill
+  sewpath(body)
+endfill
+trim
+
+// ---------------------------------------------------------------------
+//  2. the four paddle-legs  —  satin ovals at the four diagonals
+// ---------------------------------------------------------------------
+
+color 2
+
+def leg(lx, ly, ang) [
+  // a stubby paddle: trace a little satin oval tilted by `ang`
+  satin 2.2
+  let paddle = oval(0, 0, 4, 8, 24)
+  // rotate + translate each point into place
+  up
+  let first = vadd(vrot(paddle[0], ang), [lx, ly])
+  setpos(first)
+  down
+  for pt in paddle [
+    setpos(vadd(vrot(pt, ang), [lx, ly]))
+  ]
+  setpos(first)        // close the loop
+  satin 0
+  trim
+]
+
+leg(-15,  12, -35)     // front-left
+leg( 15,  12,  35)     // front-right
+leg(-15, -16, -145)    // back-left
+leg( 15, -16,  145)    // back-right
+
+// ---------------------------------------------------------------------
+//  3. the head  —  a satin oval poking out the front, with two eyes
+// ---------------------------------------------------------------------
+
+color 2
+satin 2.6
+let head = oval(0, 26, 6, 8, 24)
+up setpos(head[0]) down
+for pt in head [ setpos(pt) ]
+setpos(head[0])        // close the loop
+satin 0
+trim
+
+// eyes: two tiny bean-stitch dots
+color 4
+bean 3
+up setxy(-2.6, 30) down  fd 0.4
+trim
+up setxy( 2.6, 30) down  fd 0.4
+trim
+bean 1
+
+// ---------------------------------------------------------------------
+//  4. the carapace  —  a domed satin rim plus a field of scutes
+// ---------------------------------------------------------------------
+
+color 3
+
+// the shell rim: a satin oval just inside the body edge
+satin 2.8
+let rim = oval(0, -1, 14.5, 18.5, 40)
+up setpos(rim[0]) down
+for pt in rim [ setpos(pt) ]
+setpos(rim[0])         // close the loop
+satin 0
+trim
+
+// central column of scutes down the spine...
+let spine = [16, 8, 0, -8, -16]
+for sy in spine [
+  up setxy(0, sy) down
+  seth 0
+  scute(2.6)
+  trim
+]
+
+// ...flanked by two side columns
+let sideY = [11, 2, -7]
+for sy in sideY [
+  up setxy(-7, sy) down
+  scute(2.3)
+  trim
+  up setxy(7, sy) down
+  scute(2.3)
+  trim
+]
+
+// ---------------------------------------------------------------------
+//  5. seeded speckle  —  stipple dots scattered across the shell,
+//     kept inside the rim region so the markings never stray off-shell
+// ---------------------------------------------------------------------
+
+color 4
+let dots = scatter(4, rim)      // Poisson-disc points, clipped to the shell
+for d in dots [
+  up setpos(d) down
+  bean 3
+  fd 0.3                        // a single bold tack = one speckle
+  bean 1
+  trim
+]
+
+// a Logo signature: the turtle has drawn herself.
+up home

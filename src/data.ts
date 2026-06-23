@@ -44,6 +44,7 @@ import hilbert1Raw from '../examples/hilbert1.ns?raw';
 import hilbert2Raw from '../examples/hilbert2.ns?raw';
 import lissajousRaw from '../examples/lissajous.ns?raw';
 import fishRaw from '../examples/fish.ns?raw';
+import turtleRaw from '../examples/turtle.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -123,7 +124,8 @@ export const EXAMPLES: Record<string, string> = {
   'hilbert1': hilbert1Raw,
   'hilbert2': hilbert2Raw,
   'lissajous': lissajousRaw,
-  'fish': fishRaw
+  'fish': fishRaw,
+  'turtle': turtleRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -138,6 +140,6 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   },
   {
     label: 'advanced',
-    keys: ['echo', 'shatter', 'meadow', 'contour', 'lines', 'fill'],
+    keys: ['echo', 'shatter', 'meadow', 'contour', 'lines', 'fill', 'turtle'],
   },
 ];
