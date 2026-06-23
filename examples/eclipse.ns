@@ -22,7 +22,7 @@ def static_ticks(r, n) [
   down
 ]
 
-color 2
+color 4
 stitchlen 1.6
 static_ticks(S, 180)
 trim
