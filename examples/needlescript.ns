@@ -1,0 +1,135 @@
+// ===========================================================
+//  Single-stroke font — each glyph is ONE continuous line.
+//  Cell: 6 mm wide, 10 mm tall. Origin = bottom-left of cell.
+//  Globals ox, oy hold the current cell's bottom-left corner.
+// ===========================================================
+
+let ox = 0
+let oy = 0
+let cw = 4          // cell width
+let ch = 8         // cell height
+let gap = 3         // space between letters
+
+// move (pen up) to a cell-relative point, then drop the pen
+def go(x, y) [
+  up setxy(ox + x, oy + y) down
+]
+
+// sew (pen down) to a cell-relative point
+def to_(x, y) [
+  setxy(ox + x, oy + y)
+]
+
+// advance the origin to the next cell
+def next() [
+  ox += cw + gap
+]
+
+// ---------- glyphs (each starts with its own go, ends sewn) ----------
+
+def g_N() [
+  go(0, 0)
+  to_(0, ch)
+  to_(cw, 0)
+  to_(cw, ch)
+  next()
+]
+
+def g_E() [
+  // start top-right, run the E in one stroke (middle bar is retraced)
+  go(cw, ch)
+  to_(0, ch)            // top
+  to_(0, 0)             // left spine
+  to_(cw, 0)            // bottom
+  go(0, ch / 2)         // jump to middle-left
+  to_(cw, ch / 2)       // middle bar
+  next()
+]
+
+def g_D() [
+  go(0, 0)
+  to_(0, ch)            // left spine up
+  to_(cw * 0.55, ch)    // top curve start
+  to_(cw, ch * 0.62)
+  to_(cw, ch * 0.38)
+  to_(cw * 0.55, 0)
+  to_(0, 0)             // close bowl onto spine
+  next()
+]
+
+def g_L() [
+  go(0, ch)
+  to_(0, 0)             // down the spine
+  to_(cw, 0)            // along the base
+  next()
+]
+
+def g_S() [
+  go(cw, ch * 0.85)
+  to_(cw * 0.2, ch)     // top hook
+  to_(0, ch * 0.7)
+  to_(cw, ch * 0.3)     // diagonal sweep
+  to_(cw * 0.8, 0)
+  to_(0, ch * 0.15)     // bottom hook
+  next()
+]
+
+def g_C() [
+  go(cw, ch * 0.8)
+  to_(cw * 0.5, ch)     // top
+  to_(0, ch * 0.6)
+  to_(0, ch * 0.4)
+  to_(cw * 0.5, 0)      // bottom
+  to_(cw, ch * 0.2)
+  next()
+]
+
+def g_R() [
+  go(0, 0)
+  to_(0, ch)            // spine up
+  to_(cw * 0.6, ch)     // bowl top
+  to_(cw, ch * 0.72)
+  to_(cw * 0.6, ch / 2) // bowl close at mid-spine
+  to_(0, ch / 2)
+  to_(cw, 0)            // leg down to bottom-right
+  next()
+]
+
+def g_I() [
+  go(cw / 2, 0)
+  to_(cw / 2, ch)       // single vertical stroke (minimal)
+  next()
+]
+
+def g_P() [
+  go(0, 0)
+  to_(0, ch)            // spine up
+  to_(cw * 0.6, ch)     // bowl top
+  to_(cw, ch * 0.72)
+  to_(cw * 0.6, ch / 2) // bowl close at mid-spine
+  to_(0, ch / 2)
+  next()
+]
+
+def g_T() [
+  go(0, ch)
+  to_(cw, ch)           // top bar
+  go(cw / 2, ch)        // jump to centre of bar
+  to_(cw / 2, 0)        // stem down
+  next()
+]
+
+// ---------- the word ----------
+
+fabric "woven
+stitchlen 2
+satin 0.5               // a clean glossy single-stroke ribbon
+color 4
+
+// centre the 12-letter word: total width = 12*cw + 11*gap
+let total = 12 * cw + 11 * gap
+ox = -total / 2
+oy = -ch / 2
+
+g_N()  g_E()  g_E()  g_D()  g_L()  g_E()
+g_S()  g_C()  g_R()  g_I()  g_P()  g_T()
