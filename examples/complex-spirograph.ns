@@ -76,7 +76,7 @@ while probe < 360 [
   if rr > rmax [ rmax = rr ]
   probe = probe + 2
 ]
-let scale = fit / rmax
+let fitscale = fit / rmax
 
 
 // ------------------------------------------------------------
@@ -91,8 +91,8 @@ def draw_layer(rot) [
 
   // start point (t = 0)
   let p0 = epi(0)
-  let sx0 = scale * (p0[0] * cr - p0[1] * sr)
-  let sy0 = scale * (p0[0] * sr + p0[1] * cr)
+  let sx0 = fitscale * (p0[0] * cr - p0[1] * sr)
+  let sy0 = fitscale * (p0[0] * sr + p0[1] * cr)
   up
   setpos([sx0, sy0])
   down
@@ -101,8 +101,8 @@ def draw_layer(rot) [
   while i <= smooth [
     let t = 360 * (i / smooth)        // one full turn closes the curve
     let p = epi(t)
-    let sx = scale * (p[0] * cr - p[1] * sr)
-    let sy = scale * (p[0] * sr + p[1] * cr)
+    let sx = fitscale * (p[0] * cr - p[1] * sr)
+    let sy = fitscale * (p[0] * sr + p[1] * cr)
     setpos([sx, sy])
     i = i + 1
   ]

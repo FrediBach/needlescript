@@ -20,6 +20,19 @@ export const BUILTIN_ARITY: Record<string, number> = {
   seed: 1, print: 1, mark: 0, assert: 1,
 };
 
+/**
+ * Transform block commands (CTM stack). Each takes a fixed number of scalar
+ * arguments *then a block* — the same shape as `repeat n [ … ]` and
+ * `if cond [ … ]`. They are Core builtins (in RESERVED, can't be shadowed).
+ * The pure path-function counterparts (xlate/xrotate/xscale/xmirror) live in
+ * GEN_FUNCS below.
+ */
+export const TRANSFORM_ARITY: Record<string, number> = {
+  translate: 2, rotate: 1, rotateabout: 3,
+  scale: 1, scalexy: 2, mirror: 1, skew: 2,
+  transform: 6,
+};
+
 /** Builtins that take a single quoted-word argument, with their allowed words. */
 export const QWORD_BUILTINS: Record<string, readonly string[]> = {
   fabric: ['woven', 'knit', 'stretch', 'denim', 'canvas', 'fleece'],
@@ -150,6 +163,11 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   offsetpath: { min: 2, max: 2 },
   clippaths: { min: 3, max: 3 },
   inpath: { min: 2, max: 2 },
+  // §4.7 pure path transforms (companions to the transform block commands)
+  xlate: { min: 3, max: 3 },
+  xrotate: { min: 2, max: 4 },
+  xscale: { min: 2, max: 3 },
+  xmirror: { min: 2, max: 2 },
 };
 
 /** GEN_FUNCS whose given argument is a quoted word, with the allowed words. */
@@ -185,6 +203,7 @@ export const RESERVED = new Set<string>([
   'break', 'continue',
   ...Object.keys(ALIASES),
   ...Object.keys(BUILTIN_ARITY),
+  ...Object.keys(TRANSFORM_ARITY),
   ...Object.keys(QWORD_BUILTINS),
   ...Object.keys(FUNC_ARITY),
   ...ZERO_FUNCS,

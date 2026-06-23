@@ -175,6 +175,74 @@ Inside call parentheses the ambiguity disappears: `setxy(-6, -21)` and `fd(10 - 
 | `push` / `pop` | | save the needle state (position, heading, pen) on a stack · jump back to it without sewing. Perfect for branching structures — no more sewing back out of every branch. Max 500 saved states; `pop` on an empty stack warns and is ignored |
 | `cs` | `clearscreen`, `clear` | accepted for Logo familiarity; does nothing |
 
+## Transforms
+
+Like OpenSCAD, NeedleScript has a **current transformation matrix (CTM) stack**: a transform command takes its arguments *then a block*, applies a coordinate transform to whatever that block draws, and restores the previous frame at the end. It reads exactly like `repeat n [ … ]` — native Logo, not a bolted-on DSL — and nests inside-out:
+
+```text
+// draw a leaf once; stamp it in four places, each rotated and scaled
+def leaf() [
+  satin 1.6
+  repeat 2 [ repeat 18 [ fd 0.9 rt 5 ] rt 90 ]
+  satin 0
+]
+
+repeat 4 [
+  rotate repcount * 90 [
+    translate 20 0 [
+      scale 0.8 [ leaf() ]
+    ]
+  ]
+]
+```
+
+Both spellings work, exactly like every other command:
+
+```text
+translate 20 0 [ leaf() ]      // classic prefix
+translate(20, 0) [ leaf() ]    // glued paren — same thing
+```
+
+| Command | Effect |
+|---|---|
+| `translate dx dy [ … ]` | shift the block by `(dx, dy)` mm |
+| `rotate deg [ … ]` | rotate the block *deg* clockwise about the current origin (0 = north, like `seth`/`rt`) |
+| `rotateabout deg cx cy [ … ]` | rotate about an explicit pivot `(cx, cy)` |
+| `scale s [ … ]` | uniform scale |
+| `scalexy sx sy [ … ]` | independent axis scale |
+| `mirror deg [ … ]` | reflect across a line through the origin at heading *deg* (`mirror 0` flips left/right, `mirror 90` flips top/bottom) |
+| `skew ax ay [ … ]` | shear by *ax* / *ay* degrees |
+| `transform a b c d e f [ … ]` | raw 2×3 affine escape hatch: `(x, y) → (a·x + c·y + e, b·x + d·y + f)` |
+
+These are **Core** built-ins — like movement and stitching, they can't be redefined (so `scale`, `rotate`, `translate`, `transform`, … are off-limits as variable names; the did-you-mean machinery flags the clash loudly).
+
+**The turtle lives in untransformed local space.** Inside a transform block, `xcor`/`ycor`/`distance`/`pos()` all report *pre-transform* coordinates — the turtle walks normally and only the emitted stitches are mapped. A leaf doesn't know it's been scaled. This keeps reasoning local (a `distance(0,0) > 44` guard behaves the same no matter what transform wraps it) and keeps randomness stable (wrapping a motif in a transform draws the same `random`/`scatter` values, so nothing downstream reshuffles). `setxy` is in local space too — "absolute within this block's frame", which is exactly what you want when stamping the same motif in different places.
+
+**Stitches stay physical.** The transform maps the turtle *path*; stitch-length splitting, satin width and the whole physics layer are then evaluated **in hoop space, after the transform**:
+
+- `scale 3 [ fd 30 ]` sews nine 2.5 mm stitches over 90 mm — *not* three 7.5 mm stitches stretched out. The path is transformed, *then* stitched.
+- Satin width is transformed perpendicular to the local travel direction, per segment — so under `scalexy 2 1` a column running north widens but one running east doesn't (direction-dependent, and real).
+- The 8 mm snag warning and `shortstitch` curvature checks run on the **post-transform** geometry, since that's what actually sews.
+- `pullcomp` is a fabric constant in real millimetres and is applied **after** the transform — it is never scaled.
+
+So "what you previewed is exactly what the machine sews" holds under transforms, where a naive coordinate multiply would quietly break it.
+
+### Transformed paths — `xlate` / `xrotate` / `xscale` / `xmirror`
+
+The block form has pure-function counterparts that transform **point lists** (call-syntax only, returning new lists), so transforms compose with `scatter`/`voronoi`/`offsetpath` data, not just with imperative drawing. `translate dx dy [ block ]` is exactly "run `block`, but every emitted point passes through `xlate`" — the two forms share one matrix library and produce identical stitches.
+
+```text
+seed 4
+let cell  = first(voronoi(scatter(9)))
+let motif = resample(cell, 2.2)
+repeat 6 [
+  sewpath(xrotate(motif, repcount * 60))   // six rotated copies of one cell
+  trim
+]
+```
+
+(See the bundled **transforms** example.)
+
 ## Thread & stitch quality
 
 | Command | Effect |
@@ -553,6 +621,10 @@ There is **no operator broadcasting**: `[1, 2] + [3, 4]` stays a loud error, now
 | `catmull(points, mm)` | Catmull-Rom spline through the control points, resampled |
 | `bezier(p0, c0, c1, p1, mm)` | cubic Bézier, resampled |
 | `centroid(path)` · `bbox(path)` | point · `[minx, miny, maxx, maxy]` |
+| `xlate(path, dx, dy)` | new path, translated — the functional twin of `translate` |
+| `xrotate(path, deg)` · `xrotate(path, deg, cx, cy)` | new path, rotated clockwise (optional pivot) — twin of `rotate`/`rotateabout` |
+| `xscale(path, s)` · `xscale(path, sx, sy)` | new path, scaled uniformly or per-axis — twin of `scale`/`scalexy` |
+| `xmirror(path, deg)` | new path, reflected across heading *deg* — twin of `mirror` |
 | `sewpath(path)` | **command**: exactly `for p in path [ setpos(p) ]` — pen state, stitch mode, satin and auto-split all apply as if hand-walked |
 
 ### Generators (seeded)

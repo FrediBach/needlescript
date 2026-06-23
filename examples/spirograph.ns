@@ -92,7 +92,7 @@ def spiro_y(t) [
 // ------------------------------------------------------------
 let reach = bigR - rollR + pen           // hypotrochoid extent
 if inside == 0 [ reach = bigR + rollR + pen ]   // epitrochoid extent
-let scale = fit / reach
+let fitscale = fit / reach
 
 
 // ============================================================
@@ -105,11 +105,11 @@ let turn = 360 * revs              // total drive-angle sweep, degrees
 
 // start point
 up
-setpos([ scale * spiro_x(0), scale * spiro_y(0) ])
+setpos([ fitscale * spiro_x(0), fitscale * spiro_y(0) ])
 down
 for i = 1 to total [
   let t = turn * (i / total)
-  setpos([ scale * spiro_x(t), scale * spiro_y(t) ])
+  setpos([ fitscale * spiro_x(t), fitscale * spiro_y(t) ])
 ]
 
 trim

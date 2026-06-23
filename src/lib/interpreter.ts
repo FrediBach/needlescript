@@ -20,6 +20,11 @@ import type { Pt } from './genmath.ts';
 import { offsetRegion, clipRegions } from './geometry.ts';
 import { scatter, voronoiCells, triangulate, hull, relax } from './generators.ts';
 import type { Domain } from './generators.ts';
+import {
+  compose, applyPath,
+  mTranslate, mRotate, mRotateAbout, mScale, mScaleXY, mMirror, mSkew, mRaw,
+} from './affine.ts';
+import type { Mat } from './affine.ts';
 
 /** Thrown by `output` / `exit` to unwind to the enclosing procedure call. */
 class ReturnSignal {
@@ -468,6 +473,27 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'inpath':
         return gm.pointInRegion(pointArg(0), regionArg(1)) ? 1 : 0;
+
+      // ----- §4.7 pure path transforms (companions to the block commands) -----
+      case 'xlate':
+        return path(applyPath(mTranslate(sc(1), sc(2)), pathArg(0)));
+      case 'xrotate': {
+        if (args.length === 3)
+          throw new NeedlescriptError(
+            'xrotate takes a pivot as two numbers: xrotate(path, deg, cx, cy)',
+            line,
+          );
+        const m = args.length >= 4
+          ? mRotateAbout(sc(1), sc(2), sc(3))
+          : mRotate(sc(1));
+        return path(applyPath(m, pathArg(0)));
+      }
+      case 'xscale': {
+        const m = args.length >= 3 ? mScaleXY(sc(1), sc(2)) : mScale(sc(1));
+        return path(applyPath(m, pathArg(0)));
+      }
+      case 'xmirror':
+        return path(applyPath(mMirror(sc(1)), pathArg(0)));
     }
     throw new NeedlescriptError(`Unknown function ${name}`, line);
   }
@@ -850,6 +876,36 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         if (truthy(evalExpr(st.cond, env, repcount, depth), 'if', st.line) !== 0)
           execBlock(st.body, env, repcount, depth, contextLine);
         else if (st.elseBody) execBlock(st.elseBody, env, repcount, depth, contextLine);
+        return;
+      }
+      case 'transform': {
+        // Build the delta matrix from the args, compose it onto the CTM for
+        // the duration of the block, then restore. flushSatin on both edges
+        // guarantees a satin column is sewn entirely under one matrix. The
+        // turtle (x/y/heading) is untouched — only emitted geometry is mapped.
+        const a = st.args.map(x => num(evalExpr(x, env, repcount, depth), st.name, st.line));
+        let delta: Mat;
+        switch (st.name) {
+          case 'translate': delta = mTranslate(a[0], a[1]); break;
+          case 'rotate': delta = mRotate(a[0]); break;
+          case 'rotateabout': delta = mRotateAbout(a[0], a[1], a[2]); break;
+          case 'scale': delta = mScale(a[0]); break;
+          case 'scalexy': delta = mScaleXY(a[0], a[1]); break;
+          case 'mirror': delta = mMirror(a[0]); break;
+          case 'skew': delta = mSkew(a[0], a[1]); break;
+          case 'transform': delta = mRaw(a[0], a[1], a[2], a[3], a[4], a[5]); break;
+          default:
+            throw new NeedlescriptError(`Unhandled transform ${st.name}`, st.line);
+        }
+        m.currentLine = contextLine ?? st.line;
+        m.flushSatin();
+        m.pushCTM(compose(m.ctm, delta));
+        try {
+          execBlock(st.body, env, repcount, depth, contextLine);
+        } finally {
+          m.flushSatin();
+          m.popCTM();
+        }
         return;
       }
       case 'output': {

@@ -20,6 +20,8 @@ export const LIMITS = {
 
 import type { StitchEvent, EventType } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
+import { IDENTITY, isIdentity, apply, linApply } from './affine.ts';
+import type { Mat } from './affine.ts';
 
 export class Machine {
   x = 0; y = 0; heading = 0;
@@ -55,6 +57,25 @@ export class Machine {
   currentLine: number | undefined = undefined; // source line being executed
   stateStack: { x: number; y: number; heading: number; penDown: boolean }[] = [];
 
+  // Current transformation matrix (CTM) and its stack. The turtle lives in
+  // untransformed local space (x/y/heading are always local); only emitted
+  // geometry is mapped through the CTM on its way out — and stitch-length
+  // splitting, satin width and the physics layer all run *after* the map.
+  ctm: Mat = IDENTITY;
+  ctmStack: Mat[] = [];
+  // CTM snapshot taken when the current satin column began. A column is always
+  // flushed at CTM boundaries (push/pop), so it lives under a single matrix.
+  satinCTM: Mat = IDENTITY;
+
+  pushCTM(next: Mat) {
+    this.ctmStack.push(this.ctm);
+    this.ctm = next;
+  }
+
+  popCTM() {
+    this.ctm = this.ctmStack.pop() ?? IDENTITY;
+  }
+
   _push(t: EventType, x: number, y: number, u = false) {
     if (this.events.length >= LIMITS.maxStitches)
       throw new NeedlescriptError(
@@ -69,7 +90,8 @@ export class Machine {
   _ensureStart() {
     if (!this.started) {
       this.started = true;
-      this._push('stitch', this.x, this.y);
+      const [hx, hy] = apply(this.ctm, this.x, this.y);
+      this._push('stitch', hx, hy);
     }
   }
 
@@ -77,13 +99,13 @@ export class Machine {
     const dx = nx - this.x, dy = ny - this.y;
     const d = Math.hypot(dx, dy);
     if (d < 1e-9) { this.x = nx; this.y = ny; return; }
-    this.travel(nx, ny, d);
+    this.travel(nx, ny);
   }
 
   forward(dist: number) {
     if (!isFinite(dist)) throw new NeedlescriptError('fd/bk got a non-numeric distance');
     const rad = this.heading * Math.PI / 180;
-    this.travel(this.x + Math.sin(rad) * dist, this.y + Math.cos(rad) * dist, Math.abs(dist));
+    this.travel(this.x + Math.sin(rad) * dist, this.y + Math.cos(rad) * dist);
   }
 
   /**
@@ -105,7 +127,7 @@ export class Machine {
     for (let s = 0; s < steps; s++) {
       this.heading = (this.heading + stepAng / 2) % 360;
       const rad = this.heading * Math.PI / 180;
-      this.travel(this.x + Math.sin(rad) * chord, this.y + Math.cos(rad) * chord, chord);
+      this.travel(this.x + Math.sin(rad) * chord, this.y + Math.cos(rad) * chord);
       this.heading = (this.heading + stepAng / 2) % 360;
     }
   }
@@ -131,16 +153,23 @@ export class Machine {
 
   markHere() {
     this.flushSatin();
-    this._push('mark', this.x, this.y);
+    const [hx, hy] = apply(this.ctm, this.x, this.y);
+    this._push('mark', hx, hy);
   }
 
-  travel(nx: number, ny: number, dist: number) {
+  travel(nx: number, ny: number) {
     const ox = this.x, oy = this.y;
 
     if (this.recording) {
+      // Fill boundaries are recorded in hoop space so the fill is generated
+      // (and pull-compensated) on the geometry that actually sews.
       if (this.penDown) {
-        if (!this.curRing) this.curRing = [[ox, oy]];
-        this.curRing.push([nx, ny]);
+        const [hnx, hny] = apply(this.ctm, nx, ny);
+        if (!this.curRing) {
+          const [hox, hoy] = apply(this.ctm, ox, oy);
+          this.curRing = [[hox, hoy]];
+        }
+        this.curRing.push([hnx, hny]);
       } else {
         this._closeRing();
       }
@@ -150,19 +179,19 @@ export class Machine {
 
     if (!this.penDown) {
       this.flushSatin();
-      this._push('jump', nx, ny);
+      const [hnx, hny] = apply(this.ctm, nx, ny);
+      this._push('jump', hnx, hny);
       this.x = nx; this.y = ny;
       return;
     }
 
-    const dxT = nx - ox, dyT = ny - oy;
-    const len = Math.hypot(dxT, dyT);
-
     if (this.mode === 'satin' && this.satinWidth > 0.05) {
-      // Buffer the column path; it is sewn (underlay first, then the zigzag)
-      // when the column ends — see flushSatin().
-      if (len > 1e-9) {
-        if (!this.satinPath) this.satinPath = [{ x: ox, y: oy }];
+      // Buffer the column path in *local* space and snapshot the CTM; the
+      // column is mapped to hoop space (with width transformed perpendicular
+      // to local travel) when it ends — see flushSatin().
+      const localLen = Math.hypot(nx - ox, ny - oy);
+      if (localLen > 1e-9) {
+        if (!this.satinPath) { this.satinPath = [{ x: ox, y: oy }]; this.satinCTM = this.ctm; }
         const lastP = this.satinPath[this.satinPath.length - 1];
         if (Math.hypot(nx - lastP.x, ny - lastP.y) > 0.05)
           this.satinPath.push({ x: nx, y: ny });
@@ -171,19 +200,29 @@ export class Machine {
       return;
     }
 
+    // Map both endpoints to hoop space; split on the *hoop* length so stitch
+    // length stays physical under scaling (transform the path, then stitch).
+    const [hox, hoy] = apply(this.ctm, ox, oy);
+    const [hnx, hny] = apply(this.ctm, nx, ny);
+    const hdx = hnx - hox, hdy = hny - hoy;
+    const hlen = Math.hypot(hdx, hdy);
+
     this._ensureStart();
 
     if (this.mode === 'estitch' && this.eWidth > 0.05) {
-      if (len < 1e-9) return;
-      const ux = dxT / len, uy = dyT / len;
-      const px = -uy, py = ux;
+      if (hlen < 1e-9) { this.x = nx; this.y = ny; return; }
+      // Prong width follows the CTM perpendicular to the *local* travel
+      // direction, like satin: transform the local left-normal.
+      const llen = Math.hypot(nx - ox, ny - oy) || 1;
+      const ldx = (nx - ox) / llen, ldy = (ny - oy) / llen;
+      const [ovx, ovy] = linApply(this.ctm, -ldy, ldx); // L(local left-normal)
       const spacing = Math.max(1, this.stitchLen);
-      const steps = Math.max(1, Math.round(len / spacing));
+      const steps = Math.max(1, Math.round(hlen / spacing));
       for (let s = 1; s <= steps; s++) {
         const t = s / steps;
-        const cx = ox + dxT * t, cy = oy + dyT * t;
+        const cx = hox + hdx * t, cy = hoy + hdy * t;
         this._push('stitch', cx, cy);
-        this._push('stitch', cx + px * this.eWidth, cy + py * this.eWidth);
+        this._push('stitch', cx + ovx * this.eWidth, cy + ovy * this.eWidth);
         this._push('stitch', cx, cy);
       }
       this.x = nx; this.y = ny;
@@ -191,17 +230,17 @@ export class Machine {
     }
 
     // Running stitch
-    if (dist < LIMITS.minStitch * 0.5) {
+    if (hlen < LIMITS.minStitch * 0.5) {
       this.tinyDropped++;
       this.x = nx; this.y = ny;
       return;
     }
     const eff = Math.min(Math.max(this.stitchLen, LIMITS.minStitch), LIMITS.maxStitch);
-    const steps = Math.max(1, Math.ceil(len / eff));
-    let pxv = ox, pyv = oy;
+    const steps = Math.max(1, Math.ceil(hlen / eff));
+    let pxv = hox, pyv = hoy;
     for (let s = 1; s <= steps; s++) {
       const t = s / steps;
-      const tx = ox + dxT * t, ty = oy + dyT * t;
+      const tx = hox + hdx * t, ty = hoy + hdy * t;
       this._push('stitch', tx, ty);
       for (let r = 1; r < this.beanRepeats; r++) {
         this._push('stitch', r % 2 === 1 ? pxv : tx, r % 2 === 1 ? pyv : ty);
@@ -312,6 +351,15 @@ export class Machine {
     const path = this.satinPath;
     this.satinPath = null;
     if (!path || path.length < 2) return;
+    // The buffer holds local points; under an active transform the column is
+    // mapped to hoop space with its width transformed perpendicular to the
+    // local travel direction. With no transform the original (exact) path
+    // runs, so existing output is byte-for-byte unchanged.
+    if (isIdentity(this.satinCTM)) this._flushSatinPlain(path);
+    else this._flushSatinTransformed(path, this.satinCTM);
+  }
+
+  _flushSatinPlain(path: { x: number; y: number }[]) {
     if (!this.started) {
       this.started = true;
       this._push('stitch', path[0].x, path[0].y);
@@ -349,6 +397,147 @@ export class Machine {
     this._zigzagAlong(path, w, this.satinSpacing, false, this.shortStitch);
   }
 
+  // ---- Transform-aware satin (CTM active) ----
+
+  /** Map a local polyline into hoop space. */
+  _toHoop(pts: { x: number; y: number }[], ctm: Mat): { x: number; y: number }[] {
+    return pts.map(p => { const [x, y] = apply(ctm, p.x, p.y); return { x, y }; });
+  }
+
+  /**
+   * The hoop offset vector for a unit width perpendicular to a local segment
+   * direction: L(local left-normal). Its length is the per-direction width
+   * scale; its direction is where that perpendicular lands in hoop space.
+   */
+  _perpVec(ctm: Mat, lax: number, lay: number, lbx: number, lby: number): { ox: number; oy: number; scale: number } {
+    const dx = lbx - lax, dy = lby - lay;
+    const len = Math.hypot(dx, dy) || 1;
+    const [ox, oy] = linApply(ctm, -dy / len, dx / len);
+    return { ox, oy, scale: Math.hypot(ox, oy) || 1 };
+  }
+
+  _offsetPathT(local: { x: number; y: number }[], ctm: Mat, dist: number): { x: number; y: number }[] {
+    const n = local.length;
+    if (n < 2) return this._toHoop(local, ctm);
+    const out: { x: number; y: number }[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = local[Math.max(0, i - 1)], b = local[Math.min(n - 1, i + 1)];
+      const { ox, oy, scale } = this._perpVec(ctm, a.x, a.y, b.x, b.y);
+      const [hx, hy] = apply(ctm, local[i].x, local[i].y);
+      out.push({ x: hx + (ox / scale) * dist, y: hy + (oy / scale) * dist });
+    }
+    return out;
+  }
+
+  _zigzagAlongT(
+    local: { x: number; y: number }[],
+    designWidth: number,
+    pull: number,
+    spacing: number,
+    u: boolean,
+    shortStitch: boolean,
+  ) {
+    const hoop = this._toHoop(local, this.satinCTM);
+    const halfDesign = designWidth / 2;
+    let prevUx: number | null = null, prevUy = 0;
+    let innerCounter = 0;
+    let warnedTight = false;
+    for (let i = 1; i < hoop.length; i++) {
+      const ox = hoop[i - 1].x, oy = hoop[i - 1].y;
+      const dxT = hoop[i].x - ox, dyT = hoop[i].y - oy;
+      const len = Math.hypot(dxT, dyT);
+      if (len < 1e-9) continue;
+      const ux = dxT / len, uy = dyT / len; // hoop travel direction
+      // Width perpendicular to the *local* travel direction, mapped to hoop.
+      const { ox: ovx, oy: ovy, scale } = this._perpVec(
+        this.satinCTM, local[i - 1].x, local[i - 1].y, local[i].x, local[i].y,
+      );
+      const dirx = ovx / scale, diry = ovy / scale;
+      const halfBase = halfDesign * scale + pull / 2; // pull comp is never scaled
+      let innerSide = 0;
+      let crowded = false;
+      if (prevUx !== null) {
+        const cross = prevUx * uy - prevUy * ux;
+        const dot = Math.max(-1, Math.min(1, prevUx * ux + prevUy * uy));
+        const theta = Math.acos(dot);
+        if (theta > 1e-3 && theta < 2.1) {
+          const R = len / theta;
+          if (R < halfBase && !u && !warnedTight) {
+            this.warnings.push(
+              `satin ${(halfBase * 2).toFixed(1)} mm is wider than the curve it follows (radius ~${R.toFixed(1)} mm) — split the column or widen the curve`,
+            );
+            warnedTight = true;
+          }
+          if (shortStitch) {
+            const innerSpacing = spacing * (1 - halfBase / Math.max(R, halfBase));
+            if (innerSpacing < 0.3) {
+              crowded = true;
+              innerSide = cross > 0 ? 1 : -1;
+            }
+          }
+        }
+      }
+      const steps = Math.max(1, Math.ceil(len / spacing));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const cx = ox + dxT * t, cy = oy + dyT * t;
+        this.satinSide = -this.satinSide;
+        let h = halfBase;
+        if (crowded && this.satinSide === innerSide) {
+          innerCounter++;
+          if (innerCounter % 2 === 1) h = halfBase * 0.6;
+        }
+        this._push('stitch', cx + dirx * h * this.satinSide, cy + diry * h * this.satinSide, u);
+      }
+      prevUx = ux; prevUy = uy;
+    }
+  }
+
+  _flushSatinTransformed(local: { x: number; y: number }[], ctm: Mat) {
+    const hoop0 = apply(ctm, local[0].x, local[0].y);
+    if (!this.started) {
+      this.started = true;
+      this._push('stitch', hoop0[0], hoop0[1]);
+    }
+    // Representative width (average perpendicular scale) for underlay choice.
+    let scaleSum = 0, scaleN = 0;
+    for (let i = 1; i < local.length; i++) {
+      const { scale } = this._perpVec(ctm, local[i - 1].x, local[i - 1].y, local[i].x, local[i].y);
+      scaleSum += scale; scaleN++;
+    }
+    const avgScale = scaleN ? scaleSum / scaleN : 1;
+    const w = this.satinWidth * avgScale + this.pullComp;
+    const mode: 'off' | 'center' | 'edge' | 'zigzag' =
+      this.underlayMode === 'auto'
+        ? (w < 1.5 ? 'off' : w < 4 ? 'center' : 'zigzag')
+        : this.underlayMode;
+    const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
+    const hoop = this._toHoop(local, ctm);
+    const revLocal = local.slice().reverse();
+    const revHoop = hoop.slice().reverse();
+    if (mode !== 'off' && this.doubleUnderlay && mode !== 'center') {
+      this._runAlong(hoop, uLen, true);
+      this._runAlong(revHoop, uLen, true);
+    }
+    if (mode === 'center') {
+      this._runAlong(hoop, uLen, true);
+      this._runAlong(revHoop, uLen, true);
+      if (this.doubleUnderlay) {
+        this._zigzagAlongT(local, this.satinWidth * 0.6, this.pullComp * 0.6, 2, true, false);
+        this._runAlong(revHoop, uLen, true);
+      }
+    } else if (mode === 'edge') {
+      const off = Math.max(0.3, w * 0.3);
+      this._runAlong(this._offsetPathT(local, ctm, off), uLen, true);
+      this._runAlong(this._offsetPathT(revLocal, ctm, off), uLen, true);
+    } else if (mode === 'zigzag') {
+      this._zigzagAlongT(local, this.satinWidth * 0.6, this.pullComp * 0.6, 2, true, false);
+      this._runAlong(revHoop, uLen, true);
+    }
+    // The topping
+    this._zigzagAlongT(local, this.satinWidth, this.pullComp, this.satinSpacing, false, this.shortStitch);
+  }
+
   _closeRing() {
     if (this.curRing && this.curRing.length >= 3) this.rings.push(this.curRing);
     this.curRing = null;
@@ -362,7 +551,7 @@ export class Machine {
     this.flushSatin();
     this.recording = true;
     this.rings = [];
-    this.curRing = [[this.x, this.y]];
+    this.curRing = [apply(this.ctm, this.x, this.y)];
   }
 
   /** Emit a sequence of fill points, connecting from wherever the thread is. */
@@ -444,6 +633,9 @@ export class Machine {
     }
     const rings = this.rings;
     this.rings = [];
+    // Rings are recorded in hoop space, so the "end near" hint must be too.
+    const [hx, hy] = apply(this.ctm, this.x, this.y);
+    const endNear = { x: hx, y: hy };
     const effLen =
       this.fillLen !== null
         ? this.fillLen
@@ -474,13 +666,13 @@ export class Machine {
         angle: this.fillAngle + 90, // cross-grain so the topping doesn't sink between rows
         spacing: Math.min(this.fillSpacing * 4, 5),
         stitchLen: 4,
-        endNear: { x: this.x, y: this.y },
+        endNear,
         comp: -0.6, // inset so the underlay never peeks out of the topping
       });
       if (this.doubleUnderlay && uPts.length) {
         const uPts2 = generateFill(rings, {
           angle: this.fillAngle, spacing: Math.min(this.fillSpacing * 4, 5),
-          stitchLen: 4, endNear: { x: this.x, y: this.y }, comp: -0.6,
+          stitchLen: 4, endNear, comp: -0.6,
         });
         this._emitFillPts(uPts2, true);
       }
@@ -492,7 +684,7 @@ export class Machine {
       angle: this.fillAngle,
       spacing: this.fillSpacing,
       stitchLen: effLen,
-      endNear: { x: this.x, y: this.y },
+      endNear,
       comp: this.pullComp, // rows run along the stitch axis: extend against pull
     });
     if (!pts.length) {
@@ -501,23 +693,29 @@ export class Machine {
     }
     this._emitFillPts(pts, false);
     const back = Math.hypot(
-      (this.lastEmit?.x ?? 0) - this.x,
-      (this.lastEmit?.y ?? 0) - this.y,
+      (this.lastEmit?.x ?? 0) - hx,
+      (this.lastEmit?.y ?? 0) - hy,
     );
-    if (back > 0.6) this._push('jump', this.x, this.y);
+    if (back > 0.6) this._push('jump', hx, hy);
   }
 
   colorChange(n: number) {
     this.flushSatin();
     const idx = Math.max(0, Math.round(n));
     if (idx === this.colorIdx && this.started) return;
-    if (this.started) this._push('color', this.x, this.y);
+    if (this.started) {
+      const [hx, hy] = apply(this.ctm, this.x, this.y);
+      this._push('color', hx, hy);
+    }
     this.colorIdx = idx;
   }
 
   trimThread() {
     this.flushSatin();
-    if (this.started) this._push('trim', this.x, this.y);
+    if (this.started) {
+      const [hx, hy] = apply(this.ctm, this.x, this.y);
+      this._push('trim', hx, hy);
+    }
   }
 }
 

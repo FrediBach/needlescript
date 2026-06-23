@@ -26,11 +26,12 @@ This tutorial walks you from the absolute basics up to seeded noise fields, Voro
 14. [Paths and curves](#14-paths-and-curves)
 15. [Generators: scatter, Voronoi, hull](#15-generators-scatter-voronoi-hull)
 16. [Geometry: offsets and booleans](#16-geometry-offsets-and-booleans)
-17. [Professional embroidery and fabric physics](#17-professional-embroidery-and-fabric-physics)
-18. [Debugging](#18-debugging)
-19. [Safety limits](#19-safety-limits)
-20. [Exporting and reusing your work](#20-exporting-and-reusing-your-work)
-21. [A capstone project](#21-a-capstone-project)
+17. [Transforms: stamping motifs](#17-transforms-stamping-motifs)
+18. [Professional embroidery and fabric physics](#18-professional-embroidery-and-fabric-physics)
+19. [Debugging](#19-debugging)
+20. [Safety limits](#20-safety-limits)
+21. [Exporting and reusing your work](#21-exporting-and-reusing-your-work)
+22. [A capstone project](#22-a-capstone-project)
 
 ---
 
@@ -779,7 +780,63 @@ Combine these with the generators and you can do things like: scatter points, bu
 
 ---
 
-## 17. Professional embroidery and fabric physics
+## 17. Transforms: stamping motifs
+
+You often want the *same* motif in many places — rotated, scaled, mirrored — without rewriting it each time. That is exactly what transforms give you: a command takes its arguments **then a block**, applies a coordinate transform to whatever that block draws, and restores the previous frame afterwards. It is the same stack discipline you already know from `push`/`pop`, but operating on a 2-D coordinate frame instead of the turtle pose.
+
+Draw a motif once, in its own local frame:
+
+```text
+def leaf() [
+  satin 1.6
+  repeat 2 [ repeat 18 [ fd 0.9 rt 5 ] rt 90 ]
+  satin 0
+]
+```
+
+Then stamp it. Transforms nest inside-out, just like in OpenSCAD — read the innermost first:
+
+```text
+repeat 4 [
+  rotate repcount * 90 [        // aim this copy
+    translate 20 0 [            // push it out
+      scale 0.8 [ leaf() ]      // shrink it
+    ]
+  ]
+]
+```
+
+The full vocabulary: `translate dx dy`, `rotate deg`, `rotateabout deg cx cy`, `scale s`, `scalexy sx sy`, `mirror deg`, `skew ax ay`, and the raw escape hatch `transform a b c d e f`. Both spellings work — `translate 20 0 [ … ]` and `translate(20, 0) [ … ]` are the same command.
+
+### The turtle doesn't know it's been transformed
+
+This is the rule that keeps transforms predictable. **Inside a transform block the turtle still lives in plain local coordinates** — `xcor`, `ycor`, `distance`, `pos()` all report pre-transform values, and only the *emitted stitches* are mapped to the hoop. So a guard like `if distance(0, 0) > 44 [ return ]` behaves the same whether or not a transform wraps it, and a motif that uses `random` draws the *same* numbers no matter where you stamp it. Wrapping a motif in a transform never reshuffles anything downstream — the determinism promise holds.
+
+### Transforms sew like real embroidery, not stretched geometry
+
+A transform maps the turtle's *path*; stitch-length splitting, satin width and the physics layer are all applied **afterwards, in hoop space**. So `scale 3 [ fd 30 ]` sews nine tidy 2.5 mm stitches across 90 mm — not three 7.5 mm stitches stretched thin. Satin width follows the transform perpendicular to travel (under `scalexy 2 1`, a north-running column widens and an east-running one doesn't), and `pullcomp` — a real-millimetre fabric constant — is never scaled.
+
+### Transforming data, not just drawing
+
+Because NeedleScript has first-class point lists, every block transform has a pure-function twin that returns a new path: `xlate`, `xrotate`, `xscale`, `xmirror`. They compose with the generative-math layer, so you can transform `scatter`/`voronoi` output directly:
+
+```text
+seed 4
+let cell  = first(voronoi(scatter(9)))
+let motif = resample(cell, 2.2)
+repeat 6 [
+  sewpath(xrotate(motif, repcount * 60))   // six rotated copies of one cell
+  trim
+]
+```
+
+`translate dx dy [ block ]` is just sugar for "run `block`, but pass every emitted point through `xlate`" — the two forms share one matrix library, so they produce identical stitches. (See the bundled **transforms** example for all of this in one piece.)
+
+One caution: `scale`, `rotate`, `translate`, `mirror`, `skew`, `transform` (and friends) are **core** words now — you can't use them as variable names, and the editor will tell you loudly if you try.
+
+---
+
+## 18. Professional embroidery and fabric physics
 
 Geometry that looks right on screen doesn't automatically *sew* right. Thread tension pulls fabric inward, stitches sink into the material, tight curves crowd the needle, and layered stitching becomes a stiff, puckered patch. The following commands compensate for the physics. They are **opt-in** — without them, your program sews exactly as written.
 
@@ -832,7 +889,7 @@ Travels of 7 mm or more (configurable 3–30; `autotrim 0` off) automatically ge
 
 ---
 
-## 18. Debugging
+## 19. Debugging
 
 Generative designs surprise you. These tools tell you what actually happened.
 
@@ -863,7 +920,7 @@ repeat 50 [
 
 ---
 
-## 19. Safety limits
+## 20. Safety limits
 
 NeedleScript guards both your browser and your machine. Hit one of these and you'll get a clear error rather than a hang or a damaged garment:
 
@@ -884,7 +941,7 @@ NeedleScript guards both your browser and your machine. Hit one of these and you
 
 ---
 
-## 20. Exporting and reusing your work
+## 21. Exporting and reusing your work
 
 When a design is ready, **Download .DST** produces a standard Tajima file: 3-byte ternary delta records, moves longer than 12.1 mm split automatically, colour changes as stop records, trims as triple jumps, and a correct 512-byte header. Load it onto any machine, or into commercial software for a final check.
 
@@ -892,7 +949,7 @@ You can also bring artwork *in*: **Import SVG** (a button, or drag and drop) con
 
 ---
 
-## 21. A capstone project
+## 22. A capstone project
 
 Let's combine what you've learned into one piece that exercises the whole pipeline: a generative seeded "meadow" of stems that grow along a noise field, each topped with a small satin leaf, all sitting on stable fabric.
 

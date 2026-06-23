@@ -420,6 +420,80 @@ const NS_ITEMS: NSItem[] = [
     params: [[]],
   },
 
+  // ── Transforms (CTM stack: args then a block) ────────────────────────────
+  {
+    label: 'translate',
+    kindName: 'keyword',
+    detail: 'shift a block by (dx, dy) mm',
+    documentation: 'Shift everything the block draws by `(dx, dy)` mm. The turtle stays in local space — only emitted geometry moves.\n\n```\ntranslate 20 0 [ leaf() ]\ntranslate(20, 0) [ leaf() ]   // same thing\n```',
+    insertText: 'translate ${1:dx} ${2:dy} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['dx', 'dy']],
+  },
+  {
+    label: 'rotate',
+    kindName: 'keyword',
+    detail: 'rotate a block (clockwise, about origin)',
+    documentation: 'Rotate the block `deg` degrees clockwise about the current origin (0 = north, matching `seth`/`rt`).',
+    insertText: 'rotate ${1:degrees} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['degrees']],
+  },
+  {
+    label: 'rotateabout',
+    kindName: 'keyword',
+    detail: 'rotate about an explicit pivot',
+    documentation: 'Rotate the block `deg` clockwise about the pivot `(cx, cy)`.',
+    insertText: 'rotateabout ${1:degrees} ${2:cx} ${3:cy} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['degrees', 'cx', 'cy']],
+  },
+  {
+    label: 'scale',
+    kindName: 'keyword',
+    detail: 'uniform scale',
+    documentation: 'Uniformly scale the block by `s`. Stitch length, satin width and the physics layer are re-evaluated **after** scaling, so a scaled motif still sews like real embroidery — not stretched stitches.',
+    insertText: 'scale ${1:s} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['s']],
+  },
+  {
+    label: 'scalexy',
+    kindName: 'keyword',
+    detail: 'independent axis scale',
+    documentation: 'Scale the block by `sx` on x and `sy` on y. Non-uniform scale makes satin width direction-dependent (a column running across the stretched axis widens).',
+    insertText: 'scalexy ${1:sx} ${2:sy} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['sx', 'sy']],
+  },
+  {
+    label: 'mirror',
+    kindName: 'keyword',
+    detail: 'reflect across a heading line',
+    documentation: 'Reflect the block across a line through the origin at heading `deg`. `mirror 0` flips left/right; `mirror 90` flips top/bottom.',
+    insertText: 'mirror ${1:degrees} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['degrees']],
+  },
+  {
+    label: 'skew',
+    kindName: 'keyword',
+    detail: 'shear by ax / ay degrees',
+    documentation: 'Shear the block: `x += tan(ax)·y`, `y += tan(ay)·x`.',
+    insertText: 'skew ${1:ax} ${2:ay} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['ax', 'ay']],
+  },
+  {
+    label: 'transform',
+    kindName: 'keyword',
+    detail: 'raw 2×3 affine escape hatch',
+    documentation: 'Apply the raw affine `(x, y) → (a·x + c·y + e, b·x + d·y + f)` to the block — the power-user escape hatch behind the named transforms.',
+    insertText: 'transform ${1:a} ${2:b} ${3:c} ${4:d} ${5:e} ${6:f} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['a', 'b', 'c', 'd', 'e', 'f']],
+  },
+
   // ── Thread & stitch commands ─────────────────────────────────────────────
   {
     label: 'stitchlen',
@@ -1357,6 +1431,44 @@ const NS_ITEMS: NSItem[] = [
     isSnippet: true,
     params: [['point', 'region']],
   },
+
+  // ── Generative math — pure path transforms ───────────────────────────────
+  {
+    label: 'xlate',
+    kindName: 'function',
+    detail: 'translate a path (pure)',
+    documentation: 'New path shifted by `(dx, dy)` mm. The functional companion to the `translate` block command — composes with `scatter`/`voronoi`/`offsetpath` data.',
+    insertText: 'xlate(${1:path}, ${2:dx}, ${3:dy})',
+    isSnippet: true,
+    params: [['path', 'dx', 'dy']],
+  },
+  {
+    label: 'xrotate',
+    kindName: 'function',
+    detail: 'rotate a path (pure)',
+    documentation: 'New path rotated `deg` clockwise. Optional pivot: `xrotate(path, deg, cx, cy)`.',
+    insertText: 'xrotate(${1:path}, ${2:degrees})',
+    isSnippet: true,
+    params: [['path', 'degrees'], ['path', 'degrees', 'cx', 'cy']],
+  },
+  {
+    label: 'xscale',
+    kindName: 'function',
+    detail: 'scale a path (pure)',
+    documentation: 'New path scaled by `sx` (and `sy`). `xscale(path, s)` is uniform; `xscale(path, sx, sy)` is per-axis.',
+    insertText: 'xscale(${1:path}, ${2:s})',
+    isSnippet: true,
+    params: [['path', 's'], ['path', 'sx', 'sy']],
+  },
+  {
+    label: 'xmirror',
+    kindName: 'function',
+    detail: 'mirror a path (pure)',
+    documentation: 'New path reflected across a line through the origin at heading `deg`.',
+    insertText: 'xmirror(${1:path}, ${2:degrees})',
+    isSnippet: true,
+    params: [['path', 'degrees']],
+  },
 ];
 
 // ── Fast lookup map (label → NSItem) ─────────────────────────────────────────
@@ -1497,6 +1609,8 @@ export function registerNeedlescript(monaco: Monaco): void {
       'repeat', 'if', 'else', 'while', 'for', 'break', 'continue',
       'return', 'exit', 'output', 'op', 'to', 'end', 'def',
       'let', 'make', 'local', 'in', 'step', 'true', 'false', 'and', 'or',
+      // Transform block commands (CTM stack) — headers like repeat/if.
+      'translate', 'rotate', 'rotateabout', 'scale', 'scalexy', 'mirror', 'skew', 'transform',
     ],
 
     // ── Turtle movement commands + pen + state reporters (teal) ─────
@@ -1545,6 +1659,7 @@ export function registerNeedlescript(monaco: Monaco): void {
       'scatter', 'voronoi', 'triangulate', 'hull', 'relax',
       'offsetpath', 'clippaths', 'inpath',
       'sewpath',
+      'xlate', 'xrotate', 'xscale', 'xmirror',
     ],
 
     tokenizer: {

@@ -59,6 +59,7 @@ export type ASTNode =
   | { k: 'for'; varName: string; from: ExprNode; to: ExprNode; step: ExprNode; body: ASTNode[]; line: number }
   | { k: 'forin'; varName: string; list: ExprNode; body: ASTNode[]; line: number }
   | { k: 'if'; cond: ExprNode; body: ASTNode[]; elseBody: ASTNode[] | null; line: number }
+  | { k: 'transform'; name: string; args: ExprNode[]; body: ASTNode[]; line: number }
   | { k: 'make'; name: string; value: ExprNode; line: number }
   | { k: 'local'; name: string; value: ExprNode; line: number }
   | { k: 'letlist'; names: string[]; value: ExprNode; line: number; isLocal: boolean }

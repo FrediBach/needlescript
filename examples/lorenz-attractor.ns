@@ -84,12 +84,12 @@ for p in raw [
   let d = vdist([cx, cy], p)
   if d > rmax [ rmax = d ]
 ]
-let scale = fitradius / rmax
+let fitscale = fitradius / rmax
 
 // build the fitted path: centre, then scale
 let fit = []
 for p in raw [
-  append(fit, [ (p[0] - cx) * scale, (p[1] - cy) * scale ])
+  append(fit, [ (p[0] - cx) * fitscale, (p[1] - cy) * fitscale ])
 ]
 
 

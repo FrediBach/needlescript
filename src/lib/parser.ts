@@ -6,7 +6,7 @@
 
 import type { ASTNode, ExprNode, Token } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
-import { ALIASES, BUILTIN_ARITY, QWORD_BUILTINS, FUNC_ARITY, ZERO_FUNCS, RESERVED, LIST_FUNCS, LIST_CMDS, GEN_FUNCS, GEN_CMDS, GEN_QWORD_ARG, LIBRARY_FUNCS } from './commands.ts';
+import { ALIASES, BUILTIN_ARITY, TRANSFORM_ARITY, QWORD_BUILTINS, FUNC_ARITY, ZERO_FUNCS, RESERVED, LIST_FUNCS, LIST_CMDS, GEN_FUNCS, GEN_CMDS, GEN_QWORD_ARG, LIBRARY_FUNCS } from './commands.ts';
 import { didYouMean, didYouMeanKinded } from './suggestions.ts';
 import { prescan } from './prescan.ts';
 import { COMPOUND_ASSIGN_OPS } from './tokenizer.ts';
@@ -577,6 +577,22 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       return { k: 'if', cond, body, elseBody, line: tok.line };
     }
 
+    // Transform block commands (CTM stack):  translate dx dy [ … ].
+    // Args then a block, exactly like repeat/if. Both spellings work:
+    //   translate 20 0 [ … ]     (classic prefix)
+    //   translate(20, 0) [ … ]   (glued paren — handled in the call branch)
+    if (TRANSFORM_ARITY[name] !== undefined && !gluedParenNext(tok)) {
+      next();
+      const arity = TRANSFORM_ARITY[name];
+      const args: ExprNode[] = [];
+      // Parse each argument in header context so a glued index in the last
+      // one is reported as "add a space before the block" rather than
+      // silently swallowing the block.
+      for (let a = 0; a < arity; a++) args.push(parseHeaderExpr());
+      const body = parseHeaderBlock();
+      return { k: 'transform', name, args, body, line: tok.line };
+    }
+
     if (name === 'make' || name === 'local') {
       next();
       const nm = next();
@@ -677,6 +693,19 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         next();
         const args = parseParenArgs(name, BUILTIN_ARITY[canonical], tok.line);
         return { k: 'cmd', name: canonical, args, line: tok.line };
+      }
+      if (TRANSFORM_ARITY[name] !== undefined) {
+        next();
+        const args = parseParenArgs(name, TRANSFORM_ARITY[name], tok.line);
+        // A transform is a header: the `[` after the argument list opens a
+        // block, whether or not it is glued to the `)`.
+        if (atEnd() || peek().t !== '[')
+          throw new NeedlescriptError(
+            `${name}(…) needs a block, e.g.  ${name}(…) [ … ]`,
+            lineOf(peek() ?? tok),
+          );
+        const body = parseBracketBlock();
+        return { k: 'transform', name, args, body, line: tok.line };
       }
       if (LIST_CMDS[name] !== undefined) {
         next();

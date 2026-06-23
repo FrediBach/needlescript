@@ -1,0 +1,55 @@
+// ============================================================
+//  TRANSFORMS — STAMP ONE MOTIF MANY WAYS
+//  A current-transformation-matrix (CTM) stack: translate / rotate /
+//  scale a block without rewriting it. The turtle stays in local space —
+//  only the emitted stitches are mapped, and stitch length, satin width
+//  and the physics layer are applied AFTER the transform, so a stamped,
+//  scaled, mirrored motif still sews like real embroidery.
+// ============================================================
+
+// --- shape ---
+let petals  = 6      // [3:10] copies stamped around the ring
+let ring    = 14     // [8:1:24] ring radius, mm
+let leafsz  = 0.5    // [0.3:0.05:0.9] leaf arc step → motif size
+let grow    = 0.05   // [0:0.01:0.2] extra scale per step
+
+// one leaf, drawn once at the origin in its own local frame
+def leaf() [
+  repeat 2 [ repeat 12 [ fd leafsz rt 7.5 ] rt 90 ]
+]
+
+// ── 1. stamp the leaf around a ring, each rotated to face outward
+//        and scaled a little more than the last ──────────────────
+color 1
+repeat petals [
+  rotate repcount * (360 / petals) [      // aim this copy outward
+    translate 0 ring [                     // push it out to the ring
+      scale 0.7 + repcount * grow [        // grow as we go round
+        leaf()
+      ]
+    ]
+  ]
+  trim
+]
+
+// ── 2. a mirrored pair of sprigs at the centre ───────────────────
+//        mirror 0 flips left/right, so one def draws both sides ───
+color 2
+def sprig() [
+  repeat 9 [ fd 1.1 rt 7 ]
+]
+sprig()
+mirror 0 [ sprig() ]            // its left/right reflection
+trim
+
+// ── 3. functional companion: six rotated copies of one cell ──────
+//        x* path functions compose — recentre, shrink, then spin ──
+color 3
+seed 4
+let cell = first(voronoi(scatter(11)))
+let c = centroid(cell)
+let motif = resample(xscale(xlate(cell, -c[0], -c[1]), 0.6), 2.0)
+repeat 6 [
+  sewpath(xrotate(motif, repcount * 60))   // xrotate ≡ the rotate block
+  trim
+]
