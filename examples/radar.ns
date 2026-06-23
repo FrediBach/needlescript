@@ -4,16 +4,15 @@ let S = 6             // master radius of the ring, in mm
 let cx = 0
 let cy = 0
 
-// ---- interference ticks: seeded radiating dashes outside the ring ----
 def static_ticks(r, n) [
   repeat n [
-    let a = (repcount - 1) * 360 / n            // base angle around the ring
+    let a = (repcount - 1) * 360 / n     // base angle around the ring
     // jitter the angle and the length from a slow noise field
     let jit = snoise2(cos(a) * 1.4, sin(a) * 1.4)
     let ang = a + jit * 4
     let inner = r + 2
-    let outer = r + 24 + (jit + 1) * 6           // 5–13 mm long, noise-driven
-    let ix = cx + sin(ang) * inner              // turtle degrees: x = sin, y = cos
+    let outer = r + 24 + (jit + 1) * 6  // 5–13 mm long, noise-driven
+    let ix = cx + sin(ang) * inner      // turtle degrees: x = sin, y = cos
     let iy = cy + cos(ang) * inner
     up setxy(ix, iy) down
     seth ang
@@ -23,12 +22,6 @@ def static_ticks(r, n) [
   down
 ]
 
-// ============================================================
-//  sew the mark
-// ============================================================
-
-
-// --- the broadcast static, faint and thin ---
 color 2
 stitchlen 1.6
 static_ticks(S, 180)
