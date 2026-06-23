@@ -11,7 +11,7 @@ def static_ticks(r, n) [
     let jit = snoise2(cos(a) * 1.4, sin(a) * 1.4)
     let ang = a + jit * 4
     let inner = r + 2
-    let outer = r + 24 + (jit + 1) * 6  // 5–13 mm long, noise-driven
+    let outer = r + 36  // 5–13 mm long, noise-driven
     let ix = cx + sin(ang) * inner      // turtle degrees: x = sin, y = cos
     let iy = cy + cos(ang) * inner
     up setxy(ix, iy) down
