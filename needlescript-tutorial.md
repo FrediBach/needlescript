@@ -811,7 +811,7 @@ The full vocabulary: `translate dx dy`, `rotate deg`, `rotateabout deg cx cy`, `
 
 ### The turtle doesn't know it's been transformed
 
-This is the rule that keeps transforms predictable. **Inside a transform block the turtle still lives in plain local coordinates** — `xcor`, `ycor`, `distance`, `pos()` all report pre-transform values, and only the *emitted stitches* are mapped to the hoop. So a guard like `if distance(0, 0) > 44 [ return ]` behaves the same whether or not a transform wraps it, and a motif that uses `random` draws the *same* numbers no matter where you stamp it. Wrapping a motif in a transform never reshuffles anything downstream — the determinism promise holds.
+This is the rule that keeps transforms predictable. **Inside a transform block the turtle still lives in plain local coordinates** — `xcor`, `ycor`, `distance`, `pos()` all report pre-transform values, and only the *emitted stitches* are mapped to the hoop. So a guard like `if distance(0, 0) > 44 [ return ]` behaves the same whether or not a transform wraps it, and a motif that uses `random` draws the *same* numbers no matter where you stamp it. Wrapping a motif in a transform never reshuffles anything downstream — the determinism promise holds. The history queries (`coverat` and friends) follow the same rule: you pass local points and the engine maps them through the transform, so `coverat(pos())` reads the right patch of fabric in any frame.
 
 ### Transforms sew like real embroidery, not stretched geometry
 
@@ -957,6 +957,53 @@ On a tight satin curve the inner edge gets the same number of penetrations as th
 The physical quantity that matters most is **thread coverage**: millimetres of thread per mm² of fabric, expressed in *layers* (one layer is a clean satin column or tatami fill). Past about 2.5–3.5 layers, depending on fabric, embroidery stops behaving like fabric — needles deflect, thread breaks, the patch puckers. Every run computes a 1 mm coverage grid (deliberate tie-off micro-stitches are excluded so thread ends don't read as false hotspots). Hotspots above the limit produce warnings **with coordinates and the source lines that caused them**, and repeated penetrations in the same hole are flagged separately.
 
 The stage has a heatmap toggle (orange from about 1.2 layers, red from 3), and the stats row shows the peak. `maxdensity n` tunes the threshold (default 3.5); `maxdensity 0` silences it. Some constructions legitimately run hot — a satin border over a fill edge measures about 4 layers — and the right move is to raise the limit *knowingly*, as the bundled **patch** example does.
+
+### Reading coverage back — stitch-history queries
+
+Everything above *writes* coverage. You can also *read* it mid-program and branch on it — the step from open-loop to closed-loop generation. Five **pure reporters** expose the very grid the heatmap draws:
+
+| Call | Returns |
+|---|---|
+| `coverat(p)` | coverage at `p` in **layers** (the heatmap / `maxdensity` unit) |
+| `coverat(p, r)` | coverage averaged over radius `r` mm — for asking about an area |
+| `countat(p)` | penetration count in the 1 mm cell at `p` |
+| `nearestsewn(p)` | the closest prior penetration as `[x, y]`, or `[]` if none yet |
+| `sewnwithin(p, r)` | a list of prior penetrations within `r` mm of `p` |
+| `stitchedpoints()` | a deep-copied snapshot of every penetration so far, as a path |
+
+The headline is `coverat`: "how full is the fabric here?", in the unit you already know. A stipple that fills toward an even target instead of clumping:
+
+```text
+seed 7
+repeat 4000 [
+  let p = [random(80) - 40, random(80) - 40]
+  if vlen(p) < 46 and coverat(p) < 1.5 [   // only sew where it isn't full yet
+    up setpos(p) down
+    arc 360 0.5
+    trim
+  ]
+]
+```
+
+Three rules keep this honest:
+
+- **Pure and deterministic.** The queries draw *nothing* from the random stream and emit *nothing* — they are reads. Branching on them is still a function of `(seed, source)`, so "same seed → same design" holds. Only your own `random`/`gauss` calls ever touch the seed.
+- **Committed, in sewing order.** A query sees every penetration committed *so far* and nothing sewn later. The one catch is buffered satin: a column isn't in the grid until it flushes (pen-up, `trim`, a mode change), so check coverage *after* the stroke, not mid-column. Tie-off locks are excluded, exactly as they are from the heatmap — so a query reports the same number the heatmap shows.
+- **O(local), not O(history).** `coverat`/`countat` are single grid-cell lookups; `nearestsewn`/`sewnwithin` are backed by the same bucketing, so "what's near here" never walks all 60,000 stitches. Reach for them before scanning `stitchedpoints()`.
+
+Coverage is a property of the **fabric**, so the grid lives in hoop space — but query points follow the usual turtle rule: you pass them in local coordinates and the engine maps them through the current transform, so `coverat(pos())` reads the right spot whether or not a transform wraps it. (Points returned by `nearestsewn`/`sewnwithin`/`stitchedpoints` come back in hoop space — they're facts about the fabric, not the motif.)
+
+One hazard worth naming: a loop that runs *until a condition over history* is met can run forever if the target is unreachable, and the op/stitch limits will stop it (the error now hints that a feedback loop may not be terminating). Give such a loop a hard ceiling — `repeat 5000 [ … if done [ break ] ]`, never `while not done [ … ]`. The bundled **stipple** example models this.
+
+Because they're reporters, they compose with effects: a `warp` whose displacement reads `coverat` becomes *reactive* — wobble more where the fabric is sparse, hold steady where it's dense:
+
+```text
+def adaptive(p) [
+  let wob = clamp(2 - coverat(p), 0, 2)         // calmer where it's already dense
+  return vadd(p, [snoise2(p[1] * 9, 0) * wob, snoise2(p[0] * 9, 0) * wob])
+]
+// warp @adaptive [ … ]
+```
 
 ### Automatic trims — `autotrim mm`
 

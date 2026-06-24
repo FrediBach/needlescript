@@ -216,7 +216,7 @@ translate(20, 0) [ leaf() ]    // glued paren — same thing
 
 These are **Core** built-ins — like movement and stitching, they can't be redefined (so `scale`, `rotate`, `translate`, `transform`, … are off-limits as variable names; the did-you-mean machinery flags the clash loudly).
 
-**The turtle lives in untransformed local space.** Inside a transform block, `xcor`/`ycor`/`distance`/`pos()` all report *pre-transform* coordinates — the turtle walks normally and only the emitted stitches are mapped. A leaf doesn't know it's been scaled. This keeps reasoning local (a `distance(0,0) > 44` guard behaves the same no matter what transform wraps it) and keeps randomness stable (wrapping a motif in a transform draws the same `random`/`scatter` values, so nothing downstream reshuffles). `setxy` is in local space too — "absolute within this block's frame", which is exactly what you want when stamping the same motif in different places.
+**The turtle lives in untransformed local space.** Inside a transform block, `xcor`/`ycor`/`distance`/`pos()` all report *pre-transform* coordinates — the turtle walks normally and only the emitted stitches are mapped. A leaf doesn't know it's been scaled. This keeps reasoning local (a `distance(0,0) > 44` guard behaves the same no matter what transform wraps it) and keeps randomness stable (wrapping a motif in a transform draws the same `random`/`scatter` values, so nothing downstream reshuffles). `setxy` is in local space too — "absolute within this block's frame", which is exactly what you want when stamping the same motif in different places. The history queries (`coverat` and friends) take local points too and map them through the transform, so they read the right patch of fabric in any frame.
 
 **Stitches stay physical.** The transform maps the turtle *path*; stitch-length splitting, satin width and the whole physics layer are then evaluated **in hoop space, after the transform**:
 
@@ -417,6 +417,30 @@ On a tight satin curve the inner edge receives the same number of penetrations a
 ### Local density — `maxdensity n` + heatmap
 
 The physical quantity that matters is **thread coverage**: millimetres of thread per mm² of fabric, expressed in *layers* — one layer is a clean satin column or tatami fill. Past ~2.5–3.5 layers (fabric-dependent) embroidery stops being fabric: needles deflect, thread breaks, the patch puckers. Every run computes a 1 mm coverage grid (deliberate tie-off micro stitches are excluded so thread ends don't read as false hotspots). Hotspots above the limit produce warnings **with coordinates and the source lines that caused them**, and repeated penetrations in the same hole (≥ 5 within 0.15 mm — fabric-cutting territory) are flagged separately. The stage has a heatmap toggle (orange from ~1.2 layers, red from 3); the stats row shows the peak. `maxdensity n` tunes the threshold (default 3.5), `maxdensity 0` silences it. Some constructions legitimately run hot — a satin border over a fill edge measures ~4 layers — and the right move is to raise the limit *knowingly*, as the bundled *patch* example does.
+
+### Stitch history — closed-loop generation
+
+That same coverage grid can be **read back** mid-program, so a design can respond to what's already been sewn — adaptive density, stippling toward a target, avoidance, growth that respects what's there. Five **pure reporters** (glued-call only, shadowable):
+
+| Call | Returns |
+|---|---|
+| `coverat(p)` · `coverat(p, r)` | coverage at `p` in **layers** (the heatmap unit) — point, or averaged over radius `r` mm |
+| `countat(p)` | penetration count in the 1 mm cell at `p` |
+| `nearestsewn(p)` | the closest prior penetration as `[x, y]`, or `[]` if none yet |
+| `sewnwithin(p, r)` | a list of prior penetrations within `r` mm of `p` |
+| `stitchedpoints()` | a deep-copied snapshot of every penetration so far, as a path |
+
+```text
+seed 7
+repeat 4000 [                                 // a stipple that self-levels
+  let p = [random(80) - 40, random(80) - 40]
+  if vlen(p) < 46 and coverat(p) < 1.5 [      // only sew where it isn't full yet
+    up setpos(p) down  arc 360 0.5  trim
+  ]
+]
+```
+
+The contract that keeps closed-loop generation deterministic: the reporters **draw nothing from the random stream and emit nothing** — they're reads, so branching on them is still a function of `(seed, source)` and "same seed → same design" holds. They see **committed** penetrations in **sewing order** (a buffered satin column isn't visible until it flushes on pen-up / `trim` / mode change; tie-off locks are excluded, so the numbers match the heatmap exactly). `coverat`/`countat` are O(1) cell lookups and `nearestsewn`/`sewnwithin` are grid-bucketed O(local), so proximity logic never scans the whole history. Query points are local-frame and mapped through the current transform (so `coverat(pos())` works in any frame); returned points are hoop-space fabric facts. A loop that runs *until* a coverage condition can run forever if the target is unreachable — give it a hard cap (`repeat N [ … if done [ break ] ]`, not `while`); the op-limit error hints when a feedback loop may not be terminating. The bundled *stipple* example shows the pattern, and a `warp` reporter that reads `coverat` becomes a *reactive* shader.
 
 ### Automatic trims — `autotrim mm`
 
@@ -750,7 +774,7 @@ Backed by Clipper2 on ×1000 integer coordinates (µm precision) — results are
 
 ### Library names may be shadowed
 
-Built-in words come in two tiers. **Core** — movement, stitching, control flow, everything that predates the generative-math release — can't be redefined (hard error, unchanged). **Library** — every list and generative-math function — can: your own `def clamp(v, lo, hi) [ … ]` wins for the whole program, with a one-time console note (`note: "clamp" shadows a built-in library function (since v3) — rename to silence`). This is what lets the language keep growing a standard library without breaking existing programs that innocently used the same names.
+Built-in words come in two tiers. **Core** — movement, stitching, control flow, everything that predates the generative-math release — can't be redefined (hard error, unchanged). **Library** — every list, generative-math and stitch-history function — can: your own `def clamp(v, lo, hi) [ … ]` wins for the whole program, with a one-time console note (`note: "clamp" shadows a built-in library function (since v3) — rename to silence`). This is what lets the language keep growing a standard library without breaking existing programs that innocently used the same names.
 
 ## Randomness & determinism
 

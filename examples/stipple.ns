@@ -1,0 +1,51 @@
+// ============================================================
+//  STIPPLE — CLOSED-LOOP GENERATION WITH coverat
+//  The history queries let the program read what's already been sewn
+//  and branch on it — open-loop becomes closed-loop. Here we scatter
+//  little dots but only where the fabric ISN'T full yet: coverat(p)
+//  reports thread coverage in LAYERS (the same unit as the heatmap and
+//  maxdensity), live and in sewing order, so the fill self-levels toward
+//  an even target instead of clumping. The queries draw nothing and use
+//  no randomness, so "same seed → same design" still holds exactly.
+//
+//  The discipline that keeps a feedback loop safe: a HARD iteration cap
+//  (repeat tries [ … ]) rather than `while not full`, so the loop always
+//  terminates even if the target is unreachable.
+// ============================================================
+
+seed 7
+
+let radius = 40     // [20:1:46] disc to fill, mm
+let target = 1.8    // [0.6:0.1:3.0] stop crowding a spot past this many layers
+let dot    = 0.7    // [0.4:0.1:1.5] dot radius, mm
+let gap    = 2.2    // [1:0.1:4]   keep new dots this far from the nearest one
+let tries  = 4000   // [500:500:8000] hard cap on attempts (bounded loop)
+
+color 1
+stitchlen 1.2
+
+repeat tries [
+  // a candidate point, uniform-ish over the disc's bounding box
+  let p = [random(2 * radius) - radius, random(2 * radius) - radius]
+
+  // three pure, zero-draw guards, read against everything sewn so far:
+  //   • inside the disc
+  //   • the fabric here is not yet at the target coverage
+  //   • not on top of an existing dot (sewnwithin stays O(local))
+  if vlen(p) < radius and coverat(p) < target and len(sewnwithin(p, gap)) = 0 [
+    up
+    setpos(p)
+    down
+    arc 360 dot          // a small closed ring = one stippled dot
+    trim
+  ]
+]
+
+// A second colour threads a few connectors between near neighbours,
+// using nearestsewn — proximity logic that never scans the whole history.
+color 4
+let probe = [0, 0]
+if len(stitchedpoints()) > 0 [
+  let here = nearestsewn(probe)
+  up setpos(here) down
+]

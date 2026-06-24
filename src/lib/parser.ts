@@ -6,7 +6,7 @@
 
 import type { ASTNode, ExprNode, Token } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
-import { ALIASES, BUILTIN_ARITY, TRANSFORM_ARITY, EFFECT_ARITY, QWORD_BUILTINS, FUNC_ARITY, ZERO_FUNCS, RESERVED, LIST_FUNCS, LIST_CMDS, GEN_FUNCS, GEN_CMDS, GEN_QWORD_ARG, LIBRARY_FUNCS } from './commands.ts';
+import { ALIASES, BUILTIN_ARITY, TRANSFORM_ARITY, EFFECT_ARITY, QWORD_BUILTINS, FUNC_ARITY, ZERO_FUNCS, RESERVED, LIST_FUNCS, LIST_CMDS, GEN_FUNCS, GEN_CMDS, GEN_QWORD_ARG, QUERY_FUNCS, LIBRARY_FUNCS } from './commands.ts';
 import { didYouMean, didYouMeanKinded } from './suggestions.ts';
 import { prescan } from './prescan.ts';
 import { COMPOUND_ASSIGN_OPS } from './tokenizer.ts';
@@ -122,6 +122,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     for (const k of Object.keys(LIST_CMDS)) m.set(k, 'command');
     for (const k of Object.keys(GEN_FUNCS)) m.set(k, 'function');
     for (const k of Object.keys(GEN_CMDS)) m.set(k, 'command');
+    for (const k of Object.keys(QUERY_FUNCS)) m.set(k, 'function');
     for (const k of Object.keys(procArity)) m.set(k, 'procedure');
     for (const k of ps.globalNames) m.set(k, 'variable');
     if (currentProc && ps.procLocals[currentProc])
@@ -493,6 +494,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       const isValueWord = (w: string) =>
         FUNC_ARITY[w] !== undefined || ZERO_FUNCS.has(w) ||
         LIST_FUNCS[w] !== undefined || GEN_FUNCS[w] !== undefined ||
+        QUERY_FUNCS[w] !== undefined ||
         procArity[w] !== undefined || isVariableName(w);
       const startsValue = !!nxt && (
         nxt.t === 'num' || nxt.t === 'var' || nxt.t === '(' ||
@@ -763,7 +765,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           `${canonical} takes a quoted word, e.g.  ${canonical} "${QWORD_BUILTINS[canonical][0]}"`,
           tok.line,
         );
-      if (FUNC_ARITY[name] !== undefined || ZERO_FUNCS.has(name) || LIST_FUNCS[name] !== undefined || GEN_FUNCS[name] !== undefined)
+      if (FUNC_ARITY[name] !== undefined || ZERO_FUNCS.has(name) || LIST_FUNCS[name] !== undefined || GEN_FUNCS[name] !== undefined || QUERY_FUNCS[name] !== undefined)
         throw new NeedlescriptError(
           `"${name}" returns a value — use it inside an expression`,
           tok.line,
@@ -831,7 +833,8 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     // List/gen builtins are glued-call only (RFC-2 §4): no prefix form exists.
     if (
       LIST_CMDS[name] !== undefined || LIST_FUNCS[name] !== undefined ||
-      GEN_CMDS[name] !== undefined || GEN_FUNCS[name] !== undefined
+      GEN_CMDS[name] !== undefined || GEN_FUNCS[name] !== undefined ||
+      QUERY_FUNCS[name] !== undefined
     )
       throw new NeedlescriptError(
         `list functions need call syntax:  ${name}(…)`,
@@ -1004,6 +1007,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       if (procArity[name] === undefined) {
         const kind = builtinKind(name);
         if (kind || LIST_FUNCS[name] !== undefined || GEN_FUNCS[name] !== undefined ||
+          QUERY_FUNCS[name] !== undefined ||
           LIST_CMDS[name] !== undefined || GEN_CMDS[name] !== undefined)
           throw new NeedlescriptError(
             `@${name} must reference a procedure you defined with def/to, not a ${kind ?? 'built-in'}`,
@@ -1077,6 +1081,15 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           next();
           return parsePostfix(parseGenCall(w, tok.line), true);
         }
+        // Stitch-history query reporters: pure value functions, ranged arity.
+        if (QUERY_FUNCS[w] !== undefined) {
+          next();
+          const a = QUERY_FUNCS[w];
+          return parsePostfix(
+            { k: 'listfunc', name: w, args: parseParenArgsRange(w, a.min, a.max, tok.line), line: tok.line },
+            true,
+          );
+        }
         if (isVariableName(w))
           throw new NeedlescriptError(`"${w}" is a variable, not a procedure`, tok.line);
         if (BUILTIN_ARITY[ALIASES[w] || w] !== undefined || LIST_CMDS[w] !== undefined || GEN_CMDS[w] !== undefined)
@@ -1120,7 +1133,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         return { k: 'callexpr', name: w, args, line: tok.line };
       }
       // List/gen builtins are glued-call only (RFC-2 §4): no prefix form exists.
-      if (LIST_FUNCS[w] !== undefined || GEN_FUNCS[w] !== undefined)
+      if (LIST_FUNCS[w] !== undefined || GEN_FUNCS[w] !== undefined || QUERY_FUNCS[w] !== undefined)
         throw new NeedlescriptError(
           `list functions need call syntax:  ${w}(…)`,
           tok.line,

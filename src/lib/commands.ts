@@ -198,6 +198,24 @@ export const GEN_CMDS: Record<string, { min: number; max: number }> = {
   sewpath: { min: 1, max: 1 },
 };
 
+// ---------- Stitch-history queries (closed-loop generation) ----------
+//
+// Same soft reservation as LIST_FUNCS / GEN_FUNCS: glued-call only, resolved
+// after user procedures, never in RESERVED. These are pure, zero-draw,
+// sewing-order *reporters* over the coverage grid the engine already maintains
+// — they read accumulated state and branch on it, but consume no RNG and emit
+// nothing, so "same seed → same design" holds. Point arguments are in the
+// local (turtle) frame like pos()/distance and are mapped through the CTM;
+// returned points are hoop-space fabric facts. Queries see committed
+// (flushed) penetrations — a buffered satin column isn't visible until it ends.
+export const QUERY_FUNCS: Record<string, { min: number; max: number }> = {
+  coverat: { min: 1, max: 2 },        // coverat(p) | coverat(p, r) — coverage in layers
+  countat: { min: 1, max: 1 },        // penetration count at p
+  nearestsewn: { min: 1, max: 1 },    // closest prior penetration, or []
+  sewnwithin: { min: 2, max: 2 },     // prior penetrations within r mm of p
+  stitchedpoints: { min: 0, max: 0 }, // snapshot: a deep copy of all penetrations
+};
+
 /**
  * The Library tier (RFC-3 §3): built-in names a user definition may shadow,
  * with a one-time note instead of a hard error. Everything in RESERVED is
@@ -208,6 +226,7 @@ export const LIBRARY_FUNCS = new Set<string>([
   ...Object.keys(LIST_CMDS),
   ...Object.keys(GEN_FUNCS),
   ...Object.keys(GEN_CMDS),
+  ...Object.keys(QUERY_FUNCS),
 ]);
 
 /** Words with special meaning that user procedures must not shadow. */

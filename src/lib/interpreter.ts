@@ -4,11 +4,11 @@ import type { ASTNode, ExprNode, RunResult, RunOptions } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
 import { makeRNG, makeNoise, fork, gauss } from './prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
-import { FABRICS, GEN_FUNCS } from './commands.ts';
+import { FABRICS, GEN_FUNCS, QUERY_FUNCS } from './commands.ts';
 import { Machine, LIMITS } from './machine.ts';
 import { tokenize } from './tokenizer.ts';
 import { parse } from './parser.ts';
-import { applyAutoTrim, applyLocks, densityMap } from './postprocess.ts';
+import { applyAutoTrim, applyLocks } from './postprocess.ts';
 import { didYouMean } from './suggestions.ts';
 import {
   NsList, FuncRef, isList, isFuncRef, num, deepEqual, deepCopy, valDepth, describeVal,
@@ -21,7 +21,7 @@ import { offsetRegion, clipRegions } from './geometry.ts';
 import { scatter, voronoiCells, triangulate, hull, relax } from './generators.ts';
 import type { Domain } from './generators.ts';
 import {
-  applyPath,
+  applyPath, apply,
   mTranslate, mRotate, mRotateAbout, mScale, mScaleXY, mMirror, mSkew, mRaw,
 } from './affine.ts';
 import type { Mat } from './affine.ts';
@@ -75,20 +75,22 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   function tick(line?: number) {
     if (++ops > LIMITS.maxOps)
-      throw new NeedlescriptError(
-        'Program ran too long (possible infinite loop) — stopped',
-        line,
-      );
+      throw new NeedlescriptError(overlongMsg(), line);
   }
 
   /** Charge n element reads/writes against the op budget. */
   function tickN(n: number, line?: number) {
     ops += n;
     if (ops > LIMITS.maxOps)
-      throw new NeedlescriptError(
-        'Program ran too long (possible infinite loop) — stopped',
-        line,
-      );
+      throw new NeedlescriptError(overlongMsg(), line);
+  }
+
+  /** The op-limit message, made loop-aware once a history query has run. */
+  function overlongMsg(): string {
+    return 'Program ran too long (possible infinite loop) — stopped' +
+      (m.usedQuery
+        ? ' — a feedback loop may not be terminating; is your coverage target reachable? Cap it with  repeat N [ … if done [ break ] ].'
+        : '');
   }
 
   /** Charge n freshly allocated list cells (and the op budget). */
@@ -536,6 +538,73 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     throw new NeedlescriptError(`Unknown function ${name}`, line);
   }
 
+  // ---------- Stitch-history queries (closed-loop generation) ----------
+  //
+  // Pure, zero-draw, sewing-order reporters over the engine's live coverage
+  // grid (m.density), fed in _push. They read accumulated state and let the
+  // program branch on it, but consume no RNG and emit nothing, so the stitch
+  // stream stays a deterministic function of (seed, source): same seed → same
+  // queries → same branches → same design. Point arguments are in the local
+  // (turtle) frame like pos()/distance and are mapped through the affine CTM to
+  // the hoop grid; returned points are hoop-space fabric facts. Queries see
+  // committed (flushed) penetrations only — a buffered satin column isn't
+  // visible until it ends (pen-up / trim / mode change), and tie-off locks are
+  // excluded (added after analysis), so the numbers match the heatmap exactly.
+
+  function queryFunc(name: string, args: Val[], line: number | undefined): Val {
+    m.usedQuery = true;
+    // Local → hoop through the affine transform stack (warp is not inverted).
+    const hoop = (i: number): [number, number] => {
+      const p = gm.toPoint(args[i], name, line);
+      return apply(m.ctm, p[0], p[1]);
+    };
+    const point = (p: [number, number]) => allocList([p[0], p[1]], line);
+
+    switch (name) {
+      case 'coverat': {
+        const [hx, hy] = hoop(0);
+        if (args.length >= 2) {
+          const r = num(args[1], 'coverat', line);
+          if (!(r >= 0)) throw new NeedlescriptError('coverat radius must be 0 or more', line);
+          tickN(Math.max(1, Math.ceil(Math.PI * r * r)), line);
+          return m.density.coverAvg(hx, hy, r);
+        }
+        tick(line);
+        return m.density.coverAt(hx, hy);
+      }
+      case 'countat': {
+        const [hx, hy] = hoop(0);
+        tick(line);
+        return m.density.countAt(hx, hy);
+      }
+      case 'nearestsewn': {
+        const [hx, hy] = hoop(0);
+        tickN(8, line);
+        const p = m.density.nearestSewn(hx, hy);
+        return p ? point(p) : allocList([], line);
+      }
+      case 'sewnwithin': {
+        const [hx, hy] = hoop(0);
+        const r = num(args[1], 'sewnwithin', line);
+        if (!(r >= 0)) throw new NeedlescriptError('sewnwithin radius must be 0 or more', line);
+        const found = m.density.sewnWithin(hx, hy, r);
+        tickN(found.length + 4, line);
+        return allocList(found.map(p => point(p) as Val), line);
+      }
+      case 'stitchedpoints': {
+        const pts = m.density.snapshot();
+        if (pts.length > LIMITS.maxListLen)
+          throw new NeedlescriptError(
+            `stitchedpoints: ${pts.length.toLocaleString('en-US')} penetrations exceeds the list limit ${LIMITS.maxListLen.toLocaleString('en-US')}`,
+            line,
+          );
+        tickN(pts.length, line);
+        return allocList(pts.map(p => point(p) as Val), line);
+      }
+    }
+    throw new NeedlescriptError(`Unknown query ${name}`, line);
+  }
+
   function evalExpr(
     node: ExprNode,
     env: Record<string, Val> | null,
@@ -601,6 +670,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const args = node.args.map(a => evalExpr(a, env, repcount, depth));
         if (GEN_FUNCS[node.name] !== undefined)
           return genFunc(node.name, args, node.line, node.word);
+        if (QUERY_FUNCS[node.name] !== undefined)
+          return queryFunc(node.name, args, node.line);
         return listFunc(node.name, args, node.line);
       }
       case 'bin': {
@@ -1310,7 +1381,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   // Analyse coverage before the lock pass: tie-offs are deliberate micro
   // stitches and would otherwise read as false hotspots at every thread end.
-  const density = densityMap(m.events, 1, m.maxDensity);
+  // The machine already accumulated this grid live (in sewing order) so the
+  // history queries and this heatmap are one and the same — finalize it.
+  const density = m.density.finalize(m.maxDensity);
   if (m.maxDensity > 0) {
     const dens = density.hotspots.filter(h => h.kind === 'density').slice(0, 3);
     for (const h of dens) {

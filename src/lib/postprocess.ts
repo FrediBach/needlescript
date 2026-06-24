@@ -1,6 +1,6 @@
 // ---------- Tie-in / tie-off locks ----------
 
-import type { StitchEvent, DesignStats, DensityCell, DensityHotspot, DensityResult } from './types.ts';
+import type { EventType, StitchEvent, DesignStats, DensityCell, DensityHotspot, DensityResult } from './types.ts';
 
 interface LockResult {
   events: StitchEvent[];
@@ -128,101 +128,222 @@ export function applyAutoTrim(
 
 const THREAD_W = 0.4; // typical 40 wt thread width on fabric, mm
 
+interface DensCell { count: number; len: number; lines: Map<number, number> }
+
 /**
- * Grid analysis of thread build-up. The physical quantity that matters is
- * **coverage**: millimetres of thread per mm² of fabric, expressed in layers
- * (1 layer ≈ a clean satin column or tatami fill). Past ~2.5–3 layers the
- * patch goes hard: needle deflection, thread breaks, puckering. Repeated
- * penetrations in the same hole cut the fabric and are flagged separately.
+ * Incremental thread build-up accumulator — the single source of truth for
+ * coverage, shared by the post-process heatmap (densityMap, below) and the
+ * live history queries (coverat/countat/nearestsewn/sewnwithin/stitchedpoints
+ * — see the interpreter). Events are fed in **sewing order** exactly as they
+ * are pushed onto the stitch stream, so a query mid-program reflects every
+ * penetration committed so far and nothing buffered or sewn later. Tie-off
+ * locks are added in a later pass (never fed here), so they never read as
+ * crowding — the same exclusion the heatmap relies on.
+ *
+ * The physical quantity is **coverage**: millimetres of thread per mm² of
+ * fabric, expressed in layers (1 layer ≈ a clean satin column or tatami fill).
+ * Past ~2.5–3 layers the patch goes hard: needle deflection, thread breaks,
+ * puckering. Repeated penetrations in the same hole cut the fabric and are
+ * flagged separately.
+ */
+export class DensityGrid {
+  readonly cellMM: number;
+  private readonly cellArea: number;
+  private readonly grid = new Map<string, DensCell>();
+  private readonly micro = new Map<string, { count: number; x: number; y: number; line?: number }>();
+  // Penetration points (hoop space, including underlay) plus a coarse bucket
+  // index so nearest/within stay O(local) — the property that lets feedback
+  // loops compose with the op limit instead of fighting it.
+  private readonly pts: [number, number][] = [];
+  private readonly buckets = new Map<string, [number, number][]>();
+  private static readonly BUCKET = 4; // mm
+  private px: number | null = null;
+  private py = 0;
+
+  constructor(cellMM = 1) {
+    this.cellMM = cellMM;
+    this.cellArea = cellMM * cellMM;
+  }
+
+  private cellOf(x: number, y: number): DensCell {
+    const k = Math.floor(x / this.cellMM) + ',' + Math.floor(y / this.cellMM);
+    let cell = this.grid.get(k);
+    if (!cell) { cell = { count: 0, len: 0, lines: new Map() }; this.grid.set(k, cell); }
+    return cell;
+  }
+
+  /** Feed one stitch-stream event, in order. Mirrors the heatmap exactly. */
+  feed(t: EventType, x: number, y: number, line?: number) {
+    if (t === 'jump') { this.px = x; this.py = y; return; }
+    if (t !== 'stitch') return; // color / trim / mark: no thread, cursor unchanged
+    const cell = this.cellOf(x, y);
+    cell.count++;
+    if (line !== undefined) cell.lines.set(line, (cell.lines.get(line) || 0) + 1);
+    if (this.px !== null) {
+      const d = Math.hypot(x - this.px, y - this.py);
+      if (d > 1e-6) {
+        const steps = Math.max(1, Math.ceil(d / (this.cellMM * 0.5)));
+        const dl = d / steps;
+        for (let s = 0; s < steps; s++) {
+          const tt = (s + 0.5) / steps;
+          const c = this.cellOf(this.px + (x - this.px) * tt, this.py + (y - this.py) * tt);
+          c.len += dl;
+          if (line !== undefined) c.lines.set(line, (c.lines.get(line) || 0) + 0.2);
+        }
+      }
+    }
+    const mk = Math.round(x / 0.15) + ',' + Math.round(y / 0.15);
+    const mm = this.micro.get(mk);
+    if (mm) mm.count++;
+    else this.micro.set(mk, { count: 1, x, y, line });
+    // spatial index
+    const p: [number, number] = [x, y];
+    this.pts.push(p);
+    const bk = Math.floor(x / DensityGrid.BUCKET) + ',' + Math.floor(y / DensityGrid.BUCKET);
+    const b = this.buckets.get(bk);
+    if (b) b.push(p); else this.buckets.set(bk, [p]);
+    this.px = x; this.py = y;
+  }
+
+  // ---- Live queries (hoop space; zero draws, zero events) ----
+
+  /** Thread coverage in layers at a point (containing 1 mm cell). */
+  coverAt(x: number, y: number): number {
+    const cell = this.grid.get(Math.floor(x / this.cellMM) + ',' + Math.floor(y / this.cellMM));
+    return cell ? (cell.len * THREAD_W) / this.cellArea : 0;
+  }
+
+  /** Coverage in layers averaged over the disc of radius r (empty cells = 0). */
+  coverAvg(x: number, y: number, r: number): number {
+    if (!(r > 0)) return this.coverAt(x, y);
+    const c = this.cellMM;
+    const ix0 = Math.floor((x - r) / c), ix1 = Math.floor((x + r) / c);
+    const iy0 = Math.floor((y - r) / c), iy1 = Math.floor((y + r) / c);
+    let sum = 0, n = 0;
+    for (let ix = ix0; ix <= ix1; ix++) {
+      const cx = (ix + 0.5) * c;
+      for (let iy = iy0; iy <= iy1; iy++) {
+        const cy = (iy + 0.5) * c;
+        if (Math.hypot(cx - x, cy - y) > r) continue;
+        n++;
+        const cell = this.grid.get(ix + ',' + iy);
+        if (cell) sum += (cell.len * THREAD_W) / this.cellArea;
+      }
+    }
+    return n ? sum / n : 0;
+  }
+
+  /** Penetration count in the containing 1 mm cell. */
+  countAt(x: number, y: number): number {
+    const cell = this.grid.get(Math.floor(x / this.cellMM) + ',' + Math.floor(y / this.cellMM));
+    return cell ? cell.count : 0;
+  }
+
+  /** Closest prior penetration to (x, y), or null if nothing is sewn yet. */
+  nearestSewn(x: number, y: number): [number, number] | null {
+    if (!this.pts.length) return null;
+    const B = DensityGrid.BUCKET;
+    const bx = Math.floor(x / B), by = Math.floor(y / B);
+    let best: [number, number] | null = null, bestD = Infinity;
+    for (let ring = 0; ring < 100000; ring++) {
+      // a point in bucket-ring `ring` is at least (ring-1)*B mm away
+      if (best !== null && (ring - 1) * B > bestD) break;
+      for (let gx = bx - ring; gx <= bx + ring; gx++)
+        for (let gy = by - ring; gy <= by + ring; gy++) {
+          if (Math.max(Math.abs(gx - bx), Math.abs(gy - by)) !== ring) continue;
+          const b = this.buckets.get(gx + ',' + gy);
+          if (!b) continue;
+          for (const p of b) {
+            const d = Math.hypot(p[0] - x, p[1] - y);
+            if (d < bestD) { bestD = d; best = p; }
+          }
+        }
+    }
+    return best;
+  }
+
+  /** All prior penetrations within r mm of (x, y) (sewing order preserved). */
+  sewnWithin(x: number, y: number, r: number): [number, number][] {
+    const out: [number, number][] = [];
+    if (!(r >= 0)) return out;
+    const B = DensityGrid.BUCKET;
+    const gx0 = Math.floor((x - r) / B), gx1 = Math.floor((x + r) / B);
+    const gy0 = Math.floor((y - r) / B), gy1 = Math.floor((y + r) / B);
+    for (let gx = gx0; gx <= gx1; gx++)
+      for (let gy = gy0; gy <= gy1; gy++) {
+        const b = this.buckets.get(gx + ',' + gy);
+        if (!b) continue;
+        for (const p of b) if (Math.hypot(p[0] - x, p[1] - y) <= r) out.push(p);
+      }
+    return out;
+  }
+
+  /** The number of penetrations recorded so far. */
+  get pointCount(): number { return this.pts.length; }
+
+  /** A snapshot of every penetration so far (hoop space). */
+  snapshot(): [number, number][] { return this.pts; }
+
+  /** Collapse to the heatmap result the rest of the engine consumes. */
+  finalize(threshold = 3): DensityResult {
+    const cells: DensityCell[] = [];
+    let peak = 0;
+    for (const [k, cell] of this.grid) {
+      const [ix, iy] = k.split(',').map(Number);
+      const layers = (cell.len * THREAD_W) / this.cellArea;
+      if (layers > peak) peak = layers;
+      cells.push({ ix, iy, count: cell.count, layers });
+    }
+    const hotspots: DensityHotspot[] = [];
+    if (threshold > 0) {
+      const hot = cells
+        .filter(c => c.layers > threshold)
+        .sort((a, b) => b.layers - a.layers);
+      const taken: DensityCell[] = [];
+      for (const c of hot) {
+        if (taken.some(t => Math.abs(t.ix - c.ix) <= 2 && Math.abs(t.iy - c.iy) <= 2)) continue;
+        taken.push(c);
+        const lines = [...(this.grid.get(c.ix + ',' + c.iy)?.lines || new Map<number, number>())]
+          .toSorted((a, b) => b[1] - a[1])
+          .slice(0, 2)
+          .map(l => l[0]);
+        hotspots.push({
+          x: (c.ix + 0.5) * this.cellMM,
+          y: (c.iy + 0.5) * this.cellMM,
+          value: c.layers,
+          lines,
+          kind: 'density',
+        });
+        if (taken.length >= 20) break;
+      }
+      for (const m of this.micro.values()) {
+        if (m.count >= 5) {
+          hotspots.push({
+            x: m.x, y: m.y, value: m.count,
+            lines: m.line !== undefined ? [m.line] : [],
+            kind: 'stack',
+          });
+          if (hotspots.length >= 40) break;
+        }
+      }
+    }
+    return { cellMM: this.cellMM, cells, peak, hotspots };
+  }
+}
+
+/**
+ * Post-process heatmap: build a DensityGrid by feeding the event stream, then
+ * finalize. Identical output to feeding the live machine grid, so the history
+ * queries and the heatmap always agree (one notion of density).
  */
 export function densityMap(
   events: StitchEvent[],
   cellMM = 1,
   threshold = 3,
 ): DensityResult {
-  interface Cell { count: number; len: number; lines: Map<number, number> }
-  const grid = new Map<string, Cell>();
-  const micro = new Map<string, { count: number; x: number; y: number; line?: number }>();
-  const cellOf = (x: number, y: number) => {
-    const k = Math.floor(x / cellMM) + ',' + Math.floor(y / cellMM);
-    let cell = grid.get(k);
-    if (!cell) { cell = { count: 0, len: 0, lines: new Map() }; grid.set(k, cell); }
-    return cell;
-  };
-
-  let px: number | null = null, py = 0;
-  for (const e of events) {
-    if (e.t === 'jump') { px = e.x; py = e.y; continue; }
-    if (e.t !== 'stitch') continue;
-    const cell = cellOf(e.x, e.y);
-    cell.count++;
-    if (e.line !== undefined) cell.lines.set(e.line, (cell.lines.get(e.line) || 0) + 1);
-    // spread the thread length of this stitch over the cells it crosses
-    if (px !== null) {
-      const d = Math.hypot(e.x - px, e.y - py);
-      if (d > 1e-6) {
-        const steps = Math.max(1, Math.ceil(d / (cellMM * 0.5)));
-        const dl = d / steps;
-        for (let s = 0; s < steps; s++) {
-          const t = (s + 0.5) / steps;
-          const c = cellOf(px + (e.x - px) * t, py + (e.y - py) * t);
-          c.len += dl;
-          if (e.line !== undefined) c.lines.set(e.line, (c.lines.get(e.line) || 0) + 0.2);
-        }
-      }
-    }
-    // same-hole detection on a 0.15 mm grid
-    const mk = Math.round(e.x / 0.15) + ',' + Math.round(e.y / 0.15);
-    const m = micro.get(mk);
-    if (m) { m.count++; }
-    else micro.set(mk, { count: 1, x: e.x, y: e.y, line: e.line });
-    px = e.x; py = e.y;
-  }
-
-  const cellArea = cellMM * cellMM;
-  const cells: DensityCell[] = [];
-  let peak = 0;
-  for (const [k, cell] of grid) {
-    const [ix, iy] = k.split(',').map(Number);
-    const layers = (cell.len * THREAD_W) / cellArea;
-    if (layers > peak) peak = layers;
-    cells.push({ ix, iy, count: cell.count, layers });
-  }
-
-  const hotspots: DensityHotspot[] = [];
-  if (threshold > 0) {
-    const hot = cells
-      .filter(c => c.layers > threshold)
-      .sort((a, b) => b.layers - a.layers);
-    const taken: DensityCell[] = [];
-    for (const c of hot) {
-      if (taken.some(t => Math.abs(t.ix - c.ix) <= 2 && Math.abs(t.iy - c.iy) <= 2)) continue;
-      taken.push(c);
-      const lines = [...(grid.get(c.ix + ',' + c.iy)?.lines || new Map<number, number>())]
-        .toSorted((a, b) => b[1] - a[1])
-        .slice(0, 2)
-        .map(l => l[0]);
-      hotspots.push({
-        x: (c.ix + 0.5) * cellMM,
-        y: (c.iy + 0.5) * cellMM,
-        value: c.layers,
-        lines,
-        kind: 'density',
-      });
-      if (taken.length >= 20) break;
-    }
-    for (const m of micro.values()) {
-      if (m.count >= 5) {
-        hotspots.push({
-          x: m.x, y: m.y, value: m.count,
-          lines: m.line !== undefined ? [m.line] : [],
-          kind: 'stack',
-        });
-        if (hotspots.length >= 40) break;
-      }
-    }
-  }
-  return { cellMM, cells, peak, hotspots };
+  const g = new DensityGrid(cellMM);
+  for (const e of events) g.feed(e.t, e.x, e.y, e.line);
+  return g.finalize(threshold);
 }
 
 // ---------- Design stats ----------

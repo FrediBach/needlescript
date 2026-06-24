@@ -22,6 +22,7 @@ import type { StitchEvent, EventType } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
 import { IDENTITY, isIdentity, apply, linApply, compose } from './affine.ts';
 import type { Mat } from './affine.ts';
+import { DensityGrid } from './postprocess.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -65,6 +66,14 @@ export class Machine {
   tinyDropped = 0;
   currentLine: number | undefined = undefined; // source line being executed
   stateStack: { x: number; y: number; heading: number; penDown: boolean }[] = [];
+  // Live coverage / penetration index, fed in sewing order from _push and read
+  // by the history queries (coverat/countat/nearestsewn/sewnwithin/
+  // stitchedpoints). Finalized at program end for the heatmap — one grid, so a
+  // query always reports the same number the heatmap shows. Buffered satin /
+  // fills aren't here until flushed (committed-only); locks are added later and
+  // never fed, so tie-offs don't read as crowding.
+  density = new DensityGrid(1);
+  usedQuery = false; // a history query ran — used to make limit errors loop-aware
 
   // The pre-split output map: transforms (CTM) and `warp` effects share one
   // block-scoped stack, applied to emitted geometry *before* stitch-length
@@ -164,11 +173,15 @@ export class Machine {
   _push(t: EventType, x: number, y: number, u = false) {
     if (this.events.length >= LIMITS.maxStitches)
       throw new NeedlescriptError(
-        `Design exceeds ${LIMITS.maxStitches.toLocaleString('en-US')} stitches — stopped. Reduce repeats, raise stitchlen, or raise fillspacing.`,
+        `Design exceeds ${LIMITS.maxStitches.toLocaleString('en-US')} stitches — stopped. Reduce repeats, raise stitchlen, or raise fillspacing.` +
+        (this.usedQuery
+          ? ' A feedback loop may not be terminating — is your coverage target reachable? Cap it with  repeat N [ … if done [ break ] ].'
+          : ''),
       );
     const ev: StitchEvent = { t, x, y, c: this.colorIdx, line: this.currentLine };
     if (u) ev.u = 1;
     this.events.push(ev);
+    this.density.feed(t, x, y, this.currentLine);
     if (t === 'stitch' || t === 'jump') this.lastEmit = { x, y };
   }
 

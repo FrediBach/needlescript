@@ -1525,6 +1525,51 @@ const NS_ITEMS: NSItem[] = [
     isSnippet: true,
     params: [['path', 'cell']],
   },
+  {
+    label: 'coverat',
+    kindName: 'function',
+    detail: 'thread coverage in layers at a point (live, pure)',
+    documentation: 'Coverage at a point, in **layers** (the heatmap / `maxdensity` unit; 1 ≈ one clean satin/tatami pass), read live and in sewing order over everything committed so far.\n\n`coverat(p)` — the containing 1 mm cell\n`coverat(p, r)` — averaged over radius `r` mm\n\nPure: zero RNG draws, draws nothing. Sees flushed penetrations (a buffered satin column isn\u2019t visible until it ends).\n\n```\nif coverat(p) < 1.5 [ up setpos(p) down arc 360 0.5 trim ]\n```',
+    insertText: 'coverat(${1:p})',
+    isSnippet: true,
+    params: [['p'], ['p', 'r']],
+  },
+  {
+    label: 'countat',
+    kindName: 'function',
+    detail: 'penetration count at a point (live, pure)',
+    documentation: 'The number of penetrations in the 1 mm cell containing `p`, read live. Pure: zero draws, draws nothing.',
+    insertText: 'countat(${1:p})',
+    isSnippet: true,
+    params: [['p']],
+  },
+  {
+    label: 'nearestsewn',
+    kindName: 'function',
+    detail: 'closest prior penetration to a point (or [])',
+    documentation: 'The closest already-sewn penetration to `p`, as `[x, y]` in hoop space, or `[]` if nothing is sewn yet. Backed by a spatial index, so it stays O(local) \u2014 no history scan. Pure: zero draws.',
+    insertText: 'nearestsewn(${1:p})',
+    isSnippet: true,
+    params: [['p']],
+  },
+  {
+    label: 'sewnwithin',
+    kindName: 'function',
+    detail: 'prior penetrations within r mm of a point',
+    documentation: 'A list of already-sewn penetrations within `r` mm of `p` (hoop space). Grid-bucketed, so proximity logic stays O(local) instead of scanning the whole history.\n\n```\nif len(sewnwithin(p, 2)) = 0 [ … ]   // nothing crowding p yet\n```\n\nPure: zero draws.',
+    insertText: 'sewnwithin(${1:p}, ${2:r})',
+    isSnippet: true,
+    params: [['p', 'r']],
+  },
+  {
+    label: 'stitchedpoints',
+    kindName: 'function',
+    detail: 'snapshot: a deep copy of all penetrations so far',
+    documentation: 'A deep-copied list of every penetration committed so far, as a path of `[x, y]` points (hoop space), captured at call time. Explicit and opt-in: you pay the O(n) copy when you ask, and the result is just a list (safe to mutate). Pure: zero draws.',
+    insertText: 'stitchedpoints()',
+    isSnippet: true,
+    params: [[]],
+  },
 ];
 
 // ── Fast lookup map (label → NSItem) ─────────────────────────────────────────
@@ -1719,6 +1764,8 @@ export function registerNeedlescript(monaco: Monaco): void {
       'sewpath',
       'xlate', 'xrotate', 'xscale', 'xmirror',
       'warppath', 'humanizepath', 'snappath',
+      // stitch-history queries (closed-loop generation)
+      'coverat', 'countat', 'nearestsewn', 'sewnwithin', 'stitchedpoints',
     ],
 
     tokenizer: {
