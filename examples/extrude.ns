@@ -1,0 +1,60 @@
+; ============================================================
+;  3D EXTRUSION via stacked transforms
+;
+;  An asymmetric L-tile is stamped many times, each copy nudged
+;  a little up-and-to-the-right. The FAR copies are sewn first
+;  and the NEAR copy last (on top), so the offset stack reads as
+;  the solid side-walls of an extruded block. A filled front face
+;  caps the near end. Pure translate() — no faux-3D projection math,
+;  just a coordinate frame shifted once per layer.
+; ============================================================
+
+def lshape() [
+  ; trace the L outline (a 6-vertex polygon).
+  ; assumes the turtle already sits at the start corner, pen down.
+  setxy  8 -11
+  setxy  8  -5
+  setxy -2  -5
+  setxy -2  11
+  setxy -8  11
+  setxy -8 -11
+]
+
+def gotoc0() [ setxy -8 -11 ]   ; the L's bottom-left start corner
+
+; --- depth controls (live sliders in the Customizer) ---
+let layers = 10          ; [6:40]
+let depthx = 10           ; [0:0.5:14]   how far the block leans east
+let depthy = 6         ; [0:0.5:14]   ...and north
+let perx = depthx / layers
+let pery = depthy / layers
+
+fabric "denim            ; stable; happy with the layered depth
+maxdensity 4.5           ; stacked walls run a touch hot near the edges — allow it knowingly
+seed 1
+stitchlen 2
+
+; --- the body: far copies (up-right) first, near copy last on top ---
+color 1
+let k = 0
+repeat layers [
+  k = layers - repcount          ; 19, 18, ... 1, 0  (back to front)
+  translate(k * perx, k * pery) [
+    up gotoc0() down             ; hop to this layer's start corner, no thread
+    lshape()                     ; only the emitted path is shifted — turtle stays local
+  ]
+]
+
+; --- the lit front face: a solid fill, sewn over the near copy ---
+color 2
+fillangle 90
+fillspacing 0.45
+up gotoc0() down
+beginfill
+  lshape()
+endfill
+
+; --- crisp the near silhouette with one light pass ---
+up gotoc0() down
+lshape()
+trim

@@ -52,6 +52,8 @@ import warpRaw from '../examples/warp.ns?raw';
 import humanizeRaw from '../examples/humanize.ns?raw';
 import snaptogridRaw from '../examples/snaptogrid.ns?raw';
 import stippleRaw from '../examples/stipple.ns?raw';
+import extrudeRaw from '../examples/extrude.ns?raw';
+
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
   '#31604F', // 1 — forest
@@ -138,7 +140,8 @@ export const EXAMPLES: Record<string, string> = {
   'warp': warpRaw,
   'humanize': humanizeRaw,
   'snaptogrid': snaptogridRaw,
-  'stipple': stippleRaw
+  'stipple': stippleRaw,
+  'extrude': extrudeRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -153,6 +156,6 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   },
   {
     label: 'advanced',
-    keys: ['echo', 'shatter', 'meadow', 'contour', 'lines', 'fill', 'turtle', 'needlescript', 'stipple'],
+    keys: ['echo', 'shatter', 'meadow', 'contour', 'lines', 'fill', 'turtle', 'needlescript', 'stipple', 'extrude'],
   },
 ];
