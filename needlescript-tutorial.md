@@ -27,11 +27,12 @@ This tutorial walks you from the absolute basics up to seeded noise fields, Voro
 15. [Generators: scatter, Voronoi, hull](#15-generators-scatter-voronoi-hull)
 16. [Geometry: offsets and booleans](#16-geometry-offsets-and-booleans)
 17. [Transforms: stamping motifs](#17-transforms-stamping-motifs)
-18. [Professional embroidery and fabric physics](#18-professional-embroidery-and-fabric-physics)
-19. [Debugging](#19-debugging)
-20. [Safety limits](#20-safety-limits)
-21. [Exporting and reusing your work](#21-exporting-and-reusing-your-work)
-22. [A capstone project](#22-a-capstone-project)
+18. [Effects: warp, humanize, snaptogrid](#18-effects-warp-humanize-snaptogrid)
+19. [Professional embroidery and fabric physics](#19-professional-embroidery-and-fabric-physics)
+20. [Debugging](#20-debugging)
+21. [Safety limits](#21-safety-limits)
+22. [Exporting and reusing your work](#22-exporting-and-reusing-your-work)
+23. [A capstone project](#23-a-capstone-project)
 
 ---
 
@@ -836,7 +837,81 @@ One caution: `scale`, `rotate`, `translate`, `mirror`, `skew`, `transform` (and 
 
 ---
 
-## 18. Professional embroidery and fabric physics
+## 18. Effects: warp, humanize, snaptogrid
+
+Transforms are the *linear* case of a bigger idea. A transform maps every emitted point through a fixed matrix; an **effect** maps it through an arbitrary function. Effects sit on the same block-scoped stack and nest freely with transforms — same discipline, but nonlinear and, in two cases, stochastic. They all read as "run this block, but pass the emitted points through *this* map."
+
+```text
+scale 1.5 [
+  warp @ripple [
+    humanize 0.25 [
+      leaf()
+    ]
+  ]
+]
+```
+
+Inside-out: draw the leaf, humanize its penetrations, ripple the result, scale that. The one thing to internalise is **where in the pipeline each effect runs**, because it changes what they do:
+
+| Effect | What it is | Runs… |
+|---|---|---|
+| `warp @fn` | a geometric deformation (shader) | **before** stitch splitting — it bends the path, which is then split into clean stitches |
+| `humanize amount` | hand-stitched jitter | **after** splitting — it nudges the final needle points |
+| `snaptogrid …` | grid quantizing | **after** splitting — it snaps the final needle points to a lattice |
+
+`warp` bends the *curve* and lets the splitter make tidy physical stitches along it; `humanize`/`snaptogrid` perturb *individual penetrations* (jittering or snapping the path before splitting would resample the irregularity away, or interpolate stitches back off the grid).
+
+### `warp @fn` — the shader, and the `@name` reference
+
+`warp` takes a **procedure reference** — a procedure you write that takes a point `[x, y]` and returns a new point — and runs it on every emitted point:
+
+```text
+def push_out(p) [
+  let d = vlen(p)
+  return vscale(vnorm(p), d + 2 * snoise2(p[0] / 14, p[1] / 14))
+]
+
+warp @push_out [
+  repeat 6 [ fd 30 rt 60 ]
+]
+```
+
+The `@name` syntax is new: it's a reference to a reporter, the one new kind of value effects add. You feed it to `warp` (or to `warppath`); using it anywhere else is a loud error, and so is a reporter that takes the wrong number of arguments or forgets to `return` a point. A fisheye, a twist, a ripple, a domain-warp are all just reporters — this is your shader.
+
+`warp` hands control to your code, which can push points off the hoop or stretch segments into long loose stitches — so the hoop, density and long-stitch checks all run on the **warped** result, surfacing trouble as warnings rather than a ruined garment. `warp` itself draws no randomness; it's seeded only if your reporter calls `random`/`snoise2`.
+
+### `humanize amount` — making it look hand-made
+
+```text
+humanize 0.3 [ repeat 4 [ fd 20 rt 90 ] ]
+```
+
+`humanize` offsets each penetration by a small amount (in mm, 0–2). The craft is in *how*: it uses **coherent** seeded noise (slow `snoise2` at each point), so neighbouring stitches drift together like a real hand — not independent per-stitch jitter, which reads as damage. And it **forks**, drawing exactly one value from the seeded stream (§11), so dropping a `humanize` block shifts everything downstream by one draw, never by however many stitches were inside. Re-running with the same seed reproduces the same imperfections.
+
+### `snaptogrid …` — the cross-stitch grid
+
+```text
+snaptogrid 2 [ repeat 4 [ fd 20 rt 90 ] ]
+```
+
+`snaptogrid` snaps each penetration to a lattice. Its special trick is **frame-invariance**: a grid belongs to the fabric, not the motif, so the lattice is fixed in hoop space **outside** any enclosing transform. Stamp the same motif at four places with `translate` and all four snap to the *same* lattice — they register across the whole piece. `scale 2 [ snaptogrid 1 [ … ] ]` does **not** make a 2 mm grid; the lattice stays 1 mm and the scaled motif simply lands on different nodes. It overloads by arity for rectangular, offset and rotated grids (`snaptogrid cellx celly ox oy ang [ … ]`), is pure and drawless (its result doesn't even depend on the seed), and merges any penetrations a coarse grid collapses onto one node (with the usual tiny-stitch warning). Like `humanize`, it leaves satin columns alone — quantizing a satin rail wrecks the column — and warns once if it finds one.
+
+### Effects on data, not just drawing
+
+Each effect has a pure-function twin, exactly like the transforms: `warppath(path, @fn)`, `humanizepath(path, amount)`, `snappath(path, cell …)`. The block form is sugar for "run the block, mapping emitted points through the same function," so the two are interchangeable on path data:
+
+```text
+let coast = humanizepath(resample(cell, 2.0), 0.3)   // a hand-drawn coastline
+sewpath(coast)
+
+let pixels = snappath(scatter(8), 2)                 // Poisson dots on a 2 mm grid
+```
+
+`warp`, `humanize`, `snaptogrid` (and `@name`) are **core** words — they can't be redefined. (See the bundled **warp**, **humanize** and **snaptogrid** examples.)
+
+---
+
+## 19. Professional embroidery and fabric physics
 
 Geometry that looks right on screen doesn't automatically *sew* right. Thread tension pulls fabric inward, stitches sink into the material, tight curves crowd the needle, and layered stitching becomes a stiff, puckered patch. The following commands compensate for the physics. They are **opt-in** — without them, your program sews exactly as written.
 
@@ -889,7 +964,7 @@ Travels of 7 mm or more (configurable 3–30; `autotrim 0` off) automatically ge
 
 ---
 
-## 19. Debugging
+## 20. Debugging
 
 Generative designs surprise you. These tools tell you what actually happened.
 
@@ -920,7 +995,7 @@ repeat 50 [
 
 ---
 
-## 20. Safety limits
+## 21. Safety limits
 
 NeedleScript guards both your browser and your machine. Hit one of these and you'll get a clear error rather than a hang or a damaged garment:
 
@@ -941,7 +1016,7 @@ NeedleScript guards both your browser and your machine. Hit one of these and you
 
 ---
 
-## 21. Exporting and reusing your work
+## 22. Exporting and reusing your work
 
 When a design is ready, **Download .DST** produces a standard Tajima file: 3-byte ternary delta records, moves longer than 12.1 mm split automatically, colour changes as stop records, trims as triple jumps, and a correct 512-byte header. Load it onto any machine, or into commercial software for a final check.
 
@@ -949,7 +1024,7 @@ You can also bring artwork *in*: **Import SVG** (a button, or drag and drop) con
 
 ---
 
-## 22. A capstone project
+## 23. A capstone project
 
 Let's combine what you've learned into one piece that exercises the whole pipeline: a generative seeded "meadow" of stems that grow along a noise field, each topped with a small satin leaf, all sitting on stable fabric.
 

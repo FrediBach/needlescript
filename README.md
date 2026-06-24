@@ -243,6 +243,107 @@ repeat 6 [
 
 (See the bundled **transforms** example.)
 
+## Effects
+
+Transforms are the *linear* case of a more general idea: instead of a fixed affine matrix mapping points on the way out, an **effect** is an arbitrary per-point function applied to a block's emitted geometry. Effects live on the same block-scoped stack as transforms and nest freely with them — they're "run this block, but pass every emitted point through a function," differing only in *which* function and *where* in the pipeline it runs.
+
+```text
+scale 1.5 [
+  warp @ripple [
+    humanize 0.25 [
+      leaf()
+    ]
+  ]
+]
+```
+
+Reading inside-out: draw the leaf, humanize its penetrations, ripple the result, scale that. Each layer is a point→point map and they compose in sequence.
+
+| Effect | Linear? | Frame | Stage | Seeded? |
+|---|---|---|---|---|
+| transforms (`translate`/`rotate`/`scale`/…) | yes | local, composing | before split | no |
+| `warp @fn` | no | local, post-transform | before split | only if the reporter is |
+| `humanize amount` | no | hoop, post-transform | after split | yes (forks) |
+| `snaptogrid …` | no | **fixed hoop lattice** | after split | no |
+
+The "stage" column is the one subtlety a naive implementation gets wrong. `warp` is a *geometric deformation* — it maps the emitted path vertices **before** stitch-length splitting, so the deformed curve is still split into clean physical stitches (exactly like a transform). `humanize` and `snaptogrid` perturb *individual penetrations*, so they run **after** splitting — jitter or snap the final needle points, not the continuous path (warp-then-split would resample the irregularity away; snap-then-split would interpolate stitches back off the grid).
+
+### `warp @fn` — the shader
+
+`warp` takes a **procedure reference** and applies it to every point the block emits. The reporter receives a point `[x, y]` in hoop space and returns a new one — a fisheye, a ripple, a twist, a domain-warp are all just reporters:
+
+```text
+def push_out(p) [
+  let d = vlen(p)
+  return vscale(vnorm(p), d + 2 * snoise2(p[0] / 14, p[1] / 14))
+]
+
+warp @push_out [
+  repeat 6 [ fd 30 rt 60 ]
+]
+```
+
+The `@name` syntax is a **procedure reference** — the one new value kind effects introduce. It yields a reference to a reporter, callable by the effect machinery, and is consumed only by `warp` (and `warppath`); using it anywhere else is a loud type error. A reporter must take exactly one argument (the point) and `output`/`return` a point, or you get an error naming the problem.
+
+Because `warp` hands control to arbitrary user code, a shader can push points off the hoop, fold the path over itself, or stretch segments into long loose stitches. The posture is the usual one — **don't forbid, warn**: hoop-overflow, density and long-stitch checks all run on the **post-warp** geometry (warp sits before the physics layer), so a misbehaving shader surfaces as chips and console warnings, not a quietly ruined garment. `warp` itself draws nothing from the seeded stream — it's seeded only if the reporter calls `random`/`snoise2`.
+
+### `humanize amount` — hand-stitched imperfection
+
+```text
+humanize 0.3 [
+  repeat 4 [ fd 20 rt 90 ]
+]
+```
+
+`humanize` offsets each penetration by a small amount (the argument, in mm, clamped 0–2) so the work reads as hand-embroidered rather than machine-perfect. The details matter for embroidery specifically:
+
+- **Coherent, not white, noise.** A human's error is correlated — the hand drifts, so consecutive stitches err in similar directions. `humanize` samples seeded `snoise2` slowly at each point's own coordinates, giving smooth wander. Naive per-point `random` would read as *damage*, not handwork.
+- **Seeded, like everything else.** It draws from the seeded field, so the same seed reproduces the same imperfections. Re-running doesn't reshuffle the human-ness.
+- **Forks, like `scatter`/`shuffle`.** It draws **exactly one** value from the main stream (to seed its coherent field), so dropping a `humanize` block into a design shifts everything downstream by exactly one draw — not by however many stitches were inside. Editing the *contents* of a `humanize` block never reshuffles the rest of the piece.
+
+### `snaptogrid …` — grid quantizing
+
+```text
+snaptogrid 2 [
+  repeat 4 [ fd 20 rt 90 ]
+]
+```
+
+`snaptogrid` quantizes each penetration to a lattice — a cross-stitch / pixel-grid aesthetic. Its one defining property is **frame-invariance**: a grid is a property of *the fabric, not the motif*, so the lattice is evaluated in **fixed hoop space, outside any enclosing transform**. Stamp the same motif at four places with `translate` and all four snap to *one shared lattice* — their stitches register across the whole piece. `scale 2 [ snaptogrid 1 [ … ] ]` does **not** stretch the grid to 2 mm; the lattice stays 1 mm and the scaled motif lands on different nodes. The grid origin and rotation are hoop-space values, never mapped by the surrounding transform.
+
+It overloads by arity (like `scatter`/`range`/`slice`), with the full form as the escape hatch:
+
+| Form | Grid |
+|---|---|
+| `snaptogrid cell [ … ]` | square lattice, pitch `cell`, origin `(0, 0)`, axis-aligned |
+| `snaptogrid cellx celly [ … ]` | rectangular lattice |
+| `snaptogrid cellx celly ox oy [ … ]` | …with an origin offset |
+| `snaptogrid cellx celly ox oy ang [ … ]` | …rotated `ang` (turtle degrees) — isometric / diagonal grids |
+
+`snaptogrid` is **pure and drawless** — rounding consumes no RNG, so its determinism doesn't even depend on the seed. Two cautions: snapping can push adjacent penetrations onto the same node (a zero-length stitch) — these **merge with the existing tiny-stitch warning**, so pick a cell size compatible with your `stitchlen`. And after-split effects deliberately **skip satin columns** (quantizing or jittering a precise satin rail wrecks the column) — the column sews unaffected, with a one-time warning.
+
+### Effect paths — `warppath` / `humanizepath` / `snappath`
+
+Like transforms, each effect has a pure-function companion that maps a **point list**, so effects compose with `scatter`/`voronoi`/`offsetpath` data, not just imperative drawing. The block form is exactly "run the block, mapping emitted points through the same function," and the two are pinned identical:
+
+| Function | Returns |
+|---|---|
+| `warppath(path, @fn)` | new path, every point mapped through the reporter |
+| `humanizepath(path, amount)` | new path, seeded coherent jitter (forks, like the block) |
+| `snappath(path, cell …)` | new path, every point snapped to the fixed lattice (same arity overloads) |
+
+```text
+let coast = humanizepath(resample(cell, 2.0), 0.3)
+sewpath(coast)
+
+let pts = snappath(scatter(8), 2)   // Poisson points, quantized to a 2 mm grid
+for p in pts [ up setpos(p) down arc 360 0.6 trim ]
+```
+
+`@name` references and the effect names (`warp`, `humanize`, `snaptogrid`) are **Core** built-ins — they can't be redefined.
+
+(See the bundled **warp**, **humanize** and **snaptogrid** examples.)
+
 ## Thread & stitch quality
 
 | Command | Effect |

@@ -1,0 +1,47 @@
+// ============================================================
+//  WARP — THE SHADER: AN ARBITRARY POINT→POINT REPORTER
+//  `warp @fn [ … ]` runs the block but passes every emitted point
+//  through a procedure you write. It's the nonlinear sibling of the
+//  transform stack: applied BEFORE stitch splitting, so the deformed
+//  curve is still split into clean physical stitches, and the hoop /
+//  density / long-stitch checks all run on the warped result.
+//  The @name syntax is a procedure reference — fed only to warp.
+// ============================================================
+
+let rings   = 7      // [3:14] concentric rings drawn
+let ringgap = 5.5    // [3:0.5:8] mm between rings
+let bulge   = 3.5    // [0:0.5:6] how far the warp pushes points out, mm
+let swirl   = 18     // [0:2:40] domain-warp wavelength (smaller = busier)
+
+// the shader: push each point radially outward by seeded simplex noise,
+// so a plain set of circles blooms into an organic, coral-like field.
+// (guard the origin — the zero vector has no direction to push along)
+def push_out(p) [
+  let d = vlen(p)
+  if d < 0.001 [ return p ]
+  let n = snoise2(p[0] / swirl, p[1] / swirl)
+  return vscale(vnorm(p), d + bulge * n)
+]
+
+seed 7
+color 1
+
+// draw concentric rings centred on the hoop; the warp does the rest
+warp @push_out [
+  for r = ringgap to rings * ringgap step ringgap [
+    up setxy(0, r) down seth 90    // start on the ring, heading along it
+    arc 360 r                      // one full circle of radius r about origin
+    trim
+  ]
+]
+
+// a second pass: warp also deforms generated path data identically —
+// warppath maps the point list the same way the block maps emitted points
+color 3
+let spokes = 24
+let raw = []
+for i = 0 to spokes [
+  let a = i * (360 / spokes)
+  append(raw, vfromheading(a, (rings - 1) * ringgap))
+]
+sewpath(warppath(raw, @push_out))

@@ -48,6 +48,9 @@ import turtleRaw from '../examples/turtle.ns?raw';
 import needlescriptRaw from '../examples/needlescript.ns?raw';
 import eclipseRaw from '../examples/eclipse.ns?raw';
 import transformsRaw from '../examples/transforms.ns?raw';
+import warpRaw from '../examples/warp.ns?raw';
+import humanizeRaw from '../examples/humanize.ns?raw';
+import snaptogridRaw from '../examples/snaptogrid.ns?raw';
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
   '#31604F', // 1 — forest
@@ -130,14 +133,17 @@ export const EXAMPLES: Record<string, string> = {
   'turtle': turtleRaw,
   'needlescript': needlescriptRaw,
   'eclipse': eclipseRaw,
-  'transforms': transformsRaw
+  'transforms': transformsRaw,
+  'warp': warpRaw,
+  'humanize': humanizeRaw,
+  'snaptogrid': snaptogridRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
 export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   {
     label: 'intro',
-    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan1', 'japan2', 'hilbert1', 'hilbert2', 'lissajous', 'fish', 'eclipse', 'transforms'],
+    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan1', 'japan2', 'hilbert1', 'hilbert2', 'lissajous', 'fish', 'eclipse', 'transforms', 'warp', 'humanize', 'snaptogrid'],
   },
   {
     label: 'intermediate',

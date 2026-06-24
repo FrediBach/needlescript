@@ -1,0 +1,53 @@
+// ============================================================
+//  SNAPTOGRID — CROSS-STITCH / PIXEL-GRID QUANTIZING
+//  `snaptogrid cell [ … ]` snaps every penetration to a lattice. Its
+//  defining property is FRAME-INVARIANCE: the grid belongs to the
+//  fabric, not the motif, so it's evaluated in fixed hoop space OUTSIDE
+//  any enclosing transform. Stamp the same motif at many places with
+//  translate and they all snap to ONE shared lattice, registering across
+//  the whole piece — that's the difference between a "grid" and mere
+//  "rounding". Pure and drawless: same config → same lattice, no seed.
+// ============================================================
+
+let cell    = 1.5    // [0.5:0.5:3] lattice pitch, mm — the pixel size
+let span    = 4      // [2:6] motifs per side of the stamped grid
+let pitch   = 16     // [10:1:20] mm between stamped motifs
+let arm     = 5      // [3:1:8] motif arm length, mm
+
+// a bold diamond motif, drawn once in its own local frame with sides
+// several cells long, so quantizing steps the edges without collapsing.
+// push/pop keeps each stamp from drifting the turtle.
+def diamond() [
+  push
+  seth 45
+  repeat 4 [ fd arm rt 90 ]   // a closed square, stood on its corner
+  pop
+]
+
+color 6
+
+// One global lattice. Each stamped copy lives under its own translate,
+// but snaptogrid ignores those local frames and quantizes to the SAME
+// hoop-space grid — so every motif's stitches land on shared nodes and
+// line up cleanly across the whole piece (the cross-stitch aesthetic).
+let off = (span - 1) * pitch / 2
+snaptogrid cell [
+  for gy = 0 to span - 1 [
+    for gx = 0 to span - 1 [
+      translate (gx * pitch - off) (gy * pitch - off) [
+        diamond()
+      ]
+      trim
+    ]
+  ]
+]
+
+// The functional companion: snappath quantizes generated data to the
+// same fixed lattice. A smooth circle pulled onto the grid becomes a
+// blocky, stair-stepped pixel ring instead of a clean curve.
+color 7
+let circ = []
+for i = 0 to 48 [
+  append(circ, vfromheading(i * (360 / 48), 30))
+]
+sewpath(snappath(circ, cell))

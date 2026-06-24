@@ -1,0 +1,51 @@
+// ============================================================
+//  HUMANIZE — THE HAND-STITCHED LOOK
+//  `humanize amount [ … ]` nudges every stitch penetration by a small,
+//  SEEDED, COHERENT amount (mm) so the work reads as hand-embroidered
+//  rather than machine-perfect. The noise is simplex sampled slowly at
+//  each point — the hand drifts, so neighbouring stitches err together
+//  (white noise would read as damage, not handwork). It runs AFTER
+//  stitch splitting, perturbing the final needle points, and FORKS:
+//  exactly one draw from the seeded stream, so editing what's inside
+//  never reshuffles the rest of the design.
+// ============================================================
+
+let cols    = 9      // [4:16] columns in the hatch
+let rows    = 11     // [4:18] rows in the hatch
+let gap     = 4.0    // [2:0.5:6] spacing between rows/cols, mm
+let wobble  = 0.45   // [0:0.05:2] hand-drift amount, mm
+
+seed 5
+stitchlen 2.5
+
+let half = (cols - 1) * gap / 2
+let top  = (rows - 1) * gap / 2
+
+// a boustrophedon hatch — perfectly regular as written...
+color 2
+humanize wobble [
+  for r = 0 to rows - 1 [
+    let y = top - r * gap
+    // alternate direction each row so the thread snakes back and forth
+    if mod(r, 2) = 0 [
+      up setxy(-half, y) down setxy(half, y)
+    ] else [
+      up setxy(half, y) down setxy(-half, y)
+    ]
+  ]
+]
+trim
+
+// ...and the same wobble on the cross-hatch, drawn the other way.
+// Re-running with the same seed reproduces the exact same imperfections.
+color 4
+humanize wobble [
+  for c = 0 to cols - 1 [
+    let x = -half + c * gap
+    if mod(c, 2) = 0 [
+      up setxy(x, top) down setxy(x, -top)
+    ] else [
+      up setxy(x, -top) down setxy(x, top)
+    ]
+  ]
+]
