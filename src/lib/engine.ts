@@ -34,3 +34,6 @@ export { LIMITS } from './machine.ts';
 export { applyLocks, applyAutoTrim, densityMap, designStats, DensityGrid } from './postprocess.ts';
 export { run } from './interpreter.ts';
 export { toSVG } from './svg.ts';
+export { toDST } from './dst.ts';
+export { toPES } from './pes.ts';
+export { toEXP } from './exp.ts';
