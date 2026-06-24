@@ -54,6 +54,7 @@ import snaptogridRaw from '../examples/snaptogrid.ns?raw';
 import stippleRaw from '../examples/stipple.ns?raw';
 import extrudeRaw from '../examples/extrude.ns?raw';
 import pixelatedRaw from '../examples/pixelated.ns?raw';
+import warpedlinesRaw from '../examples/warpedlines.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -143,7 +144,8 @@ export const EXAMPLES: Record<string, string> = {
   'snaptogrid': snaptogridRaw,
   'stipple': stippleRaw,
   'extrude': extrudeRaw,
-  'pixelated': pixelatedRaw
+  'pixelated': pixelatedRaw,
+  'warpedlines': warpedlinesRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -158,6 +160,6 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   },
   {
     label: 'advanced',
-    keys: ['echo', 'shatter', 'meadow', 'contour', 'lines', 'fill', 'turtle', 'needlescript', 'stipple', 'extrude'],
+    keys: ['echo', 'shatter', 'meadow', 'contour', 'lines', 'fill', 'turtle', 'needlescript', 'stipple', 'extrude', 'warpedlines'],
   },
 ];
