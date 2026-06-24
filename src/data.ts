@@ -53,6 +53,7 @@ import humanizeRaw from '../examples/humanize.ns?raw';
 import snaptogridRaw from '../examples/snaptogrid.ns?raw';
 import stippleRaw from '../examples/stipple.ns?raw';
 import extrudeRaw from '../examples/extrude.ns?raw';
+import pixelatedRaw from '../examples/pixelated.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -141,14 +142,15 @@ export const EXAMPLES: Record<string, string> = {
   'humanize': humanizeRaw,
   'snaptogrid': snaptogridRaw,
   'stipple': stippleRaw,
-  'extrude': extrudeRaw
+  'extrude': extrudeRaw,
+  'pixelated': pixelatedRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
 export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   {
     label: 'intro',
-    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan1', 'japan2', 'hilbert1', 'hilbert2', 'lissajous', 'fish', 'eclipse', 'transforms', 'warp', 'humanize', 'snaptogrid'],
+    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan1', 'japan2', 'hilbert1', 'hilbert2', 'lissajous', 'fish', 'eclipse', 'transforms', 'warp', 'humanize', 'snaptogrid', 'pixelated'],
   },
   {
     label: 'intermediate',

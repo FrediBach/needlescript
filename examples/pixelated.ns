@@ -1,0 +1,34 @@
+// Smooth → pixelated: one ring stamped under coarsening snaptogrid lattices.
+// Each column to the right snaps to a bigger cell, so the curve crumbles
+// into a staircase. snaptogrid runs AFTER splitting, on individual
+// penetrations — exactly the cross-stitch quantizing we want.
+
+seed 3
+stitchlen 1.4          // short stitches so the grid has something to round
+
+let copies = 6         // [3:8]
+let radius = 6         // [6:14]
+let spacing = 14       // [14:24]   horizontal gap between copies
+let cellstep = 0.8     // [0:0.5:2.5]  grid grows by this much per copy
+
+// --- one ring of the motif, drawn in plain local space ---
+def ring(r) [
+  repeat 72 [ fd r * 0.0873 rt 5 ]   // ~2*pi*r/72 per step, 72 * 5 = 360
+]
+
+color 1
+let startx = 0 - copies * spacing / 2
+
+for i = 0 to copies - 1 [
+  let cell = i * cellstep              // i = 0 → cell 0 → no snapping at all
+  up setxy(startx + i * spacing, 0) down
+
+  if cell < 0.2 [
+    ring(radius)                       // first copy: untouched, smooth circle
+  ] else [
+    snaptogrid cell [
+      ring(radius)                     // quantized to a coarser lattice each time
+    ]
+  ]
+  trim
+]
