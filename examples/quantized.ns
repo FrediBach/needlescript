@@ -1,0 +1,45 @@
+// --- Sine wave mesh ---
+let nwaves  = 4      // [3:16]
+let amp     = 32     // [6:32]   peak amplitude at the centre
+let halfW   = 41     // [20:46]  half-length of the horizontal line
+let baseCyc = 3      // [1:9]    base number of cycles
+let cycVar  = 1    // [0:5]    frequency spread across the waves
+let xJitter = 3      // [0:10]   how far each wave's start shifts
+let slen    = 1    // [1:4]    stitch length
+
+// @preset Calm       : nwaves=5, amp=12, cycVar=1.5, xJitter=3
+// @preset Dense Mesh : nwaves=14, amp=18, cycVar=4, xJitter=6
+
+seed 6
+stitchlen slen
+
+// half-sine envelope: 0 at both ends, 1 in the middle
+def envelope(t) [
+  return sin(t * 180)
+]
+
+// one swelling sine wave, as a list of points along the line
+def buildwave(ox, cyc, phase) [
+  let pts = []
+  let n = 120
+  for i = 0 to n [
+    let t = i / n
+    let x = ox - halfW + t * 2 * halfW
+    let y = amp * envelope(t) * sin(t * cyc * 360 + phase)
+    append(pts, [x, y])
+  ]
+  return pts
+]
+
+snaptogrid 2 [
+  repeat nwaves [
+    let k     = repcount - 1
+    let ox    = random(2 * xJitter) - xJitter          // different start position
+    let cyc   = baseCyc + k * cycVar / nwaves + random(1)   // different frequency
+    let phase = random(360)                            // different phase
+    color((k % 3) + 3)
+    up setpos([ox - halfW, 0]) down
+    sewpath(resample(buildwave(ox, cyc, phase), slen))
+    trim
+  ]
+]
