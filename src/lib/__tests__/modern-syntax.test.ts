@@ -456,7 +456,7 @@ trim
 `;
 
 describe('meadow — modern and legacy twins (test #19)', () => {
-  const modern = EXAMPLES['meadow — modern syntax tour'];
+  const modern = EXAMPLES['meadow'];
 
   it('both versions parse', () => {
     expect(() => parse(tokenize(modern))).not.toThrow();

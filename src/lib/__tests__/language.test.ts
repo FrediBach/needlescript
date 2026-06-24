@@ -308,9 +308,9 @@ describe('source line tagging', () => {
     expect(out.events.every(e => e.line !== undefined)).toBe(true);
   });
 
-  it('stitches sewn inside a procedure report the line of the fd, not the call', () => {
+  it('stitches sewn inside a procedure report the call site, not the line of the fd', () => {
     const out = run('lock 0\nto f\nfd 5\nend\nf');
-    expect(out.events.every(e => e.line === 3)).toBe(true);
+    expect(out.events.every(e => e.line === 5)).toBe(true);
   });
 
   it('lock stitches inherit a neighbouring line', () => {

@@ -298,7 +298,7 @@ describe('the soft-builtin tier (§3)', () => {
   it('meadow.ns runs unmodified, with exactly one shadow note', () => {
     // the RFC-1 reference example defines clamp (now a library builtin)
     // and inside (not a builtin) — the policy exists so it keeps working
-    const r = run(EXAMPLES['meadow — modern syntax tour']);
+    const r = run(EXAMPLES['meadow']);
     const notes = r.warnings.filter(w => w.includes('shadows a built-in library function'));
     expect(notes).toHaveLength(1);
     expect(notes[0]).toContain('"clamp"');
