@@ -6,7 +6,7 @@
 
 import type { ASTNode, ExprNode, Token } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
-import { ALIASES, BUILTIN_ARITY, TRANSFORM_ARITY, QWORD_BUILTINS, FUNC_ARITY, ZERO_FUNCS, RESERVED, LIST_FUNCS, LIST_CMDS, GEN_FUNCS, GEN_CMDS, GEN_QWORD_ARG, LIBRARY_FUNCS } from './commands.ts';
+import { ALIASES, BUILTIN_ARITY, TRANSFORM_ARITY, EFFECT_ARITY, QWORD_BUILTINS, FUNC_ARITY, ZERO_FUNCS, RESERVED, LIST_FUNCS, LIST_CMDS, GEN_FUNCS, GEN_CMDS, GEN_QWORD_ARG, LIBRARY_FUNCS } from './commands.ts';
 import { didYouMean, didYouMeanKinded } from './suggestions.ts';
 import { prescan } from './prescan.ts';
 import { COMPOUND_ASSIGN_OPS } from './tokenizer.ts';
@@ -287,6 +287,19 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     return { k: 'listfunc', name, args, line, word };
   }
 
+  function checkEffectArity(
+    name: string,
+    got: number,
+    spec: { min: number; max: number },
+    line: number,
+  ): void {
+    if (got >= spec.min && got <= spec.max) return;
+    const want = spec.min === spec.max
+      ? `${spec.min} argument${spec.min === 1 ? '' : 's'}`
+      : `${spec.min} to ${spec.max} arguments`;
+    throw new NeedlescriptError(`${name} expects ${want} then a block, got ${got}`, line);
+  }
+
   function parseStatement(): ASTNode {
     const tok = peek();
     if (!tok) throw new NeedlescriptError('Unexpected end of program');
@@ -484,6 +497,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       const startsValue = !!nxt && (
         nxt.t === 'num' || nxt.t === 'var' || nxt.t === '(' ||
         nxt.t === '[' || // list literal (RFC-2)
+        nxt.t === 'pref' || // procedure reference @name
         (nxt.t === 'op' && nxt.v === '-') ||
         (nxt.t === 'word' && isValueWord(nxt.v as string))
       );
@@ -591,6 +605,19 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       for (let a = 0; a < arity; a++) args.push(parseHeaderExpr());
       const body = parseHeaderBlock();
       return { k: 'transform', name, args, body, line: tok.line };
+    }
+
+    // Effect block commands (effects §): warp/humanize/snaptogrid. Like
+    // transforms — args then a block, both spellings — but ranged arity, so
+    // the classic prefix form reads header expressions up to the opening `[`.
+    if (EFFECT_ARITY[name] !== undefined && !gluedParenNext(tok)) {
+      next();
+      const spec = EFFECT_ARITY[name];
+      const args: ExprNode[] = [];
+      while (!atEnd() && peek().t !== '[') args.push(parseHeaderExpr());
+      checkEffectArity(name, args.length, spec, tok.line);
+      const body = parseHeaderBlock();
+      return { k: 'effect', name, args, body, line: tok.line };
     }
 
     if (name === 'make' || name === 'local') {
@@ -706,6 +733,18 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           );
         const body = parseBracketBlock();
         return { k: 'transform', name, args, body, line: tok.line };
+      }
+      if (EFFECT_ARITY[name] !== undefined) {
+        next();
+        const spec = EFFECT_ARITY[name];
+        const args = parseParenArgsRange(name, spec.min, spec.max, tok.line);
+        if (atEnd() || peek().t !== '[')
+          throw new NeedlescriptError(
+            `${name}(…) needs a block, e.g.  ${name}(…) [ … ]`,
+            lineOf(peek() ?? tok),
+          );
+        const body = parseBracketBlock();
+        return { k: 'effect', name, args, body, line: tok.line };
       }
       if (LIST_CMDS[name] !== undefined) {
         next();
@@ -955,6 +994,27 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       // code predates indexing by definition.
       next();
       return { k: 'var', name: tok.v as string, line: tok.line };
+    }
+    // "@name" — a procedure reference, fed to warp / warppath. Resolved against
+    // the pre-scan: it must name a procedure the program defines (not a builtin
+    // or a variable), or the error says exactly that.
+    if (tok.t === 'pref') {
+      next();
+      const name = tok.v as string;
+      if (procArity[name] === undefined) {
+        const kind = builtinKind(name);
+        if (kind || LIST_FUNCS[name] !== undefined || GEN_FUNCS[name] !== undefined ||
+          LIST_CMDS[name] !== undefined || GEN_CMDS[name] !== undefined)
+          throw new NeedlescriptError(
+            `@${name} must reference a procedure you defined with def/to, not a ${kind ?? 'built-in'}`,
+            tok.line,
+          );
+        throw new NeedlescriptError(
+          `@${name} — no procedure named "${name}"${didYouMean(name, Object.keys(procArity))}`,
+          tok.line,
+        );
+      }
+      return { k: 'procref', name, line: tok.line };
     }
     if (tok.t === ',')
       throw new NeedlescriptError(

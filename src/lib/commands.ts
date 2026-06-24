@@ -33,6 +33,20 @@ export const TRANSFORM_ARITY: Record<string, number> = {
   transform: 6,
 };
 
+/**
+ * Effect block commands (effects §). Like transforms they take arguments then
+ * a block and live on the same block-scoped stack, but they admit nonlinear /
+ * stochastic and after-split maps. Ranged arity (snaptogrid overloads the way
+ * scatter/range do); `warp`'s single argument is a procedure reference (@name).
+ * The pure path-function counterparts (warppath/humanizepath/snappath) live in
+ * GEN_FUNCS below. Core builtins (in RESERVED, can't be shadowed).
+ */
+export const EFFECT_ARITY: Record<string, { min: number; max: number }> = {
+  warp: { min: 1, max: 1 },        // a reporter reference: warp @fn [ … ]
+  humanize: { min: 1, max: 1 },    // jitter amount in mm (angle knob deferred)
+  snaptogrid: { min: 1, max: 5 },  // cell | cellx celly | …ox oy | …ang
+};
+
 /** Builtins that take a single quoted-word argument, with their allowed words. */
 export const QWORD_BUILTINS: Record<string, readonly string[]> = {
   fabric: ['woven', 'knit', 'stretch', 'denim', 'canvas', 'fleece'],
@@ -168,6 +182,10 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   xrotate: { min: 2, max: 4 },
   xscale: { min: 2, max: 3 },
   xmirror: { min: 2, max: 2 },
+  // effects: pure path companions to the effect block commands
+  warppath: { min: 2, max: 2 },        // warppath(path, @fn)
+  humanizepath: { min: 2, max: 2 },    // humanizepath(path, amount)
+  snappath: { min: 2, max: 6 },        // snappath(path, cell | …grid spec)
 };
 
 /** GEN_FUNCS whose given argument is a quoted word, with the allowed words. */
@@ -204,6 +222,7 @@ export const RESERVED = new Set<string>([
   ...Object.keys(ALIASES),
   ...Object.keys(BUILTIN_ARITY),
   ...Object.keys(TRANSFORM_ARITY),
+  ...Object.keys(EFFECT_ARITY),
   ...Object.keys(QWORD_BUILTINS),
   ...Object.keys(FUNC_ARITY),
   ...ZERO_FUNCS,

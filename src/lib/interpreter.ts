@@ -11,7 +11,7 @@ import { parse } from './parser.ts';
 import { applyAutoTrim, applyLocks, densityMap } from './postprocess.ts';
 import { didYouMean } from './suggestions.ts';
 import {
-  NsList, isList, num, deepEqual, deepCopy, valDepth, describeVal,
+  NsList, FuncRef, isList, isFuncRef, num, deepEqual, deepCopy, valDepth, describeVal,
   formatNum, formatVal,
 } from './list.ts';
 import type { Val } from './list.ts';
@@ -21,10 +21,11 @@ import { offsetRegion, clipRegions } from './geometry.ts';
 import { scatter, voronoiCells, triangulate, hull, relax } from './generators.ts';
 import type { Domain } from './generators.ts';
 import {
-  compose, applyPath,
+  applyPath,
   mTranslate, mRotate, mRotateAbout, mScale, mScaleXY, mMirror, mSkew, mRaw,
 } from './affine.ts';
 import type { Mat } from './affine.ts';
+import { humanizeMap, snapMapFromSpec } from './effects.ts';
 
 /** Thrown by `output` / `exit` to unwind to the enclosing procedure call. */
 class ReturnSignal {
@@ -117,6 +118,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     if (isList(v))
       throw new NeedlescriptError(
         `"${what}" got ${describeVal(v)} — a list isn't true or false, use len(xs) > 0`,
+        line,
+      );
+    if (typeof v !== 'number')
+      throw new NeedlescriptError(
+        `"${what}" got ${describeVal(v)} — that isn't true or false`,
         line,
       );
     return v;
@@ -494,6 +500,38 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'xmirror':
         return path(applyPath(mMirror(sc(1)), pathArg(0)));
+
+      // ----- effects: pure path companions to the effect block commands -----
+      // The block forms are sugar over these same maps (effects §): a block
+      // applies the map to emitted penetrations, the function maps an explicit
+      // point list — pinned identical on pre-resampled paths.
+      case 'warppath': {
+        const p = pathArg(0);
+        if (!isFuncRef(args[1]))
+          throw new NeedlescriptError(
+            'warppath needs a procedure reference as its second argument, e.g.  warppath(path, @push_out)',
+            line,
+          );
+        const ref = args[1];
+        tickN(p.length, line);
+        return path(p.map(pt => applyReporter(ref, pt[0], pt[1], line)));
+      }
+      case 'humanizepath': {
+        const p = pathArg(0);
+        const amount = clampHumanize(sc(1));
+        // One main-stream draw seeds the coherent field (fork convention §7).
+        const childSeed = Math.floor(rng() * 4294967296);
+        const fn = humanizeMap(amount, childSeed, snoise2);
+        tickN(p.length, line);
+        return path(p.map(pt => fn(pt[0], pt[1])));
+      }
+      case 'snappath': {
+        const p = pathArg(0);
+        const nums = args.slice(1).map((_, i) => sc(i + 1));
+        const fn = snapMapFromSpec(nums, msg => new NeedlescriptError(`snappath ${msg}`, line));
+        tickN(p.length, line);
+        return path(p.map(pt => fn(pt[0], pt[1])));
+      }
     }
     throw new NeedlescriptError(`Unknown function ${name}`, line);
   }
@@ -666,6 +704,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           );
         return v;
       }
+      case 'procref':
+        return new FuncRef(node.name);
     }
   }
 
@@ -699,6 +739,61 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       throw e;
     }
     return undefined;
+  }
+
+  /**
+   * Call a procedure with already-evaluated argument values (rather than AST
+   * nodes). Used by `warp`/`warppath` to invoke a reporter once per point.
+   */
+  function callProcVals(name: string, argVals: Val[], depth: number, line?: number): Val | undefined {
+    const proc = procs[name];
+    if (!proc)
+      throw new NeedlescriptError(`Procedure "${name}" is used before it is defined`, line);
+    if (depth >= LIMITS.maxCallDepth)
+      throw new NeedlescriptError(`Too much recursion in "${name}"`, line);
+    const newEnv: Record<string, Val> = Object.create(null);
+    proc.params.forEach((p, i) => { newEnv[p] = argVals[i]; });
+    try {
+      execBlock(proc.body, newEnv, 0, depth + 1, line);
+    } catch (e) {
+      if (e instanceof ReturnSignal) return e.value;
+      if (e instanceof LoopSignal)
+        throw new NeedlescriptError(`"${e.kind}" can only be used inside a loop`, e.line);
+      throw e;
+    }
+    return undefined;
+  }
+
+  /**
+   * Invoke a `@name` reporter on a point, returning the mapped point. This is
+   * the one piece of effect machinery that runs user code per emitted vertex:
+   * it enforces the reporter contract (exactly one argument, returns a point)
+   * with errors that name exactly what went wrong.
+   */
+  function applyReporter(ref: FuncRef, x: number, y: number, line?: number): Pt {
+    const proc = procs[ref.name];
+    if (!proc)
+      throw new NeedlescriptError(`the warp reporter @${ref.name} is not defined`, line);
+    if (proc.params.length !== 1)
+      throw new NeedlescriptError(
+        `the warp reporter @${ref.name} must take exactly one argument (the point [x, y]), but takes ${proc.params.length}`,
+        line,
+      );
+    const out = callProcVals(ref.name, [allocList([x, y], line)], 0, line);
+    if (out === undefined)
+      throw new NeedlescriptError(
+        `the warp reporter @${ref.name} never reached output/return — it must return a point [x, y]`,
+        line,
+      );
+    return gm.toPoint(out, `the warp reporter @${ref.name}`, line);
+  }
+
+  /** Clamp humanize jitter to a sane embroidery range (0–2 mm), warning if out. */
+  function clampHumanize(amount: number): number {
+    const v = Math.min(Math.max(amount, 0), 2);
+    if (v !== amount)
+      m.warnings.push(`humanize ${formatNum(amount)} clamped to ${formatNum(v)} mm (range 0–2)`);
+    return v;
   }
 
   function execBlock(
@@ -899,12 +994,58 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         }
         m.currentLine = contextLine ?? st.line;
         m.flushSatin();
-        m.pushCTM(compose(m.ctm, delta));
+        m.pushTransform(delta);
         try {
           execBlock(st.body, env, repcount, depth, contextLine);
         } finally {
           m.flushSatin();
-          m.popCTM();
+          m.popOut();
+        }
+        return;
+      }
+      case 'effect': {
+        // Effects share the transform discipline: flush satin on both edges so
+        // a column lives under one map, push the map for the block, restore on
+        // exit. `warp` is a pre-split, post-CTM point map (it deforms the
+        // emitted path like a transform); `humanize`/`snaptogrid` are
+        // after-split penetration maps (effects §).
+        m.currentLine = contextLine ?? st.line;
+        m.flushSatin();
+        if (st.name === 'warp') {
+          const refVal = evalExpr(st.args[0], env, repcount, depth);
+          if (!isFuncRef(refVal))
+            throw new NeedlescriptError(
+              'warp needs a procedure reference, e.g.  warp @push_out [ … ]',
+              st.line,
+            );
+          const ref = refVal;
+          m.pushWarp((x, y) => applyReporter(ref, x, y, st.line));
+          try {
+            execBlock(st.body, env, repcount, depth, contextLine);
+          } finally {
+            m.flushSatin();
+            m.popOut();
+          }
+          return;
+        }
+        const a = st.args.map(x => num(evalExpr(x, env, repcount, depth), st.name, st.line));
+        let fn: (x: number, y: number) => [number, number];
+        if (st.name === 'humanize') {
+          const amount = clampHumanize(a[0]);
+          // One main-stream draw seeds the coherent field (fork convention §7):
+          // dropping a humanize block shifts downstream randomness by exactly
+          // one draw, never by however many stitches were inside.
+          const childSeed = Math.floor(rng() * 4294967296);
+          fn = humanizeMap(amount, childSeed, snoise2);
+        } else { // snaptogrid — pure, drawless, fixed hoop-space lattice
+          fn = snapMapFromSpec(a, msg => new NeedlescriptError(`snaptogrid ${msg}`, st.line));
+        }
+        m.pushPen(fn);
+        try {
+          execBlock(st.body, env, repcount, depth, contextLine);
+        } finally {
+          m.flushSatin();
+          m.popPen();
         }
         return;
       }

@@ -494,6 +494,35 @@ const NS_ITEMS: NSItem[] = [
     params: [['a', 'b', 'c', 'd', 'e', 'f']],
   },
 
+  // ── Effects (nonlinear / stochastic maps on the same block-scoped stack) ──
+  {
+    label: 'warp',
+    kindName: 'keyword',
+    detail: 'run a block through a point→point reporter',
+    documentation: 'Map every emitted point through a `@name` reporter (a procedure that takes a point `[x, y]` and returns a point), **before** stitch splitting — a geometric deformation, exactly like a transform but nonlinear. This is the shader: fisheye, ripple, twist, domain-warp are all just reporters.\n\n```\ndef push_out(p) [\n  let d = vlen(p)\n  return vscale(vnorm(p), d + 2 * snoise2(p[0] / 14, p[1] / 14))\n]\nwarp @push_out [ repeat 6 [ fd 30 rt 60 ] ]\n```',
+    insertText: 'warp @${1:reporter} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['reporter']],
+  },
+  {
+    label: 'humanize',
+    kindName: 'keyword',
+    detail: 'seeded hand-stitched jitter (mm)',
+    documentation: 'Perturb each stitch penetration by coherent, seeded simplex noise (the hand drifts, so consecutive stitches err together — not white-noise damage). Runs **after** stitch splitting, on the final penetrations. `amount` is the jitter in mm (clamped 0–2). Draws exactly one value from the seeded stream (forks), so dropping a `humanize` block shifts downstream randomness by one draw, not by however many stitches were inside.\n\n```\nhumanize 0.3 [ repeat 4 [ fd 20 rt 90 ] ]\n```',
+    insertText: 'humanize ${1:amount} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['amount']],
+  },
+  {
+    label: 'snaptogrid',
+    kindName: 'keyword',
+    detail: 'quantize penetrations to a fixed lattice',
+    documentation: 'Snap each penetration to a fixed hoop-space lattice, evaluated **outside** any enclosing transform — so the same grid config always yields the same lattice regardless of `translate`/`rotate`/`scale`. Pure and drawless. Overloads by arity:\n\n```\nsnaptogrid 2 [ … ]                       // square, pitch 2 mm, origin (0,0)\nsnaptogrid 2 3 [ … ]                     // rectangular\nsnaptogrid(1.5, 1.5, 0.75, 0.75) [ … ]   // …with an origin offset\nsnaptogrid(2, 2, 0, 0, 30) [ … ]         // …rotated 30°\n```',
+    insertText: 'snaptogrid ${1:cell} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['cell']],
+  },
+
   // ── Thread & stitch commands ─────────────────────────────────────────────
   {
     label: 'stitchlen',
@@ -1469,6 +1498,33 @@ const NS_ITEMS: NSItem[] = [
     isSnippet: true,
     params: [['path', 'degrees']],
   },
+  {
+    label: 'warppath',
+    kindName: 'function',
+    detail: 'map a path through a reporter (pure)',
+    documentation: 'New path with every point mapped through a `@name` reporter — the functional companion to the `warp` block. `warp @f [ sewpath(P) ]` ≡ `sewpath(warppath(P, @f))`.',
+    insertText: 'warppath(${1:path}, @${2:reporter})',
+    isSnippet: true,
+    params: [['path', 'reporter']],
+  },
+  {
+    label: 'humanizepath',
+    kindName: 'function',
+    detail: 'seeded coherent jitter on a path (pure)',
+    documentation: 'New path with seeded coherent jitter (`amount` mm) — the functional companion to `humanize`. Forks one draw from the seeded stream.\n\n```\nlet coast = humanizepath(resample(cell, 2.0), 0.3)\nsewpath(coast)\n```',
+    insertText: 'humanizepath(${1:path}, ${2:amount})',
+    isSnippet: true,
+    params: [['path', 'amount']],
+  },
+  {
+    label: 'snappath',
+    kindName: 'function',
+    detail: 'quantize a path to a fixed lattice (pure)',
+    documentation: 'New path with every point snapped to the fixed lattice — the functional companion to `snaptogrid`, same arity overloads (cell | cellx celly | …ox oy | …ang).\n\n```\nlet pts = snappath(scatter(8), 2)   // Poisson points on a 2 mm grid\n```',
+    insertText: 'snappath(${1:path}, ${2:cell})',
+    isSnippet: true,
+    params: [['path', 'cell']],
+  },
 ];
 
 // ── Fast lookup map (label → NSItem) ─────────────────────────────────────────
@@ -1611,6 +1667,8 @@ export function registerNeedlescript(monaco: Monaco): void {
       'let', 'make', 'local', 'in', 'step', 'true', 'false', 'and', 'or',
       // Transform block commands (CTM stack) — headers like repeat/if.
       'translate', 'rotate', 'rotateabout', 'scale', 'scalexy', 'mirror', 'skew', 'transform',
+      // Effect block commands (same stack, nonlinear / stochastic / after-split).
+      'warp', 'humanize', 'snaptogrid',
     ],
 
     // ── Turtle movement commands + pen + state reporters (teal) ─────
@@ -1660,6 +1718,7 @@ export function registerNeedlescript(monaco: Monaco): void {
       'offsetpath', 'clippaths', 'inpath',
       'sewpath',
       'xlate', 'xrotate', 'xscale', 'xmirror',
+      'warppath', 'humanizepath', 'snappath',
     ],
 
     tokenizer: {
@@ -1674,6 +1733,9 @@ export function registerNeedlescript(monaco: Monaco): void {
 
         // Classic variable deref: :varname  :size
         [/:[a-z_][a-z0-9_]*/, 'ns-variable'],
+
+        // Procedure reference: @push_out  @ripple  (fed to warp / warppath)
+        [/@[a-z_][a-z0-9_]*/, 'ns-variable'],
 
         // Numbers — float before integer so 2.5 isn't tokenised as 2 then .5
         [/\d+\.\d+/, 'ns-number'],

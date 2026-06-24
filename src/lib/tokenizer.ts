@@ -88,6 +88,17 @@ export function tokenize(src: string): Token[] {
       i = j;
       continue;
     }
+    // "@name" — a procedure reference (a value), consumed only by warp/warppath
+    // and friends. One new token, one new value kind; out of the way of every
+    // existing program (RFC effects §1).
+    if (c === '@') {
+      let j = i + 1;
+      while (j < src.length && isWordChar(src[j])) j++;
+      if (j === i + 1) throw new NeedlescriptError('Expected a procedure name after "@"', line);
+      tokens.push({ t: 'pref', v: src.slice(i + 1, j).toLowerCase(), line, start: i, end: j });
+      i = j;
+      continue;
+    }
     if (c === '"') {
       // Word-string rule: consume the maximal run of word characters. If the
       // immediately following character is another quote, consume it too —

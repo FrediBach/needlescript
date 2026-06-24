@@ -160,7 +160,7 @@ describe('tokenize', () => {
   // ── error cases ────────────────────────────────────────────────────────────
   describe('errors', () => {
     it('throws NeedlescriptError on unexpected character', () => {
-      expect(() => tokenize('fd @10')).toThrow(NeedlescriptError);
+      expect(() => tokenize('fd $10')).toThrow(NeedlescriptError);
     });
 
     it('error message includes the bad character', () => {

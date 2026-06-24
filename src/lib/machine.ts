@@ -20,8 +20,17 @@ export const LIMITS = {
 
 import type { StitchEvent, EventType } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
-import { IDENTITY, isIdentity, apply, linApply } from './affine.ts';
+import { IDENTITY, isIdentity, apply, linApply, compose } from './affine.ts';
 import type { Mat } from './affine.ts';
+
+/**
+ * One entry of the pre-split output stack: either an affine transform delta
+ * or a nonlinear warp (a point→point reporter). Transforms collapse, warps
+ * don't, so the stack is kept explicit — but with no warp active it is exactly
+ * a single affine matrix and the fast path below stays byte-identical to the
+ * pre-effects engine.
+ */
+type OutLayer = { kind: 'aff'; m: Mat } | { kind: 'warp'; fn: (x: number, y: number) => [number, number] };
 
 export class Machine {
   x = 0; y = 0; heading = 0;
@@ -57,23 +66,99 @@ export class Machine {
   currentLine: number | undefined = undefined; // source line being executed
   stateStack: { x: number; y: number; heading: number; penDown: boolean }[] = [];
 
-  // Current transformation matrix (CTM) and its stack. The turtle lives in
-  // untransformed local space (x/y/heading are always local); only emitted
-  // geometry is mapped through the CTM on its way out — and stitch-length
-  // splitting, satin width and the physics layer all run *after* the map.
+  // The pre-split output map: transforms (CTM) and `warp` effects share one
+  // block-scoped stack, applied to emitted geometry *before* stitch-length
+  // splitting and the physics layer ("transform the path, then stitch it").
+  // `ctm` is the collapsed affine of all transform layers (warps ignored); it
+  // drives satin width and is the fast path when no warp is active, keeping
+  // non-warp output byte-identical. The turtle (x/y/heading) is always local.
   ctm: Mat = IDENTITY;
-  ctmStack: Mat[] = [];
-  // CTM snapshot taken when the current satin column began. A column is always
-  // flushed at CTM boundaries (push/pop), so it lives under a single matrix.
+  outLayers: OutLayer[] = [];
+  hasWarp = false;
+  private outSnap: { ctm: Mat; hasWarp: boolean }[] = [];
+  // After-split penetration maps (`humanize` / `snaptogrid`): applied to each
+  // final penetration point, after splitting, before the physics layer.
+  penLayers: ((x: number, y: number) => [number, number])[] = [];
+  // Snapshot of the output stack taken when the current satin column began. A
+  // column is always flushed at stack boundaries, so it lives under one map.
   satinCTM: Mat = IDENTITY;
+  satinLayers: OutLayer[] = [];
+  satinHasWarp = false;
+  private _warnedSatinEffect = false;
 
-  pushCTM(next: Mat) {
-    this.ctmStack.push(this.ctm);
-    this.ctm = next;
+  /** Push an affine transform delta (translate/rotate/scale/…) onto the stack. */
+  pushTransform(delta: Mat) {
+    this.outSnap.push({ ctm: this.ctm, hasWarp: this.hasWarp });
+    this.outLayers.push({ kind: 'aff', m: delta });
+    this.ctm = compose(this.ctm, delta);
   }
 
-  popCTM() {
-    this.ctm = this.ctmStack.pop() ?? IDENTITY;
+  /** Push a nonlinear warp (point→point reporter) onto the stack. */
+  pushWarp(fn: (x: number, y: number) => [number, number]) {
+    this.outSnap.push({ ctm: this.ctm, hasWarp: this.hasWarp });
+    this.outLayers.push({ kind: 'warp', fn });
+    this.hasWarp = true;
+  }
+
+  /** Pop the innermost transform or warp layer, restoring the prior state. */
+  popOut() {
+    this.outLayers.pop();
+    const s = this.outSnap.pop();
+    if (s) { this.ctm = s.ctm; this.hasWarp = s.hasWarp; }
+    else { this.ctm = IDENTITY; this.hasWarp = false; }
+  }
+
+  /** Push / pop an after-split penetration effect (humanize / snaptogrid). */
+  pushPen(fn: (x: number, y: number) => [number, number]) { this.penLayers.push(fn); }
+  popPen() { this.penLayers.pop(); }
+
+  /**
+   * Map a local point to hoop space through the pre-split stack. With no warp
+   * active this is exactly `apply(ctm, …)` — the byte-identical fast path.
+   * Warps are applied innermost-first (the layer closest to the drawing
+   * command runs first), composing inside-out like transform nesting.
+   */
+  mapOut(x: number, y: number): [number, number] {
+    if (!this.hasWarp) return apply(this.ctm, x, y);
+    let px = x, py = y;
+    for (let i = this.outLayers.length - 1; i >= 0; i--) {
+      const L = this.outLayers[i];
+      const r = L.kind === 'aff' ? apply(L.m, px, py) : L.fn(px, py);
+      px = r[0]; py = r[1];
+    }
+    return [px, py];
+  }
+
+  /** Like mapOut, but using the satin column's captured snapshot. */
+  _mapSatin(lx: number, ly: number): [number, number] {
+    if (!this.satinHasWarp) return apply(this.satinCTM, lx, ly);
+    let px = lx, py = ly;
+    for (let i = this.satinLayers.length - 1; i >= 0; i--) {
+      const L = this.satinLayers[i];
+      const r = L.kind === 'aff' ? apply(L.m, px, py) : L.fn(px, py);
+      px = r[0]; py = r[1];
+    }
+    return [px, py];
+  }
+
+  /**
+   * Emit one penetration point, running it through the after-split effect
+   * stack (humanize / snaptogrid) first. Snapped or jittered duplicates that
+   * collapse below the minimum stitch ride the existing tiny-stitch merge.
+   * With no effect active this is exactly `_push('stitch', …)`.
+   */
+  _emitPen(x: number, y: number, u = false) {
+    if (this.penLayers.length === 0) { this._push('stitch', x, y, u); return; }
+    let px = x, py = y;
+    for (let i = this.penLayers.length - 1; i >= 0; i--) {
+      const r = this.penLayers[i](px, py);
+      px = r[0]; py = r[1];
+    }
+    if (this.lastEmit) {
+      const d = Math.hypot(px - this.lastEmit.x, py - this.lastEmit.y);
+      if (d < LIMITS.minStitch * 0.5) { this.tinyDropped++; return; }
+    }
+    this._push('stitch', px, py, u);
   }
 
   _push(t: EventType, x: number, y: number, u = false) {
@@ -90,7 +175,7 @@ export class Machine {
   _ensureStart() {
     if (!this.started) {
       this.started = true;
-      const [hx, hy] = apply(this.ctm, this.x, this.y);
+      const [hx, hy] = this.mapOut(this.x, this.y);
       this._push('stitch', hx, hy);
     }
   }
@@ -153,7 +238,7 @@ export class Machine {
 
   markHere() {
     this.flushSatin();
-    const [hx, hy] = apply(this.ctm, this.x, this.y);
+    const [hx, hy] = this.mapOut(this.x, this.y);
     this._push('mark', hx, hy);
   }
 
@@ -164,9 +249,9 @@ export class Machine {
       // Fill boundaries are recorded in hoop space so the fill is generated
       // (and pull-compensated) on the geometry that actually sews.
       if (this.penDown) {
-        const [hnx, hny] = apply(this.ctm, nx, ny);
+        const [hnx, hny] = this.mapOut(nx, ny);
         if (!this.curRing) {
-          const [hox, hoy] = apply(this.ctm, ox, oy);
+          const [hox, hoy] = this.mapOut(ox, oy);
           this.curRing = [[hox, hoy]];
         }
         this.curRing.push([hnx, hny]);
@@ -179,19 +264,24 @@ export class Machine {
 
     if (!this.penDown) {
       this.flushSatin();
-      const [hnx, hny] = apply(this.ctm, nx, ny);
+      const [hnx, hny] = this.mapOut(nx, ny);
       this._push('jump', hnx, hny);
       this.x = nx; this.y = ny;
       return;
     }
 
     if (this.mode === 'satin' && this.satinWidth > 0.05) {
-      // Buffer the column path in *local* space and snapshot the CTM; the
-      // column is mapped to hoop space (with width transformed perpendicular
-      // to local travel) when it ends — see flushSatin().
+      // Buffer the column path in *local* space and snapshot the output stack;
+      // the column is mapped to hoop space (with width transformed
+      // perpendicular to local travel) when it ends — see flushSatin().
       const localLen = Math.hypot(nx - ox, ny - oy);
       if (localLen > 1e-9) {
-        if (!this.satinPath) { this.satinPath = [{ x: ox, y: oy }]; this.satinCTM = this.ctm; }
+        if (!this.satinPath) {
+          this.satinPath = [{ x: ox, y: oy }];
+          this.satinCTM = this.ctm;
+          this.satinHasWarp = this.hasWarp;
+          this.satinLayers = this.hasWarp ? this.outLayers.slice() : this.satinLayers;
+        }
         const lastP = this.satinPath[this.satinPath.length - 1];
         if (Math.hypot(nx - lastP.x, ny - lastP.y) > 0.05)
           this.satinPath.push({ x: nx, y: ny });
@@ -202,8 +292,8 @@ export class Machine {
 
     // Map both endpoints to hoop space; split on the *hoop* length so stitch
     // length stays physical under scaling (transform the path, then stitch).
-    const [hox, hoy] = apply(this.ctm, ox, oy);
-    const [hnx, hny] = apply(this.ctm, nx, ny);
+    const [hox, hoy] = this.mapOut(ox, oy);
+    const [hnx, hny] = this.mapOut(nx, ny);
     const hdx = hnx - hox, hdy = hny - hoy;
     const hlen = Math.hypot(hdx, hdy);
 
@@ -221,9 +311,9 @@ export class Machine {
       for (let s = 1; s <= steps; s++) {
         const t = s / steps;
         const cx = hox + hdx * t, cy = hoy + hdy * t;
-        this._push('stitch', cx, cy);
-        this._push('stitch', cx + ovx * this.eWidth, cy + ovy * this.eWidth);
-        this._push('stitch', cx, cy);
+        this._emitPen(cx, cy);
+        this._emitPen(cx + ovx * this.eWidth, cy + ovy * this.eWidth);
+        this._emitPen(cx, cy);
       }
       this.x = nx; this.y = ny;
       return;
@@ -241,9 +331,9 @@ export class Machine {
     for (let s = 1; s <= steps; s++) {
       const t = s / steps;
       const tx = hox + hdx * t, ty = hoy + hdy * t;
-      this._push('stitch', tx, ty);
+      this._emitPen(tx, ty);
       for (let r = 1; r < this.beanRepeats; r++) {
-        this._push('stitch', r % 2 === 1 ? pxv : tx, r % 2 === 1 ? pyv : ty);
+        this._emitPen(r % 2 === 1 ? pxv : tx, r % 2 === 1 ? pyv : ty);
       }
       pxv = tx; pyv = ty;
     }
@@ -351,11 +441,20 @@ export class Machine {
     const path = this.satinPath;
     this.satinPath = null;
     if (!path || path.length < 2) return;
-    // The buffer holds local points; under an active transform the column is
-    // mapped to hoop space with its width transformed perpendicular to the
-    // local travel direction. With no transform the original (exact) path
-    // runs, so existing output is byte-for-byte unchanged.
-    if (isIdentity(this.satinCTM)) this._flushSatinPlain(path);
+    // After-split effects (humanize / snaptogrid) deliberately skip satin: the
+    // rails are emitted via _push, not _emitPen, so they sew unaffected —
+    // quantizing or jittering a precise satin rail wrecks the column. Warn once.
+    if (this.penLayers.length && !this._warnedSatinEffect) {
+      this.warnings.push(
+        'humanize/snaptogrid skips satin columns — perturbing satin rails wrecks the column; it sews unaffected',
+      );
+      this._warnedSatinEffect = true;
+    }
+    // The buffer holds local points; under an active transform or warp the
+    // column is mapped to hoop space (warp deforms the centerline; width stays
+    // affine). With no transform and no warp the original (exact) path runs, so
+    // existing output is byte-for-byte unchanged.
+    if (isIdentity(this.satinCTM) && !this.satinHasWarp) this._flushSatinPlain(path);
     else this._flushSatinTransformed(path, this.satinCTM);
   }
 
@@ -399,9 +498,9 @@ export class Machine {
 
   // ---- Transform-aware satin (CTM active) ----
 
-  /** Map a local polyline into hoop space. */
-  _toHoop(pts: { x: number; y: number }[], ctm: Mat): { x: number; y: number }[] {
-    return pts.map(p => { const [x, y] = apply(ctm, p.x, p.y); return { x, y }; });
+  /** Map a local polyline into hoop space (through the satin snapshot map). */
+  _toHoop(pts: { x: number; y: number }[], _ctm: Mat): { x: number; y: number }[] {
+    return pts.map(p => { const [x, y] = this._mapSatin(p.x, p.y); return { x, y }; });
   }
 
   /**
@@ -423,7 +522,7 @@ export class Machine {
     for (let i = 0; i < n; i++) {
       const a = local[Math.max(0, i - 1)], b = local[Math.min(n - 1, i + 1)];
       const { ox, oy, scale } = this._perpVec(ctm, a.x, a.y, b.x, b.y);
-      const [hx, hy] = apply(ctm, local[i].x, local[i].y);
+      const [hx, hy] = this._mapSatin(local[i].x, local[i].y);
       out.push({ x: hx + (ox / scale) * dist, y: hy + (oy / scale) * dist });
     }
     return out;
@@ -494,7 +593,7 @@ export class Machine {
   }
 
   _flushSatinTransformed(local: { x: number; y: number }[], ctm: Mat) {
-    const hoop0 = apply(ctm, local[0].x, local[0].y);
+    const hoop0 = this._mapSatin(local[0].x, local[0].y);
     if (!this.started) {
       this.started = true;
       this._push('stitch', hoop0[0], hoop0[1]);
@@ -551,7 +650,7 @@ export class Machine {
     this.flushSatin();
     this.recording = true;
     this.rings = [];
-    this.curRing = [apply(this.ctm, this.x, this.y)];
+    this.curRing = [this.mapOut(this.x, this.y)];
   }
 
   /** Emit a sequence of fill points, connecting from wherever the thread is. */
@@ -560,15 +659,18 @@ export class Machine {
     const first = pts[0];
     if (!this.started) {
       this.started = true;
-      this._push(Math.hypot(first.x, first.y) > 1 ? 'jump' : 'stitch', first.x, first.y, u);
+      if (Math.hypot(first.x, first.y) > 1) this._push('jump', first.x, first.y, u);
+      else this._emitPen(first.x, first.y, u);
     } else {
       const le = this.lastEmit || { x: 0, y: 0 };
       const d0 = Math.hypot(first.x - le.x, first.y - le.y);
       if (d0 > Math.max(this.stitchLen * 1.5, 2)) this._push('jump', first.x, first.y, u);
-      else if (d0 > 0.05) this._push('stitch', first.x, first.y, u);
+      else if (d0 > 0.05) this._emitPen(first.x, first.y, u);
     }
-    for (let i = 1; i < pts.length; i++)
-      this._push(pts[i].jump ? 'jump' : 'stitch', pts[i].x, pts[i].y, u);
+    for (let i = 1; i < pts.length; i++) {
+      if (pts[i].jump) this._push('jump', pts[i].x, pts[i].y, u);
+      else this._emitPen(pts[i].x, pts[i].y, u);
+    }
   }
 
   /** Inset a ring towards the interior of the shape by `d` mm (approximate). */
@@ -634,7 +736,7 @@ export class Machine {
     const rings = this.rings;
     this.rings = [];
     // Rings are recorded in hoop space, so the "end near" hint must be too.
-    const [hx, hy] = apply(this.ctm, this.x, this.y);
+    const [hx, hy] = this.mapOut(this.x, this.y);
     const endNear = { x: hx, y: hy };
     const effLen =
       this.fillLen !== null
@@ -704,7 +806,7 @@ export class Machine {
     const idx = Math.max(0, Math.round(n));
     if (idx === this.colorIdx && this.started) return;
     if (this.started) {
-      const [hx, hy] = apply(this.ctm, this.x, this.y);
+      const [hx, hy] = this.mapOut(this.x, this.y);
       this._push('color', hx, hy);
     }
     this.colorIdx = idx;
@@ -713,7 +815,7 @@ export class Machine {
   trimThread() {
     this.flushSatin();
     if (this.started) {
-      const [hx, hy] = apply(this.ctm, this.x, this.y);
+      const [hx, hy] = this.mapOut(this.x, this.y);
       this._push('trim', hx, hy);
     }
   }

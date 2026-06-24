@@ -12,7 +12,7 @@
 import { NeedlescriptError } from './errors.ts';
 import { LIMITS } from './machine.ts';
 
-export type Val = number | NsList;
+export type Val = number | NsList | FuncRef;
 
 export class NsList {
   items: Val[];
@@ -24,7 +24,21 @@ export class NsList {
   }
 }
 
+/**
+ * A reference to a user procedure, produced by the `@name` syntax. It is the
+ * one new value kind effects introduce: only `warp` and `warppath` consume it
+ * (calling it once per point), and everywhere else it is a loud type error —
+ * `num`, `truthy` and the shape guards all reject it by name.
+ */
+export class FuncRef {
+  name: string;
+  constructor(name: string) {
+    this.name = name;
+  }
+}
+
 export const isList = (v: Val): v is NsList => v instanceof NsList;
+export const isFuncRef = (v: Val): v is FuncRef => v instanceof FuncRef;
 
 /** Format a number the way print always has. */
 export function formatNum(v: number): string {
@@ -37,6 +51,7 @@ const PRINT_CAP = 64;
 
 /** Format any runtime value; lists as [1, 2, 3], capped at 64 elements. */
 export function formatVal(v: Val, depth = 0): string {
+  if (isFuncRef(v)) return '@' + v.name;
   if (!isList(v)) return formatNum(v);
   if (depth >= LIMITS.maxListDepth)
     throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`);
@@ -47,6 +62,7 @@ export function formatVal(v: Val, depth = 0): string {
 
 /** Describe a value for error messages: "a list (length 3)" / "a number". */
 export function describeVal(v: Val): string {
+  if (isFuncRef(v)) return `a procedure reference (@${v.name})`;
   return isList(v) ? `a list (length ${v.items.length})` : 'a number';
 }
 
@@ -56,7 +72,7 @@ export function describeVal(v: Val): string {
  * ("on the left" / "on the right").
  */
 export function num(v: Val, what: string, line?: number, side?: string): number {
-  if (isList(v))
+  if (typeof v !== 'number')
     throw new NeedlescriptError(
       `"${what}" expected a number, got ${describeVal(v)}${side ? ` ${side}` : ''}`,
       line,
@@ -84,6 +100,8 @@ export function valDepth(v: Val, depth = 0): number {
 export function deepEqual(a: Val, b: Val, depth = 0): boolean {
   if (depth >= LIMITS.maxListDepth)
     throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`);
+  if (isFuncRef(a) || isFuncRef(b))
+    return isFuncRef(a) && isFuncRef(b) && a.name === b.name;
   const al = isList(a), bl = isList(b);
   if (al !== bl) return false;
   if (!al) return Math.abs((a as number) - (b as number)) < 1e-9;

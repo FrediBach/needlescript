@@ -1,6 +1,6 @@
 // ---------- Shared types ----------
 
-export type TokenType = 'num' | 'var' | 'qword' | 'word' | 'op' | '[' | ']' | '(' | ')' | ',';
+export type TokenType = 'num' | 'var' | 'qword' | 'word' | 'pref' | 'op' | '[' | ']' | '(' | ')' | ',';
 
 export interface Token {
   t: TokenType;
@@ -60,6 +60,7 @@ export type ASTNode =
   | { k: 'forin'; varName: string; list: ExprNode; body: ASTNode[]; line: number }
   | { k: 'if'; cond: ExprNode; body: ASTNode[]; elseBody: ASTNode[] | null; line: number }
   | { k: 'transform'; name: string; args: ExprNode[]; body: ASTNode[]; line: number }
+  | { k: 'effect'; name: string; args: ExprNode[]; body: ASTNode[]; line: number }
   | { k: 'make'; name: string; value: ExprNode; line: number }
   | { k: 'local'; name: string; value: ExprNode; line: number }
   | { k: 'letlist'; names: string[]; value: ExprNode; line: number; isLocal: boolean }
@@ -81,7 +82,8 @@ export type ExprNode =
   | { k: 'list'; items: ExprNode[]; line: number }
   | { k: 'index'; obj: ExprNode; idx: ExprNode; line: number }
   | { k: 'callval'; obj: ExprNode; args: ExprNode[]; line: number }
-  | { k: 'callexpr'; name: string; args: ExprNode[]; line: number };
+  | { k: 'callexpr'; name: string; args: ExprNode[]; line: number }
+  | { k: 'procref'; name: string; line: number };
 
 // ---------- Density analysis types ----------
 
