@@ -56,6 +56,7 @@ import extrudeRaw from '../examples/extrude.ns?raw';
 import pixelatedRaw from '../examples/pixelated.ns?raw';
 import warpedlines1Raw from '../examples/warpedlines1.ns?raw';
 import warpedlines2Raw from '../examples/warpedlines2.ns?raw';
+import sinewavesRaw from '../examples/sinewaves.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -147,7 +148,8 @@ export const EXAMPLES: Record<string, string> = {
   'extrude': extrudeRaw,
   'pixelated': pixelatedRaw,
   'warpedlines1': warpedlines1Raw,
-  'warpedlines2': warpedlines2Raw
+  'warpedlines2': warpedlines2Raw,
+  'sinewaves': sinewavesRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -158,7 +160,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   },
   {
     label: 'intermediate',
-    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'spirolateral', 'disturbance', 'lfowaves', 'wavefront', 'ngon', 'gingham', 'ampmod1', 'ampmod2'],
+    keys: ['tree', 'fern', 'flow', 'patch', 'lorenz', 'meander', 'snowflake', 'orbits', 'waveforms', 'venn', 'spirograph 1', 'spirograph 2', 'spirolateral', 'disturbance', 'lfowaves', 'wavefront', 'ngon', 'gingham', 'ampmod1', 'ampmod2', 'sinewaves'],
   },
   {
     label: 'advanced',
