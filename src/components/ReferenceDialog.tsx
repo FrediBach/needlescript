@@ -68,7 +68,8 @@ const SECTIONS: RefSection[] = [
     entries: [
       { cmd: 'stitchlen mm', desc: 'running-stitch length, clamped 0.4–12 mm (default 2.5). Alias: stitchlength' },
       { cmd: 'satin mm', desc: 'zigzag column of this width; penetration spacing set by density. satin 0 returns to running stitch. Widths over ~8 mm tend to snag (you\'ll get a warning)' },
-      { cmd: 'density mm', desc: 'satin penetration spacing, 0.25–5 mm (default 0.4)' },
+      { cmd: 'satin @fn', desc: 'programmable column: a shape reporter def fn(t, s, i, u) you write, queried once per stitch pair, returns [advance, leftw, rightw, leftlag, rightlag] (mm). Independent rail lags rake stitches into self-crossing woven satin; advance must be > 0. satin 4 ≡ satin @[0.4,2,2,0,0]. Composes with transforms/warp; sits upstream of pullcomp/underlay/density' },
+      { cmd: 'density mm', desc: 'satin penetration spacing, 0.25–5 mm (default 0.4). Ignored while a satin @fn reporter is engaged — its advance return controls spacing' },
       { cmd: 'bean n', desc: 'bold line: each stitch sewn n times (forced odd, max 9). bean 1 off' },
       { cmd: 'estitch mm', desc: 'blanket stitch: prongs of this length on the left of travel, spaced by stitchlen. estitch 0 off' },
       { cmd: 'color n', desc: 'switch to thread n (emits a DST colour-change stop)' },

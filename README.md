@@ -284,7 +284,7 @@ warp @push_out [
 ]
 ```
 
-The `@name` syntax is a **procedure reference** — the one new value kind effects introduce. It yields a reference to a reporter, callable by the effect machinery, and is consumed only by `warp` (and `warppath`); using it anywhere else is a loud type error. A reporter must take exactly one argument (the point) and `output`/`return` a point, or you get an error naming the problem.
+The `@name` syntax is a **procedure reference** — the one new value kind effects introduce. It yields a reference to a reporter, callable by the effect machinery, and is consumed by `warp`/`warppath` and by `satin` (see *Programmable satin columns*); using it anywhere else is a loud type error. A `warp` reporter must take exactly one argument (the point) and `output`/`return` a point, or you get an error naming the problem.
 
 Because `warp` hands control to arbitrary user code, a shader can push points off the hoop, fold the path over itself, or stretch segments into long loose stitches. The posture is the usual one — **don't forbid, warn**: hoop-overflow, density and long-stitch checks all run on the **post-warp** geometry (warp sits before the physics layer), so a misbehaving shader surfaces as chips and console warnings, not a quietly ruined garment. `warp` itself draws nothing from the seeded stream — it's seeded only if the reporter calls `random`/`snoise2`.
 
@@ -350,7 +350,7 @@ for p in pts [ up setpos(p) down arc 360 0.6 trim ]
 | Command | Effect |
 |---|---|
 | `stitchlen mm` (`stitchlength`) | running-stitch length, clamped to 0.4–12 mm (default **2.5**) |
-| `satin mm` | zigzag column of this width; penetration spacing set by `density`. `satin 0` returns to running stitch. Widths over ~8 mm tend to snag (you'll get a warning) |
+| `satin mm` | zigzag column of this width; penetration spacing set by `density`. `satin 0` returns to running stitch. Widths over ~8 mm tend to snag (you'll get a warning). `satin @fn` instead drives the column from a **shape reporter** you write — see *Programmable satin columns* below |
 | `density mm` | satin penetration spacing, 0.25–5 mm (default **0.4**) |
 | `bean n` | bold line: each stitch sewn *n* times (forced odd, max 9). `bean 1` off |
 | `estitch mm` | blanket stitch: prongs of this length on the left of travel, spaced by `stitchlen`. `estitch 0` off |
@@ -414,6 +414,43 @@ A satin column is buffered while you draw it and sewn — underlay first, then t
 ### Short stitches on curves — `shortstitch 0/1`
 
 On a tight satin curve the inner edge receives the same number of penetrations as the outer edge in a fraction of the space — they bunch up, break thread, and chew the fabric. NeedleScript detects local curvature (chord length ÷ turn angle) and pulls **alternate inner-edge stitches in to 60% width**. On by default; `shortstitch 0` disables. If a column is wider than the curve's radius you get a warning — that geometry can't sew cleanly at any setting.
+
+### Programmable satin columns — `satin @fn`
+
+`satin` followed by a **procedure reference** (the same `@name` value `warp` consumes) replaces the built-in zigzag with a **shape reporter** you write. It is queried once per stitch pair as the engine walks the column spine, and returns a list of five numbers:
+
+```text
+def shapeReporter(t, s, i, u) [
+  //                              advance  leftw  rightw  leftlag  rightlag
+  return [0.4, 2, 2, 0, 0]   //  ↑ all mm; this is exactly built-in satin
+]
+satin @shapeReporter
+fd 40
+satin 0                      // numeric form (or 0) disengages, flushing the column
+```
+
+The reporter sees the cursor's state and returns how to place the next pair:
+
+| Input | Unit | Meaning |
+|---|---|---|
+| `t` | mm | cursor arc-length from the column start (real mm — on an arc this is arc length, so spatial effects don't rescale with column length) |
+| `s` | 0..1 | normalized arc-length over the whole column — the column is fully buffered before it sews, so the total length is known. Use it for tapers, tips, fades |
+| `i` | count | 0-based pair index — lets a reporter alternate behaviour ("every other stitch rakes the other way") **without holding state** (deliberately not `repcount`) |
+| `u` | turtle deg | local heading of the spine at the cursor (read-only context; most reporters ignore it) |
+
+| Return slot | Unit | Meaning |
+|---|---|---|
+| `advance` | mm | how far to step the cursor **forward** before the next pair — dynamic `density`. **Must be > 0** (the one hard rule: clamped to a 0.1 mm floor with a one-time warning, so the walk always terminates) |
+| `leftw` / `rightw` | mm | half-widths of the left / right rail. Asymmetric columns (`leftw ≠ rightw`) fall out for free; negatives clamp to 0 |
+| `leftlag` / `rightlag` | mm | longitudinal offset of each rail endpoint along the spine — negative = behind the cursor, positive = ahead (arc length on a curve) |
+
+The two lags placed **independently** are the whole trick: `leftlag = rightlag = 0` is an ordinary perpendicular bite, but opposite-sign lags rake a stitch into a diagonal, and alternating the rake by pair index makes successive diagonals **cross** — woven / cross-hatched satin — while the cursor still only ever moves forward. (Self-crossing stacks thread at every intersection and legitimately measures 4–5+ layers; raise `maxdensity` knowingly and pick a stable fabric.)
+
+All inputs and outputs are in **spine-local space** — the reporter never sees hoop coordinates. The engine maps its output to the hoop *after* it returns, which is why custom columns compose with transforms and `warp` exactly like built-in satin: `scale 1.5 [ satin @col … ]` sews 1.5× the extent with physical spacing intact (more stitches, not stretched ones), and a `warp` outside deforms the emitted rails. Because `satin @fn` **is** the generator (not an after-split effect), it sits upstream of the whole physics layer: `pullcomp` still widens its rails, `underlay "auto` picks by the column's widest realized width, the snag check measures the realized chord, and over-dense or over-curved columns warn through the existing checks. Like `warp`, the generator itself draws **nothing** from the seeded stream — it's seeded only if your reporter calls `random`/`snoise2`, so a purely geometric reporter is trivially reproducible.
+
+A malformed reporter is a loud, line-numbered error (wrong arity, no `return`, a non-list or wrong-length return, a non-number slot) — the same posture as the `warp` reporter checks. `satin` and `@name` are **Core** and can't be redefined; the reporter is ordinary user code. The equivalence pin holds exactly: `satin 4` produces a byte-identical stream to `satin @c` where `def c(t, s, i, u) [ return [0.4, 2, 2, 0, 0] ]`.
+
+(See the bundled **custom satin** example — a leaf taper, a woven crosshatch, a ripple edge and an asymmetric ramp, side by side.)
 
 ### Local density — `maxdensity n` + heatmap
 

@@ -58,6 +58,7 @@ import warpedlines1Raw from '../examples/warpedlines1.ns?raw';
 import warpedlines2Raw from '../examples/warpedlines2.ns?raw';
 import sinewavesRaw from '../examples/sinewaves.ns?raw';
 import quantizedRaw from '../examples/quantized.ns?raw';
+import customsatinRaw from '../examples/customsatin.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -151,14 +152,15 @@ export const EXAMPLES: Record<string, string> = {
   'warpedlines1': warpedlines1Raw,
   'warpedlines2': warpedlines2Raw,
   'sinewaves': sinewavesRaw,
-  'quantized': quantizedRaw
+  'quantized': quantizedRaw,
+  'custom satin': customsatinRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
 export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   {
     label: 'intro',
-    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan1', 'japan2', 'hilbert1', 'hilbert2', 'lissajous', 'fish', 'eclipse', 'transforms', 'warp', 'humanize', 'snaptogrid', 'pixelated'],
+    keys: ['bloom', 'wreath', 'wander', 'star', 'badge', 'sampler', 'waves', 'shell', 'boustrophedon', 'doublespiral', 'flower', 'spiderweb', 'japan1', 'japan2', 'hilbert1', 'hilbert2', 'lissajous', 'fish', 'eclipse', 'transforms', 'warp', 'humanize', 'snaptogrid', 'custom satin', 'pixelated'],
   },
   {
     label: 'intermediate',

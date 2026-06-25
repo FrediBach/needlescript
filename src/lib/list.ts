@@ -26,9 +26,10 @@ export class NsList {
 
 /**
  * A reference to a user procedure, produced by the `@name` syntax. It is the
- * one new value kind effects introduce: only `warp` and `warppath` consume it
- * (calling it once per point), and everywhere else it is a loud type error —
- * `num`, `truthy` and the shape guards all reject it by name.
+ * one new value kind effects introduce: `warp`/`warppath` call it once per
+ * point, and `satin @fn` calls it once per stitch pair (a shape reporter).
+ * Everywhere else it is a loud type error — `num`, `truthy` and the shape
+ * guards all reject it by name.
  */
 export class FuncRef {
   name: string;
