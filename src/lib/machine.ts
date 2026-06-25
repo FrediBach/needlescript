@@ -55,6 +55,13 @@ export class Machine {
   autoTrim = 7;                 // insert trim before jumps ≥ this (0 = off)
   maxDensity = 3.5;             // coverage warning threshold, in layers of thread
   satinPath: { x: number; y: number }[] | null = null; // buffered satin column
+  // Programmable satin (`satin @fn`): a user shape reporter that supersedes the
+  // built-in generator, queried once per stitch pair at flush time. null = the
+  // built-in numeric generator. Set/cleared by the `satin`/`estitch` commands.
+  satinReporter:
+    | ((t: number, s: number, i: number, u: number) => [number, number, number, number, number])
+    | null = null;
+  satinDensityNoted = false; // one-time "density ignored under satin @fn" note
   recording = false;
   rings: [number, number][][] = [];
   curRing: [number, number][] | null = null;
@@ -283,7 +290,7 @@ export class Machine {
       return;
     }
 
-    if (this.mode === 'satin' && this.satinWidth > 0.05) {
+    if (this.mode === 'satin' && (this.satinWidth > 0.05 || this.satinReporter)) {
       // Buffer the column path in *local* space and snapshot the output stack;
       // the column is mapped to hoop space (with width transformed
       // perpendicular to local travel) when it ends — see flushSatin().
@@ -467,7 +474,8 @@ export class Machine {
     // column is mapped to hoop space (warp deforms the centerline; width stays
     // affine). With no transform and no warp the original (exact) path runs, so
     // existing output is byte-for-byte unchanged.
-    if (isIdentity(this.satinCTM) && !this.satinHasWarp) this._flushSatinPlain(path);
+    if (this.satinReporter) this._flushSatinProgrammable(path);
+    else if (isIdentity(this.satinCTM) && !this.satinHasWarp) this._flushSatinPlain(path);
     else this._flushSatinTransformed(path, this.satinCTM);
   }
 
@@ -648,6 +656,207 @@ export class Machine {
     }
     // The topping
     this._zigzagAlongT(local, this.satinWidth, this.pullComp, this.satinSpacing, false, this.shortStitch);
+  }
+
+  // ---- Programmable satin (`satin @fn`) ----
+
+  /**
+   * Walk the buffered spine in arc-length steps, querying the shape reporter
+   * once per stitch pair to place each rail endpoint independently (§3/§6/§7).
+   *
+   * Walk semantics (the equivalence-pin reading, §3.4): the generator emits one
+   * penetration per step, alternating rail exactly as the built-in zigzag does
+   * (via this.satinSide), with the cursor advancing `advance` mm per step. A
+   * logical pair is two steps; the reporter is queried once per pair. For a
+   * reporter returning `[0.4, 2, 2, 0, 0]` on a straight spine this reproduces
+   * `satin 4`/`density 0.4` byte-for-byte. Each endpoint is anchored at its own
+   * lagged arc-length and offset along the spine normal *at that arc-length*,
+   * so a curved spine fans the rails correctly and opposite lags rake the
+   * stitch into a self-crossing diagonal — while the cursor never turns back,
+   * which is the termination guarantee.
+   *
+   * The generator itself is drawless; any RNG the reporter touches is its own
+   * business, sampled at deterministic (t, s, i) coordinates (§8).
+   */
+  _flushSatinProgrammable(local: { x: number; y: number }[]) {
+    const reporter = this.satinReporter!;
+    const n = local.length;
+    if (n < 2) return;
+
+    // Cumulative arc length of the spine in the *CTM-mapped* (hoop-affine)
+    // frame (§4 step 1: the CTM maps the spine before generation). Walking this
+    // arc length keeps penetration spacing physical under scale — a scaled
+    // column gets more stitches, not stretched ones (§11.9) — while the
+    // equivalence pin is untouched (identity CTM ⇒ this equals the local
+    // length). Warp is *not* folded in here; it deforms the emitted rails
+    // downstream (width stays affine, centerline warps), as in built-in satin.
+    const mapped = local.map(p => apply(this.satinCTM, p.x, p.y));
+    const cum: number[] = new Array(n);
+    cum[0] = 0;
+    for (let i = 1; i < n; i++)
+      cum[i] = cum[i - 1] + Math.hypot(mapped[i][0] - mapped[i - 1][0], mapped[i][1] - mapped[i - 1][1]);
+    const L = cum[n - 1];
+    if (!(L > 1e-9)) return;
+
+    // Resolve a (clamped) hoop arc-length to: the LOCAL spine point there, the
+    // LEFT normal of the LOCAL tangent (matching _zigzagAlong's px=-uy, py=ux),
+    // and the local turtle heading. Affine maps preserve along-segment ratios,
+    // so the fraction found in the mapped frame is the same fraction in local
+    // space — width then scales through the CTM exactly like built-in satin.
+    const resolve = (arcLen: number) => {
+      const a = Math.min(Math.max(arcLen, 0), L);
+      let seg = 1;
+      while (seg < n - 1 && cum[seg] < a) seg++;
+      const segLen = cum[seg] - cum[seg - 1] || 1;
+      const f = (a - cum[seg - 1]) / segLen;
+      const p0 = local[seg - 1], p1 = local[seg];
+      const dx = p1.x - p0.x, dy = p1.y - p0.y;
+      const dlen = Math.hypot(dx, dy) || 1;
+      const ux = dx / dlen, uy = dy / dlen;
+      return {
+        x: p0.x + dx * f, y: p0.y + dy * f,
+        nx: -uy, ny: ux,                                   // left normal (local)
+        heading: (Math.atan2(ux, uy) * 180 / Math.PI + 360) % 360,
+      };
+    };
+
+    // Place one rail endpoint: anchor at the lagged arc-length, offset along the
+    // (CTM-mapped) spine normal there by the half-width, signed by the rail.
+    // Mirrors _zigzagAlongT exactly so the identity case is byte-identical.
+    const place = (arcLen: number, halfW: number, side: number): [number, number] => {
+      const sp = resolve(arcLen);
+      const [ovx, ovy] = linApply(this.satinCTM, sp.nx, sp.ny);
+      const scale = Math.hypot(ovx, ovy) || 1;
+      const [cx, cy] = this._mapSatin(sp.x, sp.y);
+      const h = halfW * scale + this.pullComp / 2; // pull comp is never scaled
+      return [cx + (ovx / scale) * h * side, cy + (ovy / scale) * h * side];
+    };
+
+    // Single walk: buffer the topping penetrations (so underlay can be emitted
+    // first), tracking the max realized full width (for auto-underlay, §9) and
+    // the longest realized chord (for the snag check on real geometry, §5.2).
+    interface Pen { x: number; y: number }
+    const topping: Pen[] = [];
+    let maxFullW = 0;
+    let maxChord = 0;
+    let side = this.satinSide;       // local copy of the alternating rail flag
+    let cursor = 0;                  // arc-length consumed (pair base)
+    let pair = 0;                    // 0-based pair index → reporter's `i`
+    let advWarned = false;
+    let prev: Pen | null = null;
+    let guard = 0;
+    const guardMax = LIMITS.maxStitches + 10;
+
+    while (cursor < L - 1e-9 && guard++ < guardMax) {
+      const ret = reporter(cursor, cursor / L, pair, resolve(cursor).heading);
+      let adv = ret[0];
+      const lw = Math.max(0, ret[1]);   // negative half-widths clamp to 0 (§5.1)
+      const rw = Math.max(0, ret[2]);
+      const ll = ret[3];
+      const rl = ret[4];
+      if (!(adv > 0)) {
+        adv = 0.1; // the one hard rule: advance must be > 0, floored at 0.1 mm
+        if (!advWarned) {
+          this.warnings.push(
+            'satin @fn: advance must be greater than 0 — clamped to 0.1 mm (a non-positive advance never terminates)',
+          );
+          advWarned = true;
+        }
+      }
+      if (lw + rw > maxFullW) maxFullW = lw + rw;
+      // Two steps per pair. Rail (and which lag/width applies) follows the
+      // persistent side flip, exactly as the built-in zigzag alternates.
+      for (let k = 1; k <= 2; k++) {
+        const stepPos = cursor + adv * k;
+        if (stepPos > L + 1e-9) break;
+        side = -side;
+        const left = side > 0; // side=+1 → left rail (lw/ll); −1 → right (rw/rl)
+        const [hx, hy] = place(stepPos + (left ? ll : rl), left ? lw : rw, side);
+        if (prev) {
+          const d = Math.hypot(hx - prev.x, hy - prev.y);
+          if (d > maxChord) maxChord = d;
+          if (d < LIMITS.minStitch * 0.5) { this.tinyDropped++; continue; }
+        }
+        const pen = { x: hx, y: hy };
+        topping.push(pen);
+        prev = pen;
+      }
+      cursor += adv * 2;
+      pair++;
+    }
+    this.satinSide = side;
+
+    // Curvature guard: a column wider than the arc it follows can't sew — let it
+    // warn honestly on the realized representative width (§7.5), reusing the
+    // built-in "wider than radius" phrasing.
+    this._warnIfWiderThanRadius(local, (maxFullW + this.pullComp) / 2);
+
+    // Snag: keys off the realized chord, which for a raked stitch is the
+    // hypotenuse across width and longitudinal span — not leftw + rightw (§5.2).
+    if (maxChord > 8)
+      this.warnings.push(
+        `satin @fn: a realized stitch spans ${maxChord.toFixed(1)} mm — stitches over ~8 mm tend to snag; reduce the rake or width`,
+      );
+
+    // Emit order: anchor, then underlay (chosen from the max realized width),
+    // then the buffered topping — matching the built-in flush.
+    if (!this.started) {
+      this.started = true;
+      const [hx, hy] = this._mapSatin(local[0].x, local[0].y);
+      this._push('stitch', hx, hy);
+    }
+    this._programmableUnderlay(local, maxFullW + this.pullComp);
+    for (const p of topping) this._push('stitch', p.x, p.y, false);
+  }
+
+  /** One-time "wider than the curve it follows" warning on the realized width. */
+  _warnIfWiderThanRadius(local: { x: number; y: number }[], half: number) {
+    if (!(half > 0)) return;
+    for (let i = 1; i < local.length - 1; i++) {
+      const ax = local[i].x - local[i - 1].x, ay = local[i].y - local[i - 1].y;
+      const bx = local[i + 1].x - local[i].x, by = local[i + 1].y - local[i].y;
+      const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+      if (la < 1e-9 || lb < 1e-9) continue;
+      const dot = Math.max(-1, Math.min(1, (ax * bx + ay * by) / (la * lb)));
+      const theta = Math.acos(dot);
+      if (theta > 1e-3 && theta < 2.1) {
+        const R = lb / theta;
+        if (R < half) {
+          this.warnings.push(
+            `satin @fn column (~${(half * 2).toFixed(1)} mm wide) is wider than the curve it follows (radius ~${R.toFixed(1)} mm) — split the column or widen the curve`,
+          );
+          return;
+        }
+      }
+    }
+  }
+
+  /** Underlay for a programmable column, sized by the max realized width (§9). */
+  _programmableUnderlay(local: { x: number; y: number }[], w: number) {
+    const mode: 'off' | 'center' | 'edge' | 'zigzag' =
+      this.underlayMode === 'auto'
+        ? (w < 1.5 ? 'off' : w < 4 ? 'center' : 'zigzag')
+        : this.underlayMode;
+    if (mode === 'off') return;
+    const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
+    const hoop = this._toHoop(local, this.satinCTM);
+    const revHoop = hoop.slice().reverse();
+    const revLocal = local.slice().reverse();
+    if (this.doubleUnderlay && mode !== 'center') {
+      this._runAlong(hoop, uLen, true);
+      this._runAlong(revHoop, uLen, true);
+    }
+    if (mode === 'center') {
+      this._runAlong(hoop, uLen, true);
+      this._runAlong(revHoop, uLen, true);
+    } else if (mode === 'edge') {
+      const off = Math.max(0.3, w * 0.3);
+      this._runAlong(this._offsetPathT(local, this.satinCTM, off), uLen, true);
+      this._runAlong(this._offsetPathT(revLocal, this.satinCTM, off), uLen, true);
+    } else if (mode === 'zigzag') {
+      this._zigzagAlongT(local, w * 0.6, this.pullComp * 0.6, 2, true, false);
+      this._runAlong(revHoop, uLen, true);
+    }
   }
 
   _closeRing() {

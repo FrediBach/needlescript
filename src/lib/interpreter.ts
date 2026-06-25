@@ -859,6 +859,68 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     return gm.toPoint(out, `the warp reporter @${ref.name}`, line);
   }
 
+  /**
+   * Invoke a `@name` shape reporter for one satin pair, returning the validated
+   * 5-number contract `[advance, leftw, rightw, leftlag, rightlag]`. Mirrors
+   * `applyReporter`'s posture: every contract violation (wrong arity, no
+   * return, non-list, wrong length, non-number slot) is a loud, line-numbered
+   * error that names exactly what is wrong. Inputs are spine-local (§3.2).
+   */
+  /**
+   * Eager half of the shape-reporter contract: the reporter exists and takes
+   * exactly 4 parameters. Run at the `satin @fn` engage site so a malformed
+   * signature is reported there; the return-value half is checked per call.
+   */
+  function applyShapeReporterArity(ref: FuncRef, line?: number) {
+    const proc = procs[ref.name];
+    if (!proc)
+      throw new NeedlescriptError(`the satin reporter @${ref.name} is not defined`, line);
+    if (proc.params.length !== 4)
+      throw new NeedlescriptError(
+        `the satin reporter @${ref.name} must take exactly 4 parameters (t, s, i, u), but takes ${proc.params.length}`,
+        line,
+      );
+  }
+
+  function applyShapeReporter(
+    ref: FuncRef, t: number, s: number, i: number, u: number, line?: number,
+  ): [number, number, number, number, number] {
+    const proc = procs[ref.name];
+    if (!proc)
+      throw new NeedlescriptError(`the satin reporter @${ref.name} is not defined`, line);
+    if (proc.params.length !== 4)
+      throw new NeedlescriptError(
+        `the satin reporter @${ref.name} must take exactly 4 parameters (t, s, i, u), but takes ${proc.params.length}`,
+        line,
+      );
+    const out = callProcVals(ref.name, [t, s, i, u], 0, line);
+    if (out === undefined)
+      throw new NeedlescriptError(
+        `the satin reporter @${ref.name} never reached output/return — it must return [advance, leftw, rightw, leftlag, rightlag]`,
+        line,
+      );
+    if (!isList(out))
+      throw new NeedlescriptError(
+        `the satin reporter @${ref.name} must return a list of 5 numbers [advance, leftw, rightw, leftlag, rightlag], got ${describeVal(out)}`,
+        line,
+      );
+    if (out.items.length !== 5)
+      throw new NeedlescriptError(
+        `the satin reporter @${ref.name} must return exactly 5 numbers [advance, leftw, rightw, leftlag, rightlag], got a list of ${out.items.length}`,
+        line,
+      );
+    const slot = ['advance', 'leftw', 'rightw', 'leftlag', 'rightlag'];
+    const r = out.items.map((v, k) => {
+      if (typeof v !== 'number')
+        throw new NeedlescriptError(
+          `the satin reporter @${ref.name} returned ${describeVal(v)} for ${slot[k]} (slot ${k + 1} of 5) — it must be a number`,
+          line,
+        );
+      return v;
+    });
+    return [r[0], r[1], r[2], r[3], r[4]];
+  }
+
   /** Clamp humanize jitter to a sane embroidery range (0–2 mm), warning if out. */
   function clampHumanize(amount: number): number {
     const v = Math.min(Math.max(amount, 0), 2);
@@ -1220,6 +1282,28 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             throw new NeedlescriptError('assert failed — the condition is 0 (false)', st.line);
           return;
         }
+        // `satin @fn` — engage programmable satin: a user shape reporter
+        // supersedes the built-in generator (§2/§3). Same mode switch as the
+        // numeric form; it begins buffering a column and flushes on the usual
+        // triggers. The reporter is queried once per stitch pair at flush time.
+        if (st.name === 'satin' && isFuncRef(vals[0])) {
+          const ref = vals[0];
+          // Validate the contract eagerly so a malformed reporter is caught at
+          // the engage site, even before the column has any geometry.
+          applyShapeReporterArity(ref, st.line);
+          m.flushSatin();
+          m.satinReporter = (t, s, i, u) => applyShapeReporter(ref, t, s, i, u, st.line);
+          m.mode = 'satin';
+          // The numeric `density` command is ignored while a reporter is
+          // engaged (advance supersedes it) — note it once if one was set.
+          if (m.satinSpacing !== 0.4 && !m.satinDensityNoted) {
+            m.warnings.push(
+              `density is ignored while satin @${ref.name} is engaged — the reporter's advance return controls penetration spacing`,
+            );
+            m.satinDensityNoted = true;
+          }
+          return;
+        }
         // Every other command is scalar — a list argument is a type error
         // naming the command (RFC-2 §2).
         const a = vals.map(v => num(v, st.name, st.line));
@@ -1250,6 +1334,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           }
           case 'satin': {
             m.flushSatin();
+            m.satinReporter = null; // numeric form returns to the built-in generator
             const v = Math.max(0, a[0]);
             if (v > 10)
               m.warnings.push(
@@ -1261,6 +1346,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           }
           case 'estitch': {
             m.flushSatin();
+            m.satinReporter = null; // leaving satin mode disengages the reporter
             const v = Math.max(0, a[0]);
             if (v > 10)
               m.warnings.push(`estitch ${v} mm is very wide — prongs over ~8 mm tend to snag`);

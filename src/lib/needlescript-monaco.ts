@@ -545,8 +545,8 @@ const NS_ITEMS: NSItem[] = [
   {
     label: 'satin',
     kindName: 'function',
-    detail: 'satin column width (mm)',
-    documentation: 'Zigzag satin column of this width; penetration spacing set by `density`. `satin 0` returns to running stitch. Width > ~8 mm risks snagging.',
+    detail: 'satin column width (mm) — or @reporter',
+    documentation: 'Zigzag satin column of this width; penetration spacing set by `density`. `satin 0` returns to running stitch. Width > ~8 mm risks snagging.\n\n**Programmable satin:** `satin @fn` engages a user *shape reporter* that controls the column per stitch pair instead of the built-in generator. The reporter takes `(t, s, i, u)` — cursor arc-length (mm), normalized position (0..1), 0-based pair index, local heading — and returns `[advance, leftw, rightw, leftlag, rightlag]` (all mm; `advance` > 0). Independent left/right longitudinal lags let a column rake steeply enough to cross its own line (woven satin). `density` is ignored while a reporter is engaged. `satin 4 ≡ satin @c` where `def c(t,s,i,u) [ return [0.4,2,2,0,0] ]`.',
     insertText: 'satin ${1:width}',
     isSnippet: true,
     params: [['width']],
