@@ -1563,14 +1563,26 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   }
 
   m.flushSatin();
+  const warningLocations: WarningLocation[] = [];
   if (m.recording) {
     m.warnings.push('beginfill was never closed — endfill added at the end of the program');
     m.endFill();
   }
-  if (m.tinyDropped > 0)
+  if (m.tinyDropped > 0) {
+    const spots = m.tinyDroppedSpots;
+    if (spots.length) {
+      const lines = [...new Set(spots.map(s => s.line).filter((l): l is number => l !== undefined))];
+      warningLocations.push({
+        index: m.warnings.length,
+        points: spots.map(s => ({ x: s.x, y: s.y })),
+        lines,
+        kind: 'tiny',
+      });
+    }
     m.warnings.push(
       `${m.tinyDropped} sub-${LIMITS.minStitch} mm moves merged into neighbours (too short to sew safely)`,
     );
+  }
 
   if (m.autoTrim > 0) {
     const at = applyAutoTrim(m.events, m.autoTrim);
@@ -1582,7 +1594,6 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   // The machine already accumulated this grid live (in sewing order) so the
   // history queries and this heatmap are one and the same — finalize it.
   const density = m.density.finalize(m.maxDensity);
-  const warningLocations: WarningLocation[] = [];
   if (m.maxDensity > 0) {
     const dens = density.hotspots.filter(h => h.kind === 'density').slice(0, 3);
     for (const h of dens) {

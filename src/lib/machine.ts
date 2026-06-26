@@ -93,6 +93,9 @@ export class Machine {
   warnings: string[] = [];
   started = false;
   tinyDropped = 0;
+  // Locations of the first few merged sub-minimum moves, so the warning can be
+  // pointed to in the preview / playback bar. Capped to keep memory bounded.
+  tinyDroppedSpots: { x: number; y: number; line?: number }[] = [];
   currentLine: number | undefined = undefined; // source line being executed
   stateStack: { x: number; y: number; heading: number; penDown: boolean }[] = [];
   // Live coverage / penetration index, fed in sewing order from _push and read
@@ -194,9 +197,16 @@ export class Machine {
     }
     if (this.lastEmit) {
       const d = Math.hypot(px - this.lastEmit.x, py - this.lastEmit.y);
-      if (d < LIMITS.minStitch * 0.5) { this.tinyDropped++; return; }
+      if (d < LIMITS.minStitch * 0.5) { this._dropTiny(px, py); return; }
     }
     this._push('stitch', px, py, u);
+  }
+
+  /** Record a merged sub-minimum move so it can be located later. */
+  _dropTiny(x: number, y: number) {
+    this.tinyDropped++;
+    if (this.tinyDroppedSpots.length < 200)
+      this.tinyDroppedSpots.push({ x, y, line: this.currentLine });
   }
 
   _push(t: EventType, x: number, y: number, u = false) {
@@ -369,7 +379,7 @@ export class Machine {
 
     // Running stitch
     if (hlen < LIMITS.minStitch * 0.5) {
-      this.tinyDropped++;
+      this._dropTiny(nx, ny);
       this.x = nx; this.y = ny;
       return;
     }
@@ -803,7 +813,7 @@ export class Machine {
         if (prev) {
           const d = Math.hypot(hx - prev.x, hy - prev.y);
           if (d > maxChord) maxChord = d;
-          if (d < LIMITS.minStitch * 0.5) { this.tinyDropped++; continue; }
+          if (d < LIMITS.minStitch * 0.5) { this._dropTiny(hx, hy); continue; }
         }
         const pen = { x: hx, y: hy };
         topping.push(pen);

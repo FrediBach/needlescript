@@ -379,53 +379,74 @@ function draw(
     });
   }
 
-  // Warning location marker — shown while a hotspot warning is hovered in the
-  // console. Drawn last so it sits above everything, and independent of the
-  // scrub position (the defect is a property of the finished design).
-  if (warningLoc) {
-    for (const p of warningLoc.points) {
-      const px = X(p.x), py = Y(p.y);
-      const ring = 9 * dpr;
-
-      // Soft halo
-      ctx.beginPath();
-      ctx.arc(px, py, ring * 1.8, 0, 6.2832);
-      ctx.fillStyle = canvasWarnMarkerFill(0.18);
-      ctx.fill();
-
-      // Outer ring (white) + inner ring (warning red) for contrast on any thread
-      ctx.beginPath();
-      ctx.arc(px, py, ring, 0, 6.2832);
-      ctx.lineWidth = 3 * dpr;
-      ctx.strokeStyle = canvasWarnMarkerStroke;
-      ctx.stroke();
-      ctx.lineWidth = 1.6 * dpr;
-      ctx.strokeStyle = canvasWarnMarkerCore;
-      ctx.stroke();
-
-      // Crosshair through the centre
-      ctx.beginPath();
-      ctx.moveTo(px - ring * 1.5, py);
-      ctx.lineTo(px - ring * 0.5, py);
-      ctx.moveTo(px + ring * 0.5, py);
-      ctx.lineTo(px + ring * 1.5, py);
-      ctx.moveTo(px, py - ring * 1.5);
-      ctx.lineTo(px, py - ring * 0.5);
-      ctx.moveTo(px, py + ring * 0.5);
-      ctx.lineTo(px, py + ring * 1.5);
-      ctx.lineWidth = 1.6 * dpr;
-      ctx.strokeStyle = canvasWarnMarkerCore;
-      ctx.stroke();
-
-      // Centre dot
-      ctx.beginPath();
-      ctx.arc(px, py, 1.8 * dpr, 0, 6.2832);
-      ctx.fillStyle = canvasWarnMarkerCore;
-      ctx.fill();
+  // Warning location marker — shown while a locatable warning is hovered in
+  // the console. Drawn last so it sits above everything, and independent of
+  // the scrub position (the defect is a property of the finished design).
+  if (warningLoc && warningLoc.points.length) {
+    const pts = warningLoc.points;
+    // A single hotspot gets a prominent crosshair marker; a cluster of many
+    // spots (e.g. merged tiny moves) gets light ringed dots so the preview
+    // doesn't drown in crosshairs.
+    if (pts.length <= 4) {
+      for (const p of pts) drawWarnCrosshair(ctx, X(p.x), Y(p.y), dpr);
+    } else {
+      for (const p of pts) drawWarnDot(ctx, X(p.x), Y(p.y), dpr);
     }
   }
 
   return { scale, cx, cy, viewCX, viewCY };
+}
+
+/** Prominent warning marker: halo + white/red rings + crosshair + centre dot. */
+function drawWarnCrosshair(ctx: CanvasRenderingContext2D, px: number, py: number, dpr: number) {
+  const ring = 9 * dpr;
+
+  // Soft halo
+  ctx.beginPath();
+  ctx.arc(px, py, ring * 1.8, 0, 6.2832);
+  ctx.fillStyle = canvasWarnMarkerFill(0.18);
+  ctx.fill();
+
+  // Outer ring (white) + inner ring (warning red) for contrast on any thread
+  ctx.beginPath();
+  ctx.arc(px, py, ring, 0, 6.2832);
+  ctx.lineWidth = 3 * dpr;
+  ctx.strokeStyle = canvasWarnMarkerStroke;
+  ctx.stroke();
+  ctx.lineWidth = 1.6 * dpr;
+  ctx.strokeStyle = canvasWarnMarkerCore;
+  ctx.stroke();
+
+  // Crosshair through the centre
+  ctx.beginPath();
+  ctx.moveTo(px - ring * 1.5, py);
+  ctx.lineTo(px - ring * 0.5, py);
+  ctx.moveTo(px + ring * 0.5, py);
+  ctx.lineTo(px + ring * 1.5, py);
+  ctx.moveTo(px, py - ring * 1.5);
+  ctx.lineTo(px, py - ring * 0.5);
+  ctx.moveTo(px, py + ring * 0.5);
+  ctx.lineTo(px, py + ring * 1.5);
+  ctx.lineWidth = 1.6 * dpr;
+  ctx.strokeStyle = canvasWarnMarkerCore;
+  ctx.stroke();
+
+  // Centre dot
+  ctx.beginPath();
+  ctx.arc(px, py, 1.8 * dpr, 0, 6.2832);
+  ctx.fillStyle = canvasWarnMarkerCore;
+  ctx.fill();
+}
+
+/** Light warning marker for clustered spots: a red dot ringed in white. */
+function drawWarnDot(ctx: CanvasRenderingContext2D, px: number, py: number, dpr: number) {
+  ctx.beginPath();
+  ctx.arc(px, py, 3 * dpr, 0, 6.2832);
+  ctx.fillStyle = canvasWarnMarkerCore;
+  ctx.fill();
+  ctx.lineWidth = 1.4 * dpr;
+  ctx.strokeStyle = canvasWarnMarkerStroke;
+  ctx.stroke();
 }
 
 /** Auto-fit scale in physical px/mm — used by draw() and the render-time zoom

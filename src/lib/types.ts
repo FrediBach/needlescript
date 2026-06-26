@@ -35,7 +35,7 @@ export interface WarningLocation {
   index: number; // index into RunResult.warnings
   points: { x: number; y: number }[]; // hoop-space coordinates (mm)
   lines: number[]; // source lines that contributed to the hotspot
-  kind: 'density' | 'stack';
+  kind: 'density' | 'stack' | 'tiny';
 }
 
 export interface RunResult {
