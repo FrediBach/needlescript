@@ -56,6 +56,7 @@ import extrudeRaw from '../examples/extrude.ns?raw';
 import pixelatedRaw from '../examples/pixelated.ns?raw';
 import warpedlines1Raw from '../examples/warpedlines1.ns?raw';
 import warpedlines2Raw from '../examples/warpedlines2.ns?raw';
+import warpedlines3Raw from '../examples/warpedlines3.ns?raw';
 import sinewavesRaw from '../examples/sinewaves.ns?raw';
 import quantizedRaw from '../examples/quantized.ns?raw';
 import customsatinRaw from '../examples/customsatin.ns?raw';
@@ -152,6 +153,7 @@ export const EXAMPLES: Record<string, string> = {
   'pixelated': pixelatedRaw,
   'warpedlines1': warpedlines1Raw,
   'warpedlines2': warpedlines2Raw,
+  'warpedlines3': warpedlines3Raw,
   'sinewaves': sinewavesRaw,
   'quantized': quantizedRaw,
   'custom satin': customsatinRaw,
@@ -170,6 +172,6 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
   },
   {
     label: 'advanced',
-    keys: ['echo', 'shatter', 'meadow', 'contour', 'lines', 'fill', 'custom fill', 'turtle', 'needlescript', 'stipple', 'extrude', 'warpedlines1', 'warpedlines2'],
+    keys: ['echo', 'shatter', 'meadow', 'contour', 'lines', 'fill', 'custom fill', 'turtle', 'needlescript', 'stipple', 'extrude', 'warpedlines1', 'warpedlines2', 'warpedlines3'],
   },
 ];
