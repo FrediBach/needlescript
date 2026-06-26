@@ -2,7 +2,7 @@
 
 export const LIMITS = {
   maxStitches: 60000,
-  maxOps: 2000000,
+  maxOps: 10000000,
   maxCallDepth: 200,
   minStitch: 0.4,
   maxStitch: 12.0,
