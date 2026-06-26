@@ -20,8 +20,9 @@ export const LIMITS = {
 
 import type { StitchEvent, EventType } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
-import { IDENTITY, isIdentity, apply, linApply, compose } from './affine.ts';
+import { IDENTITY, isIdentity, apply, linApply, compose, invert } from './affine.ts';
 import type { Mat } from './affine.ts';
+import { vfromheading, vheading } from './genmath.ts';
 import { DensityGrid } from './postprocess.ts';
 
 /**
@@ -62,6 +63,27 @@ export class Machine {
     | ((t: number, s: number, i: number, u: number) => [number, number, number, number, number])
     | null = null;
   satinDensityNoted = false; // one-time "density ignored under satin @fn" note
+  // Programmable fill (`fill dir @d shape @s`): user reporters that supersede the
+  // built-in tatami generator for the next beginfill…endfill (§2/§3). null = the
+  // built-in scanline generator. The direction reporter returns a turtle heading
+  // (local space); the shape reporter returns [spacing, len, phase]. Both are
+  // queried at endfill, inside _generateProgrammableFill — the generator itself
+  // is drawless (§10), so determinism rides on the reporters' own sampling.
+  fillArmed = false;
+  fillDirReporter: ((px: number, py: number) => number) | null = null;
+  fillShapeReporter:
+    | ((px: number, py: number, row: number, v: number) => [number, number, number])
+    | null = null;
+  // Snapshot of the output stack captured at beginfill while armed, so the
+  // region/field compose with transforms (reporters see local; placement maps
+  // through this affine CTM; warp deforms emitted penetrations downstream).
+  fillCTM: Mat = IDENTITY;
+  fillLayers: OutLayer[] = [];
+  fillHasWarp = false;
+  // Armed fills record their boundary rings in LOCAL space (the non-armed path
+  // keeps recording in hoop space, untouched).
+  localRings: [number, number][][] = [];
+  curLocalRing: [number, number][] | null = null;
   recording = false;
   rings: [number, number][][] = [];
   curRing: [number, number][] | null = null;
@@ -275,6 +297,12 @@ export class Machine {
           this.curRing = [[hox, hoy]];
         }
         this.curRing.push([hnx, hny]);
+        // Armed (programmable) fills also keep the ring in LOCAL space so the
+        // field/shape reporters can be queried in local coordinates (§6).
+        if (this.fillArmed) {
+          if (!this.curLocalRing) this.curLocalRing = [[ox, oy]];
+          this.curLocalRing.push([nx, ny]);
+        }
       } else {
         this._closeRing();
       }
@@ -862,6 +890,8 @@ export class Machine {
   _closeRing() {
     if (this.curRing && this.curRing.length >= 3) this.rings.push(this.curRing);
     this.curRing = null;
+    if (this.curLocalRing && this.curLocalRing.length >= 3) this.localRings.push(this.curLocalRing);
+    this.curLocalRing = null;
   }
 
   beginFill() {
@@ -873,6 +903,27 @@ export class Machine {
     this.recording = true;
     this.rings = [];
     this.curRing = [this.mapOut(this.x, this.y)];
+    if (this.fillArmed) {
+      // Capture the output stack so the field/region compose with transforms;
+      // record the boundary in local space so reporters see local coordinates.
+      this.fillCTM = this.ctm;
+      this.fillHasWarp = this.hasWarp;
+      this.fillLayers = this.hasWarp ? this.outLayers.slice() : this.fillLayers;
+      this.localRings = [];
+      this.curLocalRing = [[this.x, this.y]];
+    }
+  }
+
+  /** Map a local point to hoop space through the fill's captured snapshot. */
+  _mapFill(lx: number, ly: number): [number, number] {
+    if (!this.fillHasWarp) return apply(this.fillCTM, lx, ly);
+    let px = lx, py = ly;
+    for (let i = this.fillLayers.length - 1; i >= 0; i--) {
+      const L = this.fillLayers[i];
+      const r = L.kind === 'aff' ? apply(L.m, px, py) : L.fn(px, py);
+      px = r[0]; py = r[1];
+    }
+    return [px, py];
   }
 
   /** Emit a sequence of fill points, connecting from wherever the thread is. */
@@ -946,6 +997,422 @@ export class Machine {
     return out;
   }
 
+  // ---- Programmable fill (`fill dir @d shape @s`, §7–§9) -------------------
+  //
+  // Evenly-spaced streamline placement (Jobard–Lefer), adapted for a clipped
+  // region with holes. The engine owns coverage (even spacing) and termination
+  // (two finite budgets, §5.2); the reporters drive direction (the field) and
+  // texture (spacing/len/phase). All placement runs in hoop-affine space so
+  // spacing stays physical under transforms; reporters are queried in local
+  // space (inverse-mapped); warp deforms the emitted penetrations downstream.
+
+  /**
+   * Place evenly-spaced streamlines through `fieldFn` over `hoopRings`.
+   * Returns the streamline polylines in deterministic placement order. `fieldFn`
+   * returns a unit hoop direction or null (a field singularity, §6). `spacingFn`
+   * gives the row separation sampled at a seed (§7.4).
+   */
+  _placeStreamlines(
+    hoopRings: [number, number][][],
+    fieldFn: (x: number, y: number) => [number, number] | null,
+    spacingFn: (x: number, y: number, row: number) => number,
+    diameter: number,
+    area: number,
+  ): { rows: [number, number][][]; truncated: boolean; seedCapped: boolean } {
+    const K_len = 4, K_seed = 4, D_test = 0.5;
+    // A representative spacing fixes the hash cell + the seed budget. Queries
+    // scan ceil(r / cell) rings so a varying per-row spacing stays correct.
+    let baseSpacing = spacingFn(
+      ...(this._regionSeedPoint(hoopRings) ?? [0, 0]),
+      0,
+    );
+    if (!(baseSpacing > 0)) baseSpacing = 0.4;
+    const cell = baseSpacing;
+    const spacingMin = Math.max(0.25, baseSpacing);
+    const lenCap = Math.max(diameter, 1) * K_len;
+    const seedCap = Math.max(8, (area / (spacingMin * spacingMin)) * K_seed);
+
+    // Spatial hash of every emitted vertex, tagged with its streamline id so the
+    // separation test ignores a streamline's own vertices (§7.1/§7.2).
+    const hash = new Map<string, [number, number, number][]>();
+    const keyOf = (x: number, y: number) =>
+      Math.floor(x / cell) + ',' + Math.floor(y / cell);
+    const addVertex = (x: number, y: number, id: number) => {
+      const k = keyOf(x, y);
+      let arr = hash.get(k);
+      if (!arr) { arr = []; hash.set(k, arr); }
+      arr.push([x, y, id]);
+    };
+    const tooClose = (x: number, y: number, r: number, excludeId: number): boolean => {
+      const ix = Math.floor(x / cell), iy = Math.floor(y / cell);
+      const span = Math.max(1, Math.ceil(r / cell));
+      const r2 = r * r;
+      for (let dx = -span; dx <= span; dx++)
+        for (let dy = -span; dy <= span; dy++) {
+          const arr = hash.get((ix + dx) + ',' + (iy + dy));
+          if (!arr) continue;
+          for (const v of arr) {
+            if (v[2] === excludeId) continue;
+            const ex = x - v[0], ey = y - v[1];
+            if (ex * ex + ey * ey < r2) return true;
+          }
+        }
+      return false;
+    };
+    const inRegion = (x: number, y: number) => evenOddInside(hoopRings, x, y);
+
+    let truncated = false, seedCapped = false;
+
+    // Integrate one streamline from `seed` with separation `sp`, both directions
+    // (forward along the field, backward against it). RK2 midpoint stepping.
+    // Each vertex carries the field direction sampled there [x, y, fx, fy] so
+    // the seeding pass can reuse it instead of re-querying the reporter.
+    const integrate = (seed: [number, number], sp: number, id: number): [number, number, number, number][] => {
+      const h = sp * 0.5;
+      const sep = sp * D_test;
+      const seedDir = fieldFn(seed[0], seed[1]);
+      const oneDir = (sign: number): [number, number, number, number][] => {
+        const verts: [number, number, number, number][] = [];
+        let px = seed[0], py = seed[1];
+        let arc = 0, guard = 0;
+        const guardMax = Math.ceil(lenCap / h) + 16;
+        while (arc < lenCap && guard++ < guardMax) {
+          const d1 = fieldFn(px, py);
+          if (!d1) break;                                   // singularity (§6)
+          const mx = px + d1[0] * sign * h * 0.5;
+          const my = py + d1[1] * sign * h * 0.5;
+          const d2 = fieldFn(mx, my) ?? d1;
+          const nx = px + d2[0] * sign * h;
+          const ny = py + d2[1] * sign * h;
+          if (!inRegion(nx, ny)) break;                     // left region/hole
+          if (tooClose(nx, ny, sep, id)) break;             // merge guard (§7.2)
+          // Closed-orbit guard: a streamline that loops back near its own seed
+          // (a vortex/swirl) is terminated after one revolution rather than
+          // re-tracing to the length cap — the standard refinement that keeps a
+          // pole's orbits finite without re-covering the same circle (§5.2).
+          if (arc > sep * 4 && Math.hypot(nx - seed[0], ny - seed[1]) < sep) break;
+          verts.push([nx, ny, d2[0], d2[1]]);
+          arc += h;
+          px = nx; py = ny;
+        }
+        if (arc >= lenCap) truncated = true;
+        return verts;
+      };
+      const fwd = oneDir(1);
+      const bwd = oneDir(-1);
+      bwd.reverse();
+      const seedVert: [number, number, number, number] =
+        [seed[0], seed[1], seedDir ? seedDir[0] : 0, seedDir ? seedDir[1] : 1];
+      return [...bwd, seedVert, ...fwd];
+    };
+
+    // FIFO seed queue (never a set — order must be deterministic, §10). Seed each
+    // disconnected piece in lexicographic-centroid order (§14).
+    const queue: [number, number][] = this._regionSeeds(hoopRings);
+    const rows: [number, number][][] = [];
+    let row = 0;
+    let pops = 0;
+    let totalVerts = 0;
+    const popCap = seedCap * 8 + 64;
+    // A finite total-work budget (the §5.2 seed-budget generalized to integration
+    // steps): a pathological field — vortex, divergent, chaotic — produces a
+    // finite, possibly imperfect fill with a warning, rather than running the
+    // global op backstop into a hard error.
+    const vertBudget = 55000;
+
+    while (queue.length && row < seedCap && pops++ < popCap && totalVerts < vertBudget) {
+      const seed = queue.shift()!;
+      if (!inRegion(seed[0], seed[1])) continue;
+      let sp = spacingFn(seed[0], seed[1], row);
+      if (!(sp > 0)) sp = spacingMin;
+      // Re-test at pop time: the field may have filled in since this candidate
+      // was queued (§7.3).
+      if (tooClose(seed[0], seed[1], sp * D_test, -1)) continue;
+      const verts = integrate(seed, sp, row);
+      if (verts.length < 2) continue;
+      totalVerts += verts.length;
+      for (const v of verts) addVertex(v[0], v[1], row);
+      rows.push(verts.map(v => [v[0], v[1]] as [number, number]));
+      // Candidate seeds perpendicular to the field, reusing each vertex's stored
+      // field direction (§7.3). Subsample to ~one candidate per `sp` of arc so a
+      // fine integration step doesn't flood the queue (and the reporter) with
+      // near-duplicate candidates that the proximity test would reject anyway.
+      const stride = Math.max(1, Math.round(sp / (sp * 0.5)));
+      for (let i = 0; i < verts.length; i += stride) {
+        const v = verts[i];
+        const px = -v[3], py = v[2];                       // perpendicular to field
+        for (const s of [-1, 1]) {
+          const cx = v[0] + px * sp * s, cy = v[1] + py * sp * s;
+          if (!inRegion(cx, cy)) continue;
+          if (tooClose(cx, cy, sp * D_test, -1)) continue;
+          if (queue.length < popCap) queue.push([cx, cy]);
+        }
+      }
+      row++;
+    }
+    if (row >= seedCap || totalVerts >= vertBudget) seedCapped = true;
+    return { rows, truncated, seedCapped };
+  }
+
+  /** Deterministic first-seed candidates: each in-region ring centroid (the
+   * fillable pieces), sorted lexicographically (§7.3/§14). */
+  _regionSeeds(hoopRings: [number, number][][]): [number, number][] {
+    const seeds: [number, number][] = [];
+    for (const ring of hoopRings) {
+      const c = this._ringCentroid(ring);
+      const seed = evenOddInside(hoopRings, c[0], c[1])
+        ? c
+        : this._nearestInRegion(hoopRings, ring, c);
+      if (seed) seeds.push(seed);
+    }
+    seeds.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+    // De-dup seeds that collapse onto the same piece centroid.
+    const out: [number, number][] = [];
+    for (const s of seeds)
+      if (!out.some(o => Math.hypot(o[0] - s[0], o[1] - s[1]) < 1e-6)) out.push(s);
+    return out;
+  }
+
+  _regionSeedPoint(hoopRings: [number, number][][]): [number, number] | null {
+    return this._regionSeeds(hoopRings)[0] ?? null;
+  }
+
+  _ringCentroid(ring: [number, number][]): [number, number] {
+    let a = 0, cx = 0, cy = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const p = ring[i], q = ring[(i + 1) % ring.length];
+      const cross = p[0] * q[1] - q[0] * p[1];
+      a += cross; cx += (p[0] + q[0]) * cross; cy += (p[1] + q[1]) * cross;
+    }
+    if (Math.abs(a) < 1e-9) {
+      let sx = 0, sy = 0;
+      for (const p of ring) { sx += p[0]; sy += p[1]; }
+      return [sx / ring.length, sy / ring.length];
+    }
+    return [cx / (3 * a), cy / (3 * a)];
+  }
+
+  /** Nearest in-region point to `target`, scanned on a coarse grid over the
+   * ring bbox (used when a centroid lands in a hole, §7.3). */
+  _nearestInRegion(
+    all: [number, number][][], ring: [number, number][], target: [number, number],
+  ): [number, number] | null {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of ring) {
+      if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
+      if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
+    }
+    const N = 24;
+    let best: [number, number] | null = null, bestD = Infinity;
+    for (let i = 0; i <= N; i++)
+      for (let j = 0; j <= N; j++) {
+        const x = minX + (maxX - minX) * i / N;
+        const y = minY + (maxY - minY) * j / N;
+        if (!evenOddInside(all, x, y)) continue;
+        const d = Math.hypot(x - target[0], y - target[1]);
+        if (d < bestD) { bestD = d; best = [x, y]; }
+      }
+    return best;
+  }
+
+  /**
+   * Run the programmable-fill generator at endfill for the general (non
+   * short-circuit) case: place streamlines through the field, walk each into
+   * penetrations with per-point len/phase, and emit in placement order with
+   * boustrophedon row direction. The constant-field / constant-shape case is
+   * handled upstream by the byte-identical tatami short-circuit.
+   *
+   * `dir`/`shape` are the user reporters (local-space). `constAngle` is the
+   * heading used when there is no direction field. `rotate90`/`coarse` drive the
+   * cross-grain underlay pass (§9); `underlay` flags the emitted stitches.
+   */
+  _generateProgrammableFill(opts: {
+    dir: ((lx: number, ly: number) => number) | null;
+    shape: ((lx: number, ly: number, row: number, v: number) => [number, number, number]) | null;
+    constAngle: number;
+    rotate90: boolean;
+    coarse: boolean;
+    underlay: boolean;
+  }) {
+    const inv = invert(this.fillCTM);
+    if (!inv) {
+      this.warnings.push('fill skipped — the active transform is degenerate (zero scale)');
+      return;
+    }
+    const hoopRings = this.localRings.map(
+      r => r.map(p => apply(this.fillCTM, p[0], p[1]) as [number, number]),
+    ).filter(r => r.length >= 3);
+    if (!hoopRings.length) return;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let area = 0;
+    for (const ring of hoopRings) {
+      let a = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const p = ring[i], q = ring[(i + 1) % ring.length];
+        a += p[0] * q[1] - q[0] * p[1];
+        if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
+        if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
+      }
+      area = Math.max(area, Math.abs(a / 2));
+    }
+    const diameter = Math.hypot(maxX - minX, maxY - minY);
+    if (!(diameter > 0) || !(area > 0)) return;
+
+    const localOf = (x: number, y: number): [number, number] => apply(inv, x, y);
+    const baseSpacing = this.fillSpacing > 0 ? this.fillSpacing : 0.4;
+    const topSpacing = opts.coarse ? Math.min(baseSpacing * 4, 5) : baseSpacing;
+    // `v` is the cross-field position, assigned by placement order (§14),
+    // normalized by an estimate of the row count so it spans ~0..1.
+    const estRows = Math.max(1, Math.round(diameter / Math.max(0.25, topSpacing)));
+    const vOf = (rowIdx: number) => Math.min(rowIdx / estRows, 1);
+
+    // Field: local heading → hoop unit direction. Non-finite or a degenerate
+    // mapped vector is a singularity (§6) → null halts the streamline.
+    const fieldFn = (x: number, y: number): [number, number] | null => {
+      let theta: number;
+      if (opts.dir) { const [lx, ly] = localOf(x, y); theta = opts.dir(lx, ly); }
+      else theta = opts.constAngle;
+      if (!isFinite(theta)) return null;
+      if (opts.rotate90) theta += 90;
+      const [vx, vy] = vfromheading(theta, 1);
+      const [hxv, hyv] = linApply(this.fillCTM, vx, vy);
+      const L = Math.hypot(hxv, hyv);
+      if (!(L > 1e-9)) return null;
+      return [hxv / L, hyv / L];
+    };
+    let spacingClampWarned = false;
+    const spacingFn = (x: number, y: number, rowIdx: number): number => {
+      if (opts.coarse || !opts.shape) return topSpacing;
+      const [lx, ly] = localOf(x, y);
+      let sp = opts.shape(lx, ly, rowIdx, vOf(rowIdx))[0];
+      if (!(sp > 0)) {
+        if (!spacingClampWarned) {
+          this.warnings.push('fill: spacing must be greater than 0 — clamped to 0.25 mm');
+          spacingClampWarned = true;
+        }
+        sp = 0.25;
+      }
+      return sp;
+    };
+    const defaultLen = this.fillLen !== null ? this.fillLen : Math.min(Math.max(this.stitchLen, 1), 7);
+    const lenFn = (lx: number, ly: number, rowIdx: number, v: number): number => {
+      if (opts.coarse || !opts.shape) return opts.coarse ? 4 : defaultLen;
+      return opts.shape(lx, ly, rowIdx, v)[1];
+    };
+    const phaseFn = (lx: number, ly: number, rowIdx: number, v: number): number => {
+      if (opts.coarse || !opts.shape) return 0.5;
+      return opts.shape(lx, ly, rowIdx, v)[2];
+    };
+
+    const { rows, truncated, seedCapped } = this._placeStreamlines(
+      hoopRings, fieldFn, spacingFn, diameter, area,
+    );
+    if (!rows.length) return;
+
+    if (truncated && !opts.underlay)
+      this.warnings.push(
+        'fill: a streamline was truncated at the length cap — possible field singularity (the field may spiral or diverge here)',
+      );
+    if (seedCapped && !opts.underlay)
+      this.warnings.push(
+        'fill: streamline seed budget reached — coverage may be incomplete (the field may be pathological; re-seed or simplify it)',
+      );
+
+    // Final hoop point for a placement (hoop-affine) point: identity when no
+    // warp (byte-exact); otherwise round-trip to local and re-apply the warp.
+    const toFinal = (x: number, y: number): [number, number] => {
+      if (!this.fillHasWarp) return [x, y];
+      const [lx, ly] = apply(inv, x, y);
+      return this._mapFill(lx, ly);
+    };
+
+    let cumPhase = 0;
+    for (let r = 0; r < rows.length; r++) {
+      let poly = rows[r];
+      // Boustrophedon: alternate row direction in placement order (§8/§14).
+      if (r % 2 === 1) poly = poly.slice().reverse();
+      poly = this._extendForPullComp(poly);
+      const v = vOf(r);
+      const pen = this._walkStreamline(poly, r, v, cumPhase, lenFn, localOf);
+      // Advance the cumulative brick phase by this row's phase (§8).
+      const [sx, sy] = localOf(poly[0][0], poly[0][1]);
+      cumPhase += phaseFn(sx, sy, r, v);
+      if (!pen.length) continue;
+      const fillPts: FillPoint[] = pen.map(p => {
+        const [fx, fy] = toFinal(p[0], p[1]);
+        return { x: fx, y: fy, jump: false };
+      });
+      this._emitFillPts(fillPts, opts.underlay);
+    }
+  }
+
+  /** Extend a streamline's two endpoints outward along the end tangent by
+   * pullComp, so rows reach the boundary against fabric pull (§4.4). */
+  _extendForPullComp(poly: [number, number][]): [number, number][] {
+    if (!(this.pullComp > 0) || poly.length < 2) return poly;
+    const ext = this.pullComp;
+    const a = poly[0], a1 = poly[1];
+    const b = poly[poly.length - 1], b1 = poly[poly.length - 2];
+    const ed = (p: [number, number], q: [number, number]): [number, number] => {
+      const dx = p[0] - q[0], dy = p[1] - q[1];
+      const l = Math.hypot(dx, dy) || 1;
+      return [p[0] + (dx / l) * ext, p[1] + (dy / l) * ext];
+    };
+    return [ed(a, a1), ...poly.slice(1, -1), ed(b, b1)];
+  }
+
+  /**
+   * Walk a streamline polyline into penetrations spaced by `lenFn` (clamped
+   * 1–7 mm), preserving the first and last vertex, with the start phase shifted
+   * by the cumulative brick offset (§8). Returns hoop-affine penetration points.
+   */
+  _walkStreamline(
+    poly: [number, number][],
+    row: number, v: number, cumPhase: number,
+    lenFn: (x: number, y: number, row: number, v: number) => number,
+    localOf: (x: number, y: number) => [number, number],
+  ): [number, number][] {
+    const out: [number, number][] = [];
+    if (poly.length < 2) return poly.slice();
+    // Cumulative arc length.
+    const cum = [0];
+    for (let i = 1; i < poly.length; i++)
+      cum.push(cum[i - 1] + Math.hypot(poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]));
+    const total = cum[cum.length - 1];
+    if (!(total > 0)) return [poly[0].slice() as [number, number]];
+
+    const at = (s: number): [number, number] => {
+      const a = Math.min(Math.max(s, 0), total);
+      let seg = 1;
+      while (seg < poly.length - 1 && cum[seg] < a) seg++;
+      const segLen = cum[seg] - cum[seg - 1] || 1;
+      const f = (a - cum[seg - 1]) / segLen;
+      return [
+        poly[seg - 1][0] + (poly[seg][0] - poly[seg - 1][0]) * f,
+        poly[seg - 1][1] + (poly[seg][1] - poly[seg - 1][1]) * f,
+      ];
+    };
+
+    out.push([poly[0][0], poly[0][1]]);
+    // Brick offset: a fractional shift of the first interior penetration.
+    const frac = ((cumPhase % 1) + 1) % 1;
+    const [l0x, l0y] = localOf(poly[0][0], poly[0][1]);
+    const firstLen = Math.min(Math.max(lenFn(l0x, l0y, row, v), 1), 7);
+    let s = frac > 1e-6 ? frac * firstLen : firstLen;
+    let guard = 0;
+    const guardMax = Math.ceil(total / 0.5) + 16;
+    while (s < total - 1e-6 && guard++ < guardMax) {
+      const p = at(s);
+      out.push(p);
+      const [lx, ly] = localOf(p[0], p[1]);
+      const len = Math.min(Math.max(lenFn(lx, ly, row, v), 1), 7);
+      s += len;
+    }
+    out.push([poly[poly.length - 1][0], poly[poly.length - 1][1]]);
+    return out;
+  }
+
   endFill() {
     if (!this.recording)
       throw new NeedlescriptError('endfill without a matching beginfill');
@@ -964,6 +1431,118 @@ export class Machine {
       this.fillLen !== null
         ? this.fillLen
         : Math.min(Math.max(this.stitchLen, 1), 7);
+
+    // Effective row direction / spacing / length for the tatami pass. For a
+    // built-in fill these are the fill-state fields; an armed programmable fill
+    // whose field+shape are constant overrides them here so the byte-identical
+    // tatami short-circuit (§3.3/§7.5) drives the same generator.
+    let useAngle = this.fillAngle;
+    let useSpacing = this.fillSpacing;
+    let useLen = effLen;
+
+    if (this.fillArmed) {
+      const dir = this.fillDirReporter;
+      const shape = this.fillShapeReporter;
+      // Consume the arming exactly at the matching endfill (§2), whatever path
+      // we take below.
+      const disarm = () => {
+        this.fillArmed = false;
+        this.fillDirReporter = null;
+        this.fillShapeReporter = null;
+        this.localRings = [];
+        this.curLocalRing = null;
+      };
+
+      // Local-space bbox of the recorded region, for constant-field sampling.
+      let lminX = Infinity, lminY = Infinity, lmaxX = -Infinity, lmaxY = -Infinity;
+      for (const ring of this.localRings) for (const p of ring) {
+        if (p[0] < lminX) lminX = p[0]; if (p[0] > lmaxX) lmaxX = p[0];
+        if (p[1] < lminY) lminY = p[1]; if (p[1] > lmaxY) lmaxY = p[1];
+      }
+      const sampleLocals: [number, number][] = [];
+      for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++)
+        sampleLocals.push([
+          lminX + (lmaxX - lminX) * i / 4,
+          lminY + (lmaxY - lminY) * j / 4,
+        ]);
+
+      // Constant-field detection: no field ⇒ the constant fillAngle; otherwise
+      // the field is constant only if every sample returns the same heading.
+      let constField = true;
+      let theta0 = this.fillAngle; // local heading
+      if (dir) {
+        theta0 = dir(sampleLocals[0][0], sampleLocals[0][1]);
+        for (const [lx, ly] of sampleLocals) {
+          const t = dir(lx, ly);
+          if (!isFinite(t) || Math.abs(t - theta0) > 1e-7) { constField = false; break; }
+        }
+      }
+      // Constant-shape detection: no shape ⇒ trivially constant; otherwise the
+      // three returns must match across samples and phase must be the default
+      // 0.5 (other phases need the per-row streamline emitter).
+      let constShape = true;
+      let scSpacing = this.fillSpacing, scLen = effLen;
+      if (shape) {
+        const probes: [number, number, number][] = [
+          [0, 0], [1, 0.5], [2, 1],
+        ].map(([r, v]) => {
+          const [sp, ln, ph] = shape(sampleLocals[0][0], sampleLocals[0][1], r, v);
+          return [sp, ln, ph];
+        });
+        const [sp0, ln0, ph0] = probes[0];
+        constShape = Math.abs(ph0 - 0.5) < 1e-9 &&
+          probes.every(p => Math.abs(p[0] - sp0) < 1e-9 && Math.abs(p[1] - ln0) < 1e-9 && Math.abs(p[2] - ph0) < 1e-9);
+        scSpacing = sp0;
+        scLen = Math.min(Math.max(ln0, 1), 7);
+      }
+
+      if (constField && constShape) {
+        // Byte-identical tatami short-circuit. Map the constant local heading to
+        // a hoop heading; the rings already carry the transform, so the angle is
+        // hoop-space like the built-in fill.
+        const [hvx, hvy] = linApply(this.fillCTM, ...vfromheading(theta0, 1));
+        useAngle = vheading([hvx, hvy]);
+        if (shape) { useSpacing = scSpacing; useLen = scLen; }
+        disarm();
+        // fall through to the built-in tatami pass below
+      } else {
+        // General streamline fill. Underlay first (cross-grain rotated field,
+        // coarser spacing), then the topping. Mirrors the built-in order.
+        const ringArea = (r: [number, number][]) => {
+          let s = 0;
+          for (let i = 0; i < r.length; i++) {
+            const a = r[i], b = r[(i + 1) % r.length];
+            s += a[0] * b[1] - b[0] * a[1];
+          }
+          return Math.abs(s / 2);
+        };
+        const area = Math.max(0, ...rings.map(ringArea));
+        let uMode: 'off' | 'tatami' | 'edge' | 'both' = 'off';
+        if (this.fillUnderlayMode === 'auto') uMode = area > 100 ? 'both' : 'tatami';
+        else if (this.fillUnderlayMode === 'tatami') uMode = 'tatami';
+        else if (this.fillUnderlayMode === 'edge') uMode = 'edge';
+        if ((uMode === 'edge' || uMode === 'both') && area >= 30) {
+          for (const ring of rings) {
+            const inset = this._insetRing(ring, rings, 0.5);
+            if (inset.length) this._emitFillPts(this._subdividePts(inset, 2.5), true);
+          }
+        }
+        if (uMode === 'tatami' || uMode === 'both') {
+          this._generateProgrammableFill({
+            dir, shape: null, constAngle: this.fillAngle,
+            rotate90: true, coarse: true, underlay: true,
+          });
+        }
+        this._generateProgrammableFill({
+          dir, shape, constAngle: this.fillAngle,
+          rotate90: false, coarse: false, underlay: false,
+        });
+        disarm();
+        const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
+        if (back > 0.6) this._push('jump', hx, hy);
+        return;
+      }
+    }
 
     // ---- Underlay (sewn first, so the topping rides on a stable base) ----
     const ringArea = (r: [number, number][]) => {
@@ -987,15 +1566,15 @@ export class Machine {
     }
     if (uMode === 'tatami' || uMode === 'both') {
       const uPts = generateFill(rings, {
-        angle: this.fillAngle + 90, // cross-grain so the topping doesn't sink between rows
-        spacing: Math.min(this.fillSpacing * 4, 5),
+        angle: useAngle + 90, // cross-grain so the topping doesn't sink between rows
+        spacing: Math.min(useSpacing * 4, 5),
         stitchLen: 4,
         endNear,
         comp: -0.6, // inset so the underlay never peeks out of the topping
       });
       if (this.doubleUnderlay && uPts.length) {
         const uPts2 = generateFill(rings, {
-          angle: this.fillAngle, spacing: Math.min(this.fillSpacing * 4, 5),
+          angle: useAngle, spacing: Math.min(useSpacing * 4, 5),
           stitchLen: 4, endNear, comp: -0.6,
         });
         this._emitFillPts(uPts2, true);
@@ -1005,9 +1584,9 @@ export class Machine {
 
     // ---- Topping ----
     const pts = generateFill(rings, {
-      angle: this.fillAngle,
-      spacing: this.fillSpacing,
-      stitchLen: effLen,
+      angle: useAngle,
+      spacing: useSpacing,
+      stitchLen: useLen,
       endNear,
       comp: this.pullComp, // rows run along the stitch axis: extend against pull
     });

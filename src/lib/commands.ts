@@ -238,6 +238,10 @@ export const RESERVED = new Set<string>([
   'let', 'def', 'return', 'step', 'true', 'false', 'in',
   // Loop control (RFC-4).
   'break', 'continue',
+  // Programmable fills: `fill dir @d shape @s` arms the next beginfill…endfill.
+  // `dir`/`shape` are only positional keywords after `fill`, so they are NOT
+  // reserved globally — existing variables named dir/shape keep working.
+  'fill',
   ...Object.keys(ALIASES),
   ...Object.keys(BUILTIN_ARITY),
   ...Object.keys(TRANSFORM_ARITY),

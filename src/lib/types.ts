@@ -70,6 +70,7 @@ export type ASTNode =
   | { k: 'continue'; line: number }
   | { k: 'cmd'; name: string; args: ExprNode[]; line: number; label?: string; word?: string }
   | { k: 'listcmd'; name: string; args: ExprNode[]; line: number }
+  | { k: 'fillarm'; dirRef: string | null; shapeRef: string | null; line: number }
   | { k: 'call'; name: string; args: ExprNode[]; line: number };
 
 export type ExprNode =

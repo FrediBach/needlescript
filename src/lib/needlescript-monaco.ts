@@ -593,6 +593,15 @@ const NS_ITEMS: NSItem[] = [
     insertText: 'endfill',
   },
   {
+    label: 'fill',
+    kindName: 'function',
+    detail: 'programmable fill (directional / textured)',
+    documentation: 'Arm a programmable fill for the next `beginfill…endfill`. `fill dir @field` drives the row direction from a field reporter `def field(p) [ return heading ]` (a directional/contour/flow fill); `fill shape @texture` drives spacing/length/brick from `def texture(p, row, v) [ return [spacing, len, phase] ]`. `fill @field` is shorthand for the direction channel. The engine keeps even-spacing coverage, hole clipping, pull-comp and underlay.',
+    insertText: 'fill dir @${1:field}',
+    isSnippet: true,
+    params: [['field']],
+  },
+  {
     label: 'fillangle',
     kindName: 'function',
     detail: 'fill row direction (degrees)',
@@ -1730,7 +1739,7 @@ export function registerNeedlescript(monaco: Monaco): void {
     // ── Stitch / thread / professional / debug commands (amber) ─────
     stitchCmds: [
       'stitchlen', 'stitchlength', 'satin', 'density', 'bean', 'estitch',
-      'beginfill', 'endfill', 'fillangle', 'fillspacing', 'filllen',
+      'beginfill', 'endfill', 'fill', 'fillangle', 'fillspacing', 'filllen',
       'lock', 'pullcomp', 'shortstitch', 'autotrim', 'maxdensity',
       'color', 'stop', 'trim',
       'seed', 'print', 'mark', 'assert',

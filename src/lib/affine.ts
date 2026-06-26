@@ -38,6 +38,27 @@ export function linApply(m: Mat, x: number, y: number): Pt {
 }
 
 /**
+ * Invert an affine matrix, or return null if it is degenerate (|det| ≈ 0,
+ * e.g. a scale-to-zero). Used by the programmable fill to map an
+ * engine-chosen hoop sample point back to local space before handing it to
+ * a field/shape reporter, so reporters always see local coordinates (§6)
+ * while placement runs in physical hoop space.
+ */
+export function invert(m: Mat): Mat | null {
+  const det = m[0] * m[3] - m[1] * m[2];
+  if (!(Math.abs(det) > 1e-12)) return null;
+  const id = 1 / det;
+  const a = m[3] * id;
+  const b = -m[1] * id;
+  const c = -m[2] * id;
+  const d = m[0] * id;
+  // translation: -(A^{-1}) · t
+  const e = -(a * m[4] + c * m[5]);
+  const f = -(b * m[4] + d * m[5]);
+  return [a, b, c, d, e, f];
+}
+
+/**
  * Compose so the result maps p → outer(inner(p)). Nesting transform blocks
  * composes this way: `translate … [ rotate … [ … ] ]` builds
  * compose(translate, rotate), i.e. the inner (rotate) is applied first —

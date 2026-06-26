@@ -786,6 +786,48 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       if (!atEnd() && peek().t === 'qword') label = next().v as string;
       return { k: 'cmd', name: 'print', args: [parseExpr()], line: tok.line, label };
     }
+    // `fill` arms programmable fill for the next beginfill…endfill (§2). Four
+    // surface forms:  fill @d  |  fill dir @d  |  fill shape @s  |
+    // fill dir @d shape @s. `dir`/`shape` are recognized only here, immediately
+    // after `fill` (positional keywords, like clippaths' "op strings), so
+    // ordinary variables named dir/shape are untouched.
+    if (canonical === 'fill') {
+      next();
+      // Read one `@name` procedure reference, reusing parsePrimary's resolution
+      // (it errors loudly if @name isn't a real def/to procedure).
+      const readRef = (channel: string): string => {
+        if (atEnd() || peek().t !== 'pref')
+          throw new NeedlescriptError(
+            `fill ${channel} needs a procedure reference, e.g.  fill ${channel} @${channel === 'shape' ? 'texture' : 'contour'}`,
+            tok.line,
+          );
+        const e = parsePrimary();
+        if (e.k !== 'procref')
+          throw new NeedlescriptError(`fill ${channel} needs a procedure reference (@name)`, tok.line);
+        return e.name;
+      };
+      const isKw = (w: string) =>
+        !atEnd() && peek().t === 'word' && peek().v === w;
+      let dirRef: string | null = null;
+      let shapeRef: string | null = null;
+      if (isKw('dir')) {
+        next();
+        dirRef = readRef('dir');
+        if (isKw('shape')) { next(); shapeRef = readRef('shape'); }
+      } else if (isKw('shape')) {
+        next();
+        shapeRef = readRef('shape');
+      } else {
+        // Bare `fill @name` — the shorthand: @name is the DIRECTION field (§2).
+        if (atEnd() || peek().t !== 'pref')
+          throw new NeedlescriptError(
+            'fill needs a direction field or shape reporter, e.g.  fill @contour  or  fill shape @texture',
+            tok.line,
+          );
+        dirRef = readRef('dir');
+      }
+      return { k: 'fillarm', dirRef, shapeRef, line: tok.line };
+    }
     if (QWORD_BUILTINS[canonical]) {
       next();
       const allowed = QWORD_BUILTINS[canonical];

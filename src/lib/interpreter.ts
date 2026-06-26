@@ -921,6 +921,82 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     return [r[0], r[1], r[2], r[3], r[4]];
   }
 
+  // ---- Programmable fill reporters (`fill dir @d shape @s`, §3) ----------
+  // Same two-phase posture as satin: an eager arity check at the arming site,
+  // then a per-sample return-value check. Every violation is a loud,
+  // line-numbered error naming the offending channel. Inputs are LOCAL-space.
+
+  function applyFillDirArity(name: string, line?: number) {
+    const proc = procs[name];
+    if (!proc)
+      throw new NeedlescriptError(`the fill dir reporter @${name} is not defined`, line);
+    if (proc.params.length !== 1)
+      throw new NeedlescriptError(
+        `the fill dir reporter @${name} must take exactly 1 parameter (the point [x, y]), but takes ${proc.params.length}`,
+        line,
+      );
+  }
+
+  /** Invoke a dir reporter; returns a turtle heading. Non-finite ⇒ NaN (a field
+   * singularity the generator handles per §5.2), not an error. */
+  function applyFillDir(name: string, px: number, py: number, line?: number): number {
+    const out = callProcVals(name, [allocList([px, py], line)], 0, line);
+    if (out === undefined)
+      throw new NeedlescriptError(
+        `the fill dir reporter @${name} never reached output/return — it must return a heading (a number)`,
+        line,
+      );
+    if (typeof out !== 'number')
+      throw new NeedlescriptError(
+        `the fill dir reporter @${name} must return a heading (a number), got ${describeVal(out)}`,
+        line,
+      );
+    return out;
+  }
+
+  function applyFillShapeArity(name: string, line?: number) {
+    const proc = procs[name];
+    if (!proc)
+      throw new NeedlescriptError(`the fill shape reporter @${name} is not defined`, line);
+    if (proc.params.length !== 3)
+      throw new NeedlescriptError(
+        `the fill shape reporter @${name} must take exactly 3 parameters (p, row, v), but takes ${proc.params.length}`,
+        line,
+      );
+  }
+
+  /** Invoke a shape reporter; returns the validated [spacing, len, phase]. */
+  function applyFillShape(
+    name: string, px: number, py: number, row: number, v: number, line?: number,
+  ): [number, number, number] {
+    const out = callProcVals(name, [allocList([px, py], line), row, v], 0, line);
+    if (out === undefined)
+      throw new NeedlescriptError(
+        `the fill shape reporter @${name} never reached output/return — it must return [spacing, len, phase]`,
+        line,
+      );
+    if (!isList(out))
+      throw new NeedlescriptError(
+        `the fill shape reporter @${name} must return a list of 3 numbers [spacing, len, phase], got ${describeVal(out)}`,
+        line,
+      );
+    if (out.items.length !== 3)
+      throw new NeedlescriptError(
+        `the fill shape reporter @${name} must return exactly 3 numbers [spacing, len, phase], got a list of ${out.items.length}`,
+        line,
+      );
+    const slot = ['spacing', 'len', 'phase'];
+    const r = out.items.map((val, k) => {
+      if (typeof val !== 'number')
+        throw new NeedlescriptError(
+          `the fill shape reporter @${name} returned ${describeVal(val)} for ${slot[k]} (slot ${k + 1} of 3) — it must be a number`,
+          line,
+        );
+      return val;
+    });
+    return [r[0], r[1], r[2]];
+  }
+
   /** Clamp humanize jitter to a sane embroidery range (0–2 mm), warning if out. */
   function clampHumanize(amount: number): number {
     const v = Math.min(Math.max(amount, 0), 2);
@@ -1198,6 +1274,42 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       case 'continue': throw new LoopSignal('continue', st.line);
       case 'call': {
         callProc(st.name, st.args, env, repcount, depth, contextLine ?? st.line);
+        return;
+      }
+      case 'fillarm': {
+        m.currentLine = contextLine ?? st.line;
+        // Arm programmable fill for the next beginfill…endfill (§2). Validate
+        // each channel's reporter arity eagerly so a malformed signature is
+        // caught here, at the arming site, not deep in the generator.
+        if (m.recording)
+          throw new NeedlescriptError(
+            'fill armed while a beginfill is open — close it with endfill before arming a new fill',
+            st.line,
+          );
+        if (st.dirRef) {
+          applyFillDirArity(st.dirRef, st.line);
+          const ref = st.dirRef;
+          m.fillDirReporter = (px, py) => applyFillDir(ref, px, py, st.line);
+        } else {
+          m.fillDirReporter = null;
+        }
+        if (st.shapeRef) {
+          applyFillShapeArity(st.shapeRef, st.line);
+          const ref = st.shapeRef;
+          m.fillShapeReporter = (px, py, row, v) => applyFillShape(ref, px, py, row, v, st.line);
+        } else {
+          m.fillShapeReporter = null;
+        }
+        m.fillArmed = true;
+        // One-time note when a channel supersedes a non-default numeric setting (§2).
+        if (m.fillDirReporter && m.fillAngle !== 0)
+          m.warnings.push(
+            `fillangle is ignored while fill dir @${st.dirRef} is engaged — the direction field supersedes it`,
+          );
+        if (m.fillShapeReporter && (m.fillSpacing !== 0.4 || m.fillLen !== null))
+          m.warnings.push(
+            `fillspacing/filllen are ignored while fill shape @${st.shapeRef} is engaged — the shape reporter supersedes them`,
+          );
         return;
       }
       case 'listcmd': {
