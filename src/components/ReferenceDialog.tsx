@@ -332,6 +332,186 @@ const SECTIONS: RefSection[] = [
   },
 ];
 
+// ── Glossary ──────────────────────────────────────────────────────────────────
+
+interface GlossTerm {
+  term: string;
+  def: string;
+}
+
+interface GlossSection {
+  title: string;
+  intro?: string;
+  terms: GlossTerm[];
+}
+
+const GLOSSARY_LEAD =
+  'NeedleScript sits where two crafts meet: machine embroidery and generative programming. ' +
+  'This glossary explains both vocabularies. If you arrive as a programmer, the embroidery sections tell you ' +
+  'what the machine is physically doing to thread and fabric — and why a command like satin or pullcomp exists. ' +
+  'If you arrive as an embroiderer, the math sections show how a handful of small rules (noise, vectors, random ' +
+  'seeds) compound into designs that look hand-made yet stay perfectly reproducible. Generative design works ' +
+  'precisely because it is deterministic: the same seed always sews the same piece, so randomness becomes a ' +
+  'material you can shape rather than an accident you tolerate.';
+
+const GLOSSARY: GlossSection[] = [
+  {
+    title: 'Stitches & thread',
+    intro: 'The atoms of embroidery. Every NeedleScript program ultimately reduces to needle penetrations joined by thread — these terms name the patterns those penetrations make.',
+    terms: [
+      { term: 'Stitch', def: 'One needle penetration to the next. The thread pulled between two consecutive needle-down points. Length matters: too long and the thread snags or floats above the fabric, too short and the needle perforates the cloth like a stamp.' },
+      { term: 'Penetration', def: 'A single point where the needle pierces the fabric. Embroidery is really a sequence of penetrations; everything else (length, density, coverage) is a way of describing how they are spaced. The density heatmap counts penetrations per area.' },
+      { term: 'Running stitch', def: 'The simplest stitch: a straight line of evenly spaced penetrations, one after another — like hand sewing. The default mode of the NeedleScript turtle; stitchlen sets the spacing.' },
+      { term: 'Satin / satin column', def: 'A dense zigzag that lays thread back and forth across a narrow shape, giving a smooth, glossy, raised surface — used for lettering, outlines and borders. The two edges are called rails and the path you steer is the spine or centre-line.' },
+      { term: 'Bean stitch', def: 'A bold running stitch where each segment is sewn several times (back and forth) so the line reads heavier and darker without changing colour. NeedleScript: bean n.' },
+      { term: 'Blanket stitch', def: 'A decorative edging stitch with little perpendicular "prongs" along one side of the travel — traditionally used to finish the edge of a blanket. NeedleScript: estitch.' },
+      { term: 'Jump / travel', def: 'Moving the needle without sewing (pen up). The machine carries the thread across a gap; if the gap is long the loose thread (a connector thread) must be trimmed so it does not snag.' },
+      { term: 'Trim', def: 'Cutting the thread mid-design — either deliberately (trim) or automatically before a long jump (autotrim) — so no loose strand bridges two areas.' },
+      { term: 'Tie-in / tie-off (lock)', def: 'A cluster of tiny back-stitches sewn wherever thread starts or ends, anchoring it so the embroidery cannot unravel. NeedleScript adds these automatically (lock) at design start/end, colour changes and trims.' },
+      { term: 'Colour change / stop', def: 'A pause in the stitch file telling the machine operator to swap thread to the next colour. NeedleScript emits one with color n; stop advances to the next thread.' },
+      { term: 'Thread palette', def: 'The ordered set of thread colours a design uses. Thread "number" refers to a slot in that palette, not a physical spool brand.' },
+    ],
+  },
+  {
+    title: 'Fills & coverage',
+    intro: 'How an area — rather than a line — gets covered in thread, and how much thread is too much.',
+    terms: [
+      { term: 'Fill', def: 'Stitching that covers an enclosed region rather than tracing a line. NeedleScript builds a fill between beginfill and endfill.' },
+      { term: 'Tatami fill', def: 'The standard fill: long parallel rows of running stitch that march across a shape, with penetrations brick-offset row to row so the needle holes never line up into a visible seam. Named for the woven look of tatami mats.' },
+      { term: 'Fill angle', def: 'The direction the fill rows run. Rotating it changes how light catches the thread, which reads as a different shade even in one colour.' },
+      { term: 'Fill spacing / density', def: 'The gap between fill rows (or between satin penetrations). Tighter spacing means more thread, richer colour and more coverage — but past a point the fabric cannot absorb it.' },
+      { term: 'Directional / contour fill', def: 'A fill whose rows follow a field of headings instead of straight parallel lines, so the grain of the stitching curves with the shape — like brush strokes following a form. NeedleScript: fill dir @field.' },
+      { term: 'Coverage', def: 'How completely thread hides the fabric beneath, measured in layers — 1 layer means the area is covered once. Generative programs can read coverage back mid-design (coverat) to adapt.' },
+      { term: 'Density (layers)', def: 'Thread stacked per unit area. Around 2.5–3.5 layers embroidery stops behaving like fabric: needles deflect, thread breaks and the patch puckers. maxdensity warns before you cross that line.' },
+      { term: 'Even-odd rule', def: 'The rule that decides what counts as "inside" a shape with holes: a point is inside if a ray from it crosses the boundary an odd number of times. It is why an inner ring inside a fill becomes a hole rather than more fill.' },
+    ],
+  },
+  {
+    title: 'Stabilization & finishing',
+    intro: 'Real thread under tension distorts fabric. These terms cover the craft of making a design sew out at the size and quality you designed.',
+    terms: [
+      { term: 'Underlay', def: 'Light stitches laid down first, beneath the visible stitching, to stabilise the fabric and give the top layer something to grip — so satin and fills sit crisp instead of sinking into the cloth.' },
+      { term: 'Pull compensation', def: 'Thread tension pulls fabric inward as it sews, so a column comes out narrower than drawn. Pull comp deliberately oversizes shapes (widens satin, extends fill rows) so the finished stitching lands at its true digitized size. NeedleScript: pullcomp.' },
+      { term: 'Push / pull distortion', def: 'The fabric movement caused by stitching: thread pulls a shape narrower along the stitch direction and pushes it longer across it. Underlay and pull compensation exist to counter this.' },
+      { term: 'Short stitch', def: 'On a tight curve, the inner edge of a satin column would crowd into one spot and break the needle or shred the fabric. Short-stitching automatically shortens alternate inner stitches to relieve that crowding.' },
+      { term: 'Puckering', def: 'The wrinkling of fabric when too much thread is packed in too tightly. The visible failure mode that density limits and underlay are designed to prevent.' },
+      { term: 'Digitizing', def: 'The craft of turning artwork into machine stitches — choosing stitch types, angles, density, underlay and order. NeedleScript is a programmable form of digitizing.' },
+    ],
+  },
+  {
+    title: 'Fabric, hoop & machine',
+    intro: 'The physical stage the turtle performs on.',
+    terms: [
+      { term: 'Hoop', def: 'The ring that clamps fabric taut under the needle. It defines the machine\'s reachable area. NeedleScript models a 100 mm hoop with a 47 mm-radius sewable field.' },
+      { term: 'Sewable field', def: 'The usable area inside the hoop where the needle can actually reach. Stitches outside it trigger a hoop-overflow warning.' },
+      { term: 'Woven / knit / stretch', def: 'Fabric families. Woven cloth (denim, canvas) is stable and tolerates dense stitching; knits and stretch fabrics move under the needle and need gentler density and more pull compensation. fabric presets bundle the right defaults.' },
+      { term: 'Backing / topping', def: 'Stabiliser added to the fabric: backing behind it for support, topping on top of fluffy fabrics (like fleece) so stitches do not sink in.' },
+      { term: 'Needle up / down', def: 'Whether the needle is sewing (down, pen down) or merely travelling (up, pen up). The single most important state of the turtle, since it decides whether motion lays thread.' },
+    ],
+  },
+  {
+    title: 'Stitch files & export',
+    intro: 'How a finished design leaves NeedleScript and reaches a machine.',
+    terms: [
+      { term: 'Tajima DST', def: 'The most common embroidery stitch-file format. It stores the design as a list of relative needle moves plus control codes for colour stops and trims. NeedleScript compiles every program to a machine-ready .DST file.' },
+      { term: 'Stitch sequence', def: 'The ordered list of every penetration and command in the order the machine will sew them. Playback scrubs through this sequence so you can watch the design build.' },
+      { term: 'Machine-ready', def: 'Geometry that has been resolved all the way down to concrete needle penetrations within the machine\'s limits — no longer abstract curves, but coordinates a machine can sew without interpretation.' },
+    ],
+  },
+  {
+    title: 'Coordinates & the turtle',
+    intro: 'NeedleScript inherits Logo\'s turtle: an agent that carries the needle through the hoop. Geometry is described by how the turtle moves, not by absolute drawing commands — which is what makes the language feel like giving directions.',
+    terms: [
+      { term: 'Turtle', def: 'The imaginary agent that holds the needle. It has a position and a heading; you move and turn it, and thread follows. A program is a set of instructions to this agent.' },
+      { term: 'Heading', def: 'The direction the turtle faces, in degrees. In NeedleScript 0 points up (north) and angles increase clockwise, so rt 90 faces east. Matches a compass, not standard math angles.' },
+      { term: 'Coordinate / point', def: 'A position in the hoop written [x, y] in millimetres, measured from the origin (0, 0) at the centre. The basic unit nearly every geometry function consumes and returns.' },
+      { term: 'Origin', def: 'The point (0, 0) — the centre of the hoop and the turtle\'s home. Rotations and mirrors happen about it unless told otherwise.' },
+      { term: 'Local frame vs hoop space', def: 'The turtle moves in its own local coordinates; a transform block can map those into different hoop-space positions. Stitch length and satin width are measured in real hoop space so previews stay physically accurate.' },
+      { term: 'Millimetre (mm)', def: 'The unit of everything spatial in NeedleScript. Working in real-world millimetres means a design\'s size on screen is its size on the garment.' },
+    ],
+  },
+  {
+    title: 'Randomness & noise',
+    intro: 'The engine of generative design. The trick is controlled randomness: numbers that look unpredictable but are perfectly repeatable, so a design can feel organic while remaining a reproducible artifact.',
+    terms: [
+      { term: 'Seed', def: 'A starting number that determines an entire sequence of "random" values. Same seed, same sequence, same design — every time. Change the seed and you get a different but equally valid piece. This determinism is what makes generative art shareable and editable.' },
+      { term: 'Deterministic / reproducible', def: 'A program that always produces the exact same output from the same inputs. NeedleScript is deterministic on purpose: randomness is a controlled ingredient, not chaos, so you can tweak one slider and trust everything else stays put.' },
+      { term: 'RNG (random number generator)', def: 'The algorithm that turns a seed into a stream of numbers. NeedleScript can fork a child RNG (e.g. for shuffle) so one part of a design can be randomised without shifting the random stream the rest depends on.' },
+      { term: 'Pseudo-random', def: 'Numbers that pass for random but are computed by a fixed formula from the seed. "Pseudo" is the whole point — true randomness could not be reproduced.' },
+      { term: 'Value / Perlin noise', def: 'A smooth, continuous form of randomness: nearby points get similar values, so it drifts gently instead of jumping. Sampling it across the hoop gives organic, cloud-like variation — the basis of natural-looking texture. NeedleScript: noise, noise2.' },
+      { term: 'Simplex noise', def: 'A faster, less grid-biased successor to Perlin noise, returning values in -1…1. The go-to source of organic drift for flow fields and jitter. NeedleScript: snoise2, snoise3.' },
+      { term: 'Octaves / fbm', def: 'Fractal Brownian motion: adding several layers of noise at doubling frequencies (octaves) and halving strength, so you get both broad shapes and fine detail at once — the way real coastlines and clouds have structure at every scale. NeedleScript: fbm2.' },
+      { term: 'Gaussian / normal distribution', def: 'The bell curve: random values that cluster around an average and rarely stray far. Used when you want natural variation that mostly stays near a target. NeedleScript: gauss.' },
+      { term: 'Domain of a noise field', def: 'The coordinates you feed into a noise function. Dividing coordinates before sampling (noise(x/15)) "zooms out", making the variation slower and smoother — a key tuning knob.' },
+    ],
+  },
+  {
+    title: 'Vectors & geometry',
+    intro: 'A vector is just a pair of numbers [x, y], but it can mean either a point or a direction-with-length. Treating positions as vectors lets you add, scale and rotate geometry with arithmetic instead of step-by-step turtle moves.',
+    terms: [
+      { term: 'Vector', def: 'An ordered pair [x, y]. Read as a point it names a location; read as a displacement it names "move this far in this direction." Most generative geometry is vector arithmetic.' },
+      { term: 'Unit vector', def: 'A vector exactly 1 long — pure direction, no magnitude. Useful as a building block: scale a unit vector by a length to step a precise distance. NeedleScript: vnorm.' },
+      { term: 'Magnitude / length', def: 'How long a vector is (its distance from the origin), via the Pythagorean theorem. NeedleScript: vlen.' },
+      { term: 'Dot product', def: 'A single number measuring how much two vectors point the same way: large when aligned, zero when perpendicular, negative when opposed. The workhorse of "are these facing the same direction?" tests. NeedleScript: vdot.' },
+      { term: 'Centroid', def: 'The average position of a set of points — the geometric "centre of mass" of a shape. Used to find the middle of a region or to pull points toward balance (see Lloyd\'s relaxation). NeedleScript: centroid.' },
+      { term: 'Bounding box', def: 'The smallest upright rectangle that contains a shape, given as its min and max corners. A cheap way to measure extent or test rough overlap. NeedleScript: bbox.' },
+    ],
+  },
+  {
+    title: 'Curves & paths',
+    intro: 'A machine sews straight segments, but designs want smooth curves. These tools build curves from a few control points, then chop them back into stitch-sized straight pieces.',
+    terms: [
+      { term: 'Path / polyline', def: 'A list of points joined by straight segments — the universal currency of generative geometry. A region is simply a closed path (the last point joins back to the first).' },
+      { term: 'Resampling', def: 'Redistributing the points along a path so segments are a uniform length. This is the bridge from a mathematical curve to physical stitches: resample at your stitch length and the curve sews evenly. NeedleScript: resample.' },
+      { term: 'Spline', def: 'A smooth curve guided by a handful of control points. Catmull-Rom splines pass through their points (good for tracing a freehand shape); Bézier curves are pulled toward off-curve handles (good for precise design). NeedleScript: catmull, bezier.' },
+      { term: 'Chaikin smoothing', def: 'A simple corner-cutting algorithm that rounds a jagged polyline by repeatedly trimming its corners. Each pass makes it smoother. NeedleScript: chaikin.' },
+      { term: 'Control point', def: 'A point that guides the shape of a curve. The curve either passes through it or is pulled toward it, depending on the curve type.' },
+      { term: 'Streamline / flow field', def: 'A path traced by following a field of directions, like a leaf carried on a current. Generative fills lay rows along streamlines so the stitching flows with the form rather than across it.' },
+    ],
+  },
+  {
+    title: 'Generators & computational geometry',
+    intro: 'Higher-level recipes that turn scattered points into structure. These classic algorithms are how a few random dots become organic networks, cells and packed patterns.',
+    terms: [
+      { term: 'Poisson-disc sampling', def: 'Scattering points randomly but never closer than a minimum distance, giving a natural, evenly-spaced "blue noise" look — like freckles or seeds — without clumps or gaps. NeedleScript: scatter.' },
+      { term: 'Voronoi diagram', def: 'Divides space into cells, one per seed point, where each cell is everywhere closer to its seed than to any other. Produces organic, cracked-mud or cellular patterns. NeedleScript: voronoi.' },
+      { term: 'Delaunay triangulation', def: 'Connecting scattered points into triangles that avoid slivers (the dual of the Voronoi diagram). A natural way to mesh a point cloud into a surface. NeedleScript: triangulate.' },
+      { term: 'Convex hull', def: 'The smallest convex outline that wraps a set of points — imagine a rubber band snapped around them. NeedleScript: hull.' },
+      { term: 'Lloyd\'s relaxation', def: 'Repeatedly nudging each point to the centroid of its Voronoi cell, which spreads a clumpy set of points into an even, restful arrangement — the basis of nice stippling. NeedleScript: relax.' },
+      { term: 'Stippling', def: 'Representing tone and shape with many small dots rather than lines. Evenly relaxed scatter points make embroidery stippling.' },
+      { term: 'Offsetting (inset/inflate)', def: 'Growing or shrinking a shape uniformly, like adding a margin or carving one away. Shrinking can split or erase a shape. NeedleScript: offsetpath.' },
+      { term: 'Boolean operations', def: 'Combining two shapes by union (merge), intersection (overlap), difference (subtract) or xor (non-overlap). The cut-and-combine logic behind complex outlines. NeedleScript: clippaths.' },
+    ],
+  },
+  {
+    title: 'Transforms & deformation',
+    intro: 'Ways to move, scale or bend whole groups of stitches at once — so you can design one motif and stamp, mirror or warp it across the hoop.',
+    terms: [
+      { term: 'Transform', def: 'A rule that maps every point of a shape to a new position. Wrapping drawing in a transform block relocates everything it draws, then restores the previous frame — like working under a movable lens.' },
+      { term: 'Affine transform', def: 'The family of transforms that keep straight lines straight and parallel lines parallel: translate, rotate, scale, mirror and skew. Expressible as a single 2×3 matrix. NeedleScript: transform a b c d e f.' },
+      { term: 'Translate / rotate / scale', def: 'The three basic moves: slide a shape, turn it about a pivot, or resize it. NeedleScript scales by re-stitching the larger path at physical spacing rather than stretching existing stitches.' },
+      { term: 'Mirror (reflection)', def: 'Flipping a shape across a line to produce its mirror image — the basis of symmetry. NeedleScript: mirror deg.' },
+      { term: 'Skew (shear)', def: 'Slanting a shape so squares become parallelograms, as if pushed sideways. NeedleScript: skew.' },
+      { term: 'CTM (current transformation matrix)', def: 'The single combined transform currently in effect — the product of all the nested transform blocks you are inside. Borrowed from graphics systems like PostScript and OpenSCAD.' },
+      { term: 'Warp', def: 'A non-affine transform: instead of a matrix, an arbitrary function bends each point freely — fisheye, ripple, twist, domain-warp. Applied before stitches are split so the bent curve still sews cleanly. NeedleScript: warp.' },
+      { term: 'Humanize', def: 'Adding small, coherent, seeded wobble to every penetration so machine-perfect lines gain a hand-stitched imperfection — variation that wanders smoothly rather than jittering randomly. NeedleScript: humanize.' },
+      { term: 'Snap to grid (quantize)', def: 'Forcing every penetration onto a fixed lattice of points, producing a deliberate cross-stitch or pixel aesthetic. NeedleScript: snaptogrid.' },
+    ],
+  },
+  {
+    title: 'Core math operations',
+    intro: 'Small numeric helpers that recur everywhere in generative work — the glue between raw randomness and finished geometry.',
+    terms: [
+      { term: 'Interpolation (lerp)', def: 'Blending between two values by a fraction t: t=0 gives the first, t=1 the second, t=0.5 the midpoint. The fundamental "fade from A to B" operation. NeedleScript: lerp, vlerp.' },
+      { term: 'Remap', def: 'Rescaling a value from one range into another — e.g. turning a noise value in -1…1 into a stitch length in 1…4 mm. The standard way to connect one system\'s numbers to another\'s. NeedleScript: remap.' },
+      { term: 'Clamp', def: 'Forcing a value to stay within a minimum and maximum, so a computed parameter never exceeds safe bounds. NeedleScript: clamp.' },
+      { term: 'Smoothstep', def: 'A soft transition from 0 to 1 that eases in and out instead of switching abruptly — gentler and more natural than a straight ramp. NeedleScript: smoothstep.' },
+      { term: 'Modulo', def: 'The remainder after division, which wraps numbers into a repeating range (useful for cycling through colours or tiling a pattern). NeedleScript uses floor modulo, so the result always takes the sign of the divisor.' },
+      { term: 'Trigonometry (sin/cos)', def: 'Functions that convert an angle into the coordinates of a point on a circle — the mathematics of anything that rotates, waves or orbits. NeedleScript takes degrees, not radians.' },
+    ],
+  },
+];
+
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 
 function slugify(text: string): string {
@@ -559,10 +739,11 @@ function AboutContent() {
 
 // ── Dialog ────────────────────────────────────────────────────────────────────
 
-type TabId = 'reference' | 'tutorial' | 'about';
+type TabId = 'reference' | 'glossary' | 'tutorial' | 'about';
 
 const TAB_LABELS: Record<TabId, string> = {
   reference: 'Language Reference',
+  glossary:  'Glossary',
   tutorial:  'Tutorial',
   about:     'About',
 };
@@ -578,9 +759,9 @@ export default function ReferenceDialog({ open, onClose }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const tutorialNodes = useMemo(() => parseMarkdown(tutorialMd), []);
 
-  // Auto-focus search when dialog opens on reference tab, clear on close
+  // Auto-focus search when dialog opens on a searchable tab, clear on close
   useEffect(() => {
-    if (open && tab === 'reference') {
+    if (open && (tab === 'reference' || tab === 'glossary')) {
       setTimeout(() => inputRef.current?.focus(), 40);
     } else if (!open) {
       setQuery('');
@@ -603,6 +784,15 @@ export default function ReferenceDialog({ open, onClose }: Props) {
         ),
       })).filter(s => s.entries.length > 0)
     : SECTIONS;
+
+  const filteredGloss = q
+    ? GLOSSARY.map(s => ({
+        ...s,
+        terms: s.terms.filter(t =>
+          t.term.toLowerCase().includes(q) || t.def.toLowerCase().includes(q)
+        ),
+      })).filter(s => s.terms.length > 0)
+    : GLOSSARY;
 
   // Shared TabsTrigger className
   const triggerCls = cn(
@@ -669,15 +859,15 @@ export default function ReferenceDialog({ open, onClose }: Props) {
               ))}
             </TabsList>
 
-            {tab === 'reference' && (
+            {(tab === 'reference' || tab === 'glossary') && (
               <Input
                 ref={inputRef}
                 type="text"
-                placeholder="filter commands…"
+                placeholder={tab === 'glossary' ? 'filter terms…' : 'filter commands…'}
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 spellCheck={false}
-                aria-label="Filter language reference"
+                aria-label={tab === 'glossary' ? 'Filter glossary' : 'Filter language reference'}
                 className={cn(
                   "h-7 text-[12.5px] font-mono flex-1 min-w-[120px] w-full sm:w-auto",
                   "bg-secondary border-border text-foreground placeholder:text-muted-foreground",
@@ -702,6 +892,33 @@ export default function ReferenceDialog({ open, onClose }: Props) {
                           <div key={i} className={styles.entry}>
                             <code className={styles.cmd}>{e.cmd}</code>
                             <span className={styles.desc}>{e.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          {/* ── Glossary panel ── */}
+          <TabsContent value="glossary" className="flex flex-col min-h-0 mt-0 overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="pb-4">
+                {!q && <p className={styles.glossLead}>{GLOSSARY_LEAD}</p>}
+                {filteredGloss.length === 0 ? (
+                  <div className={styles.empty}>no matches for &ldquo;{query}&rdquo;</div>
+                ) : (
+                  filteredGloss.map(section => (
+                    <section key={section.title} className={styles.section}>
+                      <h3 className={styles.sectionTitle}>{section.title}</h3>
+                      {!q && section.intro && <p className={styles.sectionNote}>{section.intro}</p>}
+                      <div className={styles.glossTerms}>
+                        {section.terms.map((t, i) => (
+                          <div key={i} className={styles.glossEntry}>
+                            <span className={styles.term}>{t.term}</span>
+                            <span className={styles.desc}>{t.def}</span>
                           </div>
                         ))}
                       </div>
