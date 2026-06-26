@@ -76,7 +76,14 @@ function programReducer(state: ProgramState, action: ProgramAction): ProgramStat
     case 'scrub':
       return { ...state, scrubPos: action.pos };
     case 'msg/add': {
-      const next = [...state.messages, { id: msgId++, text: action.text, type: action.msgType, loc: action.loc }];
+      // The 'time' separator marks the start of a new compile. Strip the
+      // location off every earlier message so only the current compile's
+      // warnings stay hoverable — stale markers would point into a design
+      // that's no longer on screen.
+      const prior = action.msgType === 'time'
+        ? state.messages.map(m => (m.loc ? { ...m, loc: undefined } : m))
+        : state.messages;
+      const next = [...prior, { id: msgId++, text: action.text, type: action.msgType, loc: action.loc }];
       return { ...state, messages: next.length > 40 ? next.slice(next.length - 40) : next };
     }
   }
