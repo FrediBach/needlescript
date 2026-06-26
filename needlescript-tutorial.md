@@ -29,10 +29,11 @@ This tutorial walks you from the absolute basics up to seeded noise fields, Voro
 17. [Transforms: stamping motifs](#17-transforms-stamping-motifs)
 18. [Effects: warp, humanize, snaptogrid](#18-effects-warp-humanize-snaptogrid)
 19. [Professional embroidery and fabric physics](#19-professional-embroidery-and-fabric-physics)
-20. [Debugging](#20-debugging)
-21. [Safety limits](#21-safety-limits)
-22. [Exporting and reusing your work](#22-exporting-and-reusing-your-work)
-23. [A capstone project](#23-a-capstone-project)
+20. [Programmable satin, fills, and closed-loop generation](#20-programmable-satin-fills-and-closed-loop-generation)
+21. [Debugging](#21-debugging)
+22. [Safety limits](#22-safety-limits)
+23. [Exporting and reusing your work](#23-exporting-and-reusing-your-work)
+24. [A capstone project](#24-a-capstone-project)
 
 ---
 
@@ -49,6 +50,8 @@ A few facts to anchor everything else:
 - **The only everyday value is the number.** Millimetres, degrees, counts, and truth values are all just numbers. (`0` is false, anything else is true. Comparisons return `1` or `0`, and `true`/`false` are literally `1` and `0`.) Lists arrive later as a second value type, but they never reach the stitch stream — they live in your program.
 
 Comments start with `//`, `#`, or `;` and run to the end of the line. A lone `/` is still division — only *two adjacent* slashes start a comment.
+
+One frame before the commands, especially if your background is software rather than the sewing room. An embroidery machine doesn't *draw* — it punches a needle through fabric at a sequence of points, and what you see is **thread pulled taut between them**. Everything you write here ultimately becomes a list of needle penetrations, and the craft comes down to three things: where the thread goes, how densely it piles up, and how it's secured so it can't unravel. The vocabulary in the next few sections — running stitch, satin, fills — is just different ways of turning your turtle path into those penetrations. You won't need any of the professional commands ([§19](#19-professional-embroidery-and-fabric-physics)) to start: `fd`, `rt`, and `repeat` already sew.
 
 ---
 
@@ -186,7 +189,7 @@ repeat 5 [
 
 ## 5. Stitch types: the thread vocabulary
 
-Real embroidery isn't one kind of stitch. NeedleScript gives you several, and you switch between them with mode commands. Whatever mode is active applies to subsequent moves.
+Real embroidery isn't one kind of stitch. NeedleScript gives you several, and you switch between them with mode commands. Whatever mode is active applies to subsequent moves. Pick by the shape you're sewing: thin lines and fine detail want running stitch, narrow strips and borders want satin, broad areas want a fill ([§6](#6-fills)). And because thread is glossy, the *direction* your stitches run is itself visible — the same shape can read as two different shades depending on the stitch angle.
 
 **Running stitch** is the default — a simple dashed line. Control its stitch length:
 
@@ -204,7 +207,7 @@ arc 90 12          // satin follows the arc — a curved column
 satin 0            // back to running stitch
 ```
 
-The penetration spacing along a satin column is set by `density` (0.25–5 mm, default 0.4 — smaller is denser). Columns wider than about 8 mm tend to snag, and you'll get a warning. For columns the built-in zigzag can't make — tapers, woven cross-hatches, asymmetric rails — you can hand `satin` a procedure that draws the column itself (`satin @fn`); that's covered in §19.
+The penetration spacing along a satin column is set by `density` (0.25–5 mm, default 0.4 — smaller is denser). Columns wider than about 8 mm tend to snag, and you'll get a warning. For columns the built-in zigzag can't make — tapers, woven cross-hatches, asymmetric rails — you can hand `satin` a procedure that draws the column itself (`satin @fn`); that's covered in §20.
 
 **Bean stitch** sews each stitch multiple times for a bold, hand-drawn line:
 
@@ -276,7 +279,7 @@ endfill
 
 The fill covers the area between the two circles, leaving the centre empty.
 
-For fills whose rows *follow a curve* — contour lines, a flow field, a grain that bends with the shape — you can hand `fill` a procedure that drives the row direction (and another for the texture), exactly the way `satin @fn` drives a column. That's `fill @fn`, covered in §19.
+For fills whose rows *follow a curve* — contour lines, a flow field, a grain that bends with the shape — you can hand `fill` a procedure that drives the row direction (and another for the texture), exactly the way `satin @fn` drives a column. That's `fill @fn`, covered in §20.
 
 ---
 
@@ -878,7 +881,7 @@ warp @push_out [
 ]
 ```
 
-The `@name` syntax is new: it's a reference to a reporter, the one new kind of value effects add. You feed it to `warp` (or to `warppath`), to `satin` for a programmable column, or to `fill` for a directional/textured fill (both §19); using it anywhere else is a loud error, and so is a reporter that takes the wrong number of arguments or forgets to `return`. A fisheye, a twist, a ripple, a domain-warp are all just reporters — this is your shader.
+The `@name` syntax is new: it's a reference to a reporter, the one new kind of value effects add. You feed it to `warp` (or to `warppath`), to `satin` for a programmable column, or to `fill` for a directional/textured fill (both §20); using it anywhere else is a loud error, and so is a reporter that takes the wrong number of arguments or forgets to `return`. A fisheye, a twist, a ripple, a domain-warp are all just reporters — this is your shader.
 
 `warp` hands control to your code, which can push points off the hoop or stretch segments into long loose stitches — so the hoop, density and long-stitch checks all run on the **warped** result, surfacing trouble as warnings rather than a ruined garment. `warp` itself draws no randomness; it's seeded only if your reporter calls `random`/`snoise2`.
 
@@ -954,9 +957,25 @@ A satin column is buffered while you draw it and sewn — underlay first, then t
 
 On a tight satin curve the inner edge gets the same number of penetrations as the outer edge in a fraction of the space — they bunch up, break thread, and chew the fabric. NeedleScript detects local curvature and pulls **alternate inner-edge stitches in to 60% width**. It's on by default; `shortstitch 0` disables it. If a column is wider than the curve's radius you'll get a warning — that geometry can't sew cleanly at any setting.
 
+### Local density — `maxdensity n` plus the heatmap
+
+The physical quantity that matters most is **thread coverage**: millimetres of thread per mm² of fabric, expressed in *layers* (one layer is a clean satin column or tatami fill). Past about 2.5–3.5 layers, depending on fabric, embroidery stops behaving like fabric — needles deflect, thread breaks, the patch puckers. Every run computes a 1 mm coverage grid (deliberate tie-off micro-stitches are excluded so thread ends don't read as false hotspots). Hotspots above the limit produce warnings **with coordinates and the source lines that caused them**, and repeated penetrations in the same hole are flagged separately.
+
+The stage has a heatmap toggle (orange from about 1.2 layers, red from 3), and the stats row shows the peak. `maxdensity n` tunes the threshold (default 3.5); `maxdensity 0` silences it. Some constructions legitimately run hot — a satin border over a fill edge measures about 4 layers — and the right move is to raise the limit *knowingly*, as the bundled **patch** example does.
+
+### Automatic trims — `autotrim mm`
+
+Travels of 7 mm or more (configurable 3–30; `autotrim 0` off) automatically get a `trim` before the jump, so connector threads don't dangle and snag on the garment. A trim is never inserted when nothing has been sewn since the last cut.
+
+---
+
+## 20. Programmable satin, fills, and closed-loop generation
+
+The professional layer in §19 *shapes* the built-in stitches. The three features here go further: they let you replace the stitch generators themselves with your own reporters, and even read the fabric back as you sew. This is the most advanced corner of NeedleScript — and it reuses machinery you already know: the `@name` procedure references from [§18](#18-effects-warp-humanize-snaptogrid), and the coverage grid from [§19](#19-professional-embroidery-and-fabric-physics).
+
 ### Programmable satin — `satin @fn`
 
-Everything above shapes the built-in zigzag. Sometimes you want a *different* column entirely — a leaf that tapers to nothing at both tips, a woven cross-hatch, a column that's fatter on one side. Hand a `satin` a **procedure reference** (the same `@name` value `warp` takes, from §18) instead of a width, and your reporter draws the column:
+The built-in `satin` gives you one column shape: a centred zigzag of a fixed width. Sometimes you want a *different* column entirely — a leaf that tapers to nothing at both tips, a woven cross-hatch, a column that's fatter on one side. Hand `satin` a **procedure reference** (the same `@name` value `warp` takes, from §18) instead of a width, and your reporter draws the column:
 
 ```text
 def leaf(t, s, i, u) [
@@ -1015,12 +1034,6 @@ The engine guarantees the two things a hand-rolled fill gets wrong. **Coverage:*
 
 Like `satin @fn`, this **is** the generator, so it composes the same way: reporters see local space and the engine maps through the transform afterward (a directional fill under `scale 1.5` covers 1.5× the area at physical spacing; the field rotates with the work under `rotate`), `pullcomp`/`fillunderlay`/`humanize`/the density grid all still apply, and the generator draws no randomness of its own — so a `snoise2` flow-field fill is fully reproducible. `fill`, `dir` and `shape` are Core words (though `dir`/`shape` are only special right after `fill`, so variables by those names still work), and a malformed reporter is a loud, line-numbered error. (See the bundled **custom fill** example.)
 
-### Local density — `maxdensity n` plus the heatmap
-
-The physical quantity that matters most is **thread coverage**: millimetres of thread per mm² of fabric, expressed in *layers* (one layer is a clean satin column or tatami fill). Past about 2.5–3.5 layers, depending on fabric, embroidery stops behaving like fabric — needles deflect, thread breaks, the patch puckers. Every run computes a 1 mm coverage grid (deliberate tie-off micro-stitches are excluded so thread ends don't read as false hotspots). Hotspots above the limit produce warnings **with coordinates and the source lines that caused them**, and repeated penetrations in the same hole are flagged separately.
-
-The stage has a heatmap toggle (orange from about 1.2 layers, red from 3), and the stats row shows the peak. `maxdensity n` tunes the threshold (default 3.5); `maxdensity 0` silences it. Some constructions legitimately run hot — a satin border over a fill edge measures about 4 layers — and the right move is to raise the limit *knowingly*, as the bundled **patch** example does.
-
 ### Reading coverage back — stitch-history queries
 
 Everything above *writes* coverage. You can also *read* it mid-program and branch on it — the step from open-loop to closed-loop generation. Five **pure reporters** expose the very grid the heatmap draws:
@@ -1068,13 +1081,9 @@ def adaptive(p) [
 // warp @adaptive [ … ]
 ```
 
-### Automatic trims — `autotrim mm`
-
-Travels of 7 mm or more (configurable 3–30; `autotrim 0` off) automatically get a `trim` before the jump, so connector threads don't dangle and snag on the garment. A trim is never inserted when nothing has been sewn since the last cut.
-
 ---
 
-## 20. Debugging
+## 21. Debugging
 
 Generative designs surprise you. These tools tell you what actually happened.
 
@@ -1105,7 +1114,7 @@ repeat 50 [
 
 ---
 
-## 21. Safety limits
+## 22. Safety limits
 
 NeedleScript guards both your browser and your machine. Hit one of these and you'll get a clear error rather than a hang or a damaged garment:
 
@@ -1126,7 +1135,7 @@ NeedleScript guards both your browser and your machine. Hit one of these and you
 
 ---
 
-## 22. Exporting and reusing your work
+## 23. Exporting and reusing your work
 
 When a design is ready, **Download .DST** produces a standard Tajima file: 3-byte ternary delta records, moves longer than 12.1 mm split automatically, colour changes as stop records, trims as triple jumps, and a correct 512-byte header. Load it onto any machine, or into commercial software for a final check.
 
@@ -1134,7 +1143,7 @@ You can also bring artwork *in*: **Import SVG** (a button, or drag and drop) con
 
 ---
 
-## 23. A capstone project
+## 24. A capstone project
 
 Let's combine what you've learned into one piece that exercises the whole pipeline: a generative seeded "meadow" of stems that grow along a noise field, each topped with a small satin leaf, all sitting on stable fabric.
 
