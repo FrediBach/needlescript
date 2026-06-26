@@ -1,7 +1,7 @@
 // ---------- Engine limits ----------
 
 export const LIMITS = {
-  maxStitches: 60000,
+  maxStitches: 100000,
   maxOps: 10000000,
   maxCallDepth: 200,
   minStitch: 0.4,
