@@ -1,6 +1,6 @@
 // ---------- Interpreter ----------
 
-import type { ASTNode, ExprNode, RunResult, RunOptions } from './types.ts';
+import type { ASTNode, ExprNode, RunResult, RunOptions, WarningLocation } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
 import { makeRNG, makeNoise, fork, gauss } from './prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
@@ -1582,9 +1582,16 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   // The machine already accumulated this grid live (in sewing order) so the
   // history queries and this heatmap are one and the same — finalize it.
   const density = m.density.finalize(m.maxDensity);
+  const warningLocations: WarningLocation[] = [];
   if (m.maxDensity > 0) {
     const dens = density.hotspots.filter(h => h.kind === 'density').slice(0, 3);
     for (const h of dens) {
+      warningLocations.push({
+        index: m.warnings.length,
+        points: [{ x: h.x, y: h.y }],
+        lines: h.lines,
+        kind: 'density',
+      });
       m.warnings.push(
         `${h.value.toFixed(1)} layers of thread (limit ${m.maxDensity}) near (${h.x.toFixed(0)}, ${h.y.toFixed(0)})` +
         (h.lines.length ? ` — mostly line${h.lines.length > 1 ? 's' : ''} ${h.lines.join(', ')}` : '') +
@@ -1593,6 +1600,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     }
     const stacks = density.hotspots.filter(h => h.kind === 'stack').slice(0, 2);
     for (const h of stacks) {
+      warningLocations.push({
+        index: m.warnings.length,
+        points: [{ x: h.x, y: h.y }],
+        lines: h.lines,
+        kind: 'stack',
+      });
       m.warnings.push(
         `${h.value} needle penetrations in the same hole near (${h.x.toFixed(0)}, ${h.y.toFixed(0)})` +
         (h.lines.length ? ` — line ${h.lines[0]}` : '') +
@@ -1608,5 +1621,5 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     locks = secured.locks;
   }
 
-  return { events: m.events, warnings: m.warnings, printed, locks, density };
+  return { events: m.events, warnings: m.warnings, warningLocations, printed, locks, density };
 }

@@ -1,5 +1,6 @@
 import type { DesignState, LineSegment } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
+import type { WarningLocation } from '../lib/engine.ts';
 import StageCanvas from './StageCanvas.tsx';
 import PlaybackBar from './PlaybackBar.tsx';
 import StatsChips from './StatsChips.tsx';
@@ -13,6 +14,7 @@ interface Props {
   onScrubChange: (v: number) => void;
   activeLine: number | null;
   lineSegments: LineSegment[];
+  warningLoc: WarningLocation | null;
   showDensity: boolean;
   onToggleDensity: () => void;
   hideJumps: boolean;
@@ -67,11 +69,11 @@ function CanvasSwitch({
   );
 }
 
-export default function StagePane({ design, hoop, scrubPos, onScrubChange, activeLine, lineSegments, showDensity, onToggleDensity, hideJumps, onToggleHideJumps }: Props) {
+export default function StagePane({ design, hoop, scrubPos, onScrubChange, activeLine, lineSegments, warningLoc, showDensity, onToggleDensity, hideJumps, onToggleHideJumps }: Props) {
   return (
     <section className={styles.pane}>
       <div className={styles.fabric}>
-        <StageCanvas design={design} hoop={hoop} scrubPos={scrubPos} showDensity={showDensity} hideJumps={hideJumps} />
+        <StageCanvas design={design} hoop={hoop} scrubPos={scrubPos} showDensity={showDensity} hideJumps={hideJumps} warningLoc={warningLoc} />
         <StatsChips design={design} />
         <div className="absolute top-[10px] right-[10px] flex items-center gap-[10px]">
           <CanvasSwitch
@@ -94,6 +96,7 @@ export default function StagePane({ design, hoop, scrubPos, onScrubChange, activ
         onScrubChange={onScrubChange}
         activeLine={activeLine}
         lineSegments={lineSegments}
+        highlightLines={warningLoc?.lines ?? []}
       />
     </section>
   );

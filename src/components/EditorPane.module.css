@@ -75,6 +75,19 @@
 .warn  { color: var(--gold); }
 .print { color: var(--text); }
 
+/* Warnings that carry a location can be hovered to reveal markers in the
+   preview and on the playback bar. */
+.locatable {
+  cursor: help;
+  border-radius: 3px;
+  margin: 0 -4px;
+  padding: 0 4px;
+  transition: background-color 0.12s ease;
+}
+.locatable:hover {
+  background: var(--gold-22, rgba(180, 140, 60, 0.18));
+}
+
 /* Timestamp divider printed above each new compile so runs are easy to
    tell apart. A thin rule fills the space to the right of the time label. */
 .time {

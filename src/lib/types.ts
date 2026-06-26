@@ -25,9 +25,23 @@ export interface StitchEvent {
   u?: 1; // underlay stitch (drawn lighter in previews; identical in exports)
 }
 
+/**
+ * Maps a warning (by its index in RunResult.warnings) to where the problem is
+ * in the design. Currently emitted only for density/stack hotspots, the only
+ * warnings that carry true spatial coordinates. Additive: the warnings array
+ * itself keeps its plain-string shape.
+ */
+export interface WarningLocation {
+  index: number; // index into RunResult.warnings
+  points: { x: number; y: number }[]; // hoop-space coordinates (mm)
+  lines: number[]; // source lines that contributed to the hotspot
+  kind: 'density' | 'stack';
+}
+
 export interface RunResult {
   events: StitchEvent[];
   warnings: string[];
+  warningLocations?: WarningLocation[];
   printed: string[];
   locks: number;
   density: DensityResult;

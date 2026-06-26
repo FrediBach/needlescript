@@ -1,6 +1,6 @@
 import { useReducer, useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { run, designStats, NeedlescriptError } from './lib/engine.ts';
-import type { StitchEvent, DesignStats, DensityResult } from './lib/engine.ts';
+import type { StitchEvent, DesignStats, DensityResult, WarningLocation } from './lib/engine.ts';
 import { toDST } from './lib/dst.ts';
 import { toPES } from './lib/pes.ts';
 import { toEXP } from './lib/exp.ts';
@@ -43,6 +43,7 @@ export interface ConsoleMessage {
   id: number;
   text: string;
   type: 'info' | 'ok' | 'err' | 'print' | 'warn' | 'time';
+  loc?: WarningLocation; // present for hover-locatable hotspot warnings
 }
 
 const INITIAL_DESIGN: DesignState = {
@@ -64,7 +65,7 @@ type ProgramAction =
   | { type: 'run/success'; design: DesignState; scrubPos: number }
   | { type: 'run/error' }
   | { type: 'scrub'; pos: number }
-  | { type: 'msg/add'; text: string; msgType: ConsoleMessage['type'] };
+  | { type: 'msg/add'; text: string; msgType: ConsoleMessage['type']; loc?: WarningLocation };
 
 function programReducer(state: ProgramState, action: ProgramAction): ProgramState {
   switch (action.type) {
@@ -75,7 +76,7 @@ function programReducer(state: ProgramState, action: ProgramAction): ProgramStat
     case 'scrub':
       return { ...state, scrubPos: action.pos };
     case 'msg/add': {
-      const next = [...state.messages, { id: msgId++, text: action.text, type: action.msgType }];
+      const next = [...state.messages, { id: msgId++, text: action.text, type: action.msgType, loc: action.loc }];
       return { ...state, messages: next.length > 40 ? next.slice(next.length - 40) : next };
     }
   }
@@ -95,6 +96,9 @@ export default function App() {
   const [showDensity, setShowDensity] = useState(false);
   const [hideJumps, setHideJumps] = useState(false);
   const [showReference, setShowReference] = useState(false);
+  // Location of the warning currently hovered in the console — drives the
+  // preview marker and playback-bar part highlight. null = nothing hovered.
+  const [hoverWarn, setHoverWarn] = useState<WarningLocation | null>(null);
   const [program, dispatch] = useReducer(programReducer, { design: INITIAL_DESIGN, messages: [], scrubPos: 0 });
   const { design, messages, scrubPos } = program;
   const svgFileRef = useRef<HTMLInputElement>(null);
@@ -133,12 +137,14 @@ export default function App() {
   // SVG import size derived from current hoop (fits within the sewable area)
   const fitMM = Math.min(selectedHoop.widthMM, selectedHoop.heightMM) - 10;
 
-  function addMsg(text: string, type: ConsoleMessage['type'] = 'info') {
-    dispatch({ type: 'msg/add', text, msgType: type });
+  function addMsg(text: string, type: ConsoleMessage['type'] = 'info', loc?: WarningLocation) {
+    dispatch({ type: 'msg/add', text, msgType: type, loc });
   }
 
   const runProgram = useCallback((src: string, designName: string) => {
     const t0 = performance.now();
+    // A fresh compile invalidates any hovered warning marker.
+    setHoverWarn(null);
     // Separator with a human-readable timestamp so consecutive compiles are
     // visually distinguishable in the console.
     addMsg(new Date().toLocaleTimeString(), 'time');
@@ -152,6 +158,10 @@ export default function App() {
       }
       const stats = designStats(result.events);
       const warnings: string[] = [...result.warnings];
+      // Map each engine warning to its location (hotspot warnings only). Indices
+      // refer to result.warnings, so App-appended warnings below get no location.
+      const locByIndex = new Map<number, WarningLocation>();
+      for (const wl of result.warningLocations ?? []) locByIndex.set(wl.index, wl);
 
       // density check
       const density = stats.stitches / Math.max(1, stats.width * stats.height);
@@ -165,7 +175,7 @@ export default function App() {
         (result.locks ? ` · secured ${result.locks} thread end${result.locks === 1 ? '' : 's'}` : ''),
         'ok',
       );
-      warnings.forEach(w => addMsg(w, 'warn'));
+      warnings.forEach((w, i) => addMsg(w, 'warn', locByIndex.get(i)));
 
       const newDesign: DesignState = {
         events: result.events, pts, marks, density: result.density, stats, warnings, name: designName, ok: true,
@@ -423,6 +433,7 @@ export default function App() {
           messages={messages}
           isDragging={isDragging}
           activeLine={activeLine}
+          onWarnHover={setHoverWarn}
           style={!isMobile ? { width: leftWidth, flexShrink: 0 } : undefined}
         />
         {!isMobile && (
@@ -439,6 +450,7 @@ export default function App() {
           onScrubChange={(pos) => dispatch({ type: 'scrub', pos })}
           activeLine={activeLine}
           lineSegments={lineSegments}
+          warningLoc={hoverWarn}
           showDensity={showDensity}
           onToggleDensity={() => setShowDensity(v => !v)}
           hideJumps={hideJumps}

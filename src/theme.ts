@@ -141,3 +141,8 @@ export const canvasZoomBadgeBg       = 'rgba(20,15,10,0.55)';
 export const canvasZoomBadgeText     = 'rgba(255,245,230,0.90)';
 export const canvasDensityHot        = (alpha: number) => `rgba(200,38,24,${alpha})`;
 export const canvasDensityWarm       = (alpha: number) => `rgba(228,138,32,${alpha})`;
+
+// Warning location marker (shown while hovering a hotspot warning in the console)
+export const canvasWarnMarkerFill    = (alpha: number) => `rgba(200,38,24,${alpha})`;
+export const canvasWarnMarkerStroke  = 'rgba(255,253,247,0.95)';
+export const canvasWarnMarkerCore    = '#C8261A';

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DesignState } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
+import type { WarningLocation } from '../lib/engine.ts';
 import { THREADS } from '../data.ts';
 import {
   canvasJumpThread, canvasNeedlePoint, canvasHoopOverlay, canvasHoopBoundary,
@@ -8,6 +9,7 @@ import {
   canvasDragRectBorder, canvasDragRectFill,
   canvasZoomBadgeBg, canvasZoomBadgeText,
   canvasDensityHot, canvasDensityWarm,
+  canvasWarnMarkerFill, canvasWarnMarkerStroke, canvasWarnMarkerCore,
   fontMono, fsBase,
 } from '../theme.ts';
 
@@ -17,6 +19,7 @@ interface Props {
   scrubPos: number;
   showDensity: boolean;
   hideJumps: boolean;
+  warningLoc: WarningLocation | null;
 }
 
 /** Viewport in mm-space. When null the view auto-fits the hoop. */
@@ -43,7 +46,7 @@ type DragState = {
   currentY: number;
 };
 
-export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJumps }: Props) {
+export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJumps, warningLoc }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<RenderTransform | null>(null);
 
@@ -60,8 +63,8 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJ
     const dpr = window.devicePixelRatio || 1;
     canvas.width  = Math.max(1, Math.round(box.width  * dpr));
     canvas.height = Math.max(1, Math.round(box.height * dpr));
-    transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, hideJumps, viewport);
-  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport]);
+    transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, hideJumps, viewport, warningLoc);
+  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport, warningLoc]);
 
   // ── redraw on container resize ───────────────────────────────────────────
   useEffect(() => {
@@ -74,11 +77,11 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJ
       const dpr = window.devicePixelRatio || 1;
       canvas.width  = Math.max(1, Math.round(box.width  * dpr));
       canvas.height = Math.max(1, Math.round(box.height * dpr));
-      transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, hideJumps, viewport);
+      transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, hideJumps, viewport, warningLoc);
     });
     ro.observe(canvas.parentElement!);
     return () => ro.disconnect();
-  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport]);
+  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport, warningLoc]);
 
   // ── pointer handlers ─────────────────────────────────────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -236,6 +239,7 @@ function draw(
   showDensity: boolean,
   hideJumps: boolean,
   viewport: Viewport | null,
+  warningLoc: WarningLocation | null,
 ): RenderTransform {
   const ctx = canvas.getContext('2d');
   if (!ctx) return { scale: 1, cx: 0, cy: 0, viewCX: 0, viewCY: 0 };
@@ -375,10 +379,54 @@ function draw(
     });
   }
 
+  // Warning location marker — shown while a hotspot warning is hovered in the
+  // console. Drawn last so it sits above everything, and independent of the
+  // scrub position (the defect is a property of the finished design).
+  if (warningLoc) {
+    for (const p of warningLoc.points) {
+      const px = X(p.x), py = Y(p.y);
+      const ring = 9 * dpr;
+
+      // Soft halo
+      ctx.beginPath();
+      ctx.arc(px, py, ring * 1.8, 0, 6.2832);
+      ctx.fillStyle = canvasWarnMarkerFill(0.18);
+      ctx.fill();
+
+      // Outer ring (white) + inner ring (warning red) for contrast on any thread
+      ctx.beginPath();
+      ctx.arc(px, py, ring, 0, 6.2832);
+      ctx.lineWidth = 3 * dpr;
+      ctx.strokeStyle = canvasWarnMarkerStroke;
+      ctx.stroke();
+      ctx.lineWidth = 1.6 * dpr;
+      ctx.strokeStyle = canvasWarnMarkerCore;
+      ctx.stroke();
+
+      // Crosshair through the centre
+      ctx.beginPath();
+      ctx.moveTo(px - ring * 1.5, py);
+      ctx.lineTo(px - ring * 0.5, py);
+      ctx.moveTo(px + ring * 0.5, py);
+      ctx.lineTo(px + ring * 1.5, py);
+      ctx.moveTo(px, py - ring * 1.5);
+      ctx.lineTo(px, py - ring * 0.5);
+      ctx.moveTo(px, py + ring * 0.5);
+      ctx.lineTo(px, py + ring * 1.5);
+      ctx.lineWidth = 1.6 * dpr;
+      ctx.strokeStyle = canvasWarnMarkerCore;
+      ctx.stroke();
+
+      // Centre dot
+      ctx.beginPath();
+      ctx.arc(px, py, 1.8 * dpr, 0, 6.2832);
+      ctx.fillStyle = canvasWarnMarkerCore;
+      ctx.fill();
+    }
+  }
+
   return { scale, cx, cy, viewCX, viewCY };
 }
-
-// ── helpers ───────────────────────────────────────────────────────────────────
 
 /** Auto-fit scale in physical px/mm — used by draw() and the render-time zoom
  *  level indicator so both always agree without a stale-ref round-trip. */

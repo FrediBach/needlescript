@@ -3,6 +3,7 @@ import Editor, { useMonaco } from '@monaco-editor/react';
 import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
+import type { WarningLocation } from '../lib/engine.ts';
 import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
 import { updateParameter } from '../lib/parse-parameters.ts';
@@ -18,6 +19,7 @@ interface Props {
   messages: ConsoleMessage[];
   isDragging: boolean;
   activeLine: number | null; // source line currently sewing (playback), 1-based
+  onWarnHover: (loc: WarningLocation | null) => void;
   style?: React.CSSProperties;
 }
 
@@ -32,7 +34,7 @@ const EDITOR_LINE_HEIGHT  = editorLineHeight; // 20 px
 // :global block.
 const ACTIVE_LINE_CLASS = 'ns-playback-line';
 
-export default function EditorPane({ source, onSourceChange, onRun, messages, isDragging, activeLine, style }: Props) {
+export default function EditorPane({ source, onSourceChange, onRun, messages, isDragging, activeLine, onWarnHover, style }: Props) {
   const [replValue, setReplValue] = useState('');
   const replHistoryRef = useRef<string[]>([]);
   const replIdxRef     = useRef(-1);
@@ -263,7 +265,12 @@ export default function EditorPane({ source, onSourceChange, onRun, messages, is
       <div ref={consoleRef} className={styles.console} aria-live="polite"
            style={{ height: consoleHeight }}>
         {messages.map(msg => (
-          <div key={msg.id} className={styles[msg.type] || ''}>
+          <div
+            key={msg.id}
+            className={`${styles[msg.type] || ''} ${msg.loc ? styles.locatable : ''}`}
+            onMouseEnter={msg.loc ? () => onWarnHover(msg.loc!) : undefined}
+            onMouseLeave={msg.loc ? () => onWarnHover(null) : undefined}
+          >
             {msg.text}
           </div>
         ))}

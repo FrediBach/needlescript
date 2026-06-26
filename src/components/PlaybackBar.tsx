@@ -26,9 +26,10 @@ interface Props {
   onScrubChange: (v: number) => void;
   activeLine: number | null;
   lineSegments: LineSegment[];
+  highlightLines: number[];
 }
 
-export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine, lineSegments }: Props) {
+export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine, lineSegments, highlightLines }: Props) {
   const [playingForTotal, setPlayingForTotal] = useState<number | null>(null);
   const playing = playingForTotal === total;
   const playReqRef = useRef<number | null>(null);
@@ -98,6 +99,8 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
       }
     }
   }
+
+  const hi = highlightLines.length ? new Set(highlightLines) : null;
 
   const totalStr  = total.toLocaleString();
   const paddedPos = scrubPos.toLocaleString().padStart(totalStr.length, '\u2007');
@@ -174,6 +177,22 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
                       ? 'var(--on-canvas-10)'
                       : 'var(--on-canvas-22)'
                 }
+              />
+            );
+          })}
+          {/* Warning highlight overlay — marks the parts where the hovered
+              hotspot warning was stitched. Drawn above the base strip. */}
+          {hi && lineSegments.map((seg, i) => {
+            if (!hi.has(seg.line)) return null;
+            const nextStart = lineSegments[i + 1]?.start ?? total;
+            return (
+              <rect
+                key={`hl-${i}`}
+                x={seg.start}
+                y={0}
+                width={nextStart - seg.start}
+                height={1}
+                fill="rgba(200,38,24,0.78)"
               />
             );
           })}

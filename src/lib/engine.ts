@@ -20,7 +20,7 @@
 //   postprocess.ts  — applyLocks, applyAutoTrim, densityMap, designStats
 //   interpreter.ts  — run
 
-export type { TokenType, Token, EventType, StitchEvent, RunResult, DesignStats, ASTNode, ExprNode, DensityCell, DensityHotspot, DensityResult, RunOptions } from './types.ts';
+export type { TokenType, Token, EventType, StitchEvent, RunResult, WarningLocation, DesignStats, ASTNode, ExprNode, DensityCell, DensityHotspot, DensityResult, RunOptions } from './types.ts';
 export { NeedlescriptError } from './errors.ts';
 export { makeRNG, makeNoise, fork, gauss } from './prng.ts';
 export { ALIASES, BUILTIN_ARITY, TRANSFORM_ARITY, QWORD_BUILTINS, FABRICS, FUNC_ARITY, ZERO_FUNCS, LIST_FUNCS, LIST_CMDS, GEN_FUNCS, GEN_CMDS, GEN_QWORD_ARG, QUERY_FUNCS, LIBRARY_FUNCS, RESERVED } from './commands.ts';
