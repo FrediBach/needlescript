@@ -1,0 +1,99 @@
+// ============================================================
+//  CUSTOM FILLS — PROGRAMMABLE FILLS WITH `fill @fn`
+//
+//  `fill dir @field shape @texture` arms the NEXT beginfill…endfill,
+//  replacing the built-in tatami generator with reporters you write:
+//
+//    dir   @field   — def field(p) [ return heading ]
+//                     a turtle heading (0 = north, clockwise) at the
+//                     local point p = [x, y]. The engine integrates
+//                     evenly-spaced STREAMLINES through this field and
+//                     lays one fill row along each — contour / grain /
+//                     flow fills that curve with the shape.
+//    shape @texture — def texture(p, row, v) [ return [spacing, len, phase] ]
+//                     spacing (mm, the gap to the next row, > 0),
+//                     stitch length (mm, 1–7), brick phase (0..1).
+//                     `v` is the 0..1 cross-field position by row.
+//
+//  `fill @name` is shorthand for the DIRECTION channel. The engine still
+//  owns coverage (even spacing), holes, pull-comp, underlay and physics;
+//  a constant field reduces EXACTLY to built-in tatami. Reporters see
+//  LOCAL space, so each cell below is drawn at the origin inside its own
+//  `translate` block and one set of reporters serves them all — the field
+//  composes with the transform, exactly like `satin @fn` and `warp`.
+// ============================================================
+
+let H     = 10      // [7:0.5:12] half-size of each square cell, mm
+let space = 0.7     // [0.45:0.05:1] base row spacing for the dir-only fills, mm
+let len   = 2.2     // [1.5:0.1:3] stitch length along the rows, mm
+
+seed 7
+stitchlen len
+fillspacing space
+
+
+// ── 1. CONTOUR — rows that arc around a point below the cell ────────
+// A swirl field whose pole sits well OUTSIDE the cell gives gently
+// curved "contour" rows with clean, even coverage (a pole INSIDE would
+// be a vortex — still finite, but it piles thread at the centre).
+def contour(p) [
+  return vheading(vrot(vsub(p, [0, 0 - 40]), 90))
+]
+
+// ── 2. FLOW — a reproducible noise flow field ───────────────────────
+// snoise2 turned into a heading: smooth, swirling grain. Because the
+// generator is drawless, the same seed gives the same flow every run.
+def flow(p) [
+  return snoise2(p[0] / 13, p[1] / 13) * 180
+]
+
+// ── 3. GRADED — flat rows whose SPACING fans across the cell ────────
+// No direction field, so rows are straight (north); `v` opens the row
+// spacing from tight on one side to loose on the other — graded density.
+def graded(p, row, v) [
+  return [remap(v, 0, 1, 0.45, 1.2), len, 0.5]
+]
+
+// ── 4. ADAPTIVE — reads its own coverage and thins where it's dense ─
+// coverat(p) reports thread layers already laid; the row spacing opens
+// up where the fill has piled up. A fill that responds to itself.
+def adaptive(p, row, v) [
+  return [clamp(0.5 + coverat(p) * 0.5, 0.5, 1.3), len, 0.5]
+]
+
+// ── 5. BOTH CHANNELS — a curved grain that also tapers at the edges ─
+def grain(p) [
+  return snoise2(p[0] / 15, p[1] / 15 + 5) * 130
+]
+def taper(p, row, v) [
+  let edge = clamp(1 - abs(v - 0.5) * 2, 0, 1)   // 1 in the middle, 0 at edges
+  return [remap(edge, 0, 1, 0.9, 0.45), len, 0.5]
+]
+
+
+// ------------------------------------------------------------
+//  trace one square cell, centred at the LOCAL origin, then fill it.
+//  `fill …` must be armed just before the beginfill it applies to.
+// ------------------------------------------------------------
+def cell() [
+  up setxy(0 - H, 0 - H) down
+  beginfill
+    repeat 4 [ fd H * 2 rt 90 ]
+  endfill
+]
+
+
+// ============================================================
+//  draw the five fills. Each cell lives under its own translate,
+//  so the reporters above (which read LOCAL coordinates) work
+//  unchanged — the field rotates/moves with the cell.
+// ============================================================
+
+// top row — three directional / textured fills
+translate -24 13 [ color 0  fill dir @contour            cell() ]
+translate   0 13 [ color 2  fill dir @flow               cell() ]
+translate  24 13 [ color 3  fill shape @graded           cell() ]
+
+// bottom row — an adaptive fill and a both-channel fill
+translate -12 -13 [ color 1  fill shape @adaptive        cell() ]
+translate  12 -13 [ color 4  fill dir @grain shape @taper cell() ]

@@ -276,6 +276,8 @@ endfill
 
 The fill covers the area between the two circles, leaving the centre empty.
 
+For fills whose rows *follow a curve* — contour lines, a flow field, a grain that bends with the shape — you can hand `fill` a procedure that drives the row direction (and another for the texture), exactly the way `satin @fn` drives a column. That's `fill @fn`, covered in §19.
+
 ---
 
 ## 7. Variables and expressions
@@ -876,7 +878,7 @@ warp @push_out [
 ]
 ```
 
-The `@name` syntax is new: it's a reference to a reporter, the one new kind of value effects add. You feed it to `warp` (or to `warppath`), or to `satin` for a programmable column (§19); using it anywhere else is a loud error, and so is a reporter that takes the wrong number of arguments or forgets to `return`. A fisheye, a twist, a ripple, a domain-warp are all just reporters — this is your shader.
+The `@name` syntax is new: it's a reference to a reporter, the one new kind of value effects add. You feed it to `warp` (or to `warppath`), to `satin` for a programmable column, or to `fill` for a directional/textured fill (both §19); using it anywhere else is a loud error, and so is a reporter that takes the wrong number of arguments or forgets to `return`. A fisheye, a twist, a ripple, a domain-warp are all just reporters — this is your shader.
 
 `warp` hands control to your code, which can push points off the hoop or stretch segments into long loose stitches — so the hoop, density and long-stitch checks all run on the **warped** result, surfacing trouble as warnings rather than a ruined garment. `warp` itself draws no randomness; it's seeded only if your reporter calls `random`/`snoise2`.
 
@@ -982,6 +984,36 @@ satin 0
 ```
 
 Because `satin @fn` **is** the generator — not an after-split effect — it sits upstream of the whole physics layer. The reporter works in spine-local space and the engine maps its output to the hoop afterward, so a custom column composes with transforms and `warp` exactly like the built-in one (`scale 1.5` sews 1.5× the extent at physical spacing, not stretched stitches), and `pullcomp`, `underlay`, the snag check and the density heatmap all still apply. Like `warp`, the generator draws no randomness of its own — it's reproducible unless your reporter calls `random`/`snoise2`. A reporter with the wrong number of parameters, or one that doesn't return five numbers, is a loud, line-numbered error. (See the bundled **custom satin** example.)
+
+### Programmable fills — `fill @fn`
+
+`satin @fn` lets you draw a column; `fill @fn` lets you drive a *fill*. It arms the **next** `beginfill … endfill` with up to two reporters — a **direction field** and a **stitch shaper** — and the engine does the hard part: placing rows that follow your field while keeping them an even distance apart, clipping to holes, and running the whole physics pipeline. The marquee result is the **directional fill**, where the rows curve to follow the work instead of running in straight parallel lines:
+
+```text
+def contour(p) [
+  return vheading(vrot(p, 90))   // a heading that circles the origin
+]
+fill dir @contour                // arm the next region
+beginfill
+  arc 360 30
+endfill                          // the generator runs at endfill
+```
+
+A direction reporter takes the local point `p = [x, y]` and returns a single turtle heading (0 = north, clockwise). The engine threads **streamlines** through that field and lays one fill row along each. You can instead (or also) supply a *shape* reporter for the texture:
+
+```text
+def texture(p, row, v) [
+  //       spacing  len  phase
+  return [0.4, 2.5, 0.5]         // exactly the built-in tatami row
+]
+fill shape @texture
+```
+
+The shaper is told the penetration position `p`, the 0-based `row` index, and `v` (0..1 across the field), and returns three numbers: the **spacing** to the next row (mm, must be positive — it's sampled once per row, since it's the gap *between* rows), the stitch **length** along the row (mm, 1–7), and the brick **phase** (0..1; 0.5 is standard tatami offset). Vary spacing with `v` and the rows fan apart — a graded-density fill; read `coverat(p)` and you can thin the fill where it's already covered. `fill @name` with no keyword is shorthand for the direction channel, the usual case.
+
+The engine guarantees the two things a hand-rolled fill gets wrong. **Coverage:** rows stay evenly spaced no matter how the field curves (a constant field reduces *exactly* to built-in tatami — that's the correctness pin). **Termination:** two finite budgets — a per-streamline length cap and a finite seed budget — mean a vortex, a singularity, or a chaotic field yields a finite fill *with warnings*, never a hang. A field that converges to a point legitimately piles thread there; that's surfaced honestly on the density heatmap rather than hidden, and you re-seed or raise `maxdensity` knowingly.
+
+Like `satin @fn`, this **is** the generator, so it composes the same way: reporters see local space and the engine maps through the transform afterward (a directional fill under `scale 1.5` covers 1.5× the area at physical spacing; the field rotates with the work under `rotate`), `pullcomp`/`fillunderlay`/`humanize`/the density grid all still apply, and the generator draws no randomness of its own — so a `snoise2` flow-field fill is fully reproducible. `fill`, `dir` and `shape` are Core words (though `dir`/`shape` are only special right after `fill`, so variables by those names still work), and a malformed reporter is a loud, line-numbered error. (See the bundled **custom fill** example.)
 
 ### Local density — `maxdensity n` plus the heatmap
 

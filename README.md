@@ -375,6 +375,7 @@ endfill
 | `fillangle deg` | direction of the fill rows (default 0) |
 | `fillspacing mm` | row spacing, 0.25–5 mm (default **0.4**) |
 | `filllen mm` | fill stitch length, 1–7 mm. By default the fill follows `stitchlen`; set `filllen` to override, `filllen 0` to follow again. Rows are brick-offset so penetrations don't line up |
+| `fill dir @field` / `fill shape @texture` | arms a **programmable fill** for the next `beginfill … endfill`: a reporter drives the row direction (a contour / grain / flow fill) and/or the per-row spacing, length and brick — see *Programmable fills* below |
 
 ## Professional embroidery & fabric physics
 
@@ -407,7 +408,7 @@ Underlay is stabilising stitching sewn automatically *underneath* the visible la
 | Command | Modes |
 |---|---|
 | `underlay "auto` | for satin columns: `"center` (spine, out and back), `"edge` (runs offset ±30% width), `"zigzag` (open zigzag at 60% width + return run), `"off`. `"auto` picks by width: < 1.5 mm none, < 4 mm center, wider zigzag |
-| `fillunderlay "auto` | for fills: `"tatami` (sparse cross-grain pass at `fillangle + 90`, inset 0.6 mm), `"edge` (run tracing the boundary inset 0.5 mm), `"off`. `"auto` = tatami, plus the edge run on areas over 100 mm² |
+| `fillunderlay "auto` | for fills: `"tatami` (sparse cross-grain pass at `fillangle + 90`, inset 0.6 mm), `"edge` (run tracing the boundary inset 0.5 mm), `"off`. `"auto` = tatami, plus the edge run on areas over 100 mm². Under a directional `fill dir @fn`, the tatami pass follows the field **rotated +90°** so the underlay still anchors across the grain even when the grain curves |
 
 A satin column is buffered while you draw it and sewn — underlay first, then the zigzag — when it ends (pen up, mode change, colour change, trim, fill, or end of program). The turtle's position and heading are unaffected.
 
@@ -451,6 +452,51 @@ All inputs and outputs are in **spine-local space** — the reporter never sees 
 A malformed reporter is a loud, line-numbered error (wrong arity, no `return`, a non-list or wrong-length return, a non-number slot) — the same posture as the `warp` reporter checks. `satin` and `@name` are **Core** and can't be redefined; the reporter is ordinary user code. The equivalence pin holds exactly: `satin 4` produces a byte-identical stream to `satin @c` where `def c(t, s, i, u) [ return [0.4, 2, 2, 0, 0] ]`.
 
 (See the bundled **custom satin** example — a leaf taper, a woven crosshatch, a ripple edge and an asymmetric ramp, side by side.)
+
+### Programmable fills — `fill @fn`
+
+Where `satin @fn` parameterizes a 1-D column, `fill @fn` parameterizes a 2-D fill. It arms the **next** `beginfill … endfill`, replacing the built-in tatami generator with up to two reporters you write — a **direction field** and a **stitch shaper** — while the engine keeps ownership of every structural guarantee (even-spacing coverage, hole clipping, pull-comp, underlay, the physics layer). The headline use is the **directional fill**: rows that follow a vector field, producing contour / grain / flow fills that curve with the shape of the work.
+
+```text
+def contour(p) [
+  return vheading(vrot(p, 90))   // rows circle the origin
+]
+fill dir @contour                // arm the next region
+beginfill
+  arc 360 30
+endfill                          // the generator runs here
+```
+
+Two channels, either or both (it mirrors custom satin's *shape + traversal* split):
+
+| Form | Meaning |
+|---|---|
+| `fill dir @field` | a **direction field**: `def field(p) [ return heading ]` returns a turtle heading (0 = north, clockwise) at the local point `p = [x, y]`. The engine integrates **streamlines** through the field and lays one fill row along each |
+| `fill shape @texture` | a **stitch shaper**: `def texture(p, row, v) [ return [spacing, len, phase] ]` sets the row spacing (mm, must be > 0), stitch length (mm, clamped 1–7) and brick phase (0..1) — flat tatami rows with custom texture |
+| `fill dir @d shape @s` | both channels |
+| `fill @name` | shorthand: `@name` is the **direction** field (the common case) |
+
+The shaper's inputs are `p` (local penetration position, for spatially-varying texture and `coverat(p)` reads), `row` (0-based streamline index in placement order), and `v` (0..1 cross-field position, assigned by placement order). `spacing` is sampled once **per row** at its seed (it's the gap to the next row, so it can't vary continuously *along* a row); `len`/`phase` are sampled **per penetration**. `phase = 0.5` reproduces standard brick tatami.
+
+**Coverage is the engine's job.** Naively integrating one streamline at a time clumps and gaps; the engine uses evenly-spaced streamline placement (Jobard–Lefer) so rows stay a uniform distance apart even though the direction is arbitrary. A constant field reduces *exactly* to parallel tatami scan lines — the equivalence pin: a plain `beginfill … endfill` is **byte-identical** to the same region armed with `def d(p) [ return 0 ]` and `def s(p, row, v) [ return [0.4, <stitchlen>, 0.5] ]`.
+
+**Termination is guaranteed by two finite budgets**, not by trusting the field: each streamline halts at a length cap (so a streamline that spirals forever is truncated, with a one-time warning), and seeding draws from a finite budget (so a pathological field can't seed forever). A vortex, a singularity, or a chaotic field therefore produces a *finite, possibly imperfect fill with warnings* — never a hang. A convergent field legitimately piles thread near its pole; that is **not** smoothed away — it surfaces honestly through the density heatmap, and you re-seed, accept it, or raise `maxdensity` knowingly.
+
+Like `satin @fn`, `fill @fn` **is** the generator, so the whole professional pipeline applies unchanged: pull-comp extends rows at the boundary, `fillunderlay "auto` runs its tatami pass through the field rotated +90° (anchoring across the curving grain), the density grid and tiny-stitch merge feed off the emitted penetrations, and `humanize` / `snaptogrid` jitter them like any other stitch. Reporters see **local** space and the engine maps through the CTM afterward, so a directional fill under `scale 1.5 [ … ]` covers 1.5× the area with physical stitch spacing intact (more rows, not stretched stitches), and the field rotates with the work under `rotate`. The generator draws **nothing** from the seeded stream — a noise-driven flow-field fill is reproducible precisely because the field is. A reporter with the wrong arity or a bad return is a loud, line-numbered error; `fill`, `dir` and `shape` are **Core** (`dir`/`shape` are reserved only right after `fill`, so ordinary variables named `dir`/`shape` keep working), and the reporters are ordinary user code.
+
+```text
+seed 7
+def grain(p) [
+  return snoise2(p[0] / 20, p[1] / 20) * 180   // a reproducible noise flow field
+]
+def thin(p, row, v) [
+  return [remap(v, 0, 1, 0.4, 1.1), 2.5, 0.5]  // rows fan open toward one side
+]
+fill dir @grain shape @thin
+beginfill repeat 4 [ fd 50 rt 90 ] endfill
+```
+
+(See the bundled **custom fill** example — a contour swirl, a noise flow field, a graded-density fill, an adaptive fill that thins where it's already covered, and a curved grain with both channels, side by side.)
 
 ### Local density — `maxdensity n` + heatmap
 
