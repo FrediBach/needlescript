@@ -75,6 +75,30 @@
 .warn  { color: var(--gold); }
 .print { color: var(--text); }
 
+/* Timestamp divider printed above each new compile so runs are easy to
+   tell apart. A thin rule fills the space to the right of the time label. */
+.time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: var(--fs-label);
+  letter-spacing: 0.12em;
+  color: var(--text-faint, var(--text-muted));
+  opacity: 0.7;
+}
+
+.time:first-child {
+  margin-top: 0;
+}
+
+.time::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 .replRow {
   display: flex;
   align-items: center;

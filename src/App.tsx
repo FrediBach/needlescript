@@ -42,7 +42,7 @@ export interface DesignState {
 export interface ConsoleMessage {
   id: number;
   text: string;
-  type: 'info' | 'ok' | 'err' | 'print' | 'warn';
+  type: 'info' | 'ok' | 'err' | 'print' | 'warn' | 'time';
 }
 
 const INITIAL_DESIGN: DesignState = {
@@ -139,6 +139,9 @@ export default function App() {
 
   const runProgram = useCallback((src: string, designName: string) => {
     const t0 = performance.now();
+    // Separator with a human-readable timestamp so consecutive compiles are
+    // visually distinguishable in the console.
+    addMsg(new Date().toLocaleTimeString(), 'time');
     try {
       const result = run(src);
       const pts: StitchEvent[] = [];
