@@ -5,10 +5,12 @@ import { toDST } from './lib/dst.ts';
 import { toPES } from './lib/pes.ts';
 import { toEXP } from './lib/exp.ts';
 import { toSVG } from './lib/svg.ts';
-import { svgToCode } from './lib/svg-importer.ts';
 import { THREADS, EXAMPLES, DEFAULT_HOOP } from './data.ts';
 import type { HoopConfig } from './data.ts';
 import type { ExportFormat } from './components/Header.tsx';
+import { usePanelSplit } from './hooks/usePanelSplit.ts';
+import { useSvgImport } from './hooks/useSvgImport.ts';
+import { useShare } from './hooks/useShare.ts';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
 import EditorPane from './components/EditorPane.tsx';
@@ -99,7 +101,6 @@ export default function App() {
   sourceRef.current = source;
   const [selectedHoop, setSelectedHoop] = useState<HoopConfig>(DEFAULT_HOOP);
   const [showHoopDialog, setShowHoopDialog] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
   const [showDensity, setShowDensity] = useState(false);
   const [hideJumps, setHideJumps] = useState(false);
   const [showReference, setShowReference] = useState(false);
@@ -108,45 +109,16 @@ export default function App() {
   const [hoverWarn, setHoverWarn] = useState<WarningLocation | null>(null);
   const [program, dispatch] = useReducer(programReducer, { design: INITIAL_DESIGN, messages: [], scrubPos: 0 });
   const { design, messages, scrubPos } = program;
-  const svgFileRef = useRef<HTMLInputElement>(null);
-  const shareLoadedRef = useRef(false);
 
-  // ── Horizontal panel split ────────────────────────────────────────
-  // leftWidth is in pixels; default ≈ 44 % of the viewport on first render.
-  const [leftWidth, setLeftWidth] = useState<number>(() =>
-    Math.max(330, Math.round(window.innerWidth * 0.44))
-  );
-
-  // Track the mobile breakpoint so we skip inline-width on small screens
-  // (mobile uses CSS Grid, which owns sizing without any JS state).
-  const [isMobile, setIsMobile] = useState(() =>
-    window.matchMedia('(max-width: 880px)').matches
-  );
-  useEffect(() => {
-    const mq      = window.matchMedia('(max-width: 880px)');
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
-  const mainRef = useRef<HTMLDivElement>(null);
-
-  const handleHorizDrag = useCallback((delta: number) => {
-    const total = mainRef.current?.offsetWidth ?? window.innerWidth;
-    setLeftWidth(w => Math.max(240, Math.min(w + delta, total - 240)));
-  }, []);
-
-  const handleHorizReset = useCallback(() => {
-    const total = mainRef.current?.offsetWidth ?? window.innerWidth;
-    setLeftWidth(Math.max(330, Math.round(total * 0.44)));
-  }, []);
+  // ── Panel split, SVG import, and share ───────────────────────────────────
+  const { leftWidth, isMobile, mainRef, handleHorizDrag, handleHorizReset } = usePanelSplit();
 
   // SVG import size derived from current hoop (fits within the sewable area)
   const fitMM = Math.min(selectedHoop.widthMM, selectedHoop.heightMM) - 10;
 
-  function addMsg(text: string, type: ConsoleMessage['type'] = 'info', loc?: WarningLocation) {
+  const addMsg = useCallback((text: string, type: ConsoleMessage['type'] = 'info', loc?: WarningLocation) => {
     dispatch({ type: 'msg/add', text, msgType: type, loc });
-  }
+  }, []);
 
   const runProgram = useCallback((src: string, designName: string) => {
     const t0 = performance.now();
@@ -195,7 +167,20 @@ export default function App() {
       addMsg(msg, 'err');
       dispatch({ type: 'run/error' });
     }
-  }, []);
+  }, [addMsg]);
+
+  const { isDragging, svgFileRef, handleSVGImport, handleFileInput,
+          handleDragEnter, handleDragOver, handleDragLeave, handleDrop } =
+    useSvgImport({ fitMM, runProgram, setSource, addMsg });
+
+  const { handleShare } = useShare({
+    source,
+    setSource,
+    runProgram,
+    addMsg,
+    fallbackSrc: EXAMPLES[firstKey],
+    fallbackName: 'bloom',
+  });
 
   // Hoop-fit warning computed reactively so it updates when the hoop changes
   // without requring a re-run.
@@ -278,106 +263,7 @@ export default function App() {
     } catch (e) {
       addMsg(`${format.toUpperCase()} export failed: ${e instanceof Error ? e.message : e}`, 'err');
     }
-  }, [design]);
-
-  const importSVGText = useCallback((text: string, filename: string) => {
-    try {
-      const res = svgToCode(text, { fitMM, palette: THREADS, name: filename, maxSegments: 1400 });
-      const name = filename.replace(/\.svg$/i, '') || 'import';
-      setSource(res.code);
-      const rep = res.report;
-      addMsg(
-        `imported ${filename} — ${rep.fills} fill${rep.fills === 1 ? '' : 's'}, ` +
-        `${rep.outlines} outline${rep.outlines === 1 ? '' : 's'}, ` +
-        `${rep.segments} segments (simplified to ${rep.tolerance} mm), ` +
-        `${rep.colors} colour group${rep.colors === 1 ? '' : 's'}`,
-        'ok',
-      );
-      const ig = Object.entries(rep.ignored || {});
-      if (ig.length) {
-        addMsg(
-          'skipped unsupported elements: ' +
-          ig.map(([k, v]) => `${v} <${k}>`).join(', '),
-        );
-      }
-      runProgram(res.code, name);
-    } catch (err) {
-      addMsg(`SVG import failed: ${err instanceof Error ? err.message : err}`, 'err');
-    }
-  }, [fitMM, runProgram]);
-
-  const handleSVGImport = useCallback(() => {
-    svgFileRef.current?.click();
-  }, []);
-
-  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => importSVGText(String(reader.result), file.name);
-    reader.onerror = () => addMsg(`could not read ${file.name}`, 'err');
-    reader.readAsText(file);
-    e.target.value = '';
-  }, [importSVGText]);
-
-  // Drag-and-drop
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); }, []);
-  const handleDragLeave = useCallback(() => { setIsDragging(false); }, []);
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const f = e.dataTransfer?.files?.[0];
-    if (!f) return;
-    if (/\.svg$/i.test(f.name) || f.type === 'image/svg+xml') {
-      const reader = new FileReader();
-      reader.onload = () => importSVGText(String(reader.result), f.name);
-      reader.readAsText(f);
-    } else {
-      addMsg('only .svg files can be imported', 'err');
-    }
-  }, [importSVGText]);
-
-  // ── Share: load from ?share=<binId> on mount ─────────────────────────────
-  useEffect(() => {
-    if (shareLoadedRef.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const shareId = params.get('share');
-    if (!shareId) return;
-    shareLoadedRef.current = true;
-    addMsg('loading shared snippet…', 'info');
-    fetch(`/api/share?id=${encodeURIComponent(shareId)}`)
-      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then((data: { source: string }) => {
-        setSource(data.source);
-        runProgram(data.source, 'shared');
-      })
-      .catch(err => {
-        addMsg(`could not load share: ${err instanceof Error ? err.message : err}`, 'err');
-        // Fall back to default example
-        runProgram(EXAMPLES[firstKey], 'bloom');
-      });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── Share: create a share URL and copy it to the clipboard ───────────────
-  const handleShare = useCallback(async (): Promise<void> => {
-    const res = await fetch('/api/share', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
-    }
-    const { id } = await res.json() as { id: string };
-    const url = `${window.location.origin}/?share=${id}`;
-    await navigator.clipboard.writeText(url);
-  }, [source]);
+  }, [design, addMsg]);
 
   // Kick off initial render
   const initialised = useRef(false);
