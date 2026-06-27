@@ -19,7 +19,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "doctor": "npx react-doctor@latest"
+    "doctor": "npx react-doctor@latest",
+    "knip": "knip"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -44,7 +45,7 @@
     "@arethetypeswrong/cli": "^0.18.4",
     "@eslint/js": "^10.0.1",
     "@types/delaunator": "5.0.3",
-    "@types/node": "^24.12.3",
+    "@types/node": "^24.13.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vercel/node": "^5.8.17",
@@ -56,6 +57,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "happy-dom": "^20.10.2",
+    "knip": "^6.21.0",
     "prettier": "^3.9.0",
     "prettier-config-airbnb": "^1.0.0",
     "publint": "^0.3.21",
