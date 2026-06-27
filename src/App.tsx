@@ -1,4 +1,4 @@
-import { useReducer, useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { useReducer, useState, useCallback, useRef, useMemo, useEffect, lazy, Suspense } from 'react';
 import type { StitchEvent, DesignStats, DensityResult, WarningLocation } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
 import { toDST } from './lib/dst.ts';
@@ -16,7 +16,7 @@ import Header from './components/Header.tsx';
 import EditorPane from './components/EditorPane.tsx';
 import StagePane from './components/StagePane.tsx';
 import Splitter from './components/Splitter.tsx';
-import ReferenceDialog from './components/ReferenceDialog.tsx';
+const ReferenceDialog = lazy(() => import('./components/ReferenceDialog.tsx'));
 import HoopDialog from './components/HoopDialog.tsx';
 
 export interface LineSegment {
@@ -103,6 +103,14 @@ function programReducer(state: ProgramState, action: ProgramAction): ProgramStat
       return { ...state, messages: next.length > 40 ? next.slice(next.length - 40) : next };
     }
   }
+}
+
+function DialogSpinner() {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white" />
+    </div>
+  );
 }
 
 export default function App() {
@@ -408,7 +416,9 @@ export default function App() {
         />
       </main>
 
-      <ReferenceDialog open={showReference} onClose={() => setShowReference(false)} />
+      <Suspense fallback={showReference ? <DialogSpinner /> : null}>
+        <ReferenceDialog open={showReference} onClose={() => setShowReference(false)} />
+      </Suspense>
 
       <HoopDialog
         open={showHoopDialog}
