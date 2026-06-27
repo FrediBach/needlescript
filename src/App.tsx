@@ -239,7 +239,7 @@ export default function App() {
   useEffect(() => {
     const hoopWarning =
       displayDesign.warnings.length > design.warnings.length
-        ? displayDesign.warnings[displayDesign.warnings.length - 1]
+        ? displayDesign.warnings.at(-1)!
         : null;
     if (hoopWarning !== prevHoopWarningRef.current) {
       prevHoopWarningRef.current = hoopWarning;

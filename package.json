@@ -1,7 +1,7 @@
 {
   "name": "needlescript",
   "description": "Logo inspired programming language for generative embroidery",
-  "private": false,
+  "private": true,
   "author": "Fredi Bach",
   "version": "1.0.0",
   "license": "MIT",
