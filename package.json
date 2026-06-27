@@ -21,7 +21,8 @@
     "test:coverage": "vitest run --coverage",
     "doctor": "npx react-doctor@latest",
     "knip": "knip",
-    "e18e": "npx @e18e/cli analyze"
+    "e18e": "npx @e18e/cli analyze",
+    "analyze": "ANALYZE=true npm run build"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -63,6 +64,7 @@
     "prettier": "^3.9.0",
     "prettier-config-airbnb": "^1.0.0",
     "publint": "^0.3.21",
+    "rollup-plugin-visualizer": "^7.0.1",
     "tsdown": "^0.22.3",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.62.0",
