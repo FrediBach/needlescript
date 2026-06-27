@@ -40,9 +40,7 @@ export interface ParamDef {
   line: number;
 }
 
-export type ParamItem =
-  | { kind: 'section'; title: string }
-  | { kind: 'param'; def: ParamDef };
+export type ParamItem = { kind: 'section'; title: string } | { kind: 'param'; def: ParamDef };
 
 // ── Preset type ────────────────────────────────────────────────────────────
 
@@ -78,9 +76,7 @@ function isInt(n: number): boolean {
   return Number.isFinite(n) && Math.floor(n) === n;
 }
 
-function parseAnnotation(
-  content: string,
-): Omit<ParamDef, 'name' | 'value' | 'line'> | null {
+function parseAnnotation(content: string): Omit<ParamDef, 'name' | 'value' | 'line'> | null {
   const trimmed = content.trim();
 
   // switch  or  switch:label0,label1
@@ -104,16 +100,16 @@ function parseAnnotation(
   }
 
   // Parse up to three colon-separated numbers
-  const parts = trimmed.split(':').map(s => s.trim());
+  const parts = trimmed.split(':').map((s) => s.trim());
   if (parts.length === 2) {
     // [min:max]
-    const min  = parseFloat(parts[0]);
-    const max  = parseFloat(parts[1]);
+    const min = parseFloat(parts[0]);
+    const max = parseFloat(parts[1]);
     if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) return null;
     // Only treat as integer slider when both bounds are whole numbers AND the
     // range spans more than 1 unit.  [0:1] with integer bounds is a normalised
     // float range (smooth), not a two-value integer toggle — use [switch] for that.
-    const bothInt = isInt(min) && isInt(max) && (max - min) > 1;
+    const bothInt = isInt(min) && isInt(max) && max - min > 1;
     const step = bothInt ? 1 : (max - min) / 100;
     return {
       controlType: 'slider',
@@ -126,9 +122,9 @@ function parseAnnotation(
 
   if (parts.length === 3) {
     // [min:step:max]
-    const min  = parseFloat(parts[0]);
+    const min = parseFloat(parts[0]);
     const step = parseFloat(parts[1]);
-    const max  = parseFloat(parts[2]);
+    const max = parseFloat(parts[2]);
     if (!Number.isFinite(min) || !Number.isFinite(step) || !Number.isFinite(max)) return null;
     if (step <= 0 || min >= max) return null;
     return {
@@ -150,12 +146,12 @@ function parseAnnotation(
  * in source order. Returns an empty array when no annotated parameters exist.
  */
 export function parseParameters(source: string): ParamItem[] {
-  const lines  = source.split('\n');
+  const lines = source.split('\n');
   const items: ParamItem[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line    = lines[i];
-    const lineNo  = i + 1; // 1-based
+    const line = lines[i];
+    const lineNo = i + 1; // 1-based
 
     // ── Section header ────────────────────────────────────────────────────
     const sectionMatch = SECTION_RE.exec(line);
@@ -171,7 +167,7 @@ export function parseParameters(source: string): ParamItem[] {
     const annotMatch = ANNOT_RE.exec(line);
     if (!annotMatch) continue;
 
-    const name     = (declMatch[1] ?? declMatch[2] ?? declMatch[3]).toLowerCase();
+    const name = (declMatch[1] ?? declMatch[2] ?? declMatch[3]).toLowerCase();
     const rawValue = parseFloat(declMatch[4]);
     if (!Number.isFinite(rawValue)) continue;
 
@@ -210,12 +206,12 @@ export function parseParameters(source: string): ParamItem[] {
  */
 export function updateParameter(
   source: string,
-  line: number,           // 1-based
+  line: number, // 1-based
   name: string,
   newValue: number,
 ): string {
   const lines = source.split('\n');
-  const idx   = line - 1;
+  const idx = line - 1;
   if (idx < 0 || idx >= lines.length) return source;
 
   const original = lines[idx];
@@ -232,15 +228,9 @@ export function updateParameter(
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   // let name = <value>  or  name = <value>
-  const letOrBare = new RegExp(
-    `((?:let\\s+)?${escaped}\\s*=\\s*)-?(?:\\d+\\.?\\d*|\\.\\d+)`,
-    'i',
-  );
+  const letOrBare = new RegExp(`((?:let\\s+)?${escaped}\\s*=\\s*)-?(?:\\d+\\.?\\d*|\\.\\d+)`, 'i');
   // make "name <value>
-  const makeRe = new RegExp(
-    `(make\\s+"${escaped}\\s+)-?(?:\\d+\\.?\\d*|\\.\\d+)`,
-    'i',
-  );
+  const makeRe = new RegExp(`(make\\s+"${escaped}\\s+)-?(?:\\d+\\.?\\d*|\\.\\d+)`, 'i');
 
   let updated = original.replace(letOrBare, `$1${formatted}`);
   if (updated === original) {

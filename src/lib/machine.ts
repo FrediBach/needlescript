@@ -11,7 +11,7 @@ export const LIMITS = {
   maxListCells: 1000000,
   maxListDepth: 16,
   // Generative math (RFC-3 §8)
-  sewableRadius: 47,        // the sewable field inside the 100 mm hoop, in mm
+  sewableRadius: 47, // the sewable field inside the 100 mm hoop, in mm
   maxScatterPoints: 20000,
   maxDelaunayPoints: 10000, // voronoi / triangulate / hull / relax input
 };
@@ -32,10 +32,13 @@ import { DensityGrid } from './postprocess.ts';
  * a single affine matrix and the fast path below stays byte-identical to the
  * pre-effects engine.
  */
-type OutLayer = { kind: 'aff'; m: Mat } | { kind: 'warp'; fn: (x: number, y: number) => [number, number] };
+type OutLayer =
+  { kind: 'aff'; m: Mat } | { kind: 'warp'; fn: (x: number, y: number) => [number, number] };
 
 export class Machine {
-  x = 0; y = 0; heading = 0;
+  x = 0;
+  y = 0;
+  heading = 0;
   penDown = true;
   stitchLen = 2.5;
   mode: 'run' | 'satin' | 'estitch' = 'run';
@@ -48,13 +51,13 @@ export class Machine {
   fillSpacing = 0.4;
   fillLen: number | null = null;
   lockLen = 0.7;
-  pullComp = 0;                 // pull compensation in mm
+  pullComp = 0; // pull compensation in mm
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag' = 'off';
   fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge' = 'off';
-  doubleUnderlay = false;       // fleece: stack center + zigzag passes
-  shortStitch = true;           // auto short-stitch on tight satin curves
-  autoTrim = 7;                 // insert trim before jumps ≥ this (0 = off)
-  maxDensity = 3.5;             // coverage warning threshold, in layers of thread
+  doubleUnderlay = false; // fleece: stack center + zigzag passes
+  shortStitch = true; // auto short-stitch on tight satin curves
+  autoTrim = 7; // insert trim before jumps ≥ this (0 = off)
+  maxDensity = 3.5; // coverage warning threshold, in layers of thread
   satinPath: { x: number; y: number }[] | null = null; // buffered satin column
   // Programmable satin (`satin @fn`): a user shape reporter that supersedes the
   // built-in generator, queried once per stitch pair at flush time. null = the
@@ -72,8 +75,7 @@ export class Machine {
   fillArmed = false;
   fillDirReporter: ((px: number, py: number) => number) | null = null;
   fillShapeReporter:
-    | ((px: number, py: number, row: number, v: number) => [number, number, number])
-    | null = null;
+    ((px: number, py: number, row: number, v: number) => [number, number, number]) | null = null;
   // Snapshot of the output stack captured at beginfill while armed, so the
   // region/field compose with transforms (reporters see local; placement maps
   // through this affine CTM; warp deforms emitted penetrations downstream).
@@ -145,13 +147,22 @@ export class Machine {
   popOut() {
     this.outLayers.pop();
     const s = this.outSnap.pop();
-    if (s) { this.ctm = s.ctm; this.hasWarp = s.hasWarp; }
-    else { this.ctm = IDENTITY; this.hasWarp = false; }
+    if (s) {
+      this.ctm = s.ctm;
+      this.hasWarp = s.hasWarp;
+    } else {
+      this.ctm = IDENTITY;
+      this.hasWarp = false;
+    }
   }
 
   /** Push / pop an after-split penetration effect (humanize / snaptogrid). */
-  pushPen(fn: (x: number, y: number) => [number, number]) { this.penLayers.push(fn); }
-  popPen() { this.penLayers.pop(); }
+  pushPen(fn: (x: number, y: number) => [number, number]) {
+    this.penLayers.push(fn);
+  }
+  popPen() {
+    this.penLayers.pop();
+  }
 
   /**
    * Map a local point to hoop space through the pre-split stack. With no warp
@@ -161,11 +172,13 @@ export class Machine {
    */
   mapOut(x: number, y: number): [number, number] {
     if (!this.hasWarp) return apply(this.ctm, x, y);
-    let px = x, py = y;
+    let px = x,
+      py = y;
     for (let i = this.outLayers.length - 1; i >= 0; i--) {
       const L = this.outLayers[i];
       const r = L.kind === 'aff' ? apply(L.m, px, py) : L.fn(px, py);
-      px = r[0]; py = r[1];
+      px = r[0];
+      py = r[1];
     }
     return [px, py];
   }
@@ -173,11 +186,13 @@ export class Machine {
   /** Like mapOut, but using the satin column's captured snapshot. */
   _mapSatin(lx: number, ly: number): [number, number] {
     if (!this.satinHasWarp) return apply(this.satinCTM, lx, ly);
-    let px = lx, py = ly;
+    let px = lx,
+      py = ly;
     for (let i = this.satinLayers.length - 1; i >= 0; i--) {
       const L = this.satinLayers[i];
       const r = L.kind === 'aff' ? apply(L.m, px, py) : L.fn(px, py);
-      px = r[0]; py = r[1];
+      px = r[0];
+      py = r[1];
     }
     return [px, py];
   }
@@ -189,15 +204,23 @@ export class Machine {
    * With no effect active this is exactly `_push('stitch', …)`.
    */
   _emitPen(x: number, y: number, u = false) {
-    if (this.penLayers.length === 0) { this._push('stitch', x, y, u); return; }
-    let px = x, py = y;
+    if (this.penLayers.length === 0) {
+      this._push('stitch', x, y, u);
+      return;
+    }
+    let px = x,
+      py = y;
     for (let i = this.penLayers.length - 1; i >= 0; i--) {
       const r = this.penLayers[i](px, py);
-      px = r[0]; py = r[1];
+      px = r[0];
+      py = r[1];
     }
     if (this.lastEmit) {
       const d = Math.hypot(px - this.lastEmit.x, py - this.lastEmit.y);
-      if (d < LIMITS.minStitch * 0.5) { this._dropTiny(px, py); return; }
+      if (d < LIMITS.minStitch * 0.5) {
+        this._dropTiny(px, py);
+        return;
+      }
     }
     this._push('stitch', px, py, u);
   }
@@ -213,9 +236,9 @@ export class Machine {
     if (this.events.length >= LIMITS.maxStitches)
       throw new NeedlescriptError(
         `Design exceeds ${LIMITS.maxStitches.toLocaleString('en-US')} stitches — stopped. Reduce repeats, raise stitchlen, or raise fillspacing.` +
-        (this.usedQuery
-          ? ' A feedback loop may not be terminating — is your coverage target reachable? Cap it with  repeat N [ … if done [ break ] ].'
-          : ''),
+          (this.usedQuery
+            ? ' A feedback loop may not be terminating — is your coverage target reachable? Cap it with  repeat N [ … if done [ break ] ].'
+            : ''),
       );
     const ev: StitchEvent = { t, x, y, c: this.colorIdx, line: this.currentLine };
     if (u) ev.u = 1;
@@ -233,15 +256,20 @@ export class Machine {
   }
 
   setXY(nx: number, ny: number) {
-    const dx = nx - this.x, dy = ny - this.y;
+    const dx = nx - this.x,
+      dy = ny - this.y;
     const d = Math.hypot(dx, dy);
-    if (d < 1e-9) { this.x = nx; this.y = ny; return; }
+    if (d < 1e-9) {
+      this.x = nx;
+      this.y = ny;
+      return;
+    }
     this.travel(nx, ny);
   }
 
   forward(dist: number) {
     if (!isFinite(dist)) throw new NeedlescriptError('fd/bk got a non-numeric distance');
-    const rad = this.heading * Math.PI / 180;
+    const rad = (this.heading * Math.PI) / 180;
     this.travel(this.x + Math.sin(rad) * dist, this.y + Math.cos(rad) * dist);
   }
 
@@ -256,14 +284,14 @@ export class Machine {
       throw new NeedlescriptError('arc got a non-numeric angle or radius');
     const r = Math.abs(radius);
     if (Math.abs(deg) < 1e-9 || r < 1e-9) return;
-    const arcLen = Math.abs(deg) * Math.PI / 180 * r;
+    const arcLen = ((Math.abs(deg) * Math.PI) / 180) * r;
     const eff = Math.min(Math.max(this.stitchLen, LIMITS.minStitch), LIMITS.maxStitch);
     const steps = Math.max(1, Math.ceil(Math.max(arcLen / eff, Math.abs(deg) / 15)));
     const stepAng = deg / steps;
-    const chord = 2 * r * Math.sin(Math.abs(stepAng) * Math.PI / 360);
+    const chord = 2 * r * Math.sin((Math.abs(stepAng) * Math.PI) / 360);
     for (let s = 0; s < steps; s++) {
       this.heading = (this.heading + stepAng / 2) % 360;
-      const rad = this.heading * Math.PI / 180;
+      const rad = (this.heading * Math.PI) / 180;
       this.travel(this.x + Math.sin(rad) * chord, this.y + Math.cos(rad) * chord);
       this.heading = (this.heading + stepAng / 2) % 360;
     }
@@ -295,7 +323,8 @@ export class Machine {
   }
 
   travel(nx: number, ny: number) {
-    const ox = this.x, oy = this.y;
+    const ox = this.x,
+      oy = this.y;
 
     if (this.recording) {
       // Fill boundaries are recorded in hoop space so the fill is generated
@@ -316,7 +345,8 @@ export class Machine {
       } else {
         this._closeRing();
       }
-      this.x = nx; this.y = ny;
+      this.x = nx;
+      this.y = ny;
       return;
     }
 
@@ -324,7 +354,8 @@ export class Machine {
       this.flushSatin();
       const [hnx, hny] = this.mapOut(nx, ny);
       this._push('jump', hnx, hny);
-      this.x = nx; this.y = ny;
+      this.x = nx;
+      this.y = ny;
       return;
     }
 
@@ -341,10 +372,10 @@ export class Machine {
           this.satinLayers = this.hasWarp ? this.outLayers.slice() : this.satinLayers;
         }
         const lastP = this.satinPath[this.satinPath.length - 1];
-        if (Math.hypot(nx - lastP.x, ny - lastP.y) > 0.05)
-          this.satinPath.push({ x: nx, y: ny });
+        if (Math.hypot(nx - lastP.x, ny - lastP.y) > 0.05) this.satinPath.push({ x: nx, y: ny });
       }
-      this.x = nx; this.y = ny;
+      this.x = nx;
+      this.y = ny;
       return;
     }
 
@@ -352,50 +383,63 @@ export class Machine {
     // length stays physical under scaling (transform the path, then stitch).
     const [hox, hoy] = this.mapOut(ox, oy);
     const [hnx, hny] = this.mapOut(nx, ny);
-    const hdx = hnx - hox, hdy = hny - hoy;
+    const hdx = hnx - hox,
+      hdy = hny - hoy;
     const hlen = Math.hypot(hdx, hdy);
 
     this._ensureStart();
 
     if (this.mode === 'estitch' && this.eWidth > 0.05) {
-      if (hlen < 1e-9) { this.x = nx; this.y = ny; return; }
+      if (hlen < 1e-9) {
+        this.x = nx;
+        this.y = ny;
+        return;
+      }
       // Prong width follows the CTM perpendicular to the *local* travel
       // direction, like satin: transform the local left-normal.
       const llen = Math.hypot(nx - ox, ny - oy) || 1;
-      const ldx = (nx - ox) / llen, ldy = (ny - oy) / llen;
+      const ldx = (nx - ox) / llen,
+        ldy = (ny - oy) / llen;
       const [ovx, ovy] = linApply(this.ctm, -ldy, ldx); // L(local left-normal)
       const spacing = Math.max(1, this.stitchLen);
       const steps = Math.max(1, Math.round(hlen / spacing));
       for (let s = 1; s <= steps; s++) {
         const t = s / steps;
-        const cx = hox + hdx * t, cy = hoy + hdy * t;
+        const cx = hox + hdx * t,
+          cy = hoy + hdy * t;
         this._emitPen(cx, cy);
         this._emitPen(cx + ovx * this.eWidth, cy + ovy * this.eWidth);
         this._emitPen(cx, cy);
       }
-      this.x = nx; this.y = ny;
+      this.x = nx;
+      this.y = ny;
       return;
     }
 
     // Running stitch
     if (hlen < LIMITS.minStitch * 0.5) {
       this._dropTiny(nx, ny);
-      this.x = nx; this.y = ny;
+      this.x = nx;
+      this.y = ny;
       return;
     }
     const eff = Math.min(Math.max(this.stitchLen, LIMITS.minStitch), LIMITS.maxStitch);
     const steps = Math.max(1, Math.ceil(hlen / eff));
-    let pxv = hox, pyv = hoy;
+    let pxv = hox,
+      pyv = hoy;
     for (let s = 1; s <= steps; s++) {
       const t = s / steps;
-      const tx = hox + hdx * t, ty = hoy + hdy * t;
+      const tx = hox + hdx * t,
+        ty = hoy + hdy * t;
       this._emitPen(tx, ty);
       for (let r = 1; r < this.beanRepeats; r++) {
         this._emitPen(r % 2 === 1 ? pxv : tx, r % 2 === 1 ? pyv : ty);
       }
-      pxv = tx; pyv = ty;
+      pxv = tx;
+      pyv = ty;
     }
-    this.x = nx; this.y = ny;
+    this.x = nx;
+    this.y = ny;
   }
 
   // ---- Satin column: underlay + zigzag, sewn when the column ends ----
@@ -410,9 +454,10 @@ export class Machine {
       if (d < 0.1) continue;
       const steps = Math.max(1, Math.ceil(d / slen));
       for (let s = 1; s <= steps; s++) {
-        this._push('stitch', cx + (p.x - cx) * s / steps, cy + (p.y - cy) * s / steps, u);
+        this._push('stitch', cx + ((p.x - cx) * s) / steps, cy + ((p.y - cy) * s) / steps, u);
       }
-      cx = p.x; cy = p.y;
+      cx = p.x;
+      cy = p.y;
     }
   }
 
@@ -422,8 +467,10 @@ export class Machine {
     if (n < 2) return pts.slice();
     const out: { x: number; y: number }[] = [];
     for (let i = 0; i < n; i++) {
-      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
-      const dx = b.x - a.x, dy = b.y - a.y;
+      const a = pts[Math.max(0, i - 1)],
+        b = pts[Math.min(n - 1, i + 1)];
+      const dx = b.x - a.x,
+        dy = b.y - a.y;
       const len = Math.hypot(dx, dy) || 1;
       out.push({ x: pts[i].x - (dy / len) * dist, y: pts[i].y + (dx / len) * dist });
     }
@@ -443,16 +490,21 @@ export class Machine {
     shortStitch: boolean,
   ) {
     const half = width / 2;
-    let prevUx: number | null = null, prevUy = 0;
+    let prevUx: number | null = null,
+      prevUy = 0;
     let innerCounter = 0;
     let warnedTight = false;
     for (let i = 1; i < path.length; i++) {
-      const ox = path[i - 1].x, oy = path[i - 1].y;
-      const dxT = path[i].x - ox, dyT = path[i].y - oy;
+      const ox = path[i - 1].x,
+        oy = path[i - 1].y;
+      const dxT = path[i].x - ox,
+        dyT = path[i].y - oy;
       const len = Math.hypot(dxT, dyT);
       if (len < 1e-9) continue;
-      const ux = dxT / len, uy = dyT / len;
-      const px = -uy, py = ux; // left normal
+      const ux = dxT / len,
+        uy = dyT / len;
+      const px = -uy,
+        py = ux; // left normal
       let innerSide = 0;
       let crowded = false;
       if (prevUx !== null) {
@@ -481,7 +533,8 @@ export class Machine {
       const steps = Math.max(1, Math.ceil(len / spacing));
       for (let s = 1; s <= steps; s++) {
         const t = s / steps;
-        const cx = ox + dxT * t, cy = oy + dyT * t;
+        const cx = ox + dxT * t,
+          cy = oy + dyT * t;
         this.satinSide = -this.satinSide;
         let h = half;
         if (crowded && this.satinSide === innerSide) {
@@ -490,7 +543,8 @@ export class Machine {
         }
         this._push('stitch', cx + px * h * this.satinSide, cy + py * h * this.satinSide, u);
       }
-      prevUx = ux; prevUy = uy;
+      prevUx = ux;
+      prevUy = uy;
     }
   }
 
@@ -527,7 +581,11 @@ export class Machine {
     // spine, wide columns a zigzag that lofts the topping and grips the fabric.
     const mode: 'off' | 'center' | 'edge' | 'zigzag' =
       this.underlayMode === 'auto'
-        ? (w < 1.5 ? 'off' : w < 4 ? 'center' : 'zigzag')
+        ? w < 1.5
+          ? 'off'
+          : w < 4
+            ? 'center'
+            : 'zigzag'
         : this.underlayMode;
     const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
     const rev = path.slice().reverse();
@@ -559,7 +617,10 @@ export class Machine {
 
   /** Map a local polyline into hoop space (through the satin snapshot map). */
   _toHoop(pts: { x: number; y: number }[], _ctm: Mat): { x: number; y: number }[] {
-    return pts.map(p => { const [x, y] = this._mapSatin(p.x, p.y); return { x, y }; });
+    return pts.map((p) => {
+      const [x, y] = this._mapSatin(p.x, p.y);
+      return { x, y };
+    });
   }
 
   /**
@@ -567,19 +628,31 @@ export class Machine {
    * direction: L(local left-normal). Its length is the per-direction width
    * scale; its direction is where that perpendicular lands in hoop space.
    */
-  _perpVec(ctm: Mat, lax: number, lay: number, lbx: number, lby: number): { ox: number; oy: number; scale: number } {
-    const dx = lbx - lax, dy = lby - lay;
+  _perpVec(
+    ctm: Mat,
+    lax: number,
+    lay: number,
+    lbx: number,
+    lby: number,
+  ): { ox: number; oy: number; scale: number } {
+    const dx = lbx - lax,
+      dy = lby - lay;
     const len = Math.hypot(dx, dy) || 1;
     const [ox, oy] = linApply(ctm, -dy / len, dx / len);
     return { ox, oy, scale: Math.hypot(ox, oy) || 1 };
   }
 
-  _offsetPathT(local: { x: number; y: number }[], ctm: Mat, dist: number): { x: number; y: number }[] {
+  _offsetPathT(
+    local: { x: number; y: number }[],
+    ctm: Mat,
+    dist: number,
+  ): { x: number; y: number }[] {
     const n = local.length;
     if (n < 2) return this._toHoop(local, ctm);
     const out: { x: number; y: number }[] = [];
     for (let i = 0; i < n; i++) {
-      const a = local[Math.max(0, i - 1)], b = local[Math.min(n - 1, i + 1)];
+      const a = local[Math.max(0, i - 1)],
+        b = local[Math.min(n - 1, i + 1)];
       const { ox, oy, scale } = this._perpVec(ctm, a.x, a.y, b.x, b.y);
       const [hx, hy] = this._mapSatin(local[i].x, local[i].y);
       out.push({ x: hx + (ox / scale) * dist, y: hy + (oy / scale) * dist });
@@ -597,20 +670,27 @@ export class Machine {
   ) {
     const hoop = this._toHoop(local, this.satinCTM);
     const halfDesign = designWidth / 2;
-    let prevUx: number | null = null, prevUy = 0;
+    let prevUx: number | null = null,
+      prevUy = 0;
     let innerCounter = 0;
     let warnedTight = false;
     for (let i = 1; i < hoop.length; i++) {
-      const ox = hoop[i - 1].x, oy = hoop[i - 1].y;
-      const dxT = hoop[i].x - ox, dyT = hoop[i].y - oy;
+      const ox = hoop[i - 1].x,
+        oy = hoop[i - 1].y;
+      const dxT = hoop[i].x - ox,
+        dyT = hoop[i].y - oy;
       const len = Math.hypot(dxT, dyT);
       if (len < 1e-9) continue;
-      const ux = dxT / len, uy = dyT / len; // hoop travel direction
+      const ux = dxT / len,
+        uy = dyT / len; // hoop travel direction
       // Width perpendicular to the *local* travel direction, mapped to hoop.
-      const { ox: ovx, oy: ovy, scale } = this._perpVec(
-        this.satinCTM, local[i - 1].x, local[i - 1].y, local[i].x, local[i].y,
-      );
-      const dirx = ovx / scale, diry = ovy / scale;
+      const {
+        ox: ovx,
+        oy: ovy,
+        scale,
+      } = this._perpVec(this.satinCTM, local[i - 1].x, local[i - 1].y, local[i].x, local[i].y);
+      const dirx = ovx / scale,
+        diry = ovy / scale;
       const halfBase = halfDesign * scale + pull / 2; // pull comp is never scaled
       let innerSide = 0;
       let crowded = false;
@@ -638,7 +718,8 @@ export class Machine {
       const steps = Math.max(1, Math.ceil(len / spacing));
       for (let s = 1; s <= steps; s++) {
         const t = s / steps;
-        const cx = ox + dxT * t, cy = oy + dyT * t;
+        const cx = ox + dxT * t,
+          cy = oy + dyT * t;
         this.satinSide = -this.satinSide;
         let h = halfBase;
         if (crowded && this.satinSide === innerSide) {
@@ -647,7 +728,8 @@ export class Machine {
         }
         this._push('stitch', cx + dirx * h * this.satinSide, cy + diry * h * this.satinSide, u);
       }
-      prevUx = ux; prevUy = uy;
+      prevUx = ux;
+      prevUy = uy;
     }
   }
 
@@ -658,16 +740,22 @@ export class Machine {
       this._push('stitch', hoop0[0], hoop0[1]);
     }
     // Representative width (average perpendicular scale) for underlay choice.
-    let scaleSum = 0, scaleN = 0;
+    let scaleSum = 0,
+      scaleN = 0;
     for (let i = 1; i < local.length; i++) {
       const { scale } = this._perpVec(ctm, local[i - 1].x, local[i - 1].y, local[i].x, local[i].y);
-      scaleSum += scale; scaleN++;
+      scaleSum += scale;
+      scaleN++;
     }
     const avgScale = scaleN ? scaleSum / scaleN : 1;
     const w = this.satinWidth * avgScale + this.pullComp;
     const mode: 'off' | 'center' | 'edge' | 'zigzag' =
       this.underlayMode === 'auto'
-        ? (w < 1.5 ? 'off' : w < 4 ? 'center' : 'zigzag')
+        ? w < 1.5
+          ? 'off'
+          : w < 4
+            ? 'center'
+            : 'zigzag'
         : this.underlayMode;
     const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
     const hoop = this._toHoop(local, ctm);
@@ -693,7 +781,14 @@ export class Machine {
       this._runAlong(revHoop, uLen, true);
     }
     // The topping
-    this._zigzagAlongT(local, this.satinWidth, this.pullComp, this.satinSpacing, false, this.shortStitch);
+    this._zigzagAlongT(
+      local,
+      this.satinWidth,
+      this.pullComp,
+      this.satinSpacing,
+      false,
+      this.shortStitch,
+    );
   }
 
   // ---- Programmable satin (`satin @fn`) ----
@@ -728,11 +823,12 @@ export class Machine {
     // equivalence pin is untouched (identity CTM ⇒ this equals the local
     // length). Warp is *not* folded in here; it deforms the emitted rails
     // downstream (width stays affine, centerline warps), as in built-in satin.
-    const mapped = local.map(p => apply(this.satinCTM, p.x, p.y));
+    const mapped = local.map((p) => apply(this.satinCTM, p.x, p.y));
     const cum: number[] = new Array(n);
     cum[0] = 0;
     for (let i = 1; i < n; i++)
-      cum[i] = cum[i - 1] + Math.hypot(mapped[i][0] - mapped[i - 1][0], mapped[i][1] - mapped[i - 1][1]);
+      cum[i] =
+        cum[i - 1] + Math.hypot(mapped[i][0] - mapped[i - 1][0], mapped[i][1] - mapped[i - 1][1]);
     const L = cum[n - 1];
     if (!(L > 1e-9)) return;
 
@@ -747,14 +843,19 @@ export class Machine {
       while (seg < n - 1 && cum[seg] < a) seg++;
       const segLen = cum[seg] - cum[seg - 1] || 1;
       const f = (a - cum[seg - 1]) / segLen;
-      const p0 = local[seg - 1], p1 = local[seg];
-      const dx = p1.x - p0.x, dy = p1.y - p0.y;
+      const p0 = local[seg - 1],
+        p1 = local[seg];
+      const dx = p1.x - p0.x,
+        dy = p1.y - p0.y;
       const dlen = Math.hypot(dx, dy) || 1;
-      const ux = dx / dlen, uy = dy / dlen;
+      const ux = dx / dlen,
+        uy = dy / dlen;
       return {
-        x: p0.x + dx * f, y: p0.y + dy * f,
-        nx: -uy, ny: ux,                                   // left normal (local)
-        heading: (Math.atan2(ux, uy) * 180 / Math.PI + 360) % 360,
+        x: p0.x + dx * f,
+        y: p0.y + dy * f,
+        nx: -uy,
+        ny: ux, // left normal (local)
+        heading: ((Math.atan2(ux, uy) * 180) / Math.PI + 360) % 360,
       };
     };
 
@@ -773,13 +874,16 @@ export class Machine {
     // Single walk: buffer the topping penetrations (so underlay can be emitted
     // first), tracking the max realized full width (for auto-underlay, §9) and
     // the longest realized chord (for the snag check on real geometry, §5.2).
-    interface Pen { x: number; y: number }
+    interface Pen {
+      x: number;
+      y: number;
+    }
     const topping: Pen[] = [];
     let maxFullW = 0;
     let maxChord = 0;
-    let side = this.satinSide;       // local copy of the alternating rail flag
-    let cursor = 0;                  // arc-length consumed (pair base)
-    let pair = 0;                    // 0-based pair index → reporter's `i`
+    let side = this.satinSide; // local copy of the alternating rail flag
+    let cursor = 0; // arc-length consumed (pair base)
+    let pair = 0; // 0-based pair index → reporter's `i`
     let advWarned = false;
     let prev: Pen | null = null;
     let guard = 0;
@@ -788,7 +892,7 @@ export class Machine {
     while (cursor < L - 1e-9 && guard++ < guardMax) {
       const ret = reporter(cursor, cursor / L, pair, resolve(cursor).heading);
       let adv = ret[0];
-      const lw = Math.max(0, ret[1]);   // negative half-widths clamp to 0 (§5.1)
+      const lw = Math.max(0, ret[1]); // negative half-widths clamp to 0 (§5.1)
       const rw = Math.max(0, ret[2]);
       const ll = ret[3];
       const rl = ret[4];
@@ -813,7 +917,10 @@ export class Machine {
         if (prev) {
           const d = Math.hypot(hx - prev.x, hy - prev.y);
           if (d > maxChord) maxChord = d;
-          if (d < LIMITS.minStitch * 0.5) { this._dropTiny(hx, hy); continue; }
+          if (d < LIMITS.minStitch * 0.5) {
+            this._dropTiny(hx, hy);
+            continue;
+          }
         }
         const pen = { x: hx, y: hy };
         topping.push(pen);
@@ -851,9 +958,12 @@ export class Machine {
   _warnIfWiderThanRadius(local: { x: number; y: number }[], half: number) {
     if (!(half > 0)) return;
     for (let i = 1; i < local.length - 1; i++) {
-      const ax = local[i].x - local[i - 1].x, ay = local[i].y - local[i - 1].y;
-      const bx = local[i + 1].x - local[i].x, by = local[i + 1].y - local[i].y;
-      const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+      const ax = local[i].x - local[i - 1].x,
+        ay = local[i].y - local[i - 1].y;
+      const bx = local[i + 1].x - local[i].x,
+        by = local[i + 1].y - local[i].y;
+      const la = Math.hypot(ax, ay),
+        lb = Math.hypot(bx, by);
       if (la < 1e-9 || lb < 1e-9) continue;
       const dot = Math.max(-1, Math.min(1, (ax * bx + ay * by) / (la * lb)));
       const theta = Math.acos(dot);
@@ -873,7 +983,11 @@ export class Machine {
   _programmableUnderlay(local: { x: number; y: number }[], w: number) {
     const mode: 'off' | 'center' | 'edge' | 'zigzag' =
       this.underlayMode === 'auto'
-        ? (w < 1.5 ? 'off' : w < 4 ? 'center' : 'zigzag')
+        ? w < 1.5
+          ? 'off'
+          : w < 4
+            ? 'center'
+            : 'zigzag'
         : this.underlayMode;
     if (mode === 'off') return;
     const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
@@ -927,11 +1041,13 @@ export class Machine {
   /** Map a local point to hoop space through the fill's captured snapshot. */
   _mapFill(lx: number, ly: number): [number, number] {
     if (!this.fillHasWarp) return apply(this.fillCTM, lx, ly);
-    let px = lx, py = ly;
+    let px = lx,
+      py = ly;
     for (let i = this.fillLayers.length - 1; i >= 0; i--) {
       const L = this.fillLayers[i];
       const r = L.kind === 'aff' ? apply(L.m, px, py) : L.fn(px, py);
-      px = r[0]; py = r[1];
+      px = r[0];
+      py = r[1];
     }
     return [px, py];
   }
@@ -970,15 +1086,25 @@ export class Machine {
     const out: FillPoint[] = [];
     for (let i = 0; i < n; i++) {
       const p = pts[i];
-      const a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n];
+      const a = pts[(i - 1 + n) % n],
+        b = pts[(i + 1) % n];
       // average of the two edge normals ≈ angle bisector
-      const d1x = p[0] - a[0], d1y = p[1] - a[1];
-      const d2x = b[0] - p[0], d2y = b[1] - p[1];
-      const l1 = Math.hypot(d1x, d1y) || 1, l2 = Math.hypot(d2x, d2y) || 1;
-      let nx = -(d1y / l1) - (d2y / l2), ny = d1x / l1 + d2x / l2;
+      const d1x = p[0] - a[0],
+        d1y = p[1] - a[1];
+      const d2x = b[0] - p[0],
+        d2y = b[1] - p[1];
+      const l1 = Math.hypot(d1x, d1y) || 1,
+        l2 = Math.hypot(d2x, d2y) || 1;
+      let nx = -(d1y / l1) - d2y / l2,
+        ny = d1x / l1 + d2x / l2;
       const nl = Math.hypot(nx, ny);
-      if (nl < 1e-6) { nx = -d1y / l1; ny = d1x / l1; }
-      else { nx /= nl; ny /= nl; }
+      if (nl < 1e-6) {
+        nx = -d1y / l1;
+        ny = d1x / l1;
+      } else {
+        nx /= nl;
+        ny /= nl;
+      }
       // pick whichever offset direction actually lands inside the shape
       const c1: [number, number] = [p[0] + nx * d, p[1] + ny * d];
       const c2: [number, number] = [p[0] - nx * d, p[1] - ny * d];
@@ -994,13 +1120,16 @@ export class Machine {
     const out: FillPoint[] = [];
     for (const p of pts) {
       const prev = out[out.length - 1];
-      if (!prev || p.jump) { out.push(p); continue; }
+      if (!prev || p.jump) {
+        out.push(p);
+        continue;
+      }
       const d = Math.hypot(p.x - prev.x, p.y - prev.y);
       const steps = Math.max(1, Math.ceil(d / slen));
       for (let s = 1; s <= steps; s++)
         out.push({
-          x: prev.x + (p.x - prev.x) * s / steps,
-          y: prev.y + (p.y - prev.y) * s / steps,
+          x: prev.x + ((p.x - prev.x) * s) / steps,
+          y: prev.y + ((p.y - prev.y) * s) / steps,
           jump: false,
         });
     }
@@ -1029,13 +1158,12 @@ export class Machine {
     diameter: number,
     area: number,
   ): { rows: [number, number][][]; truncated: boolean; seedCapped: boolean } {
-    const K_len = 4, K_seed = 4, D_test = 0.5;
+    const K_len = 4,
+      K_seed = 4,
+      D_test = 0.5;
     // A representative spacing fixes the hash cell + the seed budget. Queries
     // scan ceil(r / cell) rings so a varying per-row spacing stays correct.
-    let baseSpacing = spacingFn(
-      ...(this._regionSeedPoint(hoopRings) ?? [0, 0]),
-      0,
-    );
+    let baseSpacing = spacingFn(...(this._regionSeedPoint(hoopRings) ?? [0, 0]), 0);
     if (!(baseSpacing > 0)) baseSpacing = 0.4;
     const cell = baseSpacing;
     const spacingMin = Math.max(0.25, baseSpacing);
@@ -1045,25 +1173,29 @@ export class Machine {
     // Spatial hash of every emitted vertex, tagged with its streamline id so the
     // separation test ignores a streamline's own vertices (§7.1/§7.2).
     const hash = new Map<string, [number, number, number][]>();
-    const keyOf = (x: number, y: number) =>
-      Math.floor(x / cell) + ',' + Math.floor(y / cell);
+    const keyOf = (x: number, y: number) => Math.floor(x / cell) + ',' + Math.floor(y / cell);
     const addVertex = (x: number, y: number, id: number) => {
       const k = keyOf(x, y);
       let arr = hash.get(k);
-      if (!arr) { arr = []; hash.set(k, arr); }
+      if (!arr) {
+        arr = [];
+        hash.set(k, arr);
+      }
       arr.push([x, y, id]);
     };
     const tooClose = (x: number, y: number, r: number, excludeId: number): boolean => {
-      const ix = Math.floor(x / cell), iy = Math.floor(y / cell);
+      const ix = Math.floor(x / cell),
+        iy = Math.floor(y / cell);
       const span = Math.max(1, Math.ceil(r / cell));
       const r2 = r * r;
       for (let dx = -span; dx <= span; dx++)
         for (let dy = -span; dy <= span; dy++) {
-          const arr = hash.get((ix + dx) + ',' + (iy + dy));
+          const arr = hash.get(ix + dx + ',' + (iy + dy));
           if (!arr) continue;
           for (const v of arr) {
             if (v[2] === excludeId) continue;
-            const ex = x - v[0], ey = y - v[1];
+            const ex = x - v[0],
+              ey = y - v[1];
             if (ex * ex + ey * ey < r2) return true;
           }
         }
@@ -1071,31 +1203,38 @@ export class Machine {
     };
     const inRegion = (x: number, y: number) => evenOddInside(hoopRings, x, y);
 
-    let truncated = false, seedCapped = false;
+    let truncated = false,
+      seedCapped = false;
 
     // Integrate one streamline from `seed` with separation `sp`, both directions
     // (forward along the field, backward against it). RK2 midpoint stepping.
     // Each vertex carries the field direction sampled there [x, y, fx, fy] so
     // the seeding pass can reuse it instead of re-querying the reporter.
-    const integrate = (seed: [number, number], sp: number, id: number): [number, number, number, number][] => {
+    const integrate = (
+      seed: [number, number],
+      sp: number,
+      id: number,
+    ): [number, number, number, number][] => {
       const h = sp * 0.5;
       const sep = sp * D_test;
       const seedDir = fieldFn(seed[0], seed[1]);
       const oneDir = (sign: number): [number, number, number, number][] => {
         const verts: [number, number, number, number][] = [];
-        let px = seed[0], py = seed[1];
-        let arc = 0, guard = 0;
+        let px = seed[0],
+          py = seed[1];
+        let arc = 0,
+          guard = 0;
         const guardMax = Math.ceil(lenCap / h) + 16;
         while (arc < lenCap && guard++ < guardMax) {
           const d1 = fieldFn(px, py);
-          if (!d1) break;                                   // singularity (§6)
+          if (!d1) break; // singularity (§6)
           const mx = px + d1[0] * sign * h * 0.5;
           const my = py + d1[1] * sign * h * 0.5;
           const d2 = fieldFn(mx, my) ?? d1;
           const nx = px + d2[0] * sign * h;
           const ny = py + d2[1] * sign * h;
-          if (!inRegion(nx, ny)) break;                     // left region/hole
-          if (tooClose(nx, ny, sep, id)) break;             // merge guard (§7.2)
+          if (!inRegion(nx, ny)) break; // left region/hole
+          if (tooClose(nx, ny, sep, id)) break; // merge guard (§7.2)
           // Closed-orbit guard: a streamline that loops back near its own seed
           // (a vortex/swirl) is terminated after one revolution rather than
           // re-tracing to the length cap — the standard refinement that keeps a
@@ -1103,7 +1242,8 @@ export class Machine {
           if (arc > sep * 4 && Math.hypot(nx - seed[0], ny - seed[1]) < sep) break;
           verts.push([nx, ny, d2[0], d2[1]]);
           arc += h;
-          px = nx; py = ny;
+          px = nx;
+          py = ny;
         }
         if (arc >= lenCap) truncated = true;
         return verts;
@@ -1111,8 +1251,12 @@ export class Machine {
       const fwd = oneDir(1);
       const bwd = oneDir(-1);
       bwd.reverse();
-      const seedVert: [number, number, number, number] =
-        [seed[0], seed[1], seedDir ? seedDir[0] : 0, seedDir ? seedDir[1] : 1];
+      const seedVert: [number, number, number, number] = [
+        seed[0],
+        seed[1],
+        seedDir ? seedDir[0] : 0,
+        seedDir ? seedDir[1] : 1,
+      ];
       return [...bwd, seedVert, ...fwd];
     };
 
@@ -1142,7 +1286,7 @@ export class Machine {
       if (verts.length < 2) continue;
       totalVerts += verts.length;
       for (const v of verts) addVertex(v[0], v[1], row);
-      rows.push(verts.map(v => [v[0], v[1]] as [number, number]));
+      rows.push(verts.map((v) => [v[0], v[1]] as [number, number]));
       // Candidate seeds perpendicular to the field, reusing each vertex's stored
       // field direction (§7.3). Subsample to ~one candidate per `sp` of arc so a
       // fine integration step doesn't flood the queue (and the reporter) with
@@ -1150,9 +1294,11 @@ export class Machine {
       const stride = Math.max(1, Math.round(sp / (sp * 0.5)));
       for (let i = 0; i < verts.length; i += stride) {
         const v = verts[i];
-        const px = -v[3], py = v[2];                       // perpendicular to field
+        const px = -v[3],
+          py = v[2]; // perpendicular to field
         for (const s of [-1, 1]) {
-          const cx = v[0] + px * sp * s, cy = v[1] + py * sp * s;
+          const cx = v[0] + px * sp * s,
+            cy = v[1] + py * sp * s;
           if (!inRegion(cx, cy)) continue;
           if (tooClose(cx, cy, sp * D_test, -1)) continue;
           if (queue.length < popCap) queue.push([cx, cy]);
@@ -1175,11 +1321,11 @@ export class Machine {
         : this._nearestInRegion(hoopRings, ring, c);
       if (seed) seeds.push(seed);
     }
-    seeds.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+    seeds.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
     // De-dup seeds that collapse onto the same piece centroid.
     const out: [number, number][] = [];
     for (const s of seeds)
-      if (!out.some(o => Math.hypot(o[0] - s[0], o[1] - s[1]) < 1e-6)) out.push(s);
+      if (!out.some((o) => Math.hypot(o[0] - s[0], o[1] - s[1]) < 1e-6)) out.push(s);
     return out;
   }
 
@@ -1188,15 +1334,24 @@ export class Machine {
   }
 
   _ringCentroid(ring: [number, number][]): [number, number] {
-    let a = 0, cx = 0, cy = 0;
+    let a = 0,
+      cx = 0,
+      cy = 0;
     for (let i = 0; i < ring.length; i++) {
-      const p = ring[i], q = ring[(i + 1) % ring.length];
+      const p = ring[i],
+        q = ring[(i + 1) % ring.length];
       const cross = p[0] * q[1] - q[0] * p[1];
-      a += cross; cx += (p[0] + q[0]) * cross; cy += (p[1] + q[1]) * cross;
+      a += cross;
+      cx += (p[0] + q[0]) * cross;
+      cy += (p[1] + q[1]) * cross;
     }
     if (Math.abs(a) < 1e-9) {
-      let sx = 0, sy = 0;
-      for (const p of ring) { sx += p[0]; sy += p[1]; }
+      let sx = 0,
+        sy = 0;
+      for (const p of ring) {
+        sx += p[0];
+        sy += p[1];
+      }
       return [sx / ring.length, sy / ring.length];
     }
     return [cx / (3 * a), cy / (3 * a)];
@@ -1205,22 +1360,33 @@ export class Machine {
   /** Nearest in-region point to `target`, scanned on a coarse grid over the
    * ring bbox (used when a centroid lands in a hole, §7.3). */
   _nearestInRegion(
-    all: [number, number][][], ring: [number, number][], target: [number, number],
+    all: [number, number][][],
+    ring: [number, number][],
+    target: [number, number],
   ): [number, number] | null {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const p of ring) {
-      if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
-      if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
+      if (p[0] < minX) minX = p[0];
+      if (p[0] > maxX) maxX = p[0];
+      if (p[1] < minY) minY = p[1];
+      if (p[1] > maxY) maxY = p[1];
     }
     const N = 24;
-    let best: [number, number] | null = null, bestD = Infinity;
+    let best: [number, number] | null = null,
+      bestD = Infinity;
     for (let i = 0; i <= N; i++)
       for (let j = 0; j <= N; j++) {
-        const x = minX + (maxX - minX) * i / N;
-        const y = minY + (maxY - minY) * j / N;
+        const x = minX + ((maxX - minX) * i) / N;
+        const y = minY + ((maxY - minY) * j) / N;
         if (!evenOddInside(all, x, y)) continue;
         const d = Math.hypot(x - target[0], y - target[1]);
-        if (d < bestD) { bestD = d; best = [x, y]; }
+        if (d < bestD) {
+          bestD = d;
+          best = [x, y];
+        }
       }
     return best;
   }
@@ -1249,20 +1415,26 @@ export class Machine {
       this.warnings.push('fill skipped — the active transform is degenerate (zero scale)');
       return;
     }
-    const hoopRings = this.localRings.map(
-      r => r.map(p => apply(this.fillCTM, p[0], p[1]) as [number, number]),
-    ).filter(r => r.length >= 3);
+    const hoopRings = this.localRings
+      .map((r) => r.map((p) => apply(this.fillCTM, p[0], p[1]) as [number, number]))
+      .filter((r) => r.length >= 3);
     if (!hoopRings.length) return;
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     let area = 0;
     for (const ring of hoopRings) {
       let a = 0;
       for (let i = 0; i < ring.length; i++) {
-        const p = ring[i], q = ring[(i + 1) % ring.length];
+        const p = ring[i],
+          q = ring[(i + 1) % ring.length];
         a += p[0] * q[1] - q[0] * p[1];
-        if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
-        if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
+        if (p[0] < minX) minX = p[0];
+        if (p[0] > maxX) maxX = p[0];
+        if (p[1] < minY) minY = p[1];
+        if (p[1] > maxY) maxY = p[1];
       }
       area = Math.max(area, Math.abs(a / 2));
     }
@@ -1281,8 +1453,10 @@ export class Machine {
     // mapped vector is a singularity (§6) → null halts the streamline.
     const fieldFn = (x: number, y: number): [number, number] | null => {
       let theta: number;
-      if (opts.dir) { const [lx, ly] = localOf(x, y); theta = opts.dir(lx, ly); }
-      else theta = opts.constAngle;
+      if (opts.dir) {
+        const [lx, ly] = localOf(x, y);
+        theta = opts.dir(lx, ly);
+      } else theta = opts.constAngle;
       if (!isFinite(theta)) return null;
       if (opts.rotate90) theta += 90;
       const [vx, vy] = vfromheading(theta, 1);
@@ -1305,7 +1479,8 @@ export class Machine {
       }
       return sp;
     };
-    const defaultLen = this.fillLen !== null ? this.fillLen : Math.min(Math.max(this.stitchLen, 1), 7);
+    const defaultLen =
+      this.fillLen !== null ? this.fillLen : Math.min(Math.max(this.stitchLen, 1), 7);
     const lenFn = (lx: number, ly: number, rowIdx: number, v: number): number => {
       if (opts.coarse || !opts.shape) return opts.coarse ? 4 : defaultLen;
       return opts.shape(lx, ly, rowIdx, v)[1];
@@ -1316,7 +1491,11 @@ export class Machine {
     };
 
     const { rows, truncated, seedCapped } = this._placeStreamlines(
-      hoopRings, fieldFn, spacingFn, diameter, area,
+      hoopRings,
+      fieldFn,
+      spacingFn,
+      diameter,
+      area,
     );
     if (!rows.length) return;
 
@@ -1349,7 +1528,7 @@ export class Machine {
       const [sx, sy] = localOf(poly[0][0], poly[0][1]);
       cumPhase += phaseFn(sx, sy, r, v);
       if (!pen.length) continue;
-      const fillPts: FillPoint[] = pen.map(p => {
+      const fillPts: FillPoint[] = pen.map((p) => {
         const [fx, fy] = toFinal(p[0], p[1]);
         return { x: fx, y: fy, jump: false };
       });
@@ -1362,10 +1541,13 @@ export class Machine {
   _extendForPullComp(poly: [number, number][]): [number, number][] {
     if (!(this.pullComp > 0) || poly.length < 2) return poly;
     const ext = this.pullComp;
-    const a = poly[0], a1 = poly[1];
-    const b = poly[poly.length - 1], b1 = poly[poly.length - 2];
+    const a = poly[0],
+      a1 = poly[1];
+    const b = poly[poly.length - 1],
+      b1 = poly[poly.length - 2];
     const ed = (p: [number, number], q: [number, number]): [number, number] => {
-      const dx = p[0] - q[0], dy = p[1] - q[1];
+      const dx = p[0] - q[0],
+        dy = p[1] - q[1];
       const l = Math.hypot(dx, dy) || 1;
       return [p[0] + (dx / l) * ext, p[1] + (dy / l) * ext];
     };
@@ -1379,7 +1561,9 @@ export class Machine {
    */
   _walkStreamline(
     poly: [number, number][],
-    row: number, v: number, cumPhase: number,
+    row: number,
+    v: number,
+    cumPhase: number,
     lenFn: (x: number, y: number, row: number, v: number) => number,
     localOf: (x: number, y: number) => [number, number],
   ): [number, number][] {
@@ -1424,8 +1608,7 @@ export class Machine {
   }
 
   endFill() {
-    if (!this.recording)
-      throw new NeedlescriptError('endfill without a matching beginfill');
+    if (!this.recording) throw new NeedlescriptError('endfill without a matching beginfill');
     this._closeRing();
     this.recording = false;
     if (!this.rings.length) {
@@ -1437,10 +1620,7 @@ export class Machine {
     // Rings are recorded in hoop space, so the "end near" hint must be too.
     const [hx, hy] = this.mapOut(this.x, this.y);
     const endNear = { x: hx, y: hy };
-    const effLen =
-      this.fillLen !== null
-        ? this.fillLen
-        : Math.min(Math.max(this.stitchLen, 1), 7);
+    const effLen = this.fillLen !== null ? this.fillLen : Math.min(Math.max(this.stitchLen, 1), 7);
 
     // Effective row direction / spacing / length for the tatami pass. For a
     // built-in fill these are the fill-state fields; an armed programmable fill
@@ -1464,17 +1644,21 @@ export class Machine {
       };
 
       // Local-space bbox of the recorded region, for constant-field sampling.
-      let lminX = Infinity, lminY = Infinity, lmaxX = -Infinity, lmaxY = -Infinity;
-      for (const ring of this.localRings) for (const p of ring) {
-        if (p[0] < lminX) lminX = p[0]; if (p[0] > lmaxX) lmaxX = p[0];
-        if (p[1] < lminY) lminY = p[1]; if (p[1] > lmaxY) lmaxY = p[1];
-      }
+      let lminX = Infinity,
+        lminY = Infinity,
+        lmaxX = -Infinity,
+        lmaxY = -Infinity;
+      for (const ring of this.localRings)
+        for (const p of ring) {
+          if (p[0] < lminX) lminX = p[0];
+          if (p[0] > lmaxX) lmaxX = p[0];
+          if (p[1] < lminY) lminY = p[1];
+          if (p[1] > lmaxY) lmaxY = p[1];
+        }
       const sampleLocals: [number, number][] = [];
-      for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++)
-        sampleLocals.push([
-          lminX + (lmaxX - lminX) * i / 4,
-          lminY + (lmaxY - lminY) * j / 4,
-        ]);
+      for (let i = 0; i <= 4; i++)
+        for (let j = 0; j <= 4; j++)
+          sampleLocals.push([lminX + ((lmaxX - lminX) * i) / 4, lminY + ((lmaxY - lminY) * j) / 4]);
 
       // Constant-field detection: no field ⇒ the constant fillAngle; otherwise
       // the field is constant only if every sample returns the same heading.
@@ -1484,24 +1668,36 @@ export class Machine {
         theta0 = dir(sampleLocals[0][0], sampleLocals[0][1]);
         for (const [lx, ly] of sampleLocals) {
           const t = dir(lx, ly);
-          if (!isFinite(t) || Math.abs(t - theta0) > 1e-7) { constField = false; break; }
+          if (!isFinite(t) || Math.abs(t - theta0) > 1e-7) {
+            constField = false;
+            break;
+          }
         }
       }
       // Constant-shape detection: no shape ⇒ trivially constant; otherwise the
       // three returns must match across samples and phase must be the default
       // 0.5 (other phases need the per-row streamline emitter).
       let constShape = true;
-      let scSpacing = this.fillSpacing, scLen = effLen;
+      let scSpacing = this.fillSpacing,
+        scLen = effLen;
       if (shape) {
         const probes: [number, number, number][] = [
-          [0, 0], [1, 0.5], [2, 1],
+          [0, 0],
+          [1, 0.5],
+          [2, 1],
         ].map(([r, v]) => {
           const [sp, ln, ph] = shape(sampleLocals[0][0], sampleLocals[0][1], r, v);
           return [sp, ln, ph];
         });
         const [sp0, ln0, ph0] = probes[0];
-        constShape = Math.abs(ph0 - 0.5) < 1e-9 &&
-          probes.every(p => Math.abs(p[0] - sp0) < 1e-9 && Math.abs(p[1] - ln0) < 1e-9 && Math.abs(p[2] - ph0) < 1e-9);
+        constShape =
+          Math.abs(ph0 - 0.5) < 1e-9 &&
+          probes.every(
+            (p) =>
+              Math.abs(p[0] - sp0) < 1e-9 &&
+              Math.abs(p[1] - ln0) < 1e-9 &&
+              Math.abs(p[2] - ph0) < 1e-9,
+          );
         scSpacing = sp0;
         scLen = Math.min(Math.max(ln0, 1), 7);
       }
@@ -1512,7 +1708,10 @@ export class Machine {
         // hoop-space like the built-in fill.
         const [hvx, hvy] = linApply(this.fillCTM, ...vfromheading(theta0, 1));
         useAngle = vheading([hvx, hvy]);
-        if (shape) { useSpacing = scSpacing; useLen = scLen; }
+        if (shape) {
+          useSpacing = scSpacing;
+          useLen = scLen;
+        }
         disarm();
         // fall through to the built-in tatami pass below
       } else {
@@ -1521,7 +1720,8 @@ export class Machine {
         const ringArea = (r: [number, number][]) => {
           let s = 0;
           for (let i = 0; i < r.length; i++) {
-            const a = r[i], b = r[(i + 1) % r.length];
+            const a = r[i],
+              b = r[(i + 1) % r.length];
             s += a[0] * b[1] - b[0] * a[1];
           }
           return Math.abs(s / 2);
@@ -1539,13 +1739,21 @@ export class Machine {
         }
         if (uMode === 'tatami' || uMode === 'both') {
           this._generateProgrammableFill({
-            dir, shape: null, constAngle: this.fillAngle,
-            rotate90: true, coarse: true, underlay: true,
+            dir,
+            shape: null,
+            constAngle: this.fillAngle,
+            rotate90: true,
+            coarse: true,
+            underlay: true,
           });
         }
         this._generateProgrammableFill({
-          dir, shape, constAngle: this.fillAngle,
-          rotate90: false, coarse: false, underlay: false,
+          dir,
+          shape,
+          constAngle: this.fillAngle,
+          rotate90: false,
+          coarse: false,
+          underlay: false,
         });
         disarm();
         const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
@@ -1558,7 +1766,8 @@ export class Machine {
     const ringArea = (r: [number, number][]) => {
       let s = 0;
       for (let i = 0; i < r.length; i++) {
-        const a = r[i], b = r[(i + 1) % r.length];
+        const a = r[i],
+          b = r[(i + 1) % r.length];
         s += a[0] * b[1] - b[0] * a[1];
       }
       return Math.abs(s / 2);
@@ -1584,8 +1793,11 @@ export class Machine {
       });
       if (this.doubleUnderlay && uPts.length) {
         const uPts2 = generateFill(rings, {
-          angle: useAngle, spacing: Math.min(useSpacing * 4, 5),
-          stitchLen: 4, endNear, comp: -0.6,
+          angle: useAngle,
+          spacing: Math.min(useSpacing * 4, 5),
+          stitchLen: 4,
+          endNear,
+          comp: -0.6,
         });
         this._emitFillPts(uPts2, true);
       }
@@ -1605,10 +1817,7 @@ export class Machine {
       return;
     }
     this._emitFillPts(pts, false);
-    const back = Math.hypot(
-      (this.lastEmit?.x ?? 0) - hx,
-      (this.lastEmit?.y ?? 0) - hy,
-    );
+    const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
     if (back > 0.6) this._push('jump', hx, hy);
   }
 
@@ -1638,7 +1847,8 @@ function evenOddInside(rings: [number, number][][], px: number, py: number): boo
   let inside = false;
   for (const ring of rings) {
     for (let i = 0; i < ring.length; i++) {
-      const a = ring[i], b = ring[(i + 1) % ring.length];
+      const a = ring[i],
+        b = ring[(i + 1) % ring.length];
       if ((a[1] <= py && b[1] > py) || (b[1] <= py && a[1] > py)) {
         const xi = a[0] + ((py - a[1]) / (b[1] - a[1])) * (b[0] - a[0]);
         if (xi > px) inside = !inside;
@@ -1665,18 +1875,36 @@ interface FillPoint {
 
 function generateFill(rings: [number, number][][], opt: FillOpts): FillPoint[] {
   const angle = (opt.angle || 0) * (Math.PI / 180);
-  const ca = Math.cos(angle), sa = Math.sin(angle);
-  const rot = (p: [number, number]): [number, number] => [p[0] * ca + p[1] * sa, -p[0] * sa + p[1] * ca];
-  const unrot = (p: [number, number]): [number, number] => [p[0] * ca - p[1] * sa, p[0] * sa + p[1] * ca];
-  const R = rings.map(r => r.map(rot));
+  const ca = Math.cos(angle),
+    sa = Math.sin(angle);
+  const rot = (p: [number, number]): [number, number] => [
+    p[0] * ca + p[1] * sa,
+    -p[0] * sa + p[1] * ca,
+  ];
+  const unrot = (p: [number, number]): [number, number] => [
+    p[0] * ca - p[1] * sa,
+    p[0] * sa + p[1] * ca,
+  ];
+  const R = rings.map((r) => r.map(rot));
   const spacing = Math.min(Math.max(opt.spacing || 0.4, 0.25), 5);
   const slen = Math.min(Math.max(opt.stitchLen || 3, 1), 7);
 
-  let minY = Infinity, maxY = -Infinity;
-  R.forEach(r => r.forEach(p => { if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1]; }));
+  let minY = Infinity,
+    maxY = -Infinity;
+  R.forEach((r) =>
+    r.forEach((p) => {
+      if (p[1] < minY) minY = p[1];
+      if (p[1] > maxY) maxY = p[1];
+    }),
+  );
   if (!(maxY - minY > spacing * 0.6)) return [];
 
-  interface Seg { x0: number; x1: number; y: number; row: number }
+  interface Seg {
+    x0: number;
+    x1: number;
+    y: number;
+    row: number;
+  }
 
   const rows: Seg[][] = [];
   let rowIdx = 0;
@@ -1684,7 +1912,8 @@ function generateFill(rings: [number, number][][], opt: FillOpts): FillPoint[] {
     const xs: number[] = [];
     for (const ring of R) {
       for (let i = 0; i < ring.length; i++) {
-        const a = ring[i], b = ring[(i + 1) % ring.length];
+        const a = ring[i],
+          b = ring[(i + 1) % ring.length];
         if ((a[1] <= y && b[1] > y) || (b[1] <= y && a[1] > y)) {
           xs.push(a[0] + ((y - a[1]) / (b[1] - a[1])) * (b[0] - a[0]));
         }
@@ -1694,7 +1923,8 @@ function generateFill(rings: [number, number][][], opt: FillOpts): FillPoint[] {
     const segs: Seg[] = [];
     const comp = opt.comp || 0; // pull compensation (+) or underlay inset (−)
     for (let i = 0; i + 1 < xs.length; i += 2) {
-      const a0 = xs[i] - comp, a1 = xs[i + 1] + comp;
+      const a0 = xs[i] - comp,
+        a1 = xs[i + 1] + comp;
       if (a1 - a0 >= 0.5) segs.push({ x0: a0, x1: a1, y, row: rowIdx });
     }
     if (segs.length) rows.push(segs);
@@ -1719,13 +1949,14 @@ function generateFill(rings: [number, number][][], opt: FillOpts): FillPoint[] {
 
   function sewLine(to: [number, number]) {
     if (!cur) return;
-    const dx = to[0] - cur[0], dy = to[1] - cur[1];
+    const dx = to[0] - cur[0],
+      dy = to[1] - cur[1];
     const d = Math.hypot(dx, dy);
     if (d < 0.05) return;
     const start: [number, number] = [cur[0], cur[1]];
     const steps = Math.max(1, Math.ceil(d / slen));
     for (let k = 1; k <= steps; k++) {
-      push(start[0] + dx * k / steps, start[1] + dy * k / steps, false);
+      push(start[0] + (dx * k) / steps, start[1] + (dy * k) / steps, false);
     }
   }
 
@@ -1733,14 +1964,20 @@ function generateFill(rings: [number, number][][], opt: FillOpts): FillPoint[] {
     if (!cur) return;
     const d = Math.hypot(to[0] - cur[0], to[1] - cur[1]);
     if (d < 0.05) return;
-    if (d <= spacing * 3 + 0.6) { sewLine(to); return; }
+    if (d <= spacing * 3 + 0.6) {
+      sewLine(to);
+      return;
+    }
     let allIn = d <= 12;
     if (allIn) {
       const n = Math.max(2, Math.ceil(d / 1.5));
       for (let k = 1; k < n; k++) {
-        const mx = cur[0] + (to[0] - cur[0]) * k / n;
-        const my = cur[1] + (to[1] - cur[1]) * k / n;
-        if (!evenOddInside(R, mx, my)) { allIn = false; break; }
+        const mx = cur[0] + ((to[0] - cur[0]) * k) / n;
+        const my = cur[1] + ((to[1] - cur[1]) * k) / n;
+        if (!evenOddInside(R, mx, my)) {
+          allIn = false;
+          break;
+        }
       }
     }
     if (allIn) sewLine(to);
@@ -1753,7 +1990,8 @@ function generateFill(rings: [number, number][][], opt: FillOpts): FillPoint[] {
     if (cur === null) push(from, seg.y, false);
     else connect([from, seg.y]);
     const phase = (seg.row % 3) * (slen / 3);
-    const lo = Math.min(from, to) + 0.3, hi = Math.max(from, to) - 0.3;
+    const lo = Math.min(from, to) + 0.3,
+      hi = Math.max(from, to) - 0.3;
     const grid: number[] = [];
     for (let g = Math.ceil((lo - phase) / slen) * slen + phase; g < hi; g += slen) grid.push(g);
     if (reverse) grid.reverse();
@@ -1765,18 +2003,28 @@ function generateFill(rings: [number, number][][], opt: FillOpts): FillPoint[] {
   for (const rowSegs of order) for (const seg of rowSegs) all.push(seg);
 
   while (all.length) {
-    let bi = 0, brev = false, bd = Infinity;
+    let bi = 0,
+      brev = false,
+      bd = Infinity;
     for (let i = 0; i < all.length; i++) {
       const sgm = all[i];
       const dS = cur ? Math.hypot(sgm.x0 - cur[0], sgm.y - cur[1]) : i;
       const dE = cur ? Math.hypot(sgm.x1 - cur[0], sgm.y - cur[1]) : i + 0.5;
-      if (dS < bd) { bd = dS; bi = i; brev = false; }
-      if (dE < bd) { bd = dE; bi = i; brev = true; }
+      if (dS < bd) {
+        bd = dS;
+        bi = i;
+        brev = false;
+      }
+      if (dE < bd) {
+        bd = dE;
+        bi = i;
+        brev = true;
+      }
     }
     sewSegment(all.splice(bi, 1)[0], brev);
   }
 
-  return out.map(o => {
+  return out.map((o) => {
     const p = unrot(o.p);
     return { x: p[0], y: p[1], jump: o.jump };
   });

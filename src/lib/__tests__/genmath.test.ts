@@ -15,8 +15,9 @@ const first = (src: string) => printed(src)[0];
 function expectEquivalent(a: string, b: string) {
   const ra = run(a);
   const rb = run(b);
-  expect(ra.events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u })))
-    .toEqual(rb.events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u })));
+  expect(ra.events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u }))).toEqual(
+    rb.events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u })),
+  );
   expect(ra.printed).toEqual(rb.printed);
 }
 
@@ -35,8 +36,11 @@ describe('scalar utility belt (§4.1)', () => {
   });
 
   it('clamp', () => {
-    expect(printed('print clamp(5, 0, 10) print clamp(-3, 0, 10) print clamp(99, 0, 10)'))
-      .toEqual(['5', '0', '10']);
+    expect(printed('print clamp(5, 0, 10) print clamp(-3, 0, 10) print clamp(99, 0, 10)')).toEqual([
+      '5',
+      '0',
+      '10',
+    ]);
   });
 
   it('smoothstep is Hermite 0…1', () => {
@@ -47,8 +51,7 @@ describe('scalar utility belt (§4.1)', () => {
   });
 
   it('gauss: golden values, seeded', () => {
-    expect(printed('seed 4 print gauss(0, 1) print gauss(5, 2)'))
-      .toEqual(['-1.131', '6.233']);
+    expect(printed('seed 4 print gauss(0, 1) print gauss(5, 2)')).toEqual(['-1.131', '6.233']);
   });
 
   it('gauss is exactly 2 main-stream draws, no caching', () => {
@@ -73,8 +76,7 @@ describe('seeded simplex noise (§4.2)', () => {
   });
 
   it('same seed, same field — and zero main-stream draws', () => {
-    expect(first('seed 4 print snoise2(0.3, 0.7)'))
-      .toBe(first('seed 4 print snoise2(0.3, 0.7)'));
+    expect(first('seed 4 print snoise2(0.3, 0.7)')).toBe(first('seed 4 print snoise2(0.3, 0.7)'));
     // sampling noise must not shift downstream randomness
     expectEquivalent(
       'seed 4 let n = snoise2(1, 2) print random(1000)',
@@ -83,20 +85,22 @@ describe('seeded simplex noise (§4.2)', () => {
   });
 
   it('snoise range is −1…1, legacy noise stays 0…1', () => {
-    const r = run([
-      'seed 1',
-      'let lo = 0  let hi = 0  let nlo = 1  let nhi = 0',
-      'for i = 0 to 200 [',
-      '  let s = snoise2(i / 7.3, i / 11.1)',
-      '  if s < lo [ lo = s ]',
-      '  if s > hi [ hi = s ]',
-      '  let n = noise2(i / 7.3, i / 11.1)',
-      '  if n < nlo [ nlo = n ]',
-      '  if n > nhi [ nhi = n ]',
-      ']',
-      'assert lo >= -1  assert hi <= 1  assert lo < 0  assert hi > 0',
-      'assert nlo >= 0  assert nhi <= 1',
-    ].join('\n'));
+    const r = run(
+      [
+        'seed 1',
+        'let lo = 0  let hi = 0  let nlo = 1  let nhi = 0',
+        'for i = 0 to 200 [',
+        '  let s = snoise2(i / 7.3, i / 11.1)',
+        '  if s < lo [ lo = s ]',
+        '  if s > hi [ hi = s ]',
+        '  let n = noise2(i / 7.3, i / 11.1)',
+        '  if n < nlo [ nlo = n ]',
+        '  if n > nhi [ nhi = n ]',
+        ']',
+        'assert lo >= -1  assert hi <= 1  assert lo < 0  assert hi > 0',
+        'assert nlo >= 0  assert nhi <= 1',
+      ].join('\n'),
+    );
     expect(r.warnings).toEqual([]);
   });
 
@@ -106,7 +110,9 @@ describe('seeded simplex noise (§4.2)', () => {
 
   it('fbm2 octaves clamp 1–8 with a warning', () => {
     const r = run('seed 1 print fbm2(0.3, 0.7, 12)');
-    expect(r.warnings.some(w => w.includes('fbm2 octaves') && w.includes('clamped to 8'))).toBe(true);
+    expect(r.warnings.some((w) => w.includes('fbm2 octaves') && w.includes('clamped to 8'))).toBe(
+      true,
+    );
     expect(run('seed 1 print fbm2(0.3, 0.7, 4)').warnings).toEqual([]);
   });
 });
@@ -140,8 +146,8 @@ describe('vector functions (§4.3)', () => {
   });
 
   it('vheading matches atan, vfromheading is its inverse', () => {
-    expect(first('print vheading([0, 1])')).toBe('0');   // north
-    expect(first('print vheading([1, 0])')).toBe('90');  // east
+    expect(first('print vheading([0, 1])')).toBe('0'); // north
+    expect(first('print vheading([1, 0])')).toBe('90'); // east
     expect(first('print vheading([5, 7]) = atan 5 7')).toBe('1');
     expect(first('print vheading(vfromheading(123, 1))')).toBe('123');
     expect(first('print vfromheading(90, 2)')).toBe('[2, 0]');
@@ -160,31 +166,37 @@ describe('paths & curves (§4.4)', () => {
   });
 
   it('resample: even spacing, first & last preserved', () => {
-    const r = run([
-      'let p = resample([[0, 0], [10, 0]], 3)',
-      'print p[0] print last(p) print len(p)',
-      'for i = 1 to len(p) - 2 [ assert abs(vdist(p[i - 1], p[i]) - 3) < 0.000001 ]',
-    ].join('\n'));
+    const r = run(
+      [
+        'let p = resample([[0, 0], [10, 0]], 3)',
+        'print p[0] print last(p) print len(p)',
+        'for i = 1 to len(p) - 2 [ assert abs(vdist(p[i - 1], p[i]) - 3) < 0.000001 ]',
+      ].join('\n'),
+    );
     expect(r.printed).toEqual(['[0, 0]', '[10, 0]', '5']);
   });
 
   it('resample property: segment lengths within spacing ± 1e-6 (except last)', () => {
-    const r = run([
-      'seed 2',
-      'let raw = []',
-      'for i = 0 to 20 [ append(raw, [i * 2, snoise2(i / 4, 0) * 8]) ]',
-      'let p = resample(raw, 1.7)',
-      'for i = 1 to len(p) - 2 [ assert abs(vdist(p[i - 1], p[i]) - 1.7) < 0.000001 ]',
-      'assert vdist(last(p), last(raw)) < 0.000001',
-    ].join('\n'));
+    const r = run(
+      [
+        'seed 2',
+        'let raw = []',
+        'for i = 0 to 20 [ append(raw, [i * 2, snoise2(i / 4, 0) * 8]) ]',
+        'let p = resample(raw, 1.7)',
+        'for i = 1 to len(p) - 2 [ assert abs(vdist(p[i - 1], p[i]) - 1.7) < 0.000001 ]',
+        'assert vdist(last(p), last(raw)) < 0.000001',
+      ].join('\n'),
+    );
     expect(r.warnings).toEqual([]);
   });
 
   it('chaikin keeps endpoints and smooths', () => {
-    const r = run([
-      'let p = chaikin([[0, 0], [10, 0], [10, 10]], 2)',
-      'print p[0] print last(p) print len(p)',
-    ].join('\n'));
+    const r = run(
+      [
+        'let p = chaikin([[0, 0], [10, 0], [10, 10]], 2)',
+        'print p[0] print last(p) print len(p)',
+      ].join('\n'),
+    );
     expect(r.printed[0]).toBe('[0, 0]');
     expect(r.printed[1]).toBe('[10, 10]');
     expect(Number(r.printed[2])).toBeGreaterThan(3);
@@ -192,29 +204,35 @@ describe('paths & curves (§4.4)', () => {
 
   it('chaikin iterations clamp 1–6 with a warning', () => {
     const r = run('let p = chaikin([[0, 0], [10, 0]], 9)');
-    expect(r.warnings.some(w => w.includes('chaikin iterations') && w.includes('clamped to 6'))).toBe(true);
+    expect(
+      r.warnings.some((w) => w.includes('chaikin iterations') && w.includes('clamped to 6')),
+    ).toBe(true);
   });
 
   it('catmull passes through its control points', () => {
-    const r = run([
-      'let c = [[0, 0], [10, 5], [20, -5], [30, 0]]',
-      'let p = catmull(c, 0.5)',
-      'for q in c [',
-      '  let best = 1000',
-      '  for s in p [ let d = vdist(q, s) if d < best [ best = d ] ]',
-      '  assert best < 0.6',
-      ']',
-      'print p[0] print last(p)',
-    ].join('\n'));
+    const r = run(
+      [
+        'let c = [[0, 0], [10, 5], [20, -5], [30, 0]]',
+        'let p = catmull(c, 0.5)',
+        'for q in c [',
+        '  let best = 1000',
+        '  for s in p [ let d = vdist(q, s) if d < best [ best = d ] ]',
+        '  assert best < 0.6',
+        ']',
+        'print p[0] print last(p)',
+      ].join('\n'),
+    );
     expect(r.printed).toEqual(['[0, 0]', '[30, 0]']);
   });
 
   it('bezier: endpoints exact, arc-length resampled', () => {
-    const r = run([
-      'let p = bezier([0, 0], [0, 10], [10, 10], [10, 0], 1)',
-      'print p[0] print last(p)',
-      'for i = 1 to len(p) - 2 [ assert abs(vdist(p[i - 1], p[i]) - 1) < 0.000001 ]',
-    ].join('\n'));
+    const r = run(
+      [
+        'let p = bezier([0, 0], [0, 10], [10, 10], [10, 0], 1)',
+        'print p[0] print last(p)',
+        'for i = 1 to len(p) - 2 [ assert abs(vdist(p[i - 1], p[i]) - 1) < 0.000001 ]',
+      ].join('\n'),
+    );
     expect(r.printed).toEqual(['[0, 0]', '[10, 0]']);
   });
 
@@ -239,37 +257,43 @@ describe('paths & curves (§4.4)', () => {
 // ── shape errors ─────────────────────────────────────────────────────────────
 describe('shape errors name the function (§4)', () => {
   it('point of 3 / number where a point is expected', () => {
-    expect(() => run('print vadd([1, 2, 3], [1, 2])'))
-      .toThrow(/vadd: expected a point \[x, y\], got a list of 3/);
-    expect(() => run('print vlen(5)'))
-      .toThrow(/vlen: expected a point \[x, y\], got a number/);
+    expect(() => run('print vadd([1, 2, 3], [1, 2])')).toThrow(
+      /vadd: expected a point \[x, y\], got a list of 3/,
+    );
+    expect(() => run('print vlen(5)')).toThrow(/vlen: expected a point \[x, y\], got a number/);
   });
 
   it('path of 1 / ragged path', () => {
-    expect(() => run('print pathlen([[1, 2]])'))
-      .toThrow(/pathlen: expected a path of at least 2 points, got a list of 1/);
-    expect(() => run('print pathlen([[1, 2], [3, 4, 5]])'))
-      .toThrow(/pathlen: element 1 isn't a point \[x, y\]/);
-    expect(() => run('print pathlen([[1, 2], 7])'))
-      .toThrow(/pathlen: element 1 isn't a point \[x, y\] — got a number/);
+    expect(() => run('print pathlen([[1, 2]])')).toThrow(
+      /pathlen: expected a path of at least 2 points, got a list of 1/,
+    );
+    expect(() => run('print pathlen([[1, 2], [3, 4, 5]])')).toThrow(
+      /pathlen: element 1 isn't a point \[x, y\]/,
+    );
+    expect(() => run('print pathlen([[1, 2], 7])')).toThrow(
+      /pathlen: element 1 isn't a point \[x, y\] — got a number/,
+    );
   });
 
   it('resample spacing must be positive', () => {
-    expect(() => run('print resample([[0, 0], [1, 1]], 0)'))
-      .toThrow(/spacing must be greater than 0/);
+    expect(() => run('print resample([[0, 0], [1, 1]], 0)')).toThrow(
+      /spacing must be greater than 0/,
+    );
   });
 });
 
 // ── soft-builtin tier (§3) ───────────────────────────────────────────────────
 describe('the soft-builtin tier (§3)', () => {
   it('a user clamp shadows the library clamp, with one note', () => {
-    const r = run([
-      'def clamp(v, lo, hi) [ return 999 ]', // deliberately not a real clamp
-      'print clamp(5, 0, 10)',
-      'print clamp(5, 0, 10)',
-    ].join('\n'));
+    const r = run(
+      [
+        'def clamp(v, lo, hi) [ return 999 ]', // deliberately not a real clamp
+        'print clamp(5, 0, 10)',
+        'print clamp(5, 0, 10)',
+      ].join('\n'),
+    );
     expect(r.printed).toEqual(['999', '999']); // user definition wins, whole-program
-    const notes = r.warnings.filter(w => w.includes('shadows a built-in library function'));
+    const notes = r.warnings.filter((w) => w.includes('shadows a built-in library function'));
     expect(notes).toHaveLength(1); // once per name
     expect(notes[0]).toContain('"clamp"');
   });
@@ -277,7 +301,7 @@ describe('the soft-builtin tier (§3)', () => {
   it('classic to-procedures shadow the same way', () => {
     const r = run('to lerp :a output :a * 2 end print lerp 21');
     expect(r.printed).toEqual(['42']);
-    expect(r.warnings.some(w => w.includes('"lerp" shadows'))).toBe(true);
+    expect(r.warnings.some((w) => w.includes('"lerp" shadows'))).toBe(true);
   });
 
   it('Core names stay a hard error (unchanged)', () => {
@@ -292,14 +316,14 @@ describe('the soft-builtin tier (§3)', () => {
   it('RFC-2 list functions are Library tier too', () => {
     const r = run('def len(x) [ return 7 ] print len([1, 2])');
     expect(r.printed).toEqual(['7']);
-    expect(r.warnings.some(w => w.includes('"len" shadows'))).toBe(true);
+    expect(r.warnings.some((w) => w.includes('"len" shadows'))).toBe(true);
   });
 
   it('meadow.ns runs unmodified, with exactly one shadow note', () => {
     // the RFC-1 reference example defines clamp (now a library builtin)
     // and inside (not a builtin) — the policy exists so it keeps working
     const r = run(EXAMPLES['meadow']);
-    const notes = r.warnings.filter(w => w.includes('shadows a built-in library function'));
+    const notes = r.warnings.filter((w) => w.includes('shadows a built-in library function'));
     expect(notes).toHaveLength(1);
     expect(notes[0]).toContain('"clamp"');
     expect(r.events.length).toBeGreaterThan(100); // it actually sews
@@ -318,7 +342,6 @@ describe('grammar: glued-call only, expressions compose', () => {
   });
 
   it('results count toward list limits like any list', () => {
-    expect(() => run('let p = resample([[0, 0], [200, 0]], 0.001)'))
-      .toThrow(/List too long/);
+    expect(() => run('let p = resample([[0, 0], [200, 0]], 0.001)')).toThrow(/List too long/);
   });
 });

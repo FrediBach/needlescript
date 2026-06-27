@@ -11,8 +11,17 @@ import { parse } from './parser.ts';
 import { applyAutoTrim, applyLocks } from './postprocess.ts';
 import { didYouMean } from './suggestions.ts';
 import {
-  NsList, FuncRef, isList, isFuncRef, num, deepEqual, deepCopy, valDepth, describeVal,
-  formatNum, formatVal,
+  NsList,
+  FuncRef,
+  isList,
+  isFuncRef,
+  num,
+  deepEqual,
+  deepCopy,
+  valDepth,
+  describeVal,
+  formatNum,
+  formatVal,
 } from './list.ts';
 import type { Val } from './list.ts';
 import * as gm from './genmath.ts';
@@ -21,8 +30,16 @@ import { offsetRegion, clipRegions } from './geometry.ts';
 import { scatter, voronoiCells, triangulate, hull, relax } from './generators.ts';
 import type { Domain } from './generators.ts';
 import {
-  applyPath, apply,
-  mTranslate, mRotate, mRotateAbout, mScale, mScaleXY, mMirror, mSkew, mRaw,
+  applyPath,
+  apply,
+  mTranslate,
+  mRotate,
+  mRotateAbout,
+  mScale,
+  mScaleXY,
+  mMirror,
+  mSkew,
+  mRaw,
 } from './affine.ts';
 import type { Mat } from './affine.ts';
 import { humanizeMap, snapMapFromSpec } from './effects.ts';
@@ -74,23 +91,23 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   const printed: string[] = [];
 
   function tick(line?: number) {
-    if (++ops > LIMITS.maxOps)
-      throw new NeedlescriptError(overlongMsg(), line);
+    if (++ops > LIMITS.maxOps) throw new NeedlescriptError(overlongMsg(), line);
   }
 
   /** Charge n element reads/writes against the op budget. */
   function tickN(n: number, line?: number) {
     ops += n;
-    if (ops > LIMITS.maxOps)
-      throw new NeedlescriptError(overlongMsg(), line);
+    if (ops > LIMITS.maxOps) throw new NeedlescriptError(overlongMsg(), line);
   }
 
   /** The op-limit message, made loop-aware once a history query has run. */
   function overlongMsg(): string {
-    return 'Program ran too long (possible infinite loop) — stopped' +
+    return (
+      'Program ran too long (possible infinite loop) — stopped' +
       (m.usedQuery
         ? ' — a feedback loop may not be terminating; is your coverage target reachable? Cap it with  repeat N [ … if done [ break ] ].'
-        : '');
+        : '')
+    );
   }
 
   /** Charge n freshly allocated list cells (and the op budget). */
@@ -154,25 +171,17 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   /** The value must be a list. */
   function list(v: Val, what: string, line?: number): NsList {
-    if (!isList(v))
-      throw new NeedlescriptError(`"${what}" expected a list, got a number`, line);
+    if (!isList(v)) throw new NeedlescriptError(`"${what}" expected a list, got a number`, line);
     return v;
   }
 
   /** Check that nesting an element one level deeper stays within the cap. */
   function checkDepth(v: Val, line?: number) {
     if (isList(v) && valDepth(v) + 1 > LIMITS.maxListDepth)
-      throw new NeedlescriptError(
-        `list nesting deeper than ${LIMITS.maxListDepth}`,
-        line,
-      );
+      throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`, line);
   }
 
-  function listFunc(
-    name: string,
-    args: Val[],
-    line: number | undefined,
-  ): Val {
+  function listFunc(name: string, args: Val[], line: number | undefined): Val {
     switch (name) {
       case 'range': {
         const a = args.length === 1 ? 0 : num(args[0], 'range', line);
@@ -206,18 +215,18 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         for (let k = 0; k < r; k++) out.push(deepCopy(args[1], () => charge(1, line)));
         return allocList(out, line);
       }
-      case 'len': return list(args[0], 'len', line).items.length;
-      case 'islist': return isList(args[0]) ? 1 : 0;
+      case 'len':
+        return list(args[0], 'len', line).items.length;
+      case 'islist':
+        return isList(args[0]) ? 1 : 0;
       case 'first': {
         const xs = list(args[0], 'first', line);
-        if (xs.items.length === 0)
-          throw new NeedlescriptError('first of an empty list', line);
+        if (xs.items.length === 0) throw new NeedlescriptError('first of an empty list', line);
         return xs.items[0];
       }
       case 'last': {
         const xs = list(args[0], 'last', line);
-        if (xs.items.length === 0)
-          throw new NeedlescriptError('last of an empty list', line);
+        if (xs.items.length === 0) throw new NeedlescriptError('last of an empty list', line);
         return xs.items[xs.items.length - 1];
       }
       case 'concat': {
@@ -258,7 +267,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           line,
         );
       }
-      case 'copy': return deepCopy(args[0], () => charge(1, line));
+      case 'copy':
+        return deepCopy(args[0], () => charge(1, line));
       case 'indexof': {
         const xs = list(args[0], 'indexof', line);
         for (let i = 0; i < xs.items.length; i++) {
@@ -275,7 +285,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         }
         return 0;
       }
-      case 'sum': case 'mean': case 'minof': case 'maxof': {
+      case 'sum':
+      case 'mean':
+      case 'minof':
+      case 'maxof': {
         const xs = list(args[0], name, line);
         if (xs.items.length === 0) {
           if (name === 'sum') return 0;
@@ -293,8 +306,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'pick': {
         const xs = list(args[0], 'pick', line);
-        if (xs.items.length === 0)
-          throw new NeedlescriptError('pick of an empty list', line);
+        if (xs.items.length === 0) throw new NeedlescriptError('pick of an empty list', line);
         return xs.items[Math.floor(rng() * xs.items.length)]; // one RNG draw
       }
       case 'shuffle': {
@@ -307,11 +319,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const child = fork(rng);
         for (let i = out.length - 1; i >= 1; i--) {
           const j = Math.floor(child() * (i + 1));
-          const t = out[i]; out[i] = out[j]; out[j] = t;
+          const t = out[i];
+          out[i] = out[j];
+          out[j] = t;
         }
         return allocList(out, line);
       }
-      case 'pos': return allocList([m.x, m.y], line);
+      case 'pos':
+        return allocList([m.x, m.y], line);
       case 'removeat': {
         const xs = list(args[0], 'removeat', line);
         const i = toIndex(args[1], xs.items.length, 'removeat', line);
@@ -331,19 +346,18 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   // the way back. Draw accounting (§7): gauss = 2 direct draws; scatter and
   // shuffle draw exactly 1 and fork; voronoi/relax/… draw 0.
 
-  function genFunc(
-    name: string,
-    args: Val[],
-    line: number | undefined,
-    word?: string,
-  ): Val {
+  function genFunc(name: string, args: Val[], line: number | undefined, word?: string): Val {
     const sc = (i: number) => num(args[i], name, line);
     const pointArg = (i: number) => gm.toPoint(args[i], name, line);
     const pathArg = (i: number, min = 2) => gm.toPath(args[i], name, line, min);
     const regionArg = (i: number) => gm.toRegion(args[i], name, line);
     const point = (p: Pt) => allocList([p[0], p[1]], line);
-    const path = (pts: Pt[]) => gm.fromPoints(pts, items => allocList(items, line));
-    const regions = (rs: Pt[][]) => allocList(rs.map(r => path(r) as Val), line);
+    const path = (pts: Pt[]) => gm.fromPoints(pts, (items) => allocList(items, line));
+    const regions = (rs: Pt[][]) =>
+      allocList(
+        rs.map((r) => path(r) as Val),
+        line,
+      );
     const domainArg = (i: number): Domain =>
       args.length > i
         ? { kind: 'poly', pts: regionArg(i) }
@@ -361,22 +375,33 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
     switch (name) {
       // ----- §4.1 scalars -----
-      case 'lerp': return gm.lerp(sc(0), sc(1), sc(2));
-      case 'remap': return gm.remap(sc(0), sc(1), sc(2), sc(3), sc(4));
-      case 'clamp': return gm.clamp(sc(0), sc(1), sc(2));
-      case 'smoothstep': return gm.smoothstep(sc(0), sc(1), sc(2));
-      case 'gauss': return gauss(rng, sc(0), sc(1)); // exactly 2 main-stream draws
+      case 'lerp':
+        return gm.lerp(sc(0), sc(1), sc(2));
+      case 'remap':
+        return gm.remap(sc(0), sc(1), sc(2), sc(3), sc(4));
+      case 'clamp':
+        return gm.clamp(sc(0), sc(1), sc(2));
+      case 'smoothstep':
+        return gm.smoothstep(sc(0), sc(1), sc(2));
+      case 'gauss':
+        return gauss(rng, sc(0), sc(1)); // exactly 2 main-stream draws
 
       // ----- §4.2 noise (range −1…1; legacy noise/noise2 keep 0…1) -----
-      case 'snoise2': return snoise2(sc(0), sc(1));
-      case 'snoise3': return snoise3(sc(0), sc(1), sc(2));
+      case 'snoise2':
+        return snoise2(sc(0), sc(1));
+      case 'snoise3':
+        return snoise3(sc(0), sc(1), sc(2));
       case 'fbm2': {
-        const x = sc(0), y = sc(1);
+        const x = sc(0),
+          y = sc(1);
         const want = Math.round(sc(2));
         const oct = gm.clamp(want, 1, 8);
         if (oct !== want)
           m.warnings.push(`fbm2 octaves ${formatNum(sc(2))} clamped to ${oct} (range 1–8)`);
-        let sum = 0, ampSum = 0, amp = 1, freq = 1;
+        let sum = 0,
+          ampSum = 0,
+          amp = 1,
+          freq = 1;
         for (let o = 0; o < oct; o++) {
           sum += snoise2(x * freq, y * freq) * amp;
           ampSum += amp;
@@ -387,17 +412,28 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
 
       // ----- §4.3 vectors -----
-      case 'vadd': return point(gm.vadd(pointArg(0), pointArg(1)));
-      case 'vsub': return point(gm.vsub(pointArg(0), pointArg(1)));
-      case 'vscale': return point(gm.vscale(pointArg(0), sc(1)));
-      case 'vlerp': return point(gm.vlerp(pointArg(0), pointArg(1), sc(2)));
-      case 'vdot': return gm.vdot(pointArg(0), pointArg(1));
-      case 'vlen': return gm.vlen(pointArg(0));
-      case 'vdist': return gm.vdist(pointArg(0), pointArg(1));
-      case 'vnorm': return point(gm.vnorm(pointArg(0), line));
-      case 'vrot': return point(gm.vrot(pointArg(0), sc(1)));
-      case 'vheading': return gm.vheading(pointArg(0));
-      case 'vfromheading': return point(gm.vfromheading(sc(0), sc(1)));
+      case 'vadd':
+        return point(gm.vadd(pointArg(0), pointArg(1)));
+      case 'vsub':
+        return point(gm.vsub(pointArg(0), pointArg(1)));
+      case 'vscale':
+        return point(gm.vscale(pointArg(0), sc(1)));
+      case 'vlerp':
+        return point(gm.vlerp(pointArg(0), pointArg(1), sc(2)));
+      case 'vdot':
+        return gm.vdot(pointArg(0), pointArg(1));
+      case 'vlen':
+        return gm.vlen(pointArg(0));
+      case 'vdist':
+        return gm.vdist(pointArg(0), pointArg(1));
+      case 'vnorm':
+        return point(gm.vnorm(pointArg(0), line));
+      case 'vrot':
+        return point(gm.vrot(pointArg(0), sc(1)));
+      case 'vheading':
+        return gm.vheading(pointArg(0));
+      case 'vfromheading':
+        return point(gm.vfromheading(sc(0), sc(1)));
 
       // ----- §4.4 paths & curves -----
       case 'pathlen': {
@@ -423,11 +459,19 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       case 'catmull':
         return path(gm.catmull(pathArg(0), sc(1), LIMITS.maxListLen, line));
       case 'bezier':
-        return path(gm.bezier(
-          pointArg(0), pointArg(1), pointArg(2), pointArg(3),
-          sc(4), LIMITS.maxListLen, line,
-        ));
-      case 'centroid': return point(gm.centroid(pathArg(0)));
+        return path(
+          gm.bezier(
+            pointArg(0),
+            pointArg(1),
+            pointArg(2),
+            pointArg(3),
+            sc(4),
+            LIMITS.maxListLen,
+            line,
+          ),
+        );
+      case 'centroid':
+        return point(gm.centroid(pathArg(0)));
       case 'bbox': {
         const [minx, miny, maxx, maxy] = gm.bbox(pathArg(0));
         return allocList([minx, miny, maxx, maxy], line);
@@ -445,7 +489,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const cells = voronoiCells(pts, domainArg(1), line);
         tickN(pts.length * 8, line);
         return allocList(
-          cells.map(c => (c.length ? path(c) : allocList([], line)) as Val),
+          cells.map((c) => (c.length ? path(c) : allocList([], line)) as Val),
           line,
         );
       }
@@ -457,7 +501,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           line,
         );
       }
-      case 'hull': return path(hull(delaunayInput(0, 3), line));
+      case 'hull':
+        return path(hull(delaunayInput(0, 3), line));
       case 'relax': {
         const pts = delaunayInput(0, 1);
         const want = Math.round(sc(1));
@@ -475,7 +520,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         return regions(offsetRegion(r, sc(1), line));
       }
       case 'clippaths': {
-        const a = regionArg(0), b = regionArg(1);
+        const a = regionArg(0),
+          b = regionArg(1);
         tickN((a.length + b.length) * 4, line);
         return regions(clipRegions(a, b, word as string, line));
       }
@@ -491,9 +537,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             'xrotate takes a pivot as two numbers: xrotate(path, deg, cx, cy)',
             line,
           );
-        const m = args.length >= 4
-          ? mRotateAbout(sc(1), sc(2), sc(3))
-          : mRotate(sc(1));
+        const m = args.length >= 4 ? mRotateAbout(sc(1), sc(2), sc(3)) : mRotate(sc(1));
         return path(applyPath(m, pathArg(0)));
       }
       case 'xscale': {
@@ -516,7 +560,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           );
         const ref = args[1];
         tickN(p.length, line);
-        return path(p.map(pt => applyReporter(ref, pt[0], pt[1], line)));
+        return path(p.map((pt) => applyReporter(ref, pt[0], pt[1], line)));
       }
       case 'humanizepath': {
         const p = pathArg(0);
@@ -525,14 +569,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const childSeed = Math.floor(rng() * 4294967296);
         const fn = humanizeMap(amount, childSeed, snoise2);
         tickN(p.length, line);
-        return path(p.map(pt => fn(pt[0], pt[1])));
+        return path(p.map((pt) => fn(pt[0], pt[1])));
       }
       case 'snappath': {
         const p = pathArg(0);
         const nums = args.slice(1).map((_, i) => sc(i + 1));
-        const fn = snapMapFromSpec(nums, msg => new NeedlescriptError(`snappath ${msg}`, line));
+        const fn = snapMapFromSpec(nums, (msg) => new NeedlescriptError(`snappath ${msg}`, line));
         tickN(p.length, line);
-        return path(p.map(pt => fn(pt[0], pt[1])));
+        return path(p.map((pt) => fn(pt[0], pt[1])));
       }
     }
     throw new NeedlescriptError(`Unknown function ${name}`, line);
@@ -589,7 +633,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         if (!(r >= 0)) throw new NeedlescriptError('sewnwithin radius must be 0 or more', line);
         const found = m.density.sewnWithin(hx, hy, r);
         tickN(found.length + 4, line);
-        return allocList(found.map(p => point(p) as Val), line);
+        return allocList(
+          found.map((p) => point(p) as Val),
+          line,
+        );
       }
       case 'stitchedpoints': {
         const pts = m.density.snapshot();
@@ -599,7 +646,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             line,
           );
         tickN(pts.length, line);
-        return allocList(pts.map(p => point(p) as Val), line);
+        return allocList(
+          pts.map((p) => point(p) as Val),
+          line,
+        );
       }
     }
     throw new NeedlescriptError(`Unknown query ${name}`, line);
@@ -613,7 +663,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   ): Val {
     tick((node as { line?: number }).line);
     switch (node.k) {
-      case 'num': return node.v;
+      case 'num':
+        return node.v;
       case 'var': {
         if (env && node.name in env) return env[node.name];
         if (node.name in globals) return globals[node.name];
@@ -640,10 +691,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         for (const it of node.items) items.push(evalExpr(it, env, repcount, depth));
         const out = allocList(items, node.line);
         if (valDepth(out) > LIMITS.maxListDepth)
-          throw new NeedlescriptError(
-            `list nesting deeper than ${LIMITS.maxListDepth}`,
-            node.line,
-          );
+          throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`, node.line);
         return out;
       }
       case 'index': {
@@ -655,33 +703,35 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           );
         const i = toIndex(
           evalExpr(node.idx, env, repcount, depth),
-          obj.items.length, 'indexing', node.line,
+          obj.items.length,
+          'indexing',
+          node.line,
         );
         return obj.items[i];
       }
       case 'callval': {
         evalExpr(node.obj, env, repcount, depth);
-        throw new NeedlescriptError(
-          "a list value can't be called like a procedure",
-          node.line,
-        );
+        throw new NeedlescriptError("a list value can't be called like a procedure", node.line);
       }
       case 'listfunc': {
-        const args = node.args.map(a => evalExpr(a, env, repcount, depth));
+        const args = node.args.map((a) => evalExpr(a, env, repcount, depth));
         if (GEN_FUNCS[node.name] !== undefined)
           return genFunc(node.name, args, node.line, node.word);
-        if (QUERY_FUNCS[node.name] !== undefined)
-          return queryFunc(node.name, args, node.line);
+        if (QUERY_FUNCS[node.name] !== undefined) return queryFunc(node.name, args, node.line);
         return listFunc(node.name, args, node.line);
       }
       case 'bin': {
         // and / or short-circuit so guards like  :i > 0 and 10 / :i > 2  are safe
         if (node.op === 'and')
           return truthy(evalExpr(node.left, env, repcount, depth), 'and', undefined) !== 0 &&
-            truthy(evalExpr(node.right, env, repcount, depth), 'and', undefined) !== 0 ? 1 : 0;
+            truthy(evalExpr(node.right, env, repcount, depth), 'and', undefined) !== 0
+            ? 1
+            : 0;
         if (node.op === 'or')
           return truthy(evalExpr(node.left, env, repcount, depth), 'or', undefined) !== 0 ||
-            truthy(evalExpr(node.right, env, repcount, depth), 'or', undefined) !== 0 ? 1 : 0;
+            truthy(evalExpr(node.right, env, repcount, depth), 'or', undefined) !== 0
+            ? 1
+            : 0;
         const av = evalExpr(node.left, env, repcount, depth);
         const bv = evalExpr(node.right, env, repcount, depth);
         // Equality on lists is deep; mixed number/list compares unequal
@@ -689,7 +739,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         if (node.op === '=' || node.op === '!=') {
           if (isList(av) || isList(bv)) {
             const eq = deepEqual(av, bv);
-            return node.op === '=' ? (eq ? 1 : 0) : (eq ? 0 : 1);
+            return node.op === '=' ? (eq ? 1 : 0) : eq ? 0 : 1;
           }
         }
         // Arithmetic on lists stays a loud error (RFC-3 §2) — with hints
@@ -698,8 +748,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         // NumPy semantics is the kind of bug that sews before it's noticed.
         if ((isList(av) || isList(bv)) && '+-*/'.includes(node.op)) {
           const hint =
-            node.op === '+' ? ' — use vadd(a, b) for element-wise, concat(a, b) to join'
-              : node.op === '-' ? ' — use vsub(a, b) for element-wise'
+            node.op === '+'
+              ? ' — use vadd(a, b) for element-wise, concat(a, b) to join'
+              : node.op === '-'
+                ? ' — use vsub(a, b) for element-wise'
                 : ' — use vscale(a, s) to scale a point';
           throw new NeedlescriptError(
             `"${node.op}" on lists${hint}`,
@@ -709,39 +761,62 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const a = num(av, node.op, undefined, 'on the left');
         const b = num(bv, node.op, undefined, 'on the right');
         switch (node.op) {
-          case '+': return a + b;
-          case '-': return a - b;
-          case '*': return a * b;
-          case '/': if (b === 0) throw new NeedlescriptError('Division by zero'); return a / b;
-          case '<': return a < b ? 1 : 0;
-          case '>': return a > b ? 1 : 0;
-          case '<=': return a <= b ? 1 : 0;
-          case '>=': return a >= b ? 1 : 0;
-          case '=': return Math.abs(a - b) < 1e-9 ? 1 : 0;
-          case '!=': return Math.abs(a - b) < 1e-9 ? 0 : 1;
+          case '+':
+            return a + b;
+          case '-':
+            return a - b;
+          case '*':
+            return a * b;
+          case '/':
+            if (b === 0) throw new NeedlescriptError('Division by zero');
+            return a / b;
+          case '<':
+            return a < b ? 1 : 0;
+          case '>':
+            return a > b ? 1 : 0;
+          case '<=':
+            return a <= b ? 1 : 0;
+          case '>=':
+            return a >= b ? 1 : 0;
+          case '=':
+            return Math.abs(a - b) < 1e-9 ? 1 : 0;
+          case '!=':
+            return Math.abs(a - b) < 1e-9 ? 0 : 1;
         }
         throw new NeedlescriptError('Unknown operator');
       }
       case 'func': {
         if (node.name === 'not')
-          return truthy(evalExpr(node.args[0], env, repcount, depth), 'not', node.line) === 0 ? 1 : 0;
+          return truthy(evalExpr(node.args[0], env, repcount, depth), 'not', node.line) === 0
+            ? 1
+            : 0;
         // Every legacy function is scalar — a list operand is a type error
         // naming the function (RFC-2 §2).
-        const args = node.args.map(a =>
-          num(evalExpr(a, env, repcount, depth), node.name, node.line));
+        const args = node.args.map((a) =>
+          num(evalExpr(a, env, repcount, depth), node.name, node.line),
+        );
         switch (node.name) {
-          case 'random': return rng() * args[0];
-          case 'sin': return Math.sin(args[0] * Math.PI / 180);
-          case 'cos': return Math.cos(args[0] * Math.PI / 180);
+          case 'random':
+            return rng() * args[0];
+          case 'sin':
+            return Math.sin((args[0] * Math.PI) / 180);
+          case 'cos':
+            return Math.cos((args[0] * Math.PI) / 180);
           case 'sqrt':
             if (args[0] < 0) throw new NeedlescriptError('sqrt of a negative number', node.line);
             return Math.sqrt(args[0]);
-          case 'abs': return Math.abs(args[0]);
-          case 'round': return Math.round(args[0]);
-          case 'floor': return Math.floor(args[0]);
-          case 'ceil': return Math.ceil(args[0]);
-          case 'min': return Math.min(args[0], args[1]);
-          case 'max': return Math.max(args[0], args[1]);
+          case 'abs':
+            return Math.abs(args[0]);
+          case 'round':
+            return Math.round(args[0]);
+          case 'floor':
+            return Math.floor(args[0]);
+          case 'ceil':
+            return Math.ceil(args[0]);
+          case 'min':
+            return Math.min(args[0], args[1]);
+          case 'max':
+            return Math.max(args[0], args[1]);
           case 'pow': {
             const v = Math.pow(args[0], args[1]);
             if (!isFinite(v))
@@ -751,18 +826,27 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
               );
             return v;
           }
-          case 'mod': return ((args[0] % args[1]) + args[1]) % args[1];
+          case 'mod':
+            return ((args[0] % args[1]) + args[1]) % args[1];
           // heading-convention angle of the vector (x, y): 0 = up/north, clockwise
-          case 'atan': return (Math.atan2(args[0], args[1]) * 180 / Math.PI + 360) % 360;
-          case 'noise': return noise(args[0]);
-          case 'noise2': return noise(args[0], args[1]);
-          case 'distance': return Math.hypot(args[0] - m.x, args[1] - m.y);
+          case 'atan':
+            return ((Math.atan2(args[0], args[1]) * 180) / Math.PI + 360) % 360;
+          case 'noise':
+            return noise(args[0]);
+          case 'noise2':
+            return noise(args[0], args[1]);
+          case 'distance':
+            return Math.hypot(args[0] - m.x, args[1] - m.y);
           case 'towards':
-            return (Math.atan2(args[0] - m.x, args[1] - m.y) * 180 / Math.PI + 360) % 360;
-          case 'repcount': return repcount;
-          case 'xcor': return m.x;
-          case 'ycor': return m.y;
-          case 'heading': return m.heading;
+            return ((Math.atan2(args[0] - m.x, args[1] - m.y) * 180) / Math.PI + 360) % 360;
+          case 'repcount':
+            return repcount;
+          case 'xcor':
+            return m.x;
+          case 'ycor':
+            return m.y;
+          case 'heading':
+            return m.heading;
         }
         throw new NeedlescriptError(`Unknown function ${node.name}`, node.line);
       }
@@ -794,7 +878,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     if (depth >= LIMITS.maxCallDepth)
       throw new NeedlescriptError(`Too much recursion in "${name}"`, line);
     const newEnv: Record<string, Val> = Object.create(null);
-    proc.params.forEach((p, i) => { newEnv[p] = evalExpr(argNodes[i], env, repcount, depth); });
+    proc.params.forEach((p, i) => {
+      newEnv[p] = evalExpr(argNodes[i], env, repcount, depth);
+    });
     try {
       // Pass the call-site line as contextLine so that machine commands
       // inside the procedure stamp the caller's source line onto stitches
@@ -803,10 +889,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     } catch (e) {
       if (e instanceof ReturnSignal) return e.value;
       if (e instanceof LoopSignal)
-        throw new NeedlescriptError(
-          `"${e.kind}" can only be used inside a loop`,
-          e.line,
-        );
+        throw new NeedlescriptError(`"${e.kind}" can only be used inside a loop`, e.line);
       throw e;
     }
     return undefined;
@@ -816,14 +899,21 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
    * Call a procedure with already-evaluated argument values (rather than AST
    * nodes). Used by `warp`/`warppath` to invoke a reporter once per point.
    */
-  function callProcVals(name: string, argVals: Val[], depth: number, line?: number): Val | undefined {
+  function callProcVals(
+    name: string,
+    argVals: Val[],
+    depth: number,
+    line?: number,
+  ): Val | undefined {
     const proc = procs[name];
     if (!proc)
       throw new NeedlescriptError(`Procedure "${name}" is used before it is defined`, line);
     if (depth >= LIMITS.maxCallDepth)
       throw new NeedlescriptError(`Too much recursion in "${name}"`, line);
     const newEnv: Record<string, Val> = Object.create(null);
-    proc.params.forEach((p, i) => { newEnv[p] = argVals[i]; });
+    proc.params.forEach((p, i) => {
+      newEnv[p] = argVals[i];
+    });
     try {
       execBlock(proc.body, newEnv, 0, depth + 1, line);
     } catch (e) {
@@ -843,8 +933,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
    */
   function applyReporter(ref: FuncRef, x: number, y: number, line?: number): Pt {
     const proc = procs[ref.name];
-    if (!proc)
-      throw new NeedlescriptError(`the warp reporter @${ref.name} is not defined`, line);
+    if (!proc) throw new NeedlescriptError(`the warp reporter @${ref.name} is not defined`, line);
     if (proc.params.length !== 1)
       throw new NeedlescriptError(
         `the warp reporter @${ref.name} must take exactly one argument (the point [x, y]), but takes ${proc.params.length}`,
@@ -873,8 +962,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
    */
   function applyShapeReporterArity(ref: FuncRef, line?: number) {
     const proc = procs[ref.name];
-    if (!proc)
-      throw new NeedlescriptError(`the satin reporter @${ref.name} is not defined`, line);
+    if (!proc) throw new NeedlescriptError(`the satin reporter @${ref.name} is not defined`, line);
     if (proc.params.length !== 4)
       throw new NeedlescriptError(
         `the satin reporter @${ref.name} must take exactly 4 parameters (t, s, i, u), but takes ${proc.params.length}`,
@@ -883,11 +971,15 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   }
 
   function applyShapeReporter(
-    ref: FuncRef, t: number, s: number, i: number, u: number, line?: number,
+    ref: FuncRef,
+    t: number,
+    s: number,
+    i: number,
+    u: number,
+    line?: number,
   ): [number, number, number, number, number] {
     const proc = procs[ref.name];
-    if (!proc)
-      throw new NeedlescriptError(`the satin reporter @${ref.name} is not defined`, line);
+    if (!proc) throw new NeedlescriptError(`the satin reporter @${ref.name} is not defined`, line);
     if (proc.params.length !== 4)
       throw new NeedlescriptError(
         `the satin reporter @${ref.name} must take exactly 4 parameters (t, s, i, u), but takes ${proc.params.length}`,
@@ -928,8 +1020,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   function applyFillDirArity(name: string, line?: number) {
     const proc = procs[name];
-    if (!proc)
-      throw new NeedlescriptError(`the fill dir reporter @${name} is not defined`, line);
+    if (!proc) throw new NeedlescriptError(`the fill dir reporter @${name} is not defined`, line);
     if (proc.params.length !== 1)
       throw new NeedlescriptError(
         `the fill dir reporter @${name} must take exactly 1 parameter (the point [x, y]), but takes ${proc.params.length}`,
@@ -956,8 +1047,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   function applyFillShapeArity(name: string, line?: number) {
     const proc = procs[name];
-    if (!proc)
-      throw new NeedlescriptError(`the fill shape reporter @${name} is not defined`, line);
+    if (!proc) throw new NeedlescriptError(`the fill shape reporter @${name} is not defined`, line);
     if (proc.params.length !== 3)
       throw new NeedlescriptError(
         `the fill shape reporter @${name} must take exactly 3 parameters (p, row, v), but takes ${proc.params.length}`,
@@ -967,7 +1057,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   /** Invoke a shape reporter; returns the validated [spacing, len, phase]. */
   function applyFillShape(
-    name: string, px: number, py: number, row: number, v: number, line?: number,
+    name: string,
+    px: number,
+    py: number,
+    row: number,
+    v: number,
+    line?: number,
   ): [number, number, number] {
     const out = callProcVals(name, [allocList([px, py], line), row, v], 0, line);
     if (out === undefined)
@@ -1045,7 +1140,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   ) {
     tick(st.line);
     switch (st.k) {
-      case 'to': procs[st.name] = st; return;
+      case 'to':
+        procs[st.name] = st;
+        return;
       case 'make': {
         const v = evalExpr(st.value, env, repcount, depth);
         // Prefer an existing local (procedure parameter or "local") over a global.
@@ -1076,7 +1173,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             st.line,
           );
         const scope = st.isLocal && env ? env : globals;
-        st.names.forEach((n, i) => { scope[n] = v.items[i]; });
+        st.names.forEach((n, i) => {
+          scope[n] = v.items[i];
+        });
         return;
       }
       case 'setindex': {
@@ -1097,7 +1196,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             );
           const i = toIndex(
             evalExpr(st.indices[k], env, repcount, depth),
-            target.items.length, 'indexing', st.line,
+            target.items.length,
+            'indexing',
+            st.line,
           );
           tick(st.line);
           if (k === st.indices.length - 1) {
@@ -1124,8 +1225,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       case 'repeat': {
         const n = Math.floor(num(evalExpr(st.count, env, repcount, depth), 'repeat', st.line));
         if (n > 200000) throw new NeedlescriptError(`repeat count too large (${n})`, st.line);
-        for (let i = 1; i <= n; i++)
-          if (!runLoopBody(st.body, env, i, depth, contextLine)) break;
+        for (let i = 1; i <= n; i++) if (!runLoopBody(st.body, env, i, depth, contextLine)) break;
         return;
       }
       case 'while': {
@@ -1187,17 +1287,33 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         // the duration of the block, then restore. flushSatin on both edges
         // guarantees a satin column is sewn entirely under one matrix. The
         // turtle (x/y/heading) is untouched — only emitted geometry is mapped.
-        const a = st.args.map(x => num(evalExpr(x, env, repcount, depth), st.name, st.line));
+        const a = st.args.map((x) => num(evalExpr(x, env, repcount, depth), st.name, st.line));
         let delta: Mat;
         switch (st.name) {
-          case 'translate': delta = mTranslate(a[0], a[1]); break;
-          case 'rotate': delta = mRotate(a[0]); break;
-          case 'rotateabout': delta = mRotateAbout(a[0], a[1], a[2]); break;
-          case 'scale': delta = mScale(a[0]); break;
-          case 'scalexy': delta = mScaleXY(a[0], a[1]); break;
-          case 'mirror': delta = mMirror(a[0]); break;
-          case 'skew': delta = mSkew(a[0], a[1]); break;
-          case 'transform': delta = mRaw(a[0], a[1], a[2], a[3], a[4], a[5]); break;
+          case 'translate':
+            delta = mTranslate(a[0], a[1]);
+            break;
+          case 'rotate':
+            delta = mRotate(a[0]);
+            break;
+          case 'rotateabout':
+            delta = mRotateAbout(a[0], a[1], a[2]);
+            break;
+          case 'scale':
+            delta = mScale(a[0]);
+            break;
+          case 'scalexy':
+            delta = mScaleXY(a[0], a[1]);
+            break;
+          case 'mirror':
+            delta = mMirror(a[0]);
+            break;
+          case 'skew':
+            delta = mSkew(a[0], a[1]);
+            break;
+          case 'transform':
+            delta = mRaw(a[0], a[1], a[2], a[3], a[4], a[5]);
+            break;
           default:
             throw new NeedlescriptError(`Unhandled transform ${st.name}`, st.line);
         }
@@ -1237,7 +1353,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           }
           return;
         }
-        const a = st.args.map(x => num(evalExpr(x, env, repcount, depth), st.name, st.line));
+        const a = st.args.map((x) => num(evalExpr(x, env, repcount, depth), st.name, st.line));
         let fn: (x: number, y: number) => [number, number];
         if (st.name === 'humanize') {
           const amount = clampHumanize(a[0]);
@@ -1246,8 +1362,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           // one draw, never by however many stitches were inside.
           const childSeed = Math.floor(rng() * 4294967296);
           fn = humanizeMap(amount, childSeed, snoise2);
-        } else { // snaptogrid — pure, drawless, fixed hoop-space lattice
-          fn = snapMapFromSpec(a, msg => new NeedlescriptError(`snaptogrid ${msg}`, st.line));
+        } else {
+          // snaptogrid — pure, drawless, fixed hoop-space lattice
+          fn = snapMapFromSpec(a, (msg) => new NeedlescriptError(`snaptogrid ${msg}`, st.line));
         }
         m.pushPen(fn);
         try {
@@ -1264,14 +1381,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             `"${st.value ? 'output' : 'exit'}" can only be used inside a procedure`,
             st.line,
           );
-        throw new ReturnSignal(
-          st.value ? evalExpr(st.value, env, repcount, depth) : undefined,
-        );
+        throw new ReturnSignal(st.value ? evalExpr(st.value, env, repcount, depth) : undefined);
       }
       // Loop control (RFC-4): unwinds to the innermost enclosing loop.
       // The parser guarantees one exists in the same procedure body.
-      case 'break': throw new LoopSignal('break', st.line);
-      case 'continue': throw new LoopSignal('continue', st.line);
+      case 'break':
+        throw new LoopSignal('break', st.line);
+      case 'continue':
+        throw new LoopSignal('continue', st.line);
       case 'call': {
         callProc(st.name, st.args, env, repcount, depth, contextLine ?? st.line);
         return;
@@ -1314,9 +1431,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'listcmd': {
         m.currentLine = contextLine ?? st.line;
-        const a = st.args.map(x => evalExpr(x, env, repcount, depth));
+        const a = st.args.map((x) => evalExpr(x, env, repcount, depth));
         switch (st.name) {
-          case 'append': case 'prepend': {
+          case 'append':
+          case 'prepend': {
             const xs = list(a[0], st.name, st.line);
             if (xs.items.length + 1 > LIMITS.maxListLen)
               throw new NeedlescriptError(
@@ -1384,7 +1502,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'cmd': {
         m.currentLine = contextLine ?? st.line;
-        const vals = st.args.map(x => evalExpr(x, env, repcount, depth));
+        const vals = st.args.map((x) => evalExpr(x, env, repcount, depth));
         if (st.name === 'print') {
           printed.push((st.label ? st.label + ': ' : '') + formatVal(vals[0]));
           return;
@@ -1418,23 +1536,54 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         }
         // Every other command is scalar — a list argument is a type error
         // naming the command (RFC-2 §2).
-        const a = vals.map(v => num(v, st.name, st.line));
+        const a = vals.map((v) => num(v, st.name, st.line));
         switch (st.name) {
-          case 'fd': m.forward(a[0]); return;
-          case 'bk': m.forward(-a[0]); return;
-          case 'rt': m.heading = (m.heading + a[0]) % 360; return;
-          case 'lt': m.heading = (m.heading - a[0]) % 360; return;
-          case 'up': m.flushSatin(); m.penDown = false; return;
-          case 'down': m.penDown = true; return;
-          case 'home': m.setXY(0, 0); m.heading = 0; return;
-          case 'cs': return;
-          case 'setxy': m.setXY(a[0], a[1]); return;
-          case 'setx': m.setXY(a[0], m.y); return;
-          case 'sety': m.setXY(m.x, a[0]); return;
-          case 'seth': m.heading = a[0] % 360; return;
-          case 'arc': m.arc(a[0], a[1]); return;
-          case 'push': m.pushState(); return;
-          case 'pop': m.popState(); return;
+          case 'fd':
+            m.forward(a[0]);
+            return;
+          case 'bk':
+            m.forward(-a[0]);
+            return;
+          case 'rt':
+            m.heading = (m.heading + a[0]) % 360;
+            return;
+          case 'lt':
+            m.heading = (m.heading - a[0]) % 360;
+            return;
+          case 'up':
+            m.flushSatin();
+            m.penDown = false;
+            return;
+          case 'down':
+            m.penDown = true;
+            return;
+          case 'home':
+            m.setXY(0, 0);
+            m.heading = 0;
+            return;
+          case 'cs':
+            return;
+          case 'setxy':
+            m.setXY(a[0], a[1]);
+            return;
+          case 'setx':
+            m.setXY(a[0], m.y);
+            return;
+          case 'sety':
+            m.setXY(m.x, a[0]);
+            return;
+          case 'seth':
+            m.heading = a[0] % 360;
+            return;
+          case 'arc':
+            m.arc(a[0], a[1]);
+            return;
+          case 'push':
+            m.pushState();
+            return;
+          case 'pop':
+            m.popState();
+            return;
           case 'stitchlen': {
             const v = a[0];
             if (v < LIMITS.minStitch || v > LIMITS.maxStitch)
@@ -1468,52 +1617,87 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           }
           case 'bean': {
             let n = Math.round(a[0]);
-            if (n <= 1) { m.beanRepeats = 1; return; }
-            if (n % 2 === 0) { n += 1; m.warnings.push(`bean must be odd to keep advancing — using ${n}`); }
-            if (n > 9) { n = 9; m.warnings.push('bean clamped to 9 passes'); }
+            if (n <= 1) {
+              m.beanRepeats = 1;
+              return;
+            }
+            if (n % 2 === 0) {
+              n += 1;
+              m.warnings.push(`bean must be odd to keep advancing — using ${n}`);
+            }
+            if (n > 9) {
+              n = 9;
+              m.warnings.push('bean clamped to 9 passes');
+            }
             m.beanRepeats = n;
             return;
           }
           case 'lock': {
-            if (a[0] <= 0) { m.lockLen = 0; return; }
+            if (a[0] <= 0) {
+              m.lockLen = 0;
+              return;
+            }
             const v = Math.min(Math.max(a[0], 0.3), 1.5);
             if (v !== a[0]) m.warnings.push(`lock ${a[0]} clamped to ${v} mm (safe range 0.3–1.5)`);
             m.lockLen = v;
             return;
           }
-          case 'beginfill': m.beginFill(); return;
-          case 'endfill': m.endFill(); return;
-          case 'fillangle': m.fillAngle = a[0]; return;
+          case 'beginfill':
+            m.beginFill();
+            return;
+          case 'endfill':
+            m.endFill();
+            return;
+          case 'fillangle':
+            m.fillAngle = a[0];
+            return;
           case 'fillspacing': {
             const v = Math.min(Math.max(a[0], 0.25), 5);
-            if (v !== a[0]) m.warnings.push(`fillspacing ${a[0]} clamped to ${v} mm (safe range 0.25–5)`);
+            if (v !== a[0])
+              m.warnings.push(`fillspacing ${a[0]} clamped to ${v} mm (safe range 0.25–5)`);
             m.fillSpacing = v;
             return;
           }
           case 'filllen': {
-            if (a[0] <= 0) { m.fillLen = null; return; }
+            if (a[0] <= 0) {
+              m.fillLen = null;
+              return;
+            }
             const v = Math.min(Math.max(a[0], 1), 7);
             if (v !== a[0]) m.warnings.push(`filllen ${a[0]} clamped to ${v} mm (safe range 1–7)`);
             m.fillLen = v;
             return;
           }
-          case 'density': m.flushSatin(); m.satinSpacing = Math.min(Math.max(a[0], 0.25), 5); return;
+          case 'density':
+            m.flushSatin();
+            m.satinSpacing = Math.min(Math.max(a[0], 0.25), 5);
+            return;
           case 'pullcomp': {
             const v = Math.min(Math.max(a[0], 0), 1.5);
-            if (v !== a[0]) m.warnings.push(`pullcomp ${a[0]} clamped to ${v} mm (safe range 0–1.5)`);
+            if (v !== a[0])
+              m.warnings.push(`pullcomp ${a[0]} clamped to ${v} mm (safe range 0–1.5)`);
             m.pullComp = v;
             return;
           }
-          case 'shortstitch': m.shortStitch = a[0] !== 0; return;
+          case 'shortstitch':
+            m.shortStitch = a[0] !== 0;
+            return;
           case 'autotrim': {
-            if (a[0] <= 0) { m.autoTrim = 0; return; }
+            if (a[0] <= 0) {
+              m.autoTrim = 0;
+              return;
+            }
             const v = Math.min(Math.max(a[0], 3), 30);
-            if (v !== a[0]) m.warnings.push(`autotrim ${a[0]} clamped to ${v} mm (safe range 3–30, 0 = off)`);
+            if (v !== a[0])
+              m.warnings.push(`autotrim ${a[0]} clamped to ${v} mm (safe range 3–30, 0 = off)`);
             m.autoTrim = v;
             return;
           }
           case 'maxdensity': {
-            if (a[0] <= 0) { m.maxDensity = 0; return; }
+            if (a[0] <= 0) {
+              m.maxDensity = 0;
+              return;
+            }
             m.maxDensity = Math.min(Math.max(a[0], 1), 8);
             return;
           }
@@ -1530,14 +1714,19 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             m.fillUnderlayMode = 'auto';
             m.maxDensity = f.maxDensity;
             m.doubleUnderlay = !!f.doubleUnderlay;
-            if (f.densityFloor && m.satinSpacing < f.densityFloor)
-              m.satinSpacing = f.densityFloor;
+            if (f.densityFloor && m.satinSpacing < f.densityFloor) m.satinSpacing = f.densityFloor;
             if (f.note && !m.warnings.includes(f.note)) m.warnings.push(f.note);
             return;
           }
-          case 'color': m.colorChange(a[0]); return;
-          case 'stop': m.colorChange(m.colorIdx + 1); return;
-          case 'trim': m.trimThread(); return;
+          case 'color':
+            m.colorChange(a[0]);
+            return;
+          case 'stop':
+            m.colorChange(m.colorIdx + 1);
+            return;
+          case 'trim':
+            m.trimThread();
+            return;
           case 'seed': {
             const s = Math.floor(a[0]);
             rng = makeRNG(s);
@@ -1546,7 +1735,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             snoise3 = createNoise3D(makeRNG(s ^ 0x9e3779b9));
             return;
           }
-          case 'mark': m.markHere(); return;
+          case 'mark':
+            m.markHere();
+            return;
         }
         throw new NeedlescriptError(`Unhandled command ${st.name}`, st.line);
       }
@@ -1571,10 +1762,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   if (m.tinyDropped > 0) {
     const spots = m.tinyDroppedSpots;
     if (spots.length) {
-      const lines = [...new Set(spots.map(s => s.line).filter((l): l is number => l !== undefined))];
+      const lines = [
+        ...new Set(spots.map((s) => s.line).filter((l): l is number => l !== undefined)),
+      ];
       warningLocations.push({
         index: m.warnings.length,
-        points: spots.map(s => ({ x: s.x, y: s.y })),
+        points: spots.map((s) => ({ x: s.x, y: s.y })),
         lines,
         kind: 'tiny',
       });
@@ -1595,7 +1788,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   // history queries and this heatmap are one and the same — finalize it.
   const density = m.density.finalize(m.maxDensity);
   if (m.maxDensity > 0) {
-    const dens = density.hotspots.filter(h => h.kind === 'density').slice(0, 3);
+    const dens = density.hotspots.filter((h) => h.kind === 'density').slice(0, 3);
     for (const h of dens) {
       warningLocations.push({
         index: m.warnings.length,
@@ -1605,11 +1798,13 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       });
       m.warnings.push(
         `${h.value.toFixed(1)} layers of thread (limit ${m.maxDensity}) near (${h.x.toFixed(0)}, ${h.y.toFixed(0)})` +
-        (h.lines.length ? ` — mostly line${h.lines.length > 1 ? 's' : ''} ${h.lines.join(', ')}` : '') +
-        ' — may pucker or break needles',
+          (h.lines.length
+            ? ` — mostly line${h.lines.length > 1 ? 's' : ''} ${h.lines.join(', ')}`
+            : '') +
+          ' — may pucker or break needles',
       );
     }
-    const stacks = density.hotspots.filter(h => h.kind === 'stack').slice(0, 2);
+    const stacks = density.hotspots.filter((h) => h.kind === 'stack').slice(0, 2);
     for (const h of stacks) {
       warningLocations.push({
         index: m.warnings.length,
@@ -1619,8 +1814,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       });
       m.warnings.push(
         `${h.value} needle penetrations in the same hole near (${h.x.toFixed(0)}, ${h.y.toFixed(0)})` +
-        (h.lines.length ? ` — line ${h.lines[0]}` : '') +
-        ' — this can cut the fabric',
+          (h.lines.length ? ` — line ${h.lines[0]}` : '') +
+          ' — this can cut the fabric',
       );
     }
   }

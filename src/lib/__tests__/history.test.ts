@@ -17,7 +17,7 @@ const printed = (s: string) => run(s).printed;
 const num = (s: string) => parseFloat(run(s).printed[0]);
 const r4 = (n: number) => Math.round(n * 1e4) / 1e4;
 function clean(evs: StitchEvent[]) {
-  return evs.map(e => ({ t: e.t, x: r4(e.x), y: r4(e.y), c: e.c, ...(e.u ? { u: e.u } : {}) }));
+  return evs.map((e) => ({ t: e.t, x: r4(e.x), y: r4(e.y), c: e.c, ...(e.u ? { u: e.u } : {}) }));
 }
 
 // ── 1: coverat / countat speak the heatmap's numbers exactly ─────────────────
@@ -26,7 +26,7 @@ describe('one notion of density (live grid == heatmap)', () => {
     const src = 'down setpos([0, 0])\nsetpos([20, 0])\nprint coverat([10, 0])';
     const res = run(src);
     const live = parseFloat(res.printed[0]);
-    const cell = res.density.cells.find(c => c.ix === 10 && c.iy === 0)!;
+    const cell = res.density.cells.find((c) => c.ix === 10 && c.iy === 0)!;
     expect(cell).toBeTruthy();
     expect(live).toBeCloseTo(cell.layers, 6);
     expect(live).toBeGreaterThan(0);
@@ -36,7 +36,7 @@ describe('one notion of density (live grid == heatmap)', () => {
     const src = 'stitchlen 1\ndown setpos([0, 0])\nsetpos([20, 0])\nprint countat([10, 0])';
     const res = run(src);
     const live = parseFloat(res.printed[0]);
-    const cell = res.density.cells.find(c => c.ix === 10 && c.iy === 0)!;
+    const cell = res.density.cells.find((c) => c.ix === 10 && c.iy === 0)!;
     expect(live).toBe(cell.count);
   });
 
@@ -69,7 +69,7 @@ describe('queries see committed (flushed) penetrations only', () => {
       'down setpos([0, 0])\nsetpos([20, 0])\n' +
       'print coverat([10, 0])\n' + // column still buffered → nothing here
       'trim\n' +
-      'print coverat([10, 0])';    // flushed → coverage now present
+      'print coverat([10, 0])'; // flushed → coverage now present
     const out = printed(src);
     expect(parseFloat(out[0])).toBe(0);
     expect(parseFloat(out[1])).toBeGreaterThan(0);
@@ -144,7 +144,7 @@ describe('query points are local-frame, mapped through the CTM', () => {
     const src =
       'translate 30 0 [ down setpos([0, 0]) setpos([10, 0]) ]\n' +
       'print coverat([35, 0])\n' + // hoop where the thread actually is
-      'print coverat([5, 0])';     // hoop origin — nothing sewn here
+      'print coverat([5, 0])'; // hoop origin — nothing sewn here
     const out = printed(src);
     expect(parseFloat(out[0])).toBeGreaterThan(0);
     expect(parseFloat(out[1])).toBe(0);
@@ -155,9 +155,7 @@ describe('query points are local-frame, mapped through the CTM', () => {
 describe('spatial reporters', () => {
   it('nearestsewn is [] before anything is sewn, then the closest point', () => {
     expect(printed('print nearestsewn([5, 5])')[0]).toBe('[]');
-    const out = printed(
-      'down setpos([0, 0])\nsetpos([10, 0])\nprint nearestsewn([9.6, 0])',
-    )[0];
+    const out = printed('down setpos([0, 0])\nsetpos([10, 0])\nprint nearestsewn([9.6, 0])')[0];
     expect(out).toMatch(/^\[/);
     // closest penetration to (9.6, 0) on the 0..10 line is near x=10
     const m = out.match(/\[([-\d.]+),\s*([-\d.]+)\]/)!;
@@ -219,7 +217,7 @@ describe('feedback loops fail loudly', () => {
       '  ]\n' +
       ']';
     const res = run(prog);
-    const stitches = res.events.filter(e => e.t === 'stitch').length;
+    const stitches = res.events.filter((e) => e.t === 'stitch').length;
     expect(stitches).toBeGreaterThan(0);
     expect(stitches).toBeLessThan(60000);
     // self-leveling keeps the peak near the target rather than runaway crowding
@@ -244,6 +242,6 @@ describe('grammar', () => {
   it('a user procedure may shadow a query name (library tier)', () => {
     const res = run('def coverat(p) [ return 42 ]\nprint coverat([0, 0])');
     expect(res.printed[0]).toBe('42');
-    expect(res.warnings.some(w => /shadows a built-in/.test(w))).toBe(true);
+    expect(res.warnings.some((w) => /shadows a built-in/.test(w))).toBe(true);
   });
 });

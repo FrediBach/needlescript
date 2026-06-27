@@ -1,6 +1,13 @@
 // ---------- Tie-in / tie-off locks ----------
 
-import type { EventType, StitchEvent, DesignStats, DensityCell, DensityHotspot, DensityResult } from './types.ts';
+import type {
+  EventType,
+  StitchEvent,
+  DesignStats,
+  DensityCell,
+  DensityHotspot,
+  DensityResult,
+} from './types.ts';
 
 interface LockResult {
   events: StitchEvent[];
@@ -9,12 +16,15 @@ interface LockResult {
 
 export function applyLocks(events: StitchEvent[], L: number): LockResult {
   const THRESH = 4;
-  interface Part { run: boolean; ev: StitchEvent[]; cut?: boolean }
+  interface Part {
+    run: boolean;
+    ev: StitchEvent[];
+    cut?: boolean;
+  }
   const parts: Part[] = [];
   for (const e of events) {
     const isRun = e.t === 'stitch';
-    if (!parts.length || parts[parts.length - 1].run !== isRun)
-      parts.push({ run: isRun, ev: [] });
+    if (!parts.length || parts[parts.length - 1].run !== isRun) parts.push({ run: isRun, ev: [] });
     parts[parts.length - 1].ev.push(e);
   }
   const out: StitchEvent[] = [];
@@ -24,10 +34,15 @@ export function applyLocks(events: StitchEvent[], L: number): LockResult {
     Math.hypot(a.x - b.x, a.y - b.y);
 
   function gapCuts(part: Part, startPos: StitchEvent | null): boolean {
-    let cut = false, jlen = 0, p: StitchEvent | null = startPos;
+    let cut = false,
+      jlen = 0,
+      p: StitchEvent | null = startPos;
     for (const e of part.ev) {
       if (e.t === 'color' || e.t === 'trim') cut = true;
-      if (e.t === 'jump') { if (p) jlen += dist(p, e); p = e; }
+      if (e.t === 'jump') {
+        if (p) jlen += dist(p, e);
+        p = e;
+      }
     }
     return cut || jlen >= THRESH;
   }
@@ -38,7 +53,8 @@ export function applyLocks(events: StitchEvent[], L: number): LockResult {
     if (d < 1e-6) return;
     const l = Math.min(L, d);
     if (l < 0.2) return;
-    const ux = (toward.x - at.x) / d, uy = (toward.y - at.y) / d;
+    const ux = (toward.x - at.x) / d,
+      uy = (toward.y - at.y) / d;
     for (let k = 0; k < 2; k++) {
       out.push({ t: 'stitch', x: at.x + ux * l, y: at.y + uy * l, c, line: at.line });
       out.push({ t: 'stitch', x: at.x, y: at.y, c, line: at.line });
@@ -51,7 +67,10 @@ export function applyLocks(events: StitchEvent[], L: number): LockResult {
     const part = parts[pi];
     if (!part.run) {
       part.cut = gapCuts(part, pos);
-      for (const e of part.ev) { out.push(e); if (e.t === 'jump') pos = e; }
+      for (const e of part.ev) {
+        out.push(e);
+        if (e.t === 'jump') pos = e;
+      }
       continue;
     }
     const ev = part.ev;
@@ -61,12 +80,19 @@ export function applyLocks(events: StitchEvent[], L: number): LockResult {
     const needOut = nextGap === null || gapCuts(nextGap, ev[ev.length - 1]);
     firstRunSeen = true;
     if (entry === null) {
-      out.push(ev[0]); pos = ev[0];
+      out.push(ev[0]);
+      pos = ev[0];
       if (needIn) tie(ev[0], ev[1] || null, ev[0].c);
-      for (let i = 1; i < ev.length; i++) { out.push(ev[i]); pos = ev[i]; }
+      for (let i = 1; i < ev.length; i++) {
+        out.push(ev[i]);
+        pos = ev[i];
+      }
     } else {
       if (needIn) tie(entry, ev[0], ev[0].c);
-      for (const e of ev) { out.push(e); pos = e; }
+      for (const e of ev) {
+        out.push(e);
+        pos = e;
+      }
     }
     if (needOut) {
       const last = ev[ev.length - 1];
@@ -95,11 +121,24 @@ export function applyAutoTrim(
   let i = 0;
   while (i < events.length) {
     const e = events[i];
-    if (e.t === 'stitch') { sewn = true; out.push(e); pos = e; i++; continue; }
-    if (e.t === 'color' || e.t === 'trim') { sewn = false; out.push(e); i++; continue; }
+    if (e.t === 'stitch') {
+      sewn = true;
+      out.push(e);
+      pos = e;
+      i++;
+      continue;
+    }
+    if (e.t === 'color' || e.t === 'trim') {
+      sewn = false;
+      out.push(e);
+      i++;
+      continue;
+    }
     if (e.t === 'jump') {
       // measure the whole consecutive jump run
-      let j = i, jl = 0, p: StitchEvent | null = pos;
+      let j = i,
+        jl = 0,
+        p: StitchEvent | null = pos;
       while (j < events.length && (events[j].t === 'jump' || events[j].t === 'mark')) {
         if (events[j].t === 'jump') {
           if (p) jl += Math.hypot(events[j].x - p.x, events[j].y - p.y);
@@ -128,7 +167,11 @@ export function applyAutoTrim(
 
 const THREAD_W = 0.4; // typical 40 wt thread width on fabric, mm
 
-interface DensCell { count: number; len: number; lines: Map<number, number> }
+interface DensCell {
+  count: number;
+  len: number;
+  lines: Map<number, number>;
+}
 
 /**
  * Incremental thread build-up accumulator — the single source of truth for
@@ -150,7 +193,10 @@ export class DensityGrid {
   readonly cellMM: number;
   private readonly cellArea: number;
   private readonly grid = new Map<string, DensCell>();
-  private readonly micro = new Map<string, { count: number; x: number; y: number; line?: number }>();
+  private readonly micro = new Map<
+    string,
+    { count: number; x: number; y: number; line?: number }
+  >();
   // Penetration points (hoop space, including underlay) plus a coarse bucket
   // index so nearest/within stay O(local) — the property that lets feedback
   // loops compose with the op limit instead of fighting it.
@@ -168,13 +214,20 @@ export class DensityGrid {
   private cellOf(x: number, y: number): DensCell {
     const k = Math.floor(x / this.cellMM) + ',' + Math.floor(y / this.cellMM);
     let cell = this.grid.get(k);
-    if (!cell) { cell = { count: 0, len: 0, lines: new Map() }; this.grid.set(k, cell); }
+    if (!cell) {
+      cell = { count: 0, len: 0, lines: new Map() };
+      this.grid.set(k, cell);
+    }
     return cell;
   }
 
   /** Feed one stitch-stream event, in order. Mirrors the heatmap exactly. */
   feed(t: EventType, x: number, y: number, line?: number) {
-    if (t === 'jump') { this.px = x; this.py = y; return; }
+    if (t === 'jump') {
+      this.px = x;
+      this.py = y;
+      return;
+    }
     if (t !== 'stitch') return; // color / trim / mark: no thread, cursor unchanged
     const cell = this.cellOf(x, y);
     cell.count++;
@@ -201,8 +254,10 @@ export class DensityGrid {
     this.pts.push(p);
     const bk = Math.floor(x / DensityGrid.BUCKET) + ',' + Math.floor(y / DensityGrid.BUCKET);
     const b = this.buckets.get(bk);
-    if (b) b.push(p); else this.buckets.set(bk, [p]);
-    this.px = x; this.py = y;
+    if (b) b.push(p);
+    else this.buckets.set(bk, [p]);
+    this.px = x;
+    this.py = y;
   }
 
   // ---- Live queries (hoop space; zero draws, zero events) ----
@@ -217,9 +272,12 @@ export class DensityGrid {
   coverAvg(x: number, y: number, r: number): number {
     if (!(r > 0)) return this.coverAt(x, y);
     const c = this.cellMM;
-    const ix0 = Math.floor((x - r) / c), ix1 = Math.floor((x + r) / c);
-    const iy0 = Math.floor((y - r) / c), iy1 = Math.floor((y + r) / c);
-    let sum = 0, n = 0;
+    const ix0 = Math.floor((x - r) / c),
+      ix1 = Math.floor((x + r) / c);
+    const iy0 = Math.floor((y - r) / c),
+      iy1 = Math.floor((y + r) / c);
+    let sum = 0,
+      n = 0;
     for (let ix = ix0; ix <= ix1; ix++) {
       const cx = (ix + 0.5) * c;
       for (let iy = iy0; iy <= iy1; iy++) {
@@ -243,8 +301,10 @@ export class DensityGrid {
   nearestSewn(x: number, y: number): [number, number] | null {
     if (!this.pts.length) return null;
     const B = DensityGrid.BUCKET;
-    const bx = Math.floor(x / B), by = Math.floor(y / B);
-    let best: [number, number] | null = null, bestD = Infinity;
+    const bx = Math.floor(x / B),
+      by = Math.floor(y / B);
+    let best: [number, number] | null = null,
+      bestD = Infinity;
     for (let ring = 0; ring < 100000; ring++) {
       // a point in bucket-ring `ring` is at least (ring-1)*B mm away
       if (best !== null && (ring - 1) * B > bestD) break;
@@ -255,7 +315,10 @@ export class DensityGrid {
           if (!b) continue;
           for (const p of b) {
             const d = Math.hypot(p[0] - x, p[1] - y);
-            if (d < bestD) { bestD = d; best = p; }
+            if (d < bestD) {
+              bestD = d;
+              best = p;
+            }
           }
         }
     }
@@ -267,8 +330,10 @@ export class DensityGrid {
     const out: [number, number][] = [];
     if (!(r >= 0)) return out;
     const B = DensityGrid.BUCKET;
-    const gx0 = Math.floor((x - r) / B), gx1 = Math.floor((x + r) / B);
-    const gy0 = Math.floor((y - r) / B), gy1 = Math.floor((y + r) / B);
+    const gx0 = Math.floor((x - r) / B),
+      gx1 = Math.floor((x + r) / B);
+    const gy0 = Math.floor((y - r) / B),
+      gy1 = Math.floor((y + r) / B);
     for (let gx = gx0; gx <= gx1; gx++)
       for (let gy = gy0; gy <= gy1; gy++) {
         const b = this.buckets.get(gx + ',' + gy);
@@ -279,10 +344,14 @@ export class DensityGrid {
   }
 
   /** The number of penetrations recorded so far. */
-  get pointCount(): number { return this.pts.length; }
+  get pointCount(): number {
+    return this.pts.length;
+  }
 
   /** A snapshot of every penetration so far (hoop space). */
-  snapshot(): [number, number][] { return this.pts; }
+  snapshot(): [number, number][] {
+    return this.pts;
+  }
 
   /** Collapse to the heatmap result the rest of the engine consumes. */
   finalize(threshold = 3): DensityResult {
@@ -296,17 +365,15 @@ export class DensityGrid {
     }
     const hotspots: DensityHotspot[] = [];
     if (threshold > 0) {
-      const hot = cells
-        .filter(c => c.layers > threshold)
-        .sort((a, b) => b.layers - a.layers);
+      const hot = cells.filter((c) => c.layers > threshold).sort((a, b) => b.layers - a.layers);
       const taken: DensityCell[] = [];
       for (const c of hot) {
-        if (taken.some(t => Math.abs(t.ix - c.ix) <= 2 && Math.abs(t.iy - c.iy) <= 2)) continue;
+        if (taken.some((t) => Math.abs(t.ix - c.ix) <= 2 && Math.abs(t.iy - c.iy) <= 2)) continue;
         taken.push(c);
         const lines = [...(this.grid.get(c.ix + ',' + c.iy)?.lines || new Map<number, number>())]
           .toSorted((a, b) => b[1] - a[1])
           .slice(0, 2)
-          .map(l => l[0]);
+          .map((l) => l[0]);
         hotspots.push({
           x: (c.ix + 0.5) * this.cellMM,
           y: (c.iy + 0.5) * this.cellMM,
@@ -319,7 +386,9 @@ export class DensityGrid {
       for (const m of this.micro.values()) {
         if (m.count >= 5) {
           hotspots.push({
-            x: m.x, y: m.y, value: m.count,
+            x: m.x,
+            y: m.y,
+            value: m.count,
             lines: m.line !== undefined ? [m.line] : [],
             kind: 'stack',
           });
@@ -336,11 +405,7 @@ export class DensityGrid {
  * finalize. Identical output to feeding the live machine grid, so the history
  * queries and the heatmap always agree (one notion of density).
  */
-export function densityMap(
-  events: StitchEvent[],
-  cellMM = 1,
-  threshold = 3,
-): DensityResult {
+export function densityMap(events: StitchEvent[], cellMM = 1, threshold = 3): DensityResult {
   const g = new DensityGrid(cellMM);
   for (const e of events) g.feed(e.t, e.x, e.y, e.line);
   return g.finalize(threshold);
@@ -349,18 +414,38 @@ export function densityMap(
 // ---------- Design stats ----------
 
 export function designStats(events: StitchEvent[]): DesignStats {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  let stitches = 0, jumps = 0, colors = 0, trims = 0;
-  let maxLen = 0, maxR = 0, yarnLength = 0;
-  let px: number | null = null, py: number | null = null;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+  let stitches = 0,
+    jumps = 0,
+    colors = 0,
+    trims = 0;
+  let maxLen = 0,
+    maxR = 0,
+    yarnLength = 0;
+  let px: number | null = null,
+    py: number | null = null;
   const colorSet = new Set<number>();
   for (const e of events) {
     if (e.t === 'mark') continue; // debug pins are render-only
-    if (e.t === 'color') { colors++; px = e.x; py = e.y; continue; }
-    if (e.t === 'trim') { trims++; continue; }
-    if (e.x < minX) minX = e.x; if (e.x > maxX) maxX = e.x;
-    if (e.y < minY) minY = e.y; if (e.y > maxY) maxY = e.y;
-    const rr = Math.hypot(e.x, e.y); if (rr > maxR) maxR = rr;
+    if (e.t === 'color') {
+      colors++;
+      px = e.x;
+      py = e.y;
+      continue;
+    }
+    if (e.t === 'trim') {
+      trims++;
+      continue;
+    }
+    if (e.x < minX) minX = e.x;
+    if (e.x > maxX) maxX = e.x;
+    if (e.y < minY) minY = e.y;
+    if (e.y > maxY) maxY = e.y;
+    const rr = Math.hypot(e.x, e.y);
+    if (rr > maxR) maxR = rr;
     if (e.t === 'stitch') {
       stitches++;
       colorSet.add(e.c);
@@ -372,15 +457,26 @@ export function designStats(events: StitchEvent[]): DesignStats {
     } else {
       jumps++;
     }
-    px = e.x; py = e.y;
+    px = e.x;
+    py = e.y;
   }
-  if (!isFinite(minX)) { minX = maxX = minY = maxY = 0; }
+  if (!isFinite(minX)) {
+    minX = maxX = minY = maxY = 0;
+  }
   return {
-    stitches, jumps, trims,
+    stitches,
+    jumps,
+    trims,
     colorChanges: colors,
     colorsUsed: Math.max(1, colorSet.size),
-    width: maxX - minX, height: maxY - minY,
-    minX, maxX, minY, maxY, maxStitchLen: maxLen, maxRadius: maxR,
+    width: maxX - minX,
+    height: maxY - minY,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    maxStitchLen: maxLen,
+    maxRadius: maxR,
     yarnLength,
   };
 }

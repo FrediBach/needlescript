@@ -56,7 +56,7 @@ export function formatVal(v: Val, depth = 0): string {
   if (!isList(v)) return formatNum(v);
   if (depth >= LIMITS.maxListDepth)
     throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`);
-  const shown = v.items.slice(0, PRINT_CAP).map(x => formatVal(x, depth + 1));
+  const shown = v.items.slice(0, PRINT_CAP).map((x) => formatVal(x, depth + 1));
   const more = v.items.length - PRINT_CAP;
   return `[${shown.join(', ')}${more > 0 ? `, … +${more} more` : ''}]`;
 }
@@ -101,12 +101,13 @@ export function valDepth(v: Val, depth = 0): number {
 export function deepEqual(a: Val, b: Val, depth = 0): boolean {
   if (depth >= LIMITS.maxListDepth)
     throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`);
-  if (isFuncRef(a) || isFuncRef(b))
-    return isFuncRef(a) && isFuncRef(b) && a.name === b.name;
-  const al = isList(a), bl = isList(b);
+  if (isFuncRef(a) || isFuncRef(b)) return isFuncRef(a) && isFuncRef(b) && a.name === b.name;
+  const al = isList(a),
+    bl = isList(b);
   if (al !== bl) return false;
   if (!al) return Math.abs((a as number) - (b as number)) < 1e-9;
-  const ai = (a as NsList).items, bi = (b as NsList).items;
+  const ai = (a as NsList).items,
+    bi = (b as NsList).items;
   if (ai.length !== bi.length) return false;
   for (let i = 0; i < ai.length; i++) {
     if (!deepEqual(ai[i], bi[i], depth + 1)) return false;

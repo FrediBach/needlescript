@@ -15,14 +15,21 @@ export function tokenize(src: string): Token[] {
 
   while (i < src.length) {
     const c = src[i];
-    if (c === '\n') { line++; i++; continue; }
+    if (c === '\n') {
+      line++;
+      i++;
+      continue;
+    }
     // Comments: ";" and "#" to end of line, plus "//" (two adjacent slashes —
     // a lone "/" is still division).
     if (c === ';' || c === '#' || (c === '/' && src[i + 1] === '/')) {
       while (i < src.length && src[i] !== '\n') i++;
       continue;
     }
-    if (/\s/.test(c)) { i++; continue; }
+    if (/\s/.test(c)) {
+      i++;
+      continue;
+    }
     if ('[]()'.includes(c)) {
       tokens.push({ t: c as TokenType, line, start: i, end: i + 1 });
       i++;
@@ -40,16 +47,14 @@ export function tokenize(src: string): Token[] {
     // "'" was never valid; reserving it now (RFC-4 §4) means quoted strings
     // can arrive in a future version without changing any program's meaning.
     if (c === "'") {
-      throw new NeedlescriptError(
-        'single-quote strings are reserved for a future version',
-        line,
-      );
+      throw new NeedlescriptError('single-quote strings are reserved for a future version', line);
     }
     if ('+-*/<>=!%'.includes(c)) {
       const spBefore = i === 0 || /[\s[(]/.test(src[i - 1]);
       let op = c;
       if ((c === '<' || c === '>' || c === '!') && src[i + 1] === '=') op = c + '=';
-      else if (c === '=' && src[i + 1] === '=') op = '=='; // == is the same comparison as =
+      else if (c === '=' && src[i + 1] === '=')
+        op = '=='; // == is the same comparison as =
       else if ('+-*/'.includes(c) && src[i + 1] === '=') op = c + '='; // compound assignment
       const after = i + op.length;
       if (c === '!' && op === '!') {

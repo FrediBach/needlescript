@@ -6,7 +6,23 @@
 
 import type { ASTNode, ExprNode, Token } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
-import { ALIASES, BUILTIN_ARITY, TRANSFORM_ARITY, EFFECT_ARITY, QWORD_BUILTINS, FUNC_ARITY, ZERO_FUNCS, RESERVED, LIST_FUNCS, LIST_CMDS, GEN_FUNCS, GEN_CMDS, GEN_QWORD_ARG, QUERY_FUNCS, LIBRARY_FUNCS } from './commands.ts';
+import {
+  ALIASES,
+  BUILTIN_ARITY,
+  TRANSFORM_ARITY,
+  EFFECT_ARITY,
+  QWORD_BUILTINS,
+  FUNC_ARITY,
+  ZERO_FUNCS,
+  RESERVED,
+  LIST_FUNCS,
+  LIST_CMDS,
+  GEN_FUNCS,
+  GEN_CMDS,
+  GEN_QWORD_ARG,
+  QUERY_FUNCS,
+  LIBRARY_FUNCS,
+} from './commands.ts';
 import { didYouMean, didYouMeanKinded } from './suggestions.ts';
 import { prescan } from './prescan.ts';
 import { COMPOUND_ASSIGN_OPS } from './tokenizer.ts';
@@ -52,7 +68,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
   const next = () => tokens[pos++];
   const atEnd = () => pos >= tokens.length;
   const lineOf = (tok?: Token) =>
-    tok ? tok.line : (tokens.length ? tokens[tokens.length - 1].line : 1);
+    tok ? tok.line : tokens.length ? tokens[tokens.length - 1].line : 1;
 
   const declaredScope = () =>
     currentProc ? (declaredLocal[currentProc] ??= new Set()) : declaredGlobal;
@@ -85,7 +101,11 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
 
   function builtinKind(w: string): string | null {
     if (FUNC_ARITY[w] !== undefined || ZERO_FUNCS.has(w)) return 'built-in function';
-    if (BUILTIN_ARITY[w] !== undefined || ALIASES[w] !== undefined || QWORD_BUILTINS[w] !== undefined)
+    if (
+      BUILTIN_ARITY[w] !== undefined ||
+      ALIASES[w] !== undefined ||
+      QWORD_BUILTINS[w] !== undefined
+    )
       return 'built-in command';
     if (RESERVED.has(w)) return 'reserved word';
     return null;
@@ -94,8 +114,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
   /** Names that hold values or definitions must never collide (§4.3). */
   function checkBindable(name: string, what: string, line: number) {
     const kind = builtinKind(name);
-    if (kind)
-      throw new NeedlescriptError(`"${name}" is a ${kind} and can't be ${what}`, line);
+    if (kind) throw new NeedlescriptError(`"${name}" is a ${kind} and can't be ${what}`, line);
     if (procArity[name] !== undefined)
       throw new NeedlescriptError(
         `"${name}" is already a procedure (line ${ps.procLine[name]})`,
@@ -105,8 +124,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
 
   function checkParam(p: string, line: number, params: string[]) {
     checkBindable(p, 'a parameter', line);
-    if (params.includes(p))
-      throw new NeedlescriptError(`Duplicate parameter "${p}"`, line);
+    if (params.includes(p)) throw new NeedlescriptError(`Duplicate parameter "${p}"`, line);
   }
 
   /** Merged namespace for did-you-mean, with kind labels. */
@@ -197,10 +215,16 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         args.push(parseExpr());
         if (!atEnd() && peek().t === ',') {
           next();
-          if (!atEnd() && peek().t === ')') { next(); break; } // trailing comma
+          if (!atEnd() && peek().t === ')') {
+            next();
+            break;
+          } // trailing comma
           continue;
         }
-        if (!atEnd() && peek().t === ')') { next(); break; }
+        if (!atEnd() && peek().t === ')') {
+          next();
+          break;
+        }
         const bad = peek();
         throw new NeedlescriptError(
           `Expected , or ) in the arguments of ${callee}(…), got "${bad ? (bad.v !== undefined ? bad.v : bad.t) : 'end of program'}"`,
@@ -209,17 +233,14 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       }
     }
     if (args.length < min || args.length > max) {
-      const want = min === max
-        ? `${min} argument${min === 1 ? '' : 's'}`
-        : `${min} to ${max} arguments`;
+      const want =
+        min === max ? `${min} argument${min === 1 ? '' : 's'}` : `${min} to ${max} arguments`;
       // push/pop are the turtle state stack, not list operations.
-      const hint = callee === 'push' && args.length > 0
-        ? ' — push/pop save the turtle state; to add a value to a list, use append(xs, v)'
-        : '';
-      throw new NeedlescriptError(
-        `${callee}(…) expects ${want}, got ${args.length}${hint}`,
-        line,
-      );
+      const hint =
+        callee === 'push' && args.length > 0
+          ? ' — push/pop save the turtle state; to add a value to a list, use append(xs, v)'
+          : '';
+      throw new NeedlescriptError(`${callee}(…) expects ${want}, got ${args.length}${hint}`, line);
     }
     return args;
   }
@@ -235,8 +256,10 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     const q = GEN_QWORD_ARG[name];
     if (!q) {
       return {
-        k: 'listfunc', name,
-        args: parseParenArgsRange(name, a.min, a.max, line), line,
+        k: 'listfunc',
+        name,
+        args: parseParenArgsRange(name, a.min, a.max, line),
+        line,
       };
     }
     next(); // consume '('
@@ -265,10 +288,16 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       slot++;
       if (!atEnd() && peek().t === ',') {
         next();
-        if (!atEnd() && peek().t === ')') { next(); break; } // trailing comma
+        if (!atEnd() && peek().t === ')') {
+          next();
+          break;
+        } // trailing comma
         continue;
       }
-      if (!atEnd() && peek().t === ')') { next(); break; }
+      if (!atEnd() && peek().t === ')') {
+        next();
+        break;
+      }
       const bad = peek();
       throw new NeedlescriptError(
         `Expected , or ) in the arguments of ${name}(…), got "${bad ? (bad.v !== undefined ? bad.v : bad.t) : 'end of program'}"`,
@@ -295,9 +324,10 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     line: number,
   ): void {
     if (got >= spec.min && got <= spec.max) return;
-    const want = spec.min === spec.max
-      ? `${spec.min} argument${spec.min === 1 ? '' : 's'}`
-      : `${spec.min} to ${spec.max} arguments`;
+    const want =
+      spec.min === spec.max
+        ? `${spec.min} argument${spec.min === 1 ? '' : 's'}`
+        : `${spec.min} to ${spec.max} arguments`;
     throw new NeedlescriptError(`${name} expects ${want} then a block, got ${got}`, line);
   }
 
@@ -309,8 +339,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         'Commas can only separate arguments inside call parentheses, e.g.  setxy(10, 20)',
         tok.line,
       );
-    if (tok.t === '[')
-      throw new NeedlescriptError("a list literal can't be a statement", tok.line);
+    if (tok.t === '[') throw new NeedlescriptError("a list literal can't be a statement", tok.line);
     if (tok.t !== 'word')
       throw new NeedlescriptError(
         `Expected a command, got "${tok.v !== undefined ? tok.v : tok.t}"`,
@@ -343,8 +372,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       const declared = (declaredLocal[procName] ??= new Set());
       for (const p of params) declared.add(p);
       const body: ASTNode[] = [];
-      while (!atEnd() && !(peek().t === 'word' && peek().v === 'end'))
-        body.push(parseStatement());
+      while (!atEnd() && !(peek().t === 'word' && peek().v === 'end')) body.push(parseStatement());
       if (atEnd())
         throw new NeedlescriptError(`Procedure "${procName}" is missing "end"`, tok.line);
       next(); // consume end
@@ -355,10 +383,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
 
     if (name === 'def') {
       if (currentProc)
-        throw new NeedlescriptError(
-          '"def" can\'t be used inside another procedure',
-          tok.line,
-        );
+        throw new NeedlescriptError('"def" can\'t be used inside another procedure', tok.line);
       next();
       const nameTok = next();
       if (!nameTok || nameTok.t !== 'word')
@@ -400,14 +425,17 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           params.push(pTok.v as string);
           if (!atEnd() && peek().t === ',') {
             next();
-            if (!atEnd() && peek().t === ')') { next(); break; } // trailing comma
+            if (!atEnd() && peek().t === ')') {
+              next();
+              break;
+            } // trailing comma
             continue;
           }
-          if (!atEnd() && peek().t === ')') { next(); break; }
-          throw new NeedlescriptError(
-            `Expected , or ) in def ${procName}( … )`,
-            lineOf(peek()),
-          );
+          if (!atEnd() && peek().t === ')') {
+            next();
+            break;
+          }
+          throw new NeedlescriptError(`Expected , or ) in def ${procName}( … )`, lineOf(peek()));
         }
       }
       currentProc = procName;
@@ -431,7 +459,10 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         const scope = declaredScope();
         for (;;) {
           const nTok = peek();
-          if (nTok && nTok.t === ']' && names.length > 0) { next(); break; }
+          if (nTok && nTok.t === ']' && names.length > 0) {
+            next();
+            break;
+          }
           if (!nTok || nTok.t !== 'word')
             throw new NeedlescriptError(
               'let [ … ] needs bare names, e.g.  let [x, y] = pos()',
@@ -448,14 +479,17 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           names.push(w);
           if (!atEnd() && peek().t === ',') {
             next();
-            if (!atEnd() && peek().t === ']') { next(); break; } // trailing comma
+            if (!atEnd() && peek().t === ']') {
+              next();
+              break;
+            } // trailing comma
             continue;
           }
-          if (!atEnd() && peek().t === ']') { next(); break; }
-          throw new NeedlescriptError(
-            'Expected , or ] in  let [x, y] = …',
-            lineOf(peek()),
-          );
+          if (!atEnd() && peek().t === ']') {
+            next();
+            break;
+          }
+          throw new NeedlescriptError('Expected , or ] in  let [x, y] = …', lineOf(peek()));
         }
         if (atEnd() || peek().t !== 'op' || peek().v !== '=')
           throw new NeedlescriptError(
@@ -473,10 +507,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       checkBindable(w, 'a variable', nameTok.line);
       const scope = declaredScope();
       if (scope.has(w))
-        throw new NeedlescriptError(
-          `"${w}" is already declared — assign with  ${w} = …`,
-          tok.line,
-        );
+        throw new NeedlescriptError(`"${w}" is already declared — assign with  ${w} = …`, tok.line);
       next();
       if (atEnd() || peek().t !== 'op' || peek().v !== '=')
         throw new NeedlescriptError(`let needs "=", e.g.  let ${w} = 5`, tok.line);
@@ -492,17 +523,22 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       next();
       const nxt = peek();
       const isValueWord = (w: string) =>
-        FUNC_ARITY[w] !== undefined || ZERO_FUNCS.has(w) ||
-        LIST_FUNCS[w] !== undefined || GEN_FUNCS[w] !== undefined ||
+        FUNC_ARITY[w] !== undefined ||
+        ZERO_FUNCS.has(w) ||
+        LIST_FUNCS[w] !== undefined ||
+        GEN_FUNCS[w] !== undefined ||
         QUERY_FUNCS[w] !== undefined ||
-        procArity[w] !== undefined || isVariableName(w);
-      const startsValue = !!nxt && (
-        nxt.t === 'num' || nxt.t === 'var' || nxt.t === '(' ||
-        nxt.t === '[' || // list literal (RFC-2)
-        nxt.t === 'pref' || // procedure reference @name
-        (nxt.t === 'op' && nxt.v === '-') ||
-        (nxt.t === 'word' && isValueWord(nxt.v as string))
-      );
+        procArity[w] !== undefined ||
+        isVariableName(w);
+      const startsValue =
+        !!nxt &&
+        (nxt.t === 'num' ||
+          nxt.t === 'var' ||
+          nxt.t === '(' ||
+          nxt.t === '[' || // list literal (RFC-2)
+          nxt.t === 'pref' || // procedure reference @name
+          (nxt.t === 'op' && nxt.v === '-') ||
+          (nxt.t === 'word' && isValueWord(nxt.v as string)));
       // return expr ≡ output expr; bare return ≡ exit
       return { k: 'output', value: startsValue ? parseExpr() : null, line: tok.line };
     }
@@ -543,10 +579,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         next(); // =
         const from = parseExpr();
         if (atEnd() || peek().t !== 'word' || peek().v !== 'to')
-          throw new NeedlescriptError(
-            `for needs "to":  for ${w} = 1 to 10 [ … ]`,
-            tok.line,
-          );
+          throw new NeedlescriptError(`for needs "to":  for ${w} = 1 to 10 [ … ]`, tok.line);
         next(); // to
         const toExpr = parseHeaderExpr();
         let step: ExprNode = { k: 'num', v: 1 };
@@ -559,8 +592,11 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       }
       // Modern (RFC-2):  for x in xs [ … ]
       if (
-        nm && nm.t === 'word' &&
-        tokens[pos + 1] && tokens[pos + 1].t === 'word' && tokens[pos + 1].v === 'in'
+        nm &&
+        nm.t === 'word' &&
+        tokens[pos + 1] &&
+        tokens[pos + 1].t === 'word' &&
+        tokens[pos + 1].v === 'in'
       ) {
         const w = nm.v as string;
         checkBindable(w, 'a loop variable', nm.line);
@@ -653,7 +689,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         throw new NeedlescriptError(
           currentProc
             ? `"${name}" can only be used inside a loop — the loop is in the caller; ` +
-              'use return (or exit/output) to leave the procedure'
+                'use return (or exit/output) to leave the procedure'
             : `"${name}" can only be used inside a loop`,
           tok.line,
         );
@@ -669,8 +705,10 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         next(); // name
         const indices: ExprNode[] = [];
         while (
-          !atEnd() && peek().t === '[' &&
-          tokens[pos - 1] && peek().start === tokens[pos - 1].end
+          !atEnd() &&
+          peek().t === '[' &&
+          tokens[pos - 1] &&
+          peek().start === tokens[pos - 1].end
         ) {
           const open = next(); // [
           const idx = parseExpr();
@@ -688,8 +726,12 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         next(); // op
         const value = parseExpr();
         return {
-          k: 'setindex', name, indices,
-          op: opTok!.v as string, value, line: tok.line,
+          k: 'setindex',
+          name,
+          indices,
+          op: opTok!.v as string,
+          value,
+          line: tok.line,
         };
       }
     }
@@ -765,7 +807,13 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           `${canonical} takes a quoted word, e.g.  ${canonical} "${QWORD_BUILTINS[canonical][0]}"`,
           tok.line,
         );
-      if (FUNC_ARITY[name] !== undefined || ZERO_FUNCS.has(name) || LIST_FUNCS[name] !== undefined || GEN_FUNCS[name] !== undefined || QUERY_FUNCS[name] !== undefined)
+      if (
+        FUNC_ARITY[name] !== undefined ||
+        ZERO_FUNCS.has(name) ||
+        LIST_FUNCS[name] !== undefined ||
+        GEN_FUNCS[name] !== undefined ||
+        QUERY_FUNCS[name] !== undefined
+      )
         throw new NeedlescriptError(
           `"${name}" returns a value — use it inside an expression`,
           tok.line,
@@ -803,17 +851,22 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           );
         const e = parsePrimary();
         if (e.k !== 'procref')
-          throw new NeedlescriptError(`fill ${channel} needs a procedure reference (@name)`, tok.line);
+          throw new NeedlescriptError(
+            `fill ${channel} needs a procedure reference (@name)`,
+            tok.line,
+          );
         return e.name;
       };
-      const isKw = (w: string) =>
-        !atEnd() && peek().t === 'word' && peek().v === w;
+      const isKw = (w: string) => !atEnd() && peek().t === 'word' && peek().v === w;
       let dirRef: string | null = null;
       let shapeRef: string | null = null;
       if (isKw('dir')) {
         next();
         dirRef = readRef('dir');
-        if (isKw('shape')) { next(); shapeRef = readRef('shape'); }
+        if (isKw('shape')) {
+          next();
+          shapeRef = readRef('shape');
+        }
       } else if (isKw('shape')) {
         next();
         shapeRef = readRef('shape');
@@ -866,22 +919,18 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           `to index "${name}", glue the bracket to the name:  ${name}[…]`,
           tok.line,
         );
-      throw new NeedlescriptError(
-        `"${name}" is a variable — assign with  ${name} = …`,
-        tok.line,
-      );
+      throw new NeedlescriptError(`"${name}" is a variable — assign with  ${name} = …`, tok.line);
     }
 
     // List/gen builtins are glued-call only (RFC-2 §4): no prefix form exists.
     if (
-      LIST_CMDS[name] !== undefined || LIST_FUNCS[name] !== undefined ||
-      GEN_CMDS[name] !== undefined || GEN_FUNCS[name] !== undefined ||
+      LIST_CMDS[name] !== undefined ||
+      LIST_FUNCS[name] !== undefined ||
+      GEN_CMDS[name] !== undefined ||
+      GEN_FUNCS[name] !== undefined ||
       QUERY_FUNCS[name] !== undefined
     )
-      throw new NeedlescriptError(
-        `list functions need call syntax:  ${name}(…)`,
-        tok.line,
-      );
+      throw new NeedlescriptError(`list functions need call syntax:  ${name}(…)`, tok.line);
 
     throw new NeedlescriptError(
       `Unknown command "${name}"${didYouMeanKinded(name, nameCandidates())}`,
@@ -889,7 +938,9 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     );
   }
 
-  function parseExpr(): ExprNode { return parseOr(); }
+  function parseExpr(): ExprNode {
+    return parseOr();
+  }
 
   function parseOr(): ExprNode {
     let left = parseAnd();
@@ -911,11 +962,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
 
   function parseCompare(): ExprNode {
     let left = parseAdd();
-    while (
-      !atEnd() &&
-      peek().t === 'op' &&
-      COMPARE_OPS.has(peek().v as string)
-    ) {
+    while (!atEnd() && peek().t === 'op' && COMPARE_OPS.has(peek().v as string)) {
       const op = next().v as string;
       left = { k: 'bin', op, left, right: parseAdd() };
     }
@@ -944,9 +991,10 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       const right = parseUnary();
       // a % b lowers to mod(a, b): floor modulo, the result takes the sign
       // of the divisor (one semantics in the engine).
-      left = opTok.v === '%'
-        ? { k: 'func', name: 'mod', args: [left, right], line: opTok.line }
-        : { k: 'bin', op: opTok.v as string, left, right };
+      left =
+        opTok.v === '%'
+          ? { k: 'func', name: 'mod', args: [left, right], line: opTok.line }
+          : { k: 'bin', op: opTok.v as string, left, right };
     }
     return left;
   }
@@ -973,8 +1021,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       if (!nxt || !prev || nxt.start !== prev.end) return expr;
       if (nxt.t === '[') {
         const open = next(); // [
-        const headName =
-          prev.t === 'word' ? (prev.v as string) : prev.t; // ")" / "]"
+        const headName = prev.t === 'word' ? (prev.v as string) : prev.t; // ")" / "]"
         const recordHeader = headerCtx;
         if (recordHeader) lastHeaderIndex = { name: headName, line: open.line };
         let idx: ExprNode;
@@ -1011,15 +1058,20 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       next();
     } else {
       for (;;) {
-        if (atEnd())
-          throw new NeedlescriptError('Missing ] to close a list', open.line);
+        if (atEnd()) throw new NeedlescriptError('Missing ] to close a list', open.line);
         items.push(parseExpr());
         if (!atEnd() && peek().t === ',') {
           next();
-          if (!atEnd() && peek().t === ']') { next(); break; } // trailing comma
+          if (!atEnd() && peek().t === ']') {
+            next();
+            break;
+          } // trailing comma
           continue;
         }
-        if (!atEnd() && peek().t === ']') { next(); break; }
+        if (!atEnd() && peek().t === ']') {
+          next();
+          break;
+        }
         const bad = peek();
         throw new NeedlescriptError(
           `Expected , or ] in a list, got "${bad ? (bad.v !== undefined ? bad.v : bad.t) : 'end of program'}" — separate elements with commas`,
@@ -1033,7 +1085,10 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
   function parsePrimary(): ExprNode {
     const tok = peek();
     if (!tok) throw new NeedlescriptError('Expected a value but the program ended');
-    if (tok.t === 'num') { next(); return { k: 'num', v: tok.v as number }; }
+    if (tok.t === 'num') {
+      next();
+      return { k: 'num', v: tok.v as number };
+    }
     if (tok.t === 'var') {
       // Legacy :var tokens are excluded from index left-context — legacy
       // code predates indexing by definition.
@@ -1048,9 +1103,14 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       const name = tok.v as string;
       if (procArity[name] === undefined) {
         const kind = builtinKind(name);
-        if (kind || LIST_FUNCS[name] !== undefined || GEN_FUNCS[name] !== undefined ||
+        if (
+          kind ||
+          LIST_FUNCS[name] !== undefined ||
+          GEN_FUNCS[name] !== undefined ||
           QUERY_FUNCS[name] !== undefined ||
-          LIST_CMDS[name] !== undefined || GEN_CMDS[name] !== undefined)
+          LIST_CMDS[name] !== undefined ||
+          GEN_CMDS[name] !== undefined
+        )
           throw new NeedlescriptError(
             `@${name} must reference a procedure you defined with def/to, not a ${kind ?? 'built-in'}`,
             tok.line,
@@ -1067,8 +1127,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         'Commas can only separate arguments inside call parentheses, e.g.  setxy(10, 20)',
         tok.line,
       );
-    if (tok.t === '[')
-      return parsePostfix(parseListLiteral(), true);
+    if (tok.t === '[') return parsePostfix(parseListLiteral(), true);
     if (tok.t === '(') {
       next();
       const e = parseExpr();
@@ -1090,7 +1149,12 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         if (FUNC_ARITY[w] !== undefined) {
           next();
           return parsePostfix(
-            { k: 'func', name: w, args: parseParenArgs(w, FUNC_ARITY[w], tok.line), line: tok.line },
+            {
+              k: 'func',
+              name: w,
+              args: parseParenArgs(w, FUNC_ARITY[w], tok.line),
+              line: tok.line,
+            },
             true,
           );
         }
@@ -1104,7 +1168,12 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         if (procArity[w] !== undefined) {
           next();
           return parsePostfix(
-            { k: 'callexpr', name: w, args: parseParenArgs(w, procArity[w], tok.line), line: tok.line },
+            {
+              k: 'callexpr',
+              name: w,
+              args: parseParenArgs(w, procArity[w], tok.line),
+              line: tok.line,
+            },
             true,
           );
         }
@@ -1114,7 +1183,12 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           next();
           const a = LIST_FUNCS[w];
           return parsePostfix(
-            { k: 'listfunc', name: w, args: parseParenArgsRange(w, a.min, a.max, tok.line), line: tok.line },
+            {
+              k: 'listfunc',
+              name: w,
+              args: parseParenArgsRange(w, a.min, a.max, tok.line),
+              line: tok.line,
+            },
             true,
           );
         }
@@ -1128,17 +1202,23 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
           next();
           const a = QUERY_FUNCS[w];
           return parsePostfix(
-            { k: 'listfunc', name: w, args: parseParenArgsRange(w, a.min, a.max, tok.line), line: tok.line },
+            {
+              k: 'listfunc',
+              name: w,
+              args: parseParenArgsRange(w, a.min, a.max, tok.line),
+              line: tok.line,
+            },
             true,
           );
         }
         if (isVariableName(w))
           throw new NeedlescriptError(`"${w}" is a variable, not a procedure`, tok.line);
-        if (BUILTIN_ARITY[ALIASES[w] || w] !== undefined || LIST_CMDS[w] !== undefined || GEN_CMDS[w] !== undefined)
-          throw new NeedlescriptError(
-            `"${w}" is a command — it doesn't return a value`,
-            tok.line,
-          );
+        if (
+          BUILTIN_ARITY[ALIASES[w] || w] !== undefined ||
+          LIST_CMDS[w] !== undefined ||
+          GEN_CMDS[w] !== undefined
+        )
+          throw new NeedlescriptError(`"${w}" is a command — it doesn't return a value`, tok.line);
         throw new NeedlescriptError(
           `Unknown name "${w}"${didYouMeanKinded(w, nameCandidates())}`,
           tok.line,
@@ -1176,10 +1256,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       }
       // List/gen builtins are glued-call only (RFC-2 §4): no prefix form exists.
       if (LIST_FUNCS[w] !== undefined || GEN_FUNCS[w] !== undefined || QUERY_FUNCS[w] !== undefined)
-        throw new NeedlescriptError(
-          `list functions need call syntax:  ${w}(…)`,
-          tok.line,
-        );
+        throw new NeedlescriptError(`list functions need call syntax:  ${w}(…)`, tok.line);
       throw new NeedlescriptError(
         `Unknown name "${w}"${didYouMeanKinded(w, nameCandidates())}`,
         tok.line,

@@ -11,18 +11,17 @@ import { centroid, pointInRegion, signedArea } from './genmath.ts';
 import type { Pt } from './genmath.ts';
 
 /** Where generators operate: the sewable disc, or a polygon region. */
-export type Domain =
-  | { kind: 'disc'; r: number }
-  | { kind: 'poly'; pts: Pt[] };
+export type Domain = { kind: 'disc'; r: number } | { kind: 'poly'; pts: Pt[] };
 
 const inDomain = (p: Pt, d: Domain): boolean =>
-  d.kind === 'disc'
-    ? p[0] * p[0] + p[1] * p[1] <= d.r * d.r
-    : pointInRegion(p, d.pts);
+  d.kind === 'disc' ? p[0] * p[0] + p[1] * p[1] <= d.r * d.r : pointInRegion(p, d.pts);
 
 function domainBBox(d: Domain): [number, number, number, number] {
   if (d.kind === 'disc') return [-d.r, -d.r, d.r, d.r];
-  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  let minx = Infinity,
+    miny = Infinity,
+    maxx = -Infinity,
+    maxy = -Infinity;
   for (const [x, y] of d.pts) {
     if (x < minx) minx = x;
     if (y < miny) miny = y;
@@ -56,8 +55,7 @@ export function scatter(
   maxPoints: number,
   line?: number,
 ): Pt[] {
-  if (!(mindist > 0))
-    throw new NeedlescriptError('scatter: mindist must be greater than 0', line);
+  if (!(mindist > 0)) throw new NeedlescriptError('scatter: mindist must be greater than 0', line);
   const [minx, miny, maxx, maxy] = domainBBox(domain);
   const cell = mindist / Math.SQRT2;
   const gw = Math.max(1, Math.ceil((maxx - minx) / cell));
@@ -70,13 +68,15 @@ export function scatter(
   const gy = (p: Pt) => Math.min(gh - 1, Math.max(0, Math.floor((p[1] - miny) / cell)));
 
   const farEnough = (p: Pt): boolean => {
-    const cx = gx(p), cy = gy(p);
+    const cx = gx(p),
+      cy = gy(p);
     for (let iy = Math.max(0, cy - 2); iy <= Math.min(gh - 1, cy + 2); iy++) {
       for (let ix = Math.max(0, cx - 2); ix <= Math.min(gw - 1, cx + 2); ix++) {
         const k = grid[iy * gw + ix];
         if (k >= 0) {
           const q = pts[k];
-          const dx = p[0] - q[0], dy = p[1] - q[1];
+          const dx = p[0] - q[0],
+            dy = p[1] - q[1];
           if (dx * dx + dy * dy < mindist * mindist) return false;
         }
       }
@@ -99,7 +99,11 @@ export function scatter(
   let seeded = false;
   for (let tries = 0; tries < 10000; tries++) {
     const p: Pt = [minx + rng() * (maxx - minx), miny + rng() * (maxy - miny)];
-    if (inDomain(p, domain)) { place(p); seeded = true; break; }
+    if (inDomain(p, domain)) {
+      place(p);
+      seeded = true;
+      break;
+    }
   }
   if (!seeded)
     throw new NeedlescriptError("scatter couldn't place a point inside the region", line);
@@ -130,7 +134,11 @@ export function scatter(
 // ---------- Delaunay-backed structure ----------
 
 function delaunay(points: Pt[]): Delaunator<Float64Array<ArrayBuffer>> {
-  return Delaunator.from(points, p => p[0], p => p[1]);
+  return Delaunator.from(
+    points,
+    (p) => p[0],
+    (p) => p[1],
+  );
 }
 
 /** Delaunay triangles as point-index triples. */
@@ -149,7 +157,7 @@ export function hull(points: Pt[], line?: number): Pt[] {
   if (points.length < 3)
     throw new NeedlescriptError(`hull needs at least 3 points, got ${points.length}`, line);
   const d = delaunay(points);
-  const h: Pt[] = Array.from(d.hull, i => points[i]);
+  const h: Pt[] = Array.from(d.hull, (i) => points[i]);
   if (signedArea(h) < 0) h.reverse();
   return h;
 }
@@ -168,7 +176,7 @@ export function voronoiCells(points: Pt[], domain: Domain, line?: number): Pt[][
   if (points.length === 1) return [boundary.slice()];
 
   // neighbour sets — Delaunay edges when possible, all-pairs otherwise
-  const allOthers = (i: number) => points.map((_, j) => j).filter(j => j !== i);
+  const allOthers = (i: number) => points.map((_, j) => j).filter((j) => j !== i);
   let neighbours: number[][];
   if (points.length >= 3) {
     const d = delaunay(points);
@@ -182,8 +190,7 @@ export function voronoiCells(points: Pt[], domain: Domain, line?: number): Pt[][
       }
       // a point delaunator skipped (e.g. a duplicate) has no edges — fall
       // back to all-pairs for that point rather than handing it the world
-      neighbours = sets.map((s, i) =>
-        s.size > 0 ? [...s].sort((a, b) => a - b) : allOthers(i));
+      neighbours = sets.map((s, i) => (s.size > 0 ? [...s].sort((a, b) => a - b) : allOthers(i)));
     } else {
       neighbours = points.map((_, i) => allOthers(i));
     }
@@ -196,11 +203,15 @@ export function voronoiCells(points: Pt[], domain: Domain, line?: number): Pt[][
     let cell = boundary.slice();
     for (const j of neighbours[i]) {
       if (cell.length < 3) break;
-      const dx = points[i][0] - points[j][0], dy = points[i][1] - points[j][1];
+      const dx = points[i][0] - points[j][0],
+        dy = points[i][1] - points[j][1];
       if (dx * dx + dy * dy < 1e-18) {
         // coincident points have no bisector — the lower index keeps the
         // cell, the duplicate gets an empty one (deterministic tie-break)
-        if (j < i) { cell = []; break; }
+        if (j < i) {
+          cell = [];
+          break;
+        }
         continue;
       }
       cell = clipHalfPlane(cell, points[i], points[j]);
@@ -213,13 +224,17 @@ export function voronoiCells(points: Pt[], domain: Domain, line?: number): Pt[][
 
 /** Keep the part of `poly` closer to `a` than to `b` (Sutherland–Hodgman). */
 function clipHalfPlane(poly: Pt[], a: Pt, b: Pt): Pt[] {
-  const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
-  const dx = a[0] - b[0], dy = a[1] - b[1];
+  const mx = (a[0] + b[0]) / 2,
+    my = (a[1] + b[1]) / 2;
+  const dx = a[0] - b[0],
+    dy = a[1] - b[1];
   const side = (p: Pt) => (p[0] - mx) * dx + (p[1] - my) * dy;
   const out: Pt[] = [];
   for (let i = 0; i < poly.length; i++) {
-    const p = poly[i], q = poly[(i + 1) % poly.length];
-    const sp = side(p), sq = side(q);
+    const p = poly[i],
+      q = poly[(i + 1) % poly.length];
+    const sp = side(p),
+      sq = side(q);
     if (sp >= 0) out.push(p);
     if ((sp > 0 && sq < 0) || (sp < 0 && sq > 0)) {
       const t = sp / (sp - sq);
@@ -236,7 +251,8 @@ function clipHalfPlane(poly: Pt[], a: Pt, b: Pt): Pt[] {
     clean.length > 1 &&
     Math.abs(clean[0][0] - clean[clean.length - 1][0]) <= 1e-9 &&
     Math.abs(clean[0][1] - clean[clean.length - 1][1]) <= 1e-9
-  ) clean.pop();
+  )
+    clean.pop();
   return clean;
 }
 

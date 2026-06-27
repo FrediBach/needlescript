@@ -54,7 +54,7 @@ describe('applyLocks', () => {
       // Minimal run: anchor + one stitch = a lock on each end = 2 locks × 4 = 8 extra
       const events = [stitch(0, 0), stitch(0, 10)];
       const { events: out, locks } = applyLocks(events, 0.7);
-      const extraStitches = out.filter(e => e.t === 'stitch').length - 2;
+      const extraStitches = out.filter((e) => e.t === 'stitch').length - 2;
       expect(extraStitches).toBe(locks * 4);
     });
 
@@ -67,7 +67,7 @@ describe('applyLocks', () => {
       for (const e of out) {
         if (e.t !== 'stitch') continue;
         const nearStart = Math.hypot(e.x - 0, e.y - 0) <= 0.7 + 1e-9;
-        const nearEnd   = Math.hypot(e.x - 0, e.y - 2) <= 0.7 + 1e-9;
+        const nearEnd = Math.hypot(e.x - 0, e.y - 2) <= 0.7 + 1e-9;
         const isOriginal = (e.x === 0 && e.y === 0) || (e.x === 0 && e.y === 2);
         expect(nearStart || nearEnd || isOriginal).toBe(true);
       }
@@ -78,9 +78,11 @@ describe('applyLocks', () => {
   describe('gap detection — cuts at jumps ≥ 4 mm', () => {
     it('short jump (< 4 mm) does not trigger a new lock pair', () => {
       const events = [
-        stitch(0, 0), stitch(0, 2),
-        jump(0, 5),          // 3 mm jump — below threshold
-        stitch(0, 5), stitch(0, 8),
+        stitch(0, 0),
+        stitch(0, 2),
+        jump(0, 5), // 3 mm jump — below threshold
+        stitch(0, 5),
+        stitch(0, 8),
       ];
       const { locks } = applyLocks(events, 0.7);
       // Only start + end lock (2), no extra in-between
@@ -89,9 +91,11 @@ describe('applyLocks', () => {
 
     it('long jump (≥ 4 mm) triggers extra lock pair', () => {
       const events = [
-        stitch(0, 0), stitch(0, 2),
-        jump(0, 10),         // 8 mm jump — above threshold
-        stitch(0, 10), stitch(0, 15),
+        stitch(0, 0),
+        stitch(0, 2),
+        jump(0, 10), // 8 mm jump — above threshold
+        stitch(0, 10),
+        stitch(0, 15),
       ];
       const { locks } = applyLocks(events, 0.7);
       expect(locks).toBeGreaterThan(2);
@@ -101,21 +105,13 @@ describe('applyLocks', () => {
   // ── color change / trim ────────────────────────────────────────────────────
   describe('color change and trim trigger locks', () => {
     it('a color event between two runs causes locks on both sides', () => {
-      const events = [
-        stitch(0, 0), stitch(0, 5),
-        color(0, 5),
-        stitch(0, 5), stitch(0, 10),
-      ];
+      const events = [stitch(0, 0), stitch(0, 5), color(0, 5), stitch(0, 5), stitch(0, 10)];
       const { locks } = applyLocks(events, 0.7);
       expect(locks).toBeGreaterThan(2);
     });
 
     it('a trim event between two runs causes locks', () => {
-      const events = [
-        stitch(0, 0), stitch(0, 5),
-        trim(0, 5),
-        stitch(0, 5), stitch(0, 10),
-      ];
+      const events = [stitch(0, 0), stitch(0, 5), trim(0, 5), stitch(0, 5), stitch(0, 10)];
       const { locks } = applyLocks(events, 0.7);
       expect(locks).toBeGreaterThan(2);
     });
@@ -124,19 +120,15 @@ describe('applyLocks', () => {
   // ── passthrough ───────────────────────────────────────────────────────────
   describe('passthrough — non-stitch events preserved', () => {
     it('color events are preserved in the output stream', () => {
-      const events = [
-        stitch(0, 0), stitch(0, 5),
-        color(0, 5),
-        stitch(0, 5), stitch(0, 10),
-      ];
+      const events = [stitch(0, 0), stitch(0, 5), color(0, 5), stitch(0, 5), stitch(0, 10)];
       const { events: out } = applyLocks(events, 0.7);
-      expect(out.some(e => e.t === 'color')).toBe(true);
+      expect(out.some((e) => e.t === 'color')).toBe(true);
     });
 
     it('jump events are preserved', () => {
       const events = [stitch(0, 0), stitch(0, 2), jump(0, 8), stitch(0, 8)];
       const { events: out } = applyLocks(events, 0.7);
-      expect(out.some(e => e.t === 'jump')).toBe(true);
+      expect(out.some((e) => e.t === 'jump')).toBe(true);
     });
 
     it('empty input returns empty output', () => {

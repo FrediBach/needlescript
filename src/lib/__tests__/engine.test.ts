@@ -4,12 +4,11 @@ import type { StitchEvent } from '../engine.ts';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-const stitches = (src: string) => run(src).events.filter(e => e.t === 'stitch');
-const evts     = (src: string) => run(src).events;
+const stitches = (src: string) => run(src).events.filter((e) => e.t === 'stitch');
+const evts = (src: string) => run(src).events;
 
 /** Count events of a given type */
-const count = (src: string, t: StitchEvent['t']) =>
-  run(src).events.filter(e => e.t === t).length;
+const count = (src: string, t: StitchEvent['t']) => run(src).events.filter((e) => e.t === t).length;
 
 /** Round to 3 decimal places for coordinate comparisons */
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -71,8 +70,8 @@ describe('run — movement', () => {
   it('up / down controls pen state', () => {
     // pen starts down; "up" before any move means no stitches at all (just a jump)
     const ev = evts('up fd 10');
-    const jumpEvs = ev.filter(e => e.t === 'jump');
-    const stitchEvs = ev.filter(e => e.t === 'stitch');
+    const jumpEvs = ev.filter((e) => e.t === 'jump');
+    const stitchEvs = ev.filter((e) => e.t === 'stitch');
     // With pen up the move is a jump, not a stitch
     expect(jumpEvs.length).toBeGreaterThan(0);
     // No stitches sewn because pen was never put down
@@ -99,18 +98,18 @@ describe('run — stitch splitting', () => {
 
   it('stitchlen clamps below minimum (0.4)', () => {
     const { warnings } = run('stitchlen 0.1 fd 5');
-    expect(warnings.some(w => w.includes('clamped'))).toBe(true);
+    expect(warnings.some((w) => w.includes('clamped'))).toBe(true);
   });
 
   it('stitchlen clamps above maximum (12)', () => {
     const { warnings } = run('stitchlen 15 fd 5');
-    expect(warnings.some(w => w.includes('clamped'))).toBe(true);
+    expect(warnings.some((w) => w.includes('clamped'))).toBe(true);
   });
 
   it('sub-minimum moves are merged and warn', () => {
     // Move 0.1 mm — below 0.4 mm minimum
     const { warnings } = run('fd 0.1');
-    expect(warnings.some(w => w.includes('sub-'))).toBe(true);
+    expect(warnings.some((w) => w.includes('sub-'))).toBe(true);
   });
 });
 
@@ -120,8 +119,8 @@ describe('run — satin stitch', () => {
     const s = stitches('satin 3 fd 10');
     expect(s.length).toBeGreaterThan(5);
     // zigzag: x-coords should alternate sign
-    const xs = s.slice(1).map(e => r3(e.x));
-    const signs = xs.map(x => Math.sign(x));
+    const xs = s.slice(1).map((e) => r3(e.x));
+    const signs = xs.map((x) => Math.sign(x));
     const hasAlternating = signs.some((s, i) => i > 0 && s !== signs[i - 1]);
     expect(hasAlternating).toBe(true);
   });
@@ -132,7 +131,7 @@ describe('run — satin stitch', () => {
 
   it('wide satin emits a warning', () => {
     const { warnings } = run('satin 12 fd 5');
-    expect(warnings.some(w => w.includes('wide'))).toBe(true);
+    expect(warnings.some((w) => w.includes('wide'))).toBe(true);
   });
 
   it('density changes satin spacing', () => {
@@ -147,24 +146,24 @@ describe('run — satin stitch', () => {
 describe('run — bean stitch', () => {
   it('bean 3 produces more stitches than plain running', () => {
     const plain = stitches('stitchlen 5 fd 20');
-    const bean  = stitches('stitchlen 5 bean 3 fd 20');
+    const bean = stitches('stitchlen 5 bean 3 fd 20');
     expect(bean.length).toBeGreaterThan(plain.length);
   });
 
   it('bean 1 is effectively the same as no bean', () => {
     const plain = stitches('stitchlen 5 fd 20');
-    const b1    = stitches('bean 1 stitchlen 5 fd 20');
+    const b1 = stitches('bean 1 stitchlen 5 fd 20');
     expect(b1.length).toBe(plain.length);
   });
 
   it('even bean values are bumped to odd and warn', () => {
     const { warnings } = run('bean 2 fd 5');
-    expect(warnings.some(w => w.includes('odd'))).toBe(true);
+    expect(warnings.some((w) => w.includes('odd'))).toBe(true);
   });
 
   it('bean > 9 is clamped to 9 with warning', () => {
     const { warnings } = run('bean 11 fd 5');
-    expect(warnings.some(w => w.includes('clamped'))).toBe(true);
+    expect(warnings.some((w) => w.includes('clamped'))).toBe(true);
   });
 });
 
@@ -186,7 +185,7 @@ describe('run — estitch (blanket stitch)', () => {
 
   it('wide estitch warns', () => {
     const { warnings } = run('estitch 12 fd 5');
-    expect(warnings.some(w => w.includes('wide'))).toBe(true);
+    expect(warnings.some((w) => w.includes('wide'))).toBe(true);
   });
 });
 
@@ -200,7 +199,7 @@ describe('run — tatami fill', () => {
 
   it('fillangle changes fill direction', () => {
     const base = 'up setxy -15 -15 down beginfill repeat 4 [ fd 30 rt 90 ] endfill';
-    const r0  = run(base);
+    const r0 = run(base);
     const r45 = run(`fillangle 45 ${base}`);
     // Different fill angles produce different event streams
     expect(r0.events.length).not.toBe(r45.events.length);
@@ -208,13 +207,15 @@ describe('run — tatami fill', () => {
 
   it('fillspacing coarser means fewer stitches', () => {
     const base = 'up setxy -15 -15 down beginfill repeat 4 [ fd 30 rt 90 ] endfill';
-    const fine   = stitches(`fillspacing 0.4 ${base}`);
+    const fine = stitches(`fillspacing 0.4 ${base}`);
     const coarse = stitches(`fillspacing 2.0 ${base}`);
     expect(fine.length).toBeGreaterThan(coarse.length);
   });
 
   it('filllen overrides stitch length inside fill', () => {
-    expect(() => run('filllen 3 up setxy -10 -10 down beginfill repeat 4 [ fd 20 rt 90 ] endfill')).not.toThrow();
+    expect(() =>
+      run('filllen 3 up setxy -10 -10 down beginfill repeat 4 [ fd 20 rt 90 ] endfill'),
+    ).not.toThrow();
   });
 
   it('filllen 0 resets to follow stitchlen', () => {
@@ -222,19 +223,21 @@ describe('run — tatami fill', () => {
   });
 
   it('fillspacing out of range is clamped and warns', () => {
-    const { warnings } = run('fillspacing 0.1 up setxy -10 -10 down beginfill repeat 4 [ fd 20 rt 90 ] endfill');
-    expect(warnings.some(w => w.includes('clamped'))).toBe(true);
+    const { warnings } = run(
+      'fillspacing 0.1 up setxy -10 -10 down beginfill repeat 4 [ fd 20 rt 90 ] endfill',
+    );
+    expect(warnings.some((w) => w.includes('clamped'))).toBe(true);
   });
 
   it('warns if fill boundary has fewer than 3 points', () => {
     const { warnings } = run('beginfill fd 5 endfill');
-    expect(warnings.some(w => w.includes('boundary'))).toBe(true);
+    expect(warnings.some((w) => w.includes('boundary'))).toBe(true);
   });
 
   it('unclosed beginfill auto-closes at end with warning', () => {
     const src = 'up setxy -10 -10 down beginfill repeat 4 [ fd 20 rt 90 ]';
     const { warnings } = run(src);
-    expect(warnings.some(w => w.includes('beginfill'))).toBe(true);
+    expect(warnings.some((w) => w.includes('beginfill'))).toBe(true);
   });
 
   it('endfill without beginfill throws', () => {
@@ -250,16 +253,16 @@ describe('run — tatami fill', () => {
 describe('run — color and trim', () => {
   it('color n emits a color event and tags subsequent stitches', () => {
     const ev = evts('fd 5 color 2 fd 5');
-    const colorEvs = ev.filter(e => e.t === 'color');
+    const colorEvs = ev.filter((e) => e.t === 'color');
     expect(colorEvs.length).toBe(1);
     // stitches after color change have c === 2
-    const afterColor = ev.filter(e => e.t === 'stitch' && e.c === 2);
+    const afterColor = ev.filter((e) => e.t === 'stitch' && e.c === 2);
     expect(afterColor.length).toBeGreaterThan(0);
   });
 
   it('stop advances color by 1', () => {
     const ev = evts('fd 5 stop fd 5');
-    const s2 = ev.filter(e => e.t === 'stitch' && e.c === 1);
+    const s2 = ev.filter((e) => e.t === 'stitch' && e.c === 1);
     expect(s2.length).toBeGreaterThan(0);
   });
 
@@ -282,7 +285,7 @@ describe('run — lock stitches', () => {
 
   it('lock out of range is clamped and warns', () => {
     const { warnings } = run('lock 2 fd 5');
-    expect(warnings.some(w => w.includes('clamped'))).toBe(true);
+    expect(warnings.some((w) => w.includes('clamped'))).toBe(true);
   });
 });
 
@@ -444,7 +447,7 @@ describe('run — seed and random', () => {
 
   it('random stays in range [0, n)', () => {
     const { printed } = run('seed 7 repeat 20 [ print random 10 ]');
-    printed.forEach(v => {
+    printed.forEach((v) => {
       const n = parseFloat(v);
       expect(n).toBeGreaterThanOrEqual(0);
       expect(n).toBeLessThan(10);
@@ -486,19 +489,37 @@ describe('run — safety limits', () => {
 describe('run — built-in example programs', () => {
   const examples: [string, string][] = [
     ['bloom', `stitchlen 2.2\nrepeat 12 [\n  repeat 36 [ fd 3.4 rt 10 ]\n  rt 30\n]`],
-    ['wreath', `to leaf :s\n  repeat 2 [\n    repeat 30 [ fd :s rt 3 ]\n    rt 90\n  ]\nend\nrepeat 8 [ leaf 1.2 rt 45 ]`],
-    ['wander', `seed 11\nstitchlen 2\nrepeat 420 [\n  fd 2.6\n  rt random 70 - 35\n  if sqrt ( xcor * xcor + ycor * ycor ) > 36 [\n    rt 140 + random 80\n  ]\n]`],
+    [
+      'wreath',
+      `to leaf :s\n  repeat 2 [\n    repeat 30 [ fd :s rt 3 ]\n    rt 90\n  ]\nend\nrepeat 8 [ leaf 1.2 rt 45 ]`,
+    ],
+    [
+      'wander',
+      `seed 11\nstitchlen 2\nrepeat 420 [\n  fd 2.6\n  rt random 70 - 35\n  if sqrt ( xcor * xcor + ycor * ycor ) > 36 [\n    rt 140 + random 80\n  ]\n]`,
+    ],
     ['star', `up setxy -6 -21 down\nsatin 3\nrepeat 5 [ fd 42 rt 144 ]\nsatin 0`],
-    ['badge', `fillangle 30\nup setxy -26 -15 down\nbeginfill\n  repeat 6 [ fd 30 rt 60 ]\nendfill\ncolor 3\nbean 3\nrepeat 6 [ fd 30 rt 60 ]\nbean 1`],
-    ['sampler', `stitchlen 2.5\nup setxy -30 27 seth 90 down\nfd 60\nup setxy -30 10 seth 90 down\nbean 3 fd 60 bean 1\nup setxy -30 -8 seth 90 down\nsatin 2.5 fd 60 satin 0\nup setxy -30 -24 seth 90 down\nestitch 4 fd 60 estitch 0`],
-    ['waves', `stitchlen 2.5\nto wave\n  repeat 3 [\n    repeat 18 [ fd 1.1 rt 10 ]\n    repeat 18 [ fd 1.1 lt 10 ]\n  ]\nend\nrepeat 4 [\n  up setxy 38 repcount * 16 - 40 seth 180 down\n  wave\n]`],
-    ['tree', `to branch :len\n  if :len < 5 [ fd :len bk :len ]\n  else [\n    fd :len / 2\n    lt 28 branch :len * 0.62 rt 28\n    fd :len / 4\n    rt 32 branch :len * 0.62 lt 32\n    fd :len / 4\n    bk :len\n  ]\nend\nup setxy 0 -27 down\nbranch 34`],
+    [
+      'badge',
+      `fillangle 30\nup setxy -26 -15 down\nbeginfill\n  repeat 6 [ fd 30 rt 60 ]\nendfill\ncolor 3\nbean 3\nrepeat 6 [ fd 30 rt 60 ]\nbean 1`,
+    ],
+    [
+      'sampler',
+      `stitchlen 2.5\nup setxy -30 27 seth 90 down\nfd 60\nup setxy -30 10 seth 90 down\nbean 3 fd 60 bean 1\nup setxy -30 -8 seth 90 down\nsatin 2.5 fd 60 satin 0\nup setxy -30 -24 seth 90 down\nestitch 4 fd 60 estitch 0`,
+    ],
+    [
+      'waves',
+      `stitchlen 2.5\nto wave\n  repeat 3 [\n    repeat 18 [ fd 1.1 rt 10 ]\n    repeat 18 [ fd 1.1 lt 10 ]\n  ]\nend\nrepeat 4 [\n  up setxy 38 repcount * 16 - 40 seth 180 down\n  wave\n]`,
+    ],
+    [
+      'tree',
+      `to branch :len\n  if :len < 5 [ fd :len bk :len ]\n  else [\n    fd :len / 2\n    lt 28 branch :len * 0.62 rt 28\n    fd :len / 4\n    rt 32 branch :len * 0.62 lt 32\n    fd :len / 4\n    bk :len\n  ]\nend\nup setxy 0 -27 down\nbranch 34`,
+    ],
   ];
 
   for (const [name, src] of examples) {
     it(`runs "${name}" without error and produces stitches`, () => {
       const result = run(src);
-      const s = result.events.filter(e => e.t === 'stitch');
+      const s = result.events.filter((e) => e.t === 'stitch');
       expect(s.length).toBeGreaterThan(0);
     });
   }

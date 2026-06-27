@@ -183,8 +183,8 @@ describe('svgToCode', () => {
         <rect x="10" y="10" width="80" height="20" stroke="black" fill="none"
               transform="rotate(45,50,50)"/>
       </svg>`;
-      const base     = svgToCode(noRotate).code;
-      const rotated  = svgToCode(withRotate).code;
+      const base = svgToCode(noRotate).code;
+      const rotated = svgToCode(withRotate).code;
       expect(base).not.toBe(rotated);
     });
   });
@@ -296,7 +296,7 @@ describe('svgToCode', () => {
     it('generated code from filled circle produces stitches', () => {
       const { code } = svgToCode(filledCircle);
       const result = run(code);
-      const s = result.events.filter(e => e.t === 'stitch');
+      const s = result.events.filter((e) => e.t === 'stitch');
       expect(s.length).toBeGreaterThan(0);
     });
   });
@@ -321,7 +321,15 @@ describe('convertShapes', () => {
   type Shape = { subpaths: Point[][]; fill: string | null; stroke: string | null };
 
   const square: Shape = {
-    subpaths: [[[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]]],
+    subpaths: [
+      [
+        [0, 0],
+        [100, 0],
+        [100, 100],
+        [0, 100],
+        [0, 0],
+      ],
+    ],
     fill: null,
     stroke: '#000000',
   };
@@ -340,18 +348,45 @@ describe('convertShapes', () => {
   });
 
   it('throws when all shapes are invisible', () => {
-    const invisible: Shape = { subpaths: [[[0, 0], [10, 0], [10, 10]]], fill: null, stroke: null };
+    const invisible: Shape = {
+      subpaths: [
+        [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+        ],
+      ],
+      fill: null,
+      stroke: null,
+    };
     expect(() => convertShapes([invisible])).toThrow();
   });
 
   it('throws on zero-size geometry', () => {
-    const zero: Shape = { subpaths: [[[5, 5], [5, 5]]], fill: null, stroke: '#000' };
+    const zero: Shape = {
+      subpaths: [
+        [
+          [5, 5],
+          [5, 5],
+        ],
+      ],
+      fill: null,
+      stroke: '#000',
+    };
     expect(() => convertShapes([zero])).toThrow();
   });
 
   it('fill shape produces beginfill block in code', () => {
     const filled: Shape = {
-      subpaths: [[[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]]],
+      subpaths: [
+        [
+          [0, 0],
+          [100, 0],
+          [100, 100],
+          [0, 100],
+          [0, 0],
+        ],
+      ],
       fill: '#FF0000',
       stroke: null,
     };
@@ -366,8 +401,32 @@ describe('convertShapes', () => {
   });
 
   it('custom palette is used for thread color mapping', () => {
-    const red: Shape = { subpaths: [[[0,0],[100,0],[100,100],[0,100],[0,0]]], fill: '#FF0000', stroke: null };
-    const blue: Shape = { subpaths: [[[0,50],[100,50],[100,100],[0,100],[0,50]]], fill: '#0000FF', stroke: null };
+    const red: Shape = {
+      subpaths: [
+        [
+          [0, 0],
+          [100, 0],
+          [100, 100],
+          [0, 100],
+          [0, 0],
+        ],
+      ],
+      fill: '#FF0000',
+      stroke: null,
+    };
+    const blue: Shape = {
+      subpaths: [
+        [
+          [0, 50],
+          [100, 50],
+          [100, 100],
+          [0, 100],
+          [0, 50],
+        ],
+      ],
+      fill: '#0000FF',
+      stroke: null,
+    };
     const palette = ['#FF0000', '#0000FF'];
     const { code } = convertShapes([red, blue], { palette });
     // Should assign color 0 and color 1

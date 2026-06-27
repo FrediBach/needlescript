@@ -49,8 +49,10 @@ function walk(
 
   for (let i = 0; i < tokens.length; i++) {
     const tok = tokens[i];
-    if (tok.t === '[') { depth++; forBounds = false; }
-    else if (tok.t === ']') {
+    if (tok.t === '[') {
+      depth++;
+      forBounds = false;
+    } else if (tok.t === ']') {
       depth--;
       if (procEnd && procEnd.kind === 'bracket' && depth <= procEnd.depth) {
         inProc = null;
@@ -105,7 +107,8 @@ export function prescan(tokens: Token[]): PreScan {
       // walk() already validated nameTok is a word (or this `to` is a for-bound)
       if (!nameTok || nameTok.t !== 'word') return;
       const name = nameTok.v as string;
-      let p = i + 2, n = 0;
+      let p = i + 2,
+        n = 0;
       const params = localsOf(name);
       while (p < tokens.length && tokens[p].t === 'var') {
         params.add(tokens[p].v as string);
@@ -124,7 +127,8 @@ export function prescan(tokens: Token[]): PreScan {
           `"def ${name}" needs a parameter list in parentheses, e.g.  def ${name}(size) [ … ]`,
           tok.line,
         );
-      let p = i + 3, n = 0;
+      let p = i + 3,
+        n = 0;
       const params = localsOf(name);
       while (p < tokens.length && tokens[p].t !== ')') {
         if (tokens[p].t === 'word') {
@@ -176,8 +180,11 @@ export function prescan(tokens: Token[]): PreScan {
           register(nxt.v as string, inProc, true);
         // for-in (RFC-2):  for x in xs [ … ]
         else if (
-          nxt && nxt.t === 'word' &&
-          tokens[i + 2] && tokens[i + 2].t === 'word' && tokens[i + 2].v === 'in'
+          nxt &&
+          nxt.t === 'word' &&
+          tokens[i + 2] &&
+          tokens[i + 2].t === 'word' &&
+          tokens[i + 2].v === 'in'
         )
           register(nxt.v as string, inProc, true);
         break;

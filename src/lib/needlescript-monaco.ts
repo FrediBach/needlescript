@@ -1,12 +1,30 @@
 import type { Monaco } from '@monaco-editor/react';
 import type { editor as MonacoEditor } from 'monaco-editor';
 import {
-  bgApp, bgPanel, bgPanelRaised, text, textFaint,
-  gold, borderCool,
-  synComment, synKeyword, synMovement, synStitch, synMath, synLib,
-  synNumber, synString, synVariable, synOperator, synBracket,
-  monacoGutter, monacoLineNumber, monacoLineNumberActive, monacoLineHighlight,
-  monacoIndentGuide, monacoIndentGuideActive,
+  bgApp,
+  bgPanel,
+  bgPanelRaised,
+  text,
+  textFaint,
+  gold,
+  borderCool,
+  synComment,
+  synKeyword,
+  synMovement,
+  synStitch,
+  synMath,
+  synLib,
+  synNumber,
+  synString,
+  synVariable,
+  synOperator,
+  synBracket,
+  monacoGutter,
+  monacoLineNumber,
+  monacoLineNumberActive,
+  monacoLineHighlight,
+  monacoIndentGuide,
+  monacoIndentGuideActive,
   m,
 } from '../theme.ts';
 
@@ -24,23 +42,23 @@ type IPos = { readonly lineNumber: number; readonly column: number };
 type NSItemKind = 'keyword' | 'function' | 'variable' | 'constant';
 
 interface NSItem {
-  label:         string;
-  kindName:      NSItemKind;
-  detail:        string;       // short inline hint in the suggestion dropdown
-  documentation: string;       // Markdown shown in the details panel
-  insertText:    string;
-  isSnippet?:    boolean;
-  params?:       string[][];   // overloads for signature help
+  label: string;
+  kindName: NSItemKind;
+  detail: string; // short inline hint in the suggestion dropdown
+  documentation: string; // Markdown shown in the details panel
+  insertText: string;
+  isSnippet?: boolean;
+  params?: string[][]; // overloads for signature help
 }
 
 const NS_ITEMS: NSItem[] = [
-
   // ── Keywords & control flow ──────────────────────────────────────────────
   {
     label: 'repeat',
     kindName: 'keyword',
     detail: 'loop n times',
-    documentation: 'Loop n times. `repcount` is the 1-based counter of the innermost repeat.\n\n```\nrepeat 36 [\n  fd 5  rt 10\n]\n```',
+    documentation:
+      'Loop n times. `repcount` is the 1-based counter of the innermost repeat.\n\n```\nrepeat 36 [\n  fd 5  rt 10\n]\n```',
     insertText: 'repeat ${1:n} [\n\t$0\n]',
     isSnippet: true,
   },
@@ -48,7 +66,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'while',
     kindName: 'keyword',
     detail: 'loop while condition is true',
-    documentation: 'Loop while the condition is true (non-zero). `while true [ … break ]` is the idiomatic search loop.',
+    documentation:
+      'Loop while the condition is true (non-zero). `while true [ … break ]` is the idiomatic search loop.',
     insertText: 'while ${1:condition} [\n\t$0\n]',
     isSnippet: true,
   },
@@ -56,7 +75,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'for',
     kindName: 'keyword',
     detail: 'counted or for-in loop',
-    documentation: '**Counted loop:** `for i = 0 to n [ … ]` — inclusive of *to*, step defaults to 1.\n\n**For-in loop:** `for x in xs [ … ]` — iterate list elements.\n\n**With step:** `for i = 10 to 1 step -2 [ … ]`',
+    documentation:
+      '**Counted loop:** `for i = 0 to n [ … ]` — inclusive of *to*, step defaults to 1.\n\n**For-in loop:** `for x in xs [ … ]` — iterate list elements.\n\n**With step:** `for i = 10 to 1 step -2 [ … ]`',
     insertText: 'for ${1:i} = ${2:0} to ${3:n} [\n\t$0\n]',
     isSnippet: true,
   },
@@ -64,7 +84,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'if',
     kindName: 'keyword',
     detail: 'conditional',
-    documentation: 'Conditional block. Chains with `else if` and `else`.\n\n```\nif x > 0 [\n  fd x\n] else [\n  bk x\n]\n```',
+    documentation:
+      'Conditional block. Chains with `else if` and `else`.\n\n```\nif x > 0 [\n  fd x\n] else [\n  bk x\n]\n```',
     insertText: 'if ${1:condition} [\n\t$0\n]',
     isSnippet: true,
   },
@@ -94,7 +115,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'def',
     kindName: 'keyword',
     detail: 'define a procedure',
-    documentation: 'Define a procedure. Parameters are local and can recurse (depth limit 200).\n\n```\ndef leaf(size) [\n  fd size  bk size\n]\n```\nClassic form: `to name :a :b … end`',
+    documentation:
+      'Define a procedure. Parameters are local and can recurse (depth limit 200).\n\n```\ndef leaf(size) [\n  fd size  bk size\n]\n```\nClassic form: `to name :a :b … end`',
     insertText: 'def ${1:name}(${2:params}) [\n\t$0\n]',
     isSnippet: true,
   },
@@ -102,7 +124,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'to',
     kindName: 'keyword',
     detail: 'classic procedure definition',
-    documentation: 'Classic Logo procedure definition. Modern equivalent: `def name(a, b) [ … ]`.\n\n```\nto leaf :size\n  fd :size  bk :size\nend\n```',
+    documentation:
+      'Classic Logo procedure definition. Modern equivalent: `def name(a, b) [ … ]`.\n\n```\nto leaf :size\n  fd :size  bk :size\nend\n```',
     insertText: 'to ${1:name} :${2:param}\n\t$0\nend',
     isSnippet: true,
   },
@@ -117,7 +140,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'return',
     kindName: 'keyword',
     detail: 'return value / exit early',
-    documentation: 'Return a value from a procedure. Without argument, exits early. Classic aliases: `output`, `op`.',
+    documentation:
+      'Return a value from a procedure. Without argument, exits early. Classic aliases: `output`, `op`.',
     insertText: 'return ${1:value}',
     isSnippet: true,
   },
@@ -140,7 +164,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'let',
     kindName: 'keyword',
     detail: 'declare a variable',
-    documentation: 'Declare a variable — global at top level, local inside a procedure. Redeclaring the same name in the same scope is a parse error.',
+    documentation:
+      'Declare a variable — global at top level, local inside a procedure. Redeclaring the same name in the same scope is a parse error.',
     insertText: 'let ${1:name} = ${2:value}',
     isSnippet: true,
   },
@@ -156,7 +181,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'local',
     kindName: 'keyword',
     detail: 'classic local variable',
-    documentation: 'Classic Logo local variable declaration inside a procedure. Illegal at top level.',
+    documentation:
+      'Classic Logo local variable declaration inside a procedure. Illegal at top level.',
     insertText: 'local "${1:name} ${2:value}',
     isSnippet: true,
   },
@@ -280,7 +306,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'up',
     kindName: 'function',
     detail: 'pen up (travel mode)',
-    documentation: 'Needle up — subsequent moves are jump travels, not stitches.\n\nAliases: `penup`, `pu`',
+    documentation:
+      'Needle up — subsequent moves are jump travels, not stitches.\n\nAliases: `penup`, `pu`',
     insertText: 'up',
   },
   {
@@ -308,7 +335,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'arc',
     kindName: 'function',
     detail: 'sew an arc',
-    documentation: 'Sew along a circle of radius mm, turning deg in total. Positive degrees curves right, negative left. Works in every stitch mode — including satin!',
+    documentation:
+      'Sew along a circle of radius mm, turning deg in total. Positive degrees curves right, negative left. Works in every stitch mode — including satin!',
     insertText: 'arc ${1:degrees} ${2:radius}',
     isSnippet: true,
     params: [['degrees', 'radius']],
@@ -344,7 +372,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'seth',
     kindName: 'function',
     detail: 'set heading (degrees)',
-    documentation: 'Set the heading absolutely. 0 = up/north, clockwise positive.\n\nAlias: `setheading`',
+    documentation:
+      'Set the heading absolutely. 0 = up/north, clockwise positive.\n\nAlias: `setheading`',
     insertText: 'seth ${1:degrees}',
     isSnippet: true,
     params: [['degrees']],
@@ -362,28 +391,32 @@ const NS_ITEMS: NSItem[] = [
     label: 'home',
     kindName: 'function',
     detail: 'return to (0,0), heading 0',
-    documentation: 'Return to origin (0, 0) with heading 0 (north). Sews/jumps depending on pen state.',
+    documentation:
+      'Return to origin (0, 0) with heading 0 (north). Sews/jumps depending on pen state.',
     insertText: 'home',
   },
   {
     label: 'push',
     kindName: 'function',
     detail: 'save needle state onto stack',
-    documentation: 'Save needle state (position, heading, pen up/down) onto a stack. Max 500 saved states.',
+    documentation:
+      'Save needle state (position, heading, pen up/down) onto a stack. Max 500 saved states.',
     insertText: 'push',
   },
   {
     label: 'pop',
     kindName: 'function',
     detail: 'restore needle state from stack',
-    documentation: 'Restore the last saved needle state from the stack. Pop on an empty stack warns and is ignored.',
+    documentation:
+      'Restore the last saved needle state from the stack. Pop on an empty stack warns and is ignored.',
     insertText: 'pop',
   },
   {
     label: 'cs',
     kindName: 'function',
     detail: 'clearscreen (no-op)',
-    documentation: 'Accepted for Logo familiarity; does nothing in NeedleScript.\n\nAliases: `clearscreen`, `clear`',
+    documentation:
+      'Accepted for Logo familiarity; does nothing in NeedleScript.\n\nAliases: `clearscreen`, `clear`',
     insertText: 'cs',
   },
   // Zero-arg reporters
@@ -425,7 +458,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'translate',
     kindName: 'keyword',
     detail: 'shift a block by (dx, dy) mm',
-    documentation: 'Shift everything the block draws by `(dx, dy)` mm. The turtle stays in local space — only emitted geometry moves.\n\n```\ntranslate 20 0 [ leaf() ]\ntranslate(20, 0) [ leaf() ]   // same thing\n```',
+    documentation:
+      'Shift everything the block draws by `(dx, dy)` mm. The turtle stays in local space — only emitted geometry moves.\n\n```\ntranslate 20 0 [ leaf() ]\ntranslate(20, 0) [ leaf() ]   // same thing\n```',
     insertText: 'translate ${1:dx} ${2:dy} [\n\t$0\n]',
     isSnippet: true,
     params: [['dx', 'dy']],
@@ -434,7 +468,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'rotate',
     kindName: 'keyword',
     detail: 'rotate a block (clockwise, about origin)',
-    documentation: 'Rotate the block `deg` degrees clockwise about the current origin (0 = north, matching `seth`/`rt`).',
+    documentation:
+      'Rotate the block `deg` degrees clockwise about the current origin (0 = north, matching `seth`/`rt`).',
     insertText: 'rotate ${1:degrees} [\n\t$0\n]',
     isSnippet: true,
     params: [['degrees']],
@@ -452,7 +487,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'scale',
     kindName: 'keyword',
     detail: 'uniform scale',
-    documentation: 'Uniformly scale the block by `s`. Stitch length, satin width and the physics layer are re-evaluated **after** scaling, so a scaled motif still sews like real embroidery — not stretched stitches.',
+    documentation:
+      'Uniformly scale the block by `s`. Stitch length, satin width and the physics layer are re-evaluated **after** scaling, so a scaled motif still sews like real embroidery — not stretched stitches.',
     insertText: 'scale ${1:s} [\n\t$0\n]',
     isSnippet: true,
     params: [['s']],
@@ -461,7 +497,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'scalexy',
     kindName: 'keyword',
     detail: 'independent axis scale',
-    documentation: 'Scale the block by `sx` on x and `sy` on y. Non-uniform scale makes satin width direction-dependent (a column running across the stretched axis widens).',
+    documentation:
+      'Scale the block by `sx` on x and `sy` on y. Non-uniform scale makes satin width direction-dependent (a column running across the stretched axis widens).',
     insertText: 'scalexy ${1:sx} ${2:sy} [\n\t$0\n]',
     isSnippet: true,
     params: [['sx', 'sy']],
@@ -470,7 +507,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'mirror',
     kindName: 'keyword',
     detail: 'reflect across a heading line',
-    documentation: 'Reflect the block across a line through the origin at heading `deg`. `mirror 0` flips left/right; `mirror 90` flips top/bottom.',
+    documentation:
+      'Reflect the block across a line through the origin at heading `deg`. `mirror 0` flips left/right; `mirror 90` flips top/bottom.',
     insertText: 'mirror ${1:degrees} [\n\t$0\n]',
     isSnippet: true,
     params: [['degrees']],
@@ -488,7 +526,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'transform',
     kindName: 'keyword',
     detail: 'raw 2×3 affine escape hatch',
-    documentation: 'Apply the raw affine `(x, y) → (a·x + c·y + e, b·x + d·y + f)` to the block — the power-user escape hatch behind the named transforms.',
+    documentation:
+      'Apply the raw affine `(x, y) → (a·x + c·y + e, b·x + d·y + f)` to the block — the power-user escape hatch behind the named transforms.',
     insertText: 'transform ${1:a} ${2:b} ${3:c} ${4:d} ${5:e} ${6:f} [\n\t$0\n]',
     isSnippet: true,
     params: [['a', 'b', 'c', 'd', 'e', 'f']],
@@ -499,7 +538,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'warp',
     kindName: 'keyword',
     detail: 'run a block through a point→point reporter',
-    documentation: 'Map every emitted point through a `@name` reporter (a procedure that takes a point `[x, y]` and returns a point), **before** stitch splitting — a geometric deformation, exactly like a transform but nonlinear. This is the shader: fisheye, ripple, twist, domain-warp are all just reporters.\n\n```\ndef push_out(p) [\n  let d = vlen(p)\n  return vscale(vnorm(p), d + 2 * snoise2(p[0] / 14, p[1] / 14))\n]\nwarp @push_out [ repeat 6 [ fd 30 rt 60 ] ]\n```',
+    documentation:
+      'Map every emitted point through a `@name` reporter (a procedure that takes a point `[x, y]` and returns a point), **before** stitch splitting — a geometric deformation, exactly like a transform but nonlinear. This is the shader: fisheye, ripple, twist, domain-warp are all just reporters.\n\n```\ndef push_out(p) [\n  let d = vlen(p)\n  return vscale(vnorm(p), d + 2 * snoise2(p[0] / 14, p[1] / 14))\n]\nwarp @push_out [ repeat 6 [ fd 30 rt 60 ] ]\n```',
     insertText: 'warp @${1:reporter} [\n\t$0\n]',
     isSnippet: true,
     params: [['reporter']],
@@ -508,7 +548,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'humanize',
     kindName: 'keyword',
     detail: 'seeded hand-stitched jitter (mm)',
-    documentation: 'Perturb each stitch penetration by coherent, seeded simplex noise (the hand drifts, so consecutive stitches err together — not white-noise damage). Runs **after** stitch splitting, on the final penetrations. `amount` is the jitter in mm (clamped 0–2). Draws exactly one value from the seeded stream (forks), so dropping a `humanize` block shifts downstream randomness by one draw, not by however many stitches were inside.\n\n```\nhumanize 0.3 [ repeat 4 [ fd 20 rt 90 ] ]\n```',
+    documentation:
+      'Perturb each stitch penetration by coherent, seeded simplex noise (the hand drifts, so consecutive stitches err together — not white-noise damage). Runs **after** stitch splitting, on the final penetrations. `amount` is the jitter in mm (clamped 0–2). Draws exactly one value from the seeded stream (forks), so dropping a `humanize` block shifts downstream randomness by one draw, not by however many stitches were inside.\n\n```\nhumanize 0.3 [ repeat 4 [ fd 20 rt 90 ] ]\n```',
     insertText: 'humanize ${1:amount} [\n\t$0\n]',
     isSnippet: true,
     params: [['amount']],
@@ -517,7 +558,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'snaptogrid',
     kindName: 'keyword',
     detail: 'quantize penetrations to a fixed lattice',
-    documentation: 'Snap each penetration to a fixed hoop-space lattice, evaluated **outside** any enclosing transform — so the same grid config always yields the same lattice regardless of `translate`/`rotate`/`scale`. Pure and drawless. Overloads by arity:\n\n```\nsnaptogrid 2 [ … ]                       // square, pitch 2 mm, origin (0,0)\nsnaptogrid 2 3 [ … ]                     // rectangular\nsnaptogrid(1.5, 1.5, 0.75, 0.75) [ … ]   // …with an origin offset\nsnaptogrid(2, 2, 0, 0, 30) [ … ]         // …rotated 30°\n```',
+    documentation:
+      'Snap each penetration to a fixed hoop-space lattice, evaluated **outside** any enclosing transform — so the same grid config always yields the same lattice regardless of `translate`/`rotate`/`scale`. Pure and drawless. Overloads by arity:\n\n```\nsnaptogrid 2 [ … ]                       // square, pitch 2 mm, origin (0,0)\nsnaptogrid 2 3 [ … ]                     // rectangular\nsnaptogrid(1.5, 1.5, 0.75, 0.75) [ … ]   // …with an origin offset\nsnaptogrid(2, 2, 0, 0, 30) [ … ]         // …rotated 30°\n```',
     insertText: 'snaptogrid ${1:cell} [\n\t$0\n]',
     isSnippet: true,
     params: [['cell']],
@@ -528,7 +570,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'stitchlen',
     kindName: 'function',
     detail: 'running stitch length (mm)',
-    documentation: 'Running-stitch length, clamped 0.4–12 mm (default 2.5).\n\nAlias: `stitchlength`',
+    documentation:
+      'Running-stitch length, clamped 0.4–12 mm (default 2.5).\n\nAlias: `stitchlength`',
     insertText: 'stitchlen ${1:mm}',
     isSnippet: true,
     params: [['mm']],
@@ -546,7 +589,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'satin',
     kindName: 'function',
     detail: 'satin column width (mm) — or @reporter',
-    documentation: 'Zigzag satin column of this width; penetration spacing set by `density`. `satin 0` returns to running stitch. Width > ~8 mm risks snagging.\n\n**Programmable satin:** `satin @fn` engages a user *shape reporter* that controls the column per stitch pair instead of the built-in generator. The reporter takes `(t, s, i, u)` — cursor arc-length (mm), normalized position (0..1), 0-based pair index, local heading — and returns `[advance, leftw, rightw, leftlag, rightlag]` (all mm; `advance` > 0). Independent left/right longitudinal lags let a column rake steeply enough to cross its own line (woven satin). `density` is ignored while a reporter is engaged. `satin 4 ≡ satin @c` where `def c(t,s,i,u) [ return [0.4,2,2,0,0] ]`.',
+    documentation:
+      'Zigzag satin column of this width; penetration spacing set by `density`. `satin 0` returns to running stitch. Width > ~8 mm risks snagging.\n\n**Programmable satin:** `satin @fn` engages a user *shape reporter* that controls the column per stitch pair instead of the built-in generator. The reporter takes `(t, s, i, u)` — cursor arc-length (mm), normalized position (0..1), 0-based pair index, local heading — and returns `[advance, leftw, rightw, leftlag, rightlag]` (all mm; `advance` > 0). Independent left/right longitudinal lags let a column rake steeply enough to cross its own line (woven satin). `density` is ignored while a reporter is engaged. `satin 4 ≡ satin @c` where `def c(t,s,i,u) [ return [0.4,2,2,0,0] ]`.',
     insertText: 'satin ${1:width}',
     isSnippet: true,
     params: [['width']],
@@ -573,7 +617,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'estitch',
     kindName: 'function',
     detail: 'blanket stitch prong length (mm)',
-    documentation: 'Blanket stitch: prongs of this length on the left of travel direction, spaced by `stitchlen`. `estitch 0` off.',
+    documentation:
+      'Blanket stitch: prongs of this length on the left of travel direction, spaced by `stitchlen`. `estitch 0` off.',
     insertText: 'estitch ${1:mm}',
     isSnippet: true,
     params: [['mm']],
@@ -582,7 +627,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'beginfill',
     kindName: 'function',
     detail: 'begin fill boundary trace',
-    documentation: 'Start tracing a fill boundary. Moves between `beginfill` and `endfill` define the shape rather than sewing. A pen-up move starts a new ring — inner rings become holes (even-odd rule).',
+    documentation:
+      'Start tracing a fill boundary. Moves between `beginfill` and `endfill` define the shape rather than sewing. A pen-up move starts a new ring — inner rings become holes (even-odd rule).',
     insertText: 'beginfill',
   },
   {
@@ -596,7 +642,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'fill',
     kindName: 'function',
     detail: 'programmable fill (directional / textured)',
-    documentation: 'Arm a programmable fill for the next `beginfill…endfill`. `fill dir @field` drives the row direction from a field reporter `def field(p) [ return heading ]` (a directional/contour/flow fill); `fill shape @texture` drives spacing/length/brick from `def texture(p, row, v) [ return [spacing, len, phase] ]`. `fill @field` is shorthand for the direction channel. The engine keeps even-spacing coverage, hole clipping, pull-comp and underlay.',
+    documentation:
+      'Arm a programmable fill for the next `beginfill…endfill`. `fill dir @field` drives the row direction from a field reporter `def field(p) [ return heading ]` (a directional/contour/flow fill); `fill shape @texture` drives spacing/length/brick from `def texture(p, row, v) [ return [spacing, len, phase] ]`. `fill @field` is shorthand for the direction channel. The engine keeps even-spacing coverage, hole clipping, pull-comp and underlay.',
     insertText: 'fill dir @${1:field}',
     isSnippet: true,
     params: [['field']],
@@ -623,7 +670,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'filllen',
     kindName: 'function',
     detail: 'fill stitch length (mm)',
-    documentation: 'Fill stitch length, 1–7 mm. Defaults to `stitchlen`. `filllen 0` to follow `stitchlen` again. Rows are brick-offset so penetrations don\'t line up.',
+    documentation:
+      "Fill stitch length, 1–7 mm. Defaults to `stitchlen`. `filllen 0` to follow `stitchlen` again. Rows are brick-offset so penetrations don't line up.",
     insertText: 'filllen ${1:mm}',
     isSnippet: true,
     params: [['mm']],
@@ -641,7 +689,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'stop',
     kindName: 'function',
     detail: 'next color (shorthand)',
-    documentation: 'Shorthand for "next colour" — equivalent to incrementing the thread number by 1.',
+    documentation:
+      'Shorthand for "next colour" — equivalent to incrementing the thread number by 1.',
     insertText: 'stop',
   },
   {
@@ -655,7 +704,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'lock',
     kindName: 'function',
     detail: 'tie-in/tie-off size (mm)',
-    documentation: 'Tie-in/tie-off: 4 micro back-stitches where thread starts/ends. Size 0.3–1.5 mm (default 0.7). `lock 0` off.',
+    documentation:
+      'Tie-in/tie-off: 4 micro back-stitches where thread starts/ends. Size 0.3–1.5 mm (default 0.7). `lock 0` off.',
     insertText: 'lock ${1:size}',
     isSnippet: true,
     params: [['size']],
@@ -664,7 +714,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'pullcomp',
     kindName: 'function',
     detail: 'pull compensation (mm)',
-    documentation: 'Pull compensation 0–1.5 mm: widens satin columns and extends fill rows so shapes sew out at their digitized size.',
+    documentation:
+      'Pull compensation 0–1.5 mm: widens satin columns and extends fill rows so shapes sew out at their digitized size.',
     insertText: 'pullcomp ${1:mm}',
     isSnippet: true,
     params: [['mm']],
@@ -673,7 +724,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'shortstitch',
     kindName: 'function',
     detail: 'short-stitch on/off (0 or 1)',
-    documentation: 'Curve physics (on by default): on tight satin curves, alternate inner stitches are shortened to 60% width to prevent thread breaks.',
+    documentation:
+      'Curve physics (on by default): on tight satin curves, alternate inner stitches are shortened to 60% width to prevent thread breaks.',
     insertText: 'shortstitch ${1:on}',
     isSnippet: true,
     params: [['on']],
@@ -691,7 +743,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'maxdensity',
     kindName: 'function',
     detail: 'density warning threshold (layers)',
-    documentation: 'Thread-coverage warning threshold in layers (default 3.5). `maxdensity 0` silences warnings.',
+    documentation:
+      'Thread-coverage warning threshold in layers (default 3.5). `maxdensity 0` silences warnings.',
     insertText: 'maxdensity ${1:layers}',
     isSnippet: true,
     params: [['layers']],
@@ -701,7 +754,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'fabric',
     kindName: 'function',
     detail: 'fabric preset',
-    documentation: 'Apply a fabric preset. Sets pull compensation, density limit, and underlay defaults.\n\n- `"woven` — pull 0.2 mm, max 3.5 layers\n- `"knit` — pull 0.5 mm, max 3.0, density floor 0.45 mm\n- `"stretch` — pull 0.6 mm, max 2.8, density floor 0.5 mm\n- `"denim` / `"canvas` — pull 0.15 mm, max 4.0\n- `"fleece` — pull 0.3 mm, max 2.6, double underlay',
+    documentation:
+      'Apply a fabric preset. Sets pull compensation, density limit, and underlay defaults.\n\n- `"woven` — pull 0.2 mm, max 3.5 layers\n- `"knit` — pull 0.5 mm, max 3.0, density floor 0.45 mm\n- `"stretch` — pull 0.6 mm, max 2.8, density floor 0.5 mm\n- `"denim` / `"canvas` — pull 0.15 mm, max 4.0\n- `"fleece` — pull 0.3 mm, max 2.6, double underlay',
     insertText: 'fabric "${1|woven,knit,stretch,denim,canvas,fleece|}"',
     isSnippet: true,
   },
@@ -709,7 +763,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'underlay',
     kindName: 'function',
     detail: 'satin underlay style',
-    documentation: 'Stabilising stitches under each satin column.\n\n- `"auto` — picks by width: <1.5 mm none, <4 mm center, wider zigzag\n- `"center` — center walk\n- `"edge` — edge walk\n- `"zigzag` — cross-grain zigzag\n- `"off` — no underlay',
+    documentation:
+      'Stabilising stitches under each satin column.\n\n- `"auto` — picks by width: <1.5 mm none, <4 mm center, wider zigzag\n- `"center` — center walk\n- `"edge` — edge walk\n- `"zigzag` — cross-grain zigzag\n- `"off` — no underlay',
     insertText: 'underlay "${1|auto,center,edge,zigzag,off|}"',
     isSnippet: true,
   },
@@ -717,7 +772,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'fillunderlay',
     kindName: 'function',
     detail: 'fill underlay style',
-    documentation: 'Underlay beneath fills.\n\n- `"auto` — tatami, plus edge run on areas > 100 mm²\n- `"tatami` — sparse cross-grain pass\n- `"edge` — inset edge run only\n- `"off` — no underlay',
+    documentation:
+      'Underlay beneath fills.\n\n- `"auto` — tatami, plus edge run on areas > 100 mm²\n- `"tatami` — sparse cross-grain pass\n- `"edge` — inset edge run only\n- `"off` — no underlay',
     insertText: 'fillunderlay "${1|auto,tatami,edge,off|}"',
     isSnippet: true,
   },
@@ -735,7 +791,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'print',
     kindName: 'function',
     detail: 'log value to console',
-    documentation: 'Log a value to the console. `print "label expr` adds a label:\n`print "radius r` → `radius: 1.5`',
+    documentation:
+      'Log a value to the console. `print "label expr` adds a label:\n`print "radius r` → `radius: 1.5`',
     insertText: 'print ${1:value}',
     isSnippet: true,
     params: [['value']],
@@ -744,14 +801,16 @@ const NS_ITEMS: NSItem[] = [
     label: 'mark',
     kindName: 'function',
     detail: 'drop debug pin on stage',
-    documentation: 'Drop a numbered pin on the preview at the needle position. Never exported to the machine or counted in stats.',
+    documentation:
+      'Drop a numbered pin on the preview at the needle position. Never exported to the machine or counted in stats.',
     insertText: 'mark',
   },
   {
     label: 'assert',
     kindName: 'function',
     detail: 'assertion check',
-    documentation: 'Stop with an error (and line number) if the condition is false.\n\nExample: `assert (distance 0 0) < 47`',
+    documentation:
+      'Stop with an error (and line number) if the condition is false.\n\nExample: `assert (distance 0 0) < 47`',
     insertText: 'assert ${1:condition}',
     isSnippet: true,
     params: [['condition']],
@@ -834,7 +893,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'mod',
     kindName: 'function',
     detail: 'floor modulo',
-    documentation: 'Floor modulo — result always has the sign of b. `mod(-7, 3)` is 2, not −1. The `%` operator is the same operation.',
+    documentation:
+      'Floor modulo — result always has the sign of b. `mod(-7, 3)` is 2, not −1. The `%` operator is the same operation.',
     insertText: 'mod(${1:a}, ${2:b})',
     isSnippet: true,
     params: [['a', 'b']],
@@ -870,7 +930,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'atan',
     kindName: 'function',
     detail: 'heading of vector (x, y)',
-    documentation: 'Heading of the vector (x, y) in turtle degrees: 0 = north, clockwise. `atan(1, 0)` is 90.',
+    documentation:
+      'Heading of the vector (x, y) in turtle degrees: 0 = north, clockwise. `atan(1, 0)` is 90.',
     insertText: 'atan(${1:x}, ${2:y})',
     isSnippet: true,
     params: [['x', 'y']],
@@ -879,7 +940,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'noise',
     kindName: 'function',
     detail: '1D value noise (0…1)',
-    documentation: 'Smooth seeded value noise in 0…1. Sample slowly (divide coordinates by 10–20) for organic drift.',
+    documentation:
+      'Smooth seeded value noise in 0…1. Sample slowly (divide coordinates by 10–20) for organic drift.',
     insertText: 'noise(${1:x})',
     isSnippet: true,
     params: [['x']],
@@ -915,7 +977,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'not',
     kindName: 'function',
     detail: 'logical NOT',
-    documentation: 'Logical NOT. Also written `!`. Binds tightly — write `!(a = 1)` when negating a comparison.',
+    documentation:
+      'Logical NOT. Also written `!`. Binds tightly — write `!(a = 1)` when negating a comparison.',
     insertText: 'not(${1:value})',
     isSnippet: true,
     params: [['value']],
@@ -926,7 +989,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'range',
     kindName: 'function',
     detail: 'create a range list',
-    documentation: '`range(n)` → [0…n-1]\n`range(a, b)` → [a…b-1]\n`range(a, b, step)` → stepped\n\n0-based, end-exclusive (like Python). Call-syntax only.',
+    documentation:
+      '`range(n)` → [0…n-1]\n`range(a, b)` → [a…b-1]\n`range(a, b, step)` → stepped\n\n0-based, end-exclusive (like Python). Call-syntax only.',
     insertText: 'range(${1:n})',
     isSnippet: true,
     params: [['n'], ['start', 'end'], ['start', 'end', 'step']],
@@ -989,10 +1053,14 @@ const NS_ITEMS: NSItem[] = [
     label: 'slice',
     kindName: 'function',
     detail: 'slice a list',
-    documentation: '`slice(xs, start)` or `slice(xs, start, end)` — new list, Python semantics including negative bounds, clamped.',
+    documentation:
+      '`slice(xs, start)` or `slice(xs, start, end)` — new list, Python semantics including negative bounds, clamped.',
     insertText: 'slice(${1:list}, ${2:start})',
     isSnippet: true,
-    params: [['list', 'start'], ['list', 'start', 'end']],
+    params: [
+      ['list', 'start'],
+      ['list', 'start', 'end'],
+    ],
   },
   {
     label: 'reverse',
@@ -1007,7 +1075,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'sort',
     kindName: 'function',
     detail: 'sorted list (pure, ascending)',
-    documentation: 'Returns a new sorted list. Numbers only, ascending, stable. Pure — does not mutate.',
+    documentation:
+      'Returns a new sorted list. Numbers only, ascending, stable. Pure — does not mutate.',
     insertText: 'sort(${1:list})',
     isSnippet: true,
     params: [['list']],
@@ -1088,7 +1157,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'shuffle',
     kindName: 'function',
     detail: 'shuffled list (pure)',
-    documentation: 'Returns a new shuffled list — seeded, forks a child RNG. Pure — does not mutate.',
+    documentation:
+      'Returns a new shuffled list — seeded, forks a child RNG. Pure — does not mutate.',
     insertText: 'shuffle(${1:list})',
     isSnippet: true,
     params: [['list']],
@@ -1097,7 +1167,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'pos',
     kindName: 'function',
     detail: 'needle position as [x, y]',
-    documentation: 'Needle position as `[xcor, ycor]`. Pair with `setpos(p)` to save and restore positions.',
+    documentation:
+      'Needle position as `[xcor, ycor]`. Pair with `setpos(p)` to save and restore positions.',
     insertText: 'pos()',
     params: [[]],
   },
@@ -1141,7 +1212,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'setpos',
     kindName: 'function',
     detail: 'move needle to [x, y] point',
-    documentation: 'Command: move needle to the point p (like `setxy p[0] p[1]`). Pair with `pos()`.',
+    documentation:
+      'Command: move needle to the point p (like `setxy p[0] p[1]`). Pair with `pos()`.',
     insertText: 'setpos(${1:point})',
     isSnippet: true,
     params: [['point']],
@@ -1197,7 +1269,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'snoise2',
     kindName: 'function',
     detail: '2D simplex noise (−1…1)',
-    documentation: 'Seeded simplex noise in −1…1 (industry convention). Slightly finer-grained than legacy `noise2` (0…1).',
+    documentation:
+      'Seeded simplex noise in −1…1 (industry convention). Slightly finer-grained than legacy `noise2` (0…1).',
     insertText: 'snoise2(${1:x}, ${2:y})',
     isSnippet: true,
     params: [['x', 'y']],
@@ -1206,7 +1279,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'snoise3',
     kindName: 'function',
     detail: '3D simplex noise (−1…1)',
-    documentation: 'Seeded 3D simplex noise in −1…1. Use z for variation: `snoise3(x/14, y/14, motif*50)` gives each motif its own noise field.',
+    documentation:
+      'Seeded 3D simplex noise in −1…1. Use z for variation: `snoise3(x/14, y/14, motif*50)` gives each motif its own noise field.',
     insertText: 'snoise3(${1:x}, ${2:y}, ${3:z})',
     isSnippet: true,
     params: [['x', 'y', 'z']],
@@ -1215,7 +1289,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'fbm2',
     kindName: 'function',
     detail: 'fractal Brownian motion',
-    documentation: 'Fractal sum of `snoise2`: lacunarity 2.0, gain 0.5, 1–8 octaves (clamped), normalised to ≈−1…1.',
+    documentation:
+      'Fractal sum of `snoise2`: lacunarity 2.0, gain 0.5, 1–8 octaves (clamped), normalised to ≈−1…1.',
     insertText: 'fbm2(${1:x}, ${2:y}, ${3:octaves})',
     isSnippet: true,
     params: [['x', 'y', 'octaves']],
@@ -1316,7 +1391,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vfromheading',
     kindName: 'function',
     detail: 'vector from heading + length',
-    documentation: 'Make a vector from turtle heading + length. `vfromheading(heading, 1)` is the needle\'s direction unit vector.',
+    documentation:
+      "Make a vector from turtle heading + length. `vfromheading(heading, 1)` is the needle's direction unit vector.",
     insertText: 'vfromheading(${1:degrees}, ${2:length})',
     isSnippet: true,
     params: [['degrees', 'length']],
@@ -1336,7 +1412,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'resample',
     kindName: 'function',
     detail: 'resample path to spacing (mm)',
-    documentation: 'New path whose segments are each exactly spacing mm long (last may be shorter). The bridge between math curves and physical stitch spacing.',
+    documentation:
+      'New path whose segments are each exactly spacing mm long (last may be shorter). The bridge between math curves and physical stitch spacing.',
     insertText: 'resample(${1:path}, ${2:spacing})',
     isSnippet: true,
     params: [['path', 'spacing']],
@@ -1363,7 +1440,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'bezier',
     kindName: 'function',
     detail: 'cubic Bézier curve',
-    documentation: 'Cubic Bézier from p0 to p1 through control points c0, c1, resampled at spacing mm.',
+    documentation:
+      'Cubic Bézier from p0 to p1 through control points c0, c1, resampled at spacing mm.',
     insertText: 'bezier(${1:p0}, ${2:c0}, ${3:c1}, ${4:p1}, ${5:spacing})',
     isSnippet: true,
     params: [['p0', 'c0', 'c1', 'p1', 'spacing']],
@@ -1390,7 +1468,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'sewpath',
     kindName: 'function',
     detail: 'sew along a list of points',
-    documentation: 'Exactly `for p in path [ setpos(p) ]`. Pen state, stitch mode, satin, and auto-split all apply as if hand-walked.',
+    documentation:
+      'Exactly `for p in path [ setpos(p) ]`. Pen state, stitch mode, satin, and auto-split all apply as if hand-walked.',
     insertText: 'sewpath(${1:path})',
     isSnippet: true,
     params: [['path']],
@@ -1401,7 +1480,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'scatter',
     kindName: 'function',
     detail: 'Poisson-disc scatter points',
-    documentation: 'Seeded Poisson-disc (Bridson) points.\n\n`scatter(minDist)` — over the 47 mm field\n`scatter(minDist, region)` — inside a region polygon\n\nCapped at 20,000 points.',
+    documentation:
+      'Seeded Poisson-disc (Bridson) points.\n\n`scatter(minDist)` — over the 47 mm field\n`scatter(minDist, region)` — inside a region polygon\n\nCapped at 20,000 points.',
     insertText: 'scatter(${1:minDist})',
     isSnippet: true,
     params: [['minDist'], ['minDist', 'region']],
@@ -1410,7 +1490,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'voronoi',
     kindName: 'function',
     detail: 'Voronoi cells from points',
-    documentation: 'One region per input point, in input order, clipped to the sewable field or a given region. Max 10,000 input points.',
+    documentation:
+      'One region per input point, in input order, clipped to the sewable field or a given region. Max 10,000 input points.',
     insertText: 'voronoi(${1:points})',
     isSnippet: true,
     params: [['points'], ['points', 'region']],
@@ -1437,7 +1518,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'relax',
     kindName: 'function',
     detail: "Lloyd's relaxation",
-    documentation: "n rounds of Lloyd's relaxation — moves each point to its Voronoi cell's centroid for even stippling.",
+    documentation:
+      "n rounds of Lloyd's relaxation — moves each point to its Voronoi cell's centroid for even stippling.",
     insertText: 'relax(${1:points}, ${2:iterations})',
     isSnippet: true,
     params: [['points', 'iterations']],
@@ -1446,7 +1528,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'offsetpath',
     kindName: 'function',
     detail: 'inflate / shrink a region',
-    documentation: 'Inflate (+) or shrink (−) a region. Returns a list of regions. Shrinking may split or erase the shape entirely.',
+    documentation:
+      'Inflate (+) or shrink (−) a region. Returns a list of regions. Shrinking may split or erase the shape entirely.',
     insertText: 'offsetpath(${1:region}, ${2:offset})',
     isSnippet: true,
     params: [['region', 'offset']],
@@ -1455,7 +1538,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'clippaths',
     kindName: 'function',
     detail: 'boolean of two regions',
-    documentation: 'Boolean operation on two regions. Backed by Clipper2 at μm precision. Returns a list of regions.\n\nOperations: `"union` `"intersect` `"difference` `"xor`',
+    documentation:
+      'Boolean operation on two regions. Backed by Clipper2 at μm precision. Returns a list of regions.\n\nOperations: `"union` `"intersect` `"difference` `"xor`',
     insertText: 'clippaths(${1:a}, ${2:b}, "${3|union,intersect,difference,xor|}")',
     isSnippet: true,
     params: [['a', 'b', '"op']],
@@ -1475,7 +1559,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'xlate',
     kindName: 'function',
     detail: 'translate a path (pure)',
-    documentation: 'New path shifted by `(dx, dy)` mm. The functional companion to the `translate` block command — composes with `scatter`/`voronoi`/`offsetpath` data.',
+    documentation:
+      'New path shifted by `(dx, dy)` mm. The functional companion to the `translate` block command — composes with `scatter`/`voronoi`/`offsetpath` data.',
     insertText: 'xlate(${1:path}, ${2:dx}, ${3:dy})',
     isSnippet: true,
     params: [['path', 'dx', 'dy']],
@@ -1484,19 +1569,27 @@ const NS_ITEMS: NSItem[] = [
     label: 'xrotate',
     kindName: 'function',
     detail: 'rotate a path (pure)',
-    documentation: 'New path rotated `deg` clockwise. Optional pivot: `xrotate(path, deg, cx, cy)`.',
+    documentation:
+      'New path rotated `deg` clockwise. Optional pivot: `xrotate(path, deg, cx, cy)`.',
     insertText: 'xrotate(${1:path}, ${2:degrees})',
     isSnippet: true,
-    params: [['path', 'degrees'], ['path', 'degrees', 'cx', 'cy']],
+    params: [
+      ['path', 'degrees'],
+      ['path', 'degrees', 'cx', 'cy'],
+    ],
   },
   {
     label: 'xscale',
     kindName: 'function',
     detail: 'scale a path (pure)',
-    documentation: 'New path scaled by `sx` (and `sy`). `xscale(path, s)` is uniform; `xscale(path, sx, sy)` is per-axis.',
+    documentation:
+      'New path scaled by `sx` (and `sy`). `xscale(path, s)` is uniform; `xscale(path, sx, sy)` is per-axis.',
     insertText: 'xscale(${1:path}, ${2:s})',
     isSnippet: true,
-    params: [['path', 's'], ['path', 'sx', 'sy']],
+    params: [
+      ['path', 's'],
+      ['path', 'sx', 'sy'],
+    ],
   },
   {
     label: 'xmirror',
@@ -1511,7 +1604,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'warppath',
     kindName: 'function',
     detail: 'map a path through a reporter (pure)',
-    documentation: 'New path with every point mapped through a `@name` reporter — the functional companion to the `warp` block. `warp @f [ sewpath(P) ]` ≡ `sewpath(warppath(P, @f))`.',
+    documentation:
+      'New path with every point mapped through a `@name` reporter — the functional companion to the `warp` block. `warp @f [ sewpath(P) ]` ≡ `sewpath(warppath(P, @f))`.',
     insertText: 'warppath(${1:path}, @${2:reporter})',
     isSnippet: true,
     params: [['path', 'reporter']],
@@ -1520,7 +1614,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'humanizepath',
     kindName: 'function',
     detail: 'seeded coherent jitter on a path (pure)',
-    documentation: 'New path with seeded coherent jitter (`amount` mm) — the functional companion to `humanize`. Forks one draw from the seeded stream.\n\n```\nlet coast = humanizepath(resample(cell, 2.0), 0.3)\nsewpath(coast)\n```',
+    documentation:
+      'New path with seeded coherent jitter (`amount` mm) — the functional companion to `humanize`. Forks one draw from the seeded stream.\n\n```\nlet coast = humanizepath(resample(cell, 2.0), 0.3)\nsewpath(coast)\n```',
     insertText: 'humanizepath(${1:path}, ${2:amount})',
     isSnippet: true,
     params: [['path', 'amount']],
@@ -1529,7 +1624,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'snappath',
     kindName: 'function',
     detail: 'quantize a path to a fixed lattice (pure)',
-    documentation: 'New path with every point snapped to the fixed lattice — the functional companion to `snaptogrid`, same arity overloads (cell | cellx celly | …ox oy | …ang).\n\n```\nlet pts = snappath(scatter(8), 2)   // Poisson points on a 2 mm grid\n```',
+    documentation:
+      'New path with every point snapped to the fixed lattice — the functional companion to `snaptogrid`, same arity overloads (cell | cellx celly | …ox oy | …ang).\n\n```\nlet pts = snappath(scatter(8), 2)   // Poisson points on a 2 mm grid\n```',
     insertText: 'snappath(${1:path}, ${2:cell})',
     isSnippet: true,
     params: [['path', 'cell']],
@@ -1538,7 +1634,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'coverat',
     kindName: 'function',
     detail: 'thread coverage in layers at a point (live, pure)',
-    documentation: 'Coverage at a point, in **layers** (the heatmap / `maxdensity` unit; 1 ≈ one clean satin/tatami pass), read live and in sewing order over everything committed so far.\n\n`coverat(p)` — the containing 1 mm cell\n`coverat(p, r)` — averaged over radius `r` mm\n\nPure: zero RNG draws, draws nothing. Sees flushed penetrations (a buffered satin column isn\u2019t visible until it ends).\n\n```\nif coverat(p) < 1.5 [ up setpos(p) down arc 360 0.5 trim ]\n```',
+    documentation:
+      'Coverage at a point, in **layers** (the heatmap / `maxdensity` unit; 1 ≈ one clean satin/tatami pass), read live and in sewing order over everything committed so far.\n\n`coverat(p)` — the containing 1 mm cell\n`coverat(p, r)` — averaged over radius `r` mm\n\nPure: zero RNG draws, draws nothing. Sees flushed penetrations (a buffered satin column isn\u2019t visible until it ends).\n\n```\nif coverat(p) < 1.5 [ up setpos(p) down arc 360 0.5 trim ]\n```',
     insertText: 'coverat(${1:p})',
     isSnippet: true,
     params: [['p'], ['p', 'r']],
@@ -1547,7 +1644,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'countat',
     kindName: 'function',
     detail: 'penetration count at a point (live, pure)',
-    documentation: 'The number of penetrations in the 1 mm cell containing `p`, read live. Pure: zero draws, draws nothing.',
+    documentation:
+      'The number of penetrations in the 1 mm cell containing `p`, read live. Pure: zero draws, draws nothing.',
     insertText: 'countat(${1:p})',
     isSnippet: true,
     params: [['p']],
@@ -1556,7 +1654,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'nearestsewn',
     kindName: 'function',
     detail: 'closest prior penetration to a point (or [])',
-    documentation: 'The closest already-sewn penetration to `p`, as `[x, y]` in hoop space, or `[]` if nothing is sewn yet. Backed by a spatial index, so it stays O(local) \u2014 no history scan. Pure: zero draws.',
+    documentation:
+      'The closest already-sewn penetration to `p`, as `[x, y]` in hoop space, or `[]` if nothing is sewn yet. Backed by a spatial index, so it stays O(local) \u2014 no history scan. Pure: zero draws.',
     insertText: 'nearestsewn(${1:p})',
     isSnippet: true,
     params: [['p']],
@@ -1565,7 +1664,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'sewnwithin',
     kindName: 'function',
     detail: 'prior penetrations within r mm of a point',
-    documentation: 'A list of already-sewn penetrations within `r` mm of `p` (hoop space). Grid-bucketed, so proximity logic stays O(local) instead of scanning the whole history.\n\n```\nif len(sewnwithin(p, 2)) = 0 [ … ]   // nothing crowding p yet\n```\n\nPure: zero draws.',
+    documentation:
+      'A list of already-sewn penetrations within `r` mm of `p` (hoop space). Grid-bucketed, so proximity logic stays O(local) instead of scanning the whole history.\n\n```\nif len(sewnwithin(p, 2)) = 0 [ … ]   // nothing crowding p yet\n```\n\nPure: zero draws.',
     insertText: 'sewnwithin(${1:p}, ${2:r})',
     isSnippet: true,
     params: [['p', 'r']],
@@ -1574,7 +1674,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'stitchedpoints',
     kindName: 'function',
     detail: 'snapshot: a deep copy of all penetrations so far',
-    documentation: 'A deep-copied list of every penetration committed so far, as a path of `[x, y]` points (hoop space), captured at call time. Explicit and opt-in: you pay the O(n) copy when you ask, and the result is just a list (safe to mutate). Pure: zero draws.',
+    documentation:
+      'A deep-copied list of every penetration committed so far, as a path of `[x, y]` points (hoop space), captured at call time. Explicit and opt-in: you pay the O(n) copy when you ask, and the result is just a list (safe to mutate). Pure: zero draws.',
     insertText: 'stitchedpoints()',
     isSnippet: true,
     params: [[]],
@@ -1582,14 +1683,16 @@ const NS_ITEMS: NSItem[] = [
 ];
 
 // ── Fast lookup map (label → NSItem) ─────────────────────────────────────────
-const NS_ITEM_MAP = new Map<string, NSItem>(NS_ITEMS.map(item => [item.label, item]));
+const NS_ITEM_MAP = new Map<string, NSItem>(NS_ITEMS.map((item) => [item.label, item]));
 
 // ── Helper: walk text backwards to find the active function call context ─────
 //
 // Returns the function name and the 0-based active parameter index, or null if
 // the cursor is not inside a function call.  Handles nested parens/brackets.
 //
-function getSignatureContext(textBeforeCursor: string): { name: string; paramIndex: number } | null {
+function getSignatureContext(
+  textBeforeCursor: string,
+): { name: string; paramIndex: number } | null {
   let depth = 0;
   let paramIndex = 0;
 
@@ -1622,10 +1725,10 @@ function getSignatureContext(textBeforeCursor: string): { name: string; paramInd
 
 // ── Helper: scan document text for user-defined procedures and variables ──────
 interface UserSymbol {
-  label:     string;
-  kindName:  'function' | 'variable';
-  detail:    string;
-  params?:   string[];   // parameter names (for procedures)
+  label: string;
+  kindName: 'function' | 'variable';
+  detail: string;
+  params?: string[]; // parameter names (for procedures)
 }
 
 function extractUserSymbols(text: string): UserSymbol[] {
@@ -1645,7 +1748,7 @@ function extractUserSymbols(text: string): UserSymbol[] {
   while ((m = modernProc.exec(text)) !== null) {
     const name = m[1].toLowerCase();
     const rawParams = m[2].trim();
-    const params = rawParams ? rawParams.split(',').map(p => p.trim().replace(/^:/, '')) : [];
+    const params = rawParams ? rawParams.split(',').map((p) => p.trim().replace(/^:/, '')) : [];
     add({ label: name, kindName: 'function', detail: `procedure(${params.join(', ')})`, params });
   }
 
@@ -1654,7 +1757,12 @@ function extractUserSymbols(text: string): UserSymbol[] {
   while ((m = classicProc.exec(text)) !== null) {
     const name = m[1].toLowerCase();
     const rawParams = m[2].trim();
-    const params = rawParams ? rawParams.split(/\s+/).filter(Boolean).map(p => p.replace(/^:/, '')) : [];
+    const params = rawParams
+      ? rawParams
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((p) => p.replace(/^:/, ''))
+      : [];
     add({ label: name, kindName: 'function', detail: `procedure(${params.join(', ')})`, params });
   }
 
@@ -1691,7 +1799,7 @@ export function registerNeedlescript(monaco: Monaco): void {
   // CompletionItemKind values
   const CIK = monaco.languages.CompletionItemKind;
   const kindMap: Record<NSItemKind, number> = {
-    keyword:  CIK.Keyword,
+    keyword: CIK.Keyword,
     function: CIK.Function,
     variable: CIK.Variable,
     constant: CIK.Constant,
@@ -1716,65 +1824,210 @@ export function registerNeedlescript(monaco: Monaco): void {
 
     // ── Control flow & definition keywords (gold) ──────────────────
     keywords: [
-      'repeat', 'if', 'else', 'while', 'for', 'break', 'continue',
-      'return', 'exit', 'output', 'op', 'to', 'end', 'def',
-      'let', 'make', 'local', 'in', 'step', 'true', 'false', 'and', 'or',
+      'repeat',
+      'if',
+      'else',
+      'while',
+      'for',
+      'break',
+      'continue',
+      'return',
+      'exit',
+      'output',
+      'op',
+      'to',
+      'end',
+      'def',
+      'let',
+      'make',
+      'local',
+      'in',
+      'step',
+      'true',
+      'false',
+      'and',
+      'or',
       // Transform block commands (CTM stack) — headers like repeat/if.
-      'translate', 'rotate', 'rotateabout', 'scale', 'scalexy', 'mirror', 'skew', 'transform',
+      'translate',
+      'rotate',
+      'rotateabout',
+      'scale',
+      'scalexy',
+      'mirror',
+      'skew',
+      'transform',
       // Effect block commands (same stack, nonlinear / stochastic / after-split).
-      'warp', 'humanize', 'snaptogrid',
+      'warp',
+      'humanize',
+      'snaptogrid',
     ],
 
     // ── Turtle movement commands + pen + state reporters (teal) ─────
     movementCmds: [
-      'fd', 'forward', 'bk', 'back', 'backward',
-      'rt', 'right', 'lt', 'left',
-      'up', 'down', 'penup', 'pendown', 'pu', 'pd',
-      'setxy', 'setx', 'sety', 'seth', 'setheading',
-      'home', 'arc', 'push', 'pop', 'cs', 'clearscreen', 'clear',
+      'fd',
+      'forward',
+      'bk',
+      'back',
+      'backward',
+      'rt',
+      'right',
+      'lt',
+      'left',
+      'up',
+      'down',
+      'penup',
+      'pendown',
+      'pu',
+      'pd',
+      'setxy',
+      'setx',
+      'sety',
+      'seth',
+      'setheading',
+      'home',
+      'arc',
+      'push',
+      'pop',
+      'cs',
+      'clearscreen',
+      'clear',
       // zero-argument reporters that describe the turtle's current state
-      'xcor', 'ycor', 'heading', 'repcount',
+      'xcor',
+      'ycor',
+      'heading',
+      'repcount',
     ],
 
     // ── Stitch / thread / professional / debug commands (amber) ─────
     stitchCmds: [
-      'stitchlen', 'stitchlength', 'satin', 'density', 'bean', 'estitch',
-      'beginfill', 'endfill', 'fill', 'fillangle', 'fillspacing', 'filllen',
-      'lock', 'pullcomp', 'shortstitch', 'autotrim', 'maxdensity',
-      'color', 'stop', 'trim',
-      'seed', 'print', 'mark', 'assert',
-      'fabric', 'underlay', 'fillunderlay',
+      'stitchlen',
+      'stitchlength',
+      'satin',
+      'density',
+      'bean',
+      'estitch',
+      'beginfill',
+      'endfill',
+      'fill',
+      'fillangle',
+      'fillspacing',
+      'filllen',
+      'lock',
+      'pullcomp',
+      'shortstitch',
+      'autotrim',
+      'maxdensity',
+      'color',
+      'stop',
+      'trim',
+      'seed',
+      'print',
+      'mark',
+      'assert',
+      'fabric',
+      'underlay',
+      'fillunderlay',
     ],
 
     // ── Core built-in math functions (lavender) ─────────────────────
     mathFuncs: [
-      'random', 'sin', 'cos', 'sqrt', 'abs', 'round', 'mod',
-      'floor', 'ceil', 'min', 'max', 'pow', 'atan',
-      'noise', 'noise2', 'distance', 'towards', 'not',
+      'random',
+      'sin',
+      'cos',
+      'sqrt',
+      'abs',
+      'round',
+      'mod',
+      'floor',
+      'ceil',
+      'min',
+      'max',
+      'pow',
+      'atan',
+      'noise',
+      'noise2',
+      'distance',
+      'towards',
+      'not',
     ],
 
     // ── Library functions: list + generative math (mint) ────────────
     libFuncs: [
       // list functions
-      'range', 'filled', 'len', 'islist', 'first', 'last',
-      'concat', 'slice', 'reverse', 'sort', 'copy',
-      'indexof', 'contains', 'sum', 'mean', 'minof', 'maxof',
-      'pick', 'shuffle', 'pos', 'removeat',
-      'append', 'prepend', 'insertat', 'setpos',
+      'range',
+      'filled',
+      'len',
+      'islist',
+      'first',
+      'last',
+      'concat',
+      'slice',
+      'reverse',
+      'sort',
+      'copy',
+      'indexof',
+      'contains',
+      'sum',
+      'mean',
+      'minof',
+      'maxof',
+      'pick',
+      'shuffle',
+      'pos',
+      'removeat',
+      'append',
+      'prepend',
+      'insertat',
+      'setpos',
       // generative math
-      'snoise2', 'snoise3', 'fbm2',
-      'lerp', 'remap', 'clamp', 'smoothstep', 'gauss',
-      'vadd', 'vsub', 'vscale', 'vlerp', 'vdot', 'vlen', 'vdist',
-      'vnorm', 'vrot', 'vheading', 'vfromheading',
-      'pathlen', 'resample', 'chaikin', 'catmull', 'bezier',
-      'centroid', 'bbox',
-      'scatter', 'voronoi', 'triangulate', 'hull', 'relax',
-      'offsetpath', 'clippaths', 'inpath',
+      'snoise2',
+      'snoise3',
+      'fbm2',
+      'lerp',
+      'remap',
+      'clamp',
+      'smoothstep',
+      'gauss',
+      'vadd',
+      'vsub',
+      'vscale',
+      'vlerp',
+      'vdot',
+      'vlen',
+      'vdist',
+      'vnorm',
+      'vrot',
+      'vheading',
+      'vfromheading',
+      'pathlen',
+      'resample',
+      'chaikin',
+      'catmull',
+      'bezier',
+      'centroid',
+      'bbox',
+      'scatter',
+      'voronoi',
+      'triangulate',
+      'hull',
+      'relax',
+      'offsetpath',
+      'clippaths',
+      'inpath',
       'sewpath',
-      'xlate', 'xrotate', 'xscale', 'xmirror',
-      'warppath', 'humanizepath', 'snappath',
+      'xlate',
+      'xrotate',
+      'xscale',
+      'xmirror',
+      'warppath',
+      'humanizepath',
+      'snappath',
       // stitch-history queries (closed-loop generation)
-      'coverat', 'countat', 'nearestsewn', 'sewnwithin', 'stitchedpoints',
+      'coverat',
+      'countat',
+      'nearestsewn',
+      'sewnwithin',
+      'stitchedpoints',
     ],
 
     tokenizer: {
@@ -1798,16 +2051,19 @@ export function registerNeedlescript(monaco: Monaco): void {
         [/\d+/, 'ns-number'],
 
         // Identifiers — dispatch to the appropriate semantic group
-        [/[a-z_][a-z0-9_]*/, {
-          cases: {
-            '@keywords':     'ns-keyword',
-            '@movementCmds': 'ns-movement',
-            '@stitchCmds':   'ns-stitch',
-            '@mathFuncs':    'ns-math',
-            '@libFuncs':     'ns-lib',
-            '@default':      'ns-identifier',
+        [
+          /[a-z_][a-z0-9_]*/,
+          {
+            cases: {
+              '@keywords': 'ns-keyword',
+              '@movementCmds': 'ns-movement',
+              '@stitchCmds': 'ns-stitch',
+              '@mathFuncs': 'ns-math',
+              '@libFuncs': 'ns-lib',
+              '@default': 'ns-identifier',
+            },
           },
-        }],
+        ],
 
         // Multi-char operators before single-char so != etc. don't split
         [/[=!<>]=/, 'ns-operator'],
@@ -1833,91 +2089,91 @@ export function registerNeedlescript(monaco: Monaco): void {
     inherit: false,
     rules: [
       // Default / plain identifiers
-      { token: '',              foreground: m(text) },
+      { token: '', foreground: m(text) },
       { token: 'ns-identifier', foreground: m(text) },
       // Comments — muted, italic
-      { token: 'ns-comment',    foreground: m(synComment),  fontStyle: 'italic' },
+      { token: 'ns-comment', foreground: m(synComment), fontStyle: 'italic' },
       // Control flow & definition keywords — brand gold, bold
-      { token: 'ns-keyword',    foreground: m(synKeyword),  fontStyle: 'bold' },
+      { token: 'ns-keyword', foreground: m(synKeyword), fontStyle: 'bold' },
       // Turtle movement + reporters — sky teal
-      { token: 'ns-movement',   foreground: m(synMovement) },
+      { token: 'ns-movement', foreground: m(synMovement) },
       // Stitch / thread / fabric commands — warm amber
-      { token: 'ns-stitch',     foreground: m(synStitch) },
+      { token: 'ns-stitch', foreground: m(synStitch) },
       // Core math functions — soft lavender
-      { token: 'ns-math',       foreground: m(synMath) },
+      { token: 'ns-math', foreground: m(synMath) },
       // Library functions (list + generative) — mint green
-      { token: 'ns-lib',        foreground: m(synLib) },
+      { token: 'ns-lib', foreground: m(synLib) },
       // Numbers
-      { token: 'ns-number',     foreground: m(synNumber) },
+      { token: 'ns-number', foreground: m(synNumber) },
       // Quoted words / Logo "strings"
-      { token: 'ns-string',     foreground: m(synString) },
+      { token: 'ns-string', foreground: m(synString) },
       // Classic variable deref :var — steel blue, italic
-      { token: 'ns-variable',   foreground: m(synVariable), fontStyle: 'italic' },
+      { token: 'ns-variable', foreground: m(synVariable), fontStyle: 'italic' },
       // Operators and punctuation — muted
-      { token: 'ns-operator',   foreground: m(synOperator) },
-      { token: 'ns-bracket',    foreground: m(synBracket) },
-      { token: 'ns-delimiter',  foreground: m(synBracket) },
+      { token: 'ns-operator', foreground: m(synOperator) },
+      { token: 'ns-bracket', foreground: m(synBracket) },
+      { token: 'ns-delimiter', foreground: m(synBracket) },
     ],
     colors: {
       // Editor surface
-      'editor.background':                    bgPanel,
-      'editor.foreground':                    text,
+      'editor.background': bgPanel,
+      'editor.foreground': text,
       // Cursor
-      'editorCursor.foreground':              gold,
+      'editorCursor.foreground': gold,
       // Selection
-      'editor.selectionBackground':           gold + '40',
-      'editor.inactiveSelectionBackground':   gold + '22',
+      'editor.selectionBackground': gold + '40',
+      'editor.inactiveSelectionBackground': gold + '22',
       // Current-line highlight (cursor line, not the playback line)
-      'editor.lineHighlightBackground':       monacoLineHighlight,
-      'editor.lineHighlightBorder':           '#00000000',
+      'editor.lineHighlightBackground': monacoLineHighlight,
+      'editor.lineHighlightBorder': '#00000000',
       // Line numbers
-      'editorLineNumber.foreground':          monacoLineNumber,
-      'editorLineNumber.activeForeground':    monacoLineNumberActive,
+      'editorLineNumber.foreground': monacoLineNumber,
+      'editorLineNumber.activeForeground': monacoLineNumberActive,
       // Gutter
-      'editorGutter.background':              monacoGutter,
+      'editorGutter.background': monacoGutter,
       // Indent guides
-      'editorIndentGuide.background1':        monacoIndentGuide,
-      'editorIndentGuide.activeBackground1':  monacoIndentGuideActive,
+      'editorIndentGuide.background1': monacoIndentGuide,
+      'editorIndentGuide.activeBackground1': monacoIndentGuideActive,
       // Bracket pair colorization
-      'editorBracketHighlight.foreground1':   gold,
-      'editorBracketHighlight.foreground2':   synMovement,
-      'editorBracketHighlight.foreground3':   synMath,
+      'editorBracketHighlight.foreground1': gold,
+      'editorBracketHighlight.foreground2': synMovement,
+      'editorBracketHighlight.foreground3': synMath,
       // Find/match highlight
-      'editor.findMatchBackground':           gold + '50',
-      'editor.findMatchHighlightBackground':  gold + '28',
+      'editor.findMatchBackground': gold + '50',
+      'editor.findMatchHighlightBackground': gold + '28',
       // Scrollbar
-      'scrollbarSlider.background':           borderCool + '44',
-      'scrollbarSlider.hoverBackground':      monacoIndentGuideActive,
-      'scrollbarSlider.activeBackground':     textFaint + 'AA',
+      'scrollbarSlider.background': borderCool + '44',
+      'scrollbarSlider.hoverBackground': monacoIndentGuideActive,
+      'scrollbarSlider.activeBackground': textFaint + 'AA',
       // Overview ruler
-      'editorOverviewRuler.border':           '#00000000',
+      'editorOverviewRuler.border': '#00000000',
       // Widget popups (find bar, etc.)
-      'editorWidget.background':              bgApp,
-      'editorWidget.border':                  borderCool,
-      'editorWidget.foreground':              text,
+      'editorWidget.background': bgApp,
+      'editorWidget.border': borderCool,
+      'editorWidget.foreground': text,
       // Input boxes inside widgets
-      'input.background':                     bgPanel,
-      'input.foreground':                     text,
-      'inputOption.activeBorder':             gold,
-      'inputOption.activeBackground':         gold + '30',
+      'input.background': bgPanel,
+      'input.foreground': text,
+      'inputOption.activeBorder': gold,
+      'inputOption.activeBackground': gold + '30',
       // Focus border
-      'focusBorder':                          gold,
+      focusBorder: gold,
       // ── Suggestion / IntelliSense widget ───────────────────────────
-      'editorSuggestWidget.background':               bgApp,
-      'editorSuggestWidget.border':                   borderCool,
-      'editorSuggestWidget.foreground':               text,
-      'editorSuggestWidget.selectedBackground':       bgPanelRaised,
-      'editorSuggestWidget.selectedForeground':       text,
-      'editorSuggestWidget.highlightForeground':      gold,
+      'editorSuggestWidget.background': bgApp,
+      'editorSuggestWidget.border': borderCool,
+      'editorSuggestWidget.foreground': text,
+      'editorSuggestWidget.selectedBackground': bgPanelRaised,
+      'editorSuggestWidget.selectedForeground': text,
+      'editorSuggestWidget.highlightForeground': gold,
       'editorSuggestWidget.focusHighlightForeground': gold,
       // ── Hover widget ───────────────────────────────────────────────
-      'editorHoverWidget.background':         bgApp,
-      'editorHoverWidget.border':             borderCool,
-      'editorHoverWidget.foreground':         text,
+      'editorHoverWidget.background': bgApp,
+      'editorHoverWidget.border': borderCool,
+      'editorHoverWidget.foreground': text,
       // ── Parameter hints widget ─────────────────────────────────────
-      'editorHintForeground':                 text,
-      'parameterHints.background':            bgApp,
-      'parameterHints.border':                borderCool,
+      editorHintForeground: text,
+      'parameterHints.background': bgApp,
+      'parameterHints.border': borderCool,
     },
   });
 
@@ -1955,18 +2211,21 @@ export function registerNeedlescript(monaco: Monaco): void {
       const wordInfo = model.getWordUntilPosition(position);
       const range = {
         startLineNumber: position.lineNumber,
-        endLineNumber:   position.lineNumber,
-        startColumn:     wordInfo.startColumn,
-        endColumn:       wordInfo.endColumn,
+        endLineNumber: position.lineNumber,
+        startColumn: wordInfo.startColumn,
+        endColumn: wordInfo.endColumn,
       };
 
       // Built-in completions
-      const suggestions = NS_ITEMS.map(item => ({
-        label:           item.label,
-        kind:            kindMap[item.kindName],
-        detail:          item.detail,
-        documentation:   { value: item.documentation, isTrusted: true } as Monaco['languages']['IMarkdownString'],
-        insertText:      item.insertText,
+      const suggestions = NS_ITEMS.map((item) => ({
+        label: item.label,
+        kind: kindMap[item.kindName],
+        detail: item.detail,
+        documentation: {
+          value: item.documentation,
+          isTrusted: true,
+        } as Monaco['languages']['IMarkdownString'],
+        insertText: item.insertText,
         insertTextRules: item.isSnippet ? SNIPPET_RULE : undefined,
         range,
       }));
@@ -1974,28 +2233,26 @@ export function registerNeedlescript(monaco: Monaco): void {
       // User-defined completions (scanned from the current document)
       const userSymbols = extractUserSymbols(model.getValue());
       for (const sym of userSymbols) {
-        const userKind = sym.kindName === 'function'
-          ? CIK.Function
-          : CIK.Variable;
+        const userKind = sym.kindName === 'function' ? CIK.Function : CIK.Variable;
 
         if (sym.kindName === 'function' && sym.params && sym.params.length > 0) {
           const snippetText = `${sym.label}(${sym.params.map((p, i) => `\${${i + 1}:${p}}`).join(', ')})`;
           suggestions.push({
-            label:           sym.label,
-            kind:            userKind,
-            detail:          sym.detail,
-            documentation:   { value: `User-defined procedure.`, isTrusted: false },
-            insertText:      snippetText,
+            label: sym.label,
+            kind: userKind,
+            detail: sym.detail,
+            documentation: { value: `User-defined procedure.`, isTrusted: false },
+            insertText: snippetText,
             insertTextRules: SNIPPET_RULE,
             range,
           });
         } else {
           suggestions.push({
-            label:           sym.label,
-            kind:            userKind,
-            detail:          sym.detail,
-            documentation:   { value: `User-defined ${sym.kindName}.`, isTrusted: false },
-            insertText:      sym.label,
+            label: sym.label,
+            kind: userKind,
+            detail: sym.detail,
+            documentation: { value: `User-defined ${sym.kindName}.`, isTrusted: false },
+            insertText: sym.label,
             insertTextRules: undefined,
             range,
           });
@@ -2037,16 +2294,16 @@ export function registerNeedlescript(monaco: Monaco): void {
 
   // ── Signature help provider ───────────────────────────────────────
   monaco.languages.registerSignatureHelpProvider('needlescript', {
-    signatureHelpTriggerCharacters:   ['(', ','],
+    signatureHelpTriggerCharacters: ['(', ','],
     signatureHelpRetriggerCharacters: [','],
 
     provideSignatureHelp(model: MonacoEditor.ITextModel, position: IPos) {
       // Gather text from document start to cursor
       const textBefore = model.getValueInRange({
         startLineNumber: 1,
-        startColumn:     1,
-        endLineNumber:   position.lineNumber,
-        endColumn:       position.column,
+        startColumn: 1,
+        endLineNumber: position.lineNumber,
+        endColumn: position.column,
       });
 
       const ctx = getSignatureContext(textBefore);
@@ -2056,24 +2313,26 @@ export function registerNeedlescript(monaco: Monaco): void {
       if (!item || !item.params) return null;
 
       // Build one SignatureInformation per overload
-      const signatures = item.params.map(paramNames => {
-        const label = paramNames.length > 0
-          ? `${item.label}(${paramNames.join(', ')})`
-          : `${item.label}()`;
+      const signatures = item.params.map((paramNames) => {
+        const label =
+          paramNames.length > 0 ? `${item.label}(${paramNames.join(', ')})` : `${item.label}()`;
 
         // Compute label ranges for each parameter
-        const parameters = paramNames.map(paramName => {
+        const parameters = paramNames.map((paramName) => {
           const start = label.indexOf(paramName);
-          const end   = start + paramName.length;
+          const end = start + paramName.length;
           return {
-            label:         [start, end] as [number, number],
+            label: [start, end] as [number, number],
             documentation: undefined,
           };
         });
 
         return {
           label,
-          documentation: { value: item.documentation, isTrusted: true } as Monaco['languages']['IMarkdownString'],
+          documentation: {
+            value: item.documentation,
+            isTrusted: true,
+          } as Monaco['languages']['IMarkdownString'],
           parameters,
         };
       });
@@ -2092,8 +2351,8 @@ export function registerNeedlescript(monaco: Monaco): void {
       }
 
       // Cap the active parameter index at the last parameter in this overload
-      const sig           = signatures[activeSignature];
-      const activeParam   = Math.min(ctx.paramIndex, sig.parameters.length - 1);
+      const sig = signatures[activeSignature];
+      const activeParam = Math.min(ctx.paramIndex, sig.parameters.length - 1);
 
       return {
         value: {

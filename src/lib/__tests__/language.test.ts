@@ -5,7 +5,7 @@ import { EXAMPLES } from '../../data.ts';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-const stitches = (src: string) => run(src).events.filter(e => e.t === 'stitch');
+const stitches = (src: string) => run(src).events.filter((e) => e.t === 'stitch');
 const lastStitch = (src: string) => {
   const s = stitches(src);
   return s[s.length - 1];
@@ -16,8 +16,12 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 // ── new operators ───────────────────────────────────────────────────────────
 describe('operators — <= >= != and or not', () => {
   it('<= and >= compare inclusively', () => {
-    expect(printed('print 3 <= 3 print 4 <= 3 print 3 >= 3 print 2 >= 3'))
-      .toEqual(['1', '0', '1', '0']);
+    expect(printed('print 3 <= 3 print 4 <= 3 print 3 >= 3 print 2 >= 3')).toEqual([
+      '1',
+      '0',
+      '1',
+      '0',
+    ]);
   });
 
   it('!= compares for inequality', () => {
@@ -25,8 +29,9 @@ describe('operators — <= >= != and or not', () => {
   });
 
   it('and / or / not work on truthiness (0 = false)', () => {
-    expect(printed('print 1 and 0 print 1 and 2 print 0 or 0 print 0 or 5 print not 0 print not 7'))
-      .toEqual(['0', '1', '0', '1', '1', '0']);
+    expect(
+      printed('print 1 and 0 print 1 and 2 print 0 or 0 print 0 or 5 print not 0 print not 7'),
+    ).toEqual(['0', '1', '0', '1', '1', '0']);
   });
 
   it('and / or short-circuit, so guarded division is safe', () => {
@@ -46,8 +51,7 @@ describe('while and for loops', () => {
   });
 
   it('while that never sews and never ends hits the ops budget', () => {
-    expect(() => run('make "i 1 while :i > 0 [ make "i :i + 1 ]'))
-      .toThrow(/ran too long/);
+    expect(() => run('make "i 1 while :i > 0 [ make "i :i + 1 ]')).toThrow(/ran too long/);
   });
 
   it('for counts inclusively with the given step', () => {
@@ -75,14 +79,7 @@ describe('while and for loops', () => {
 // ── local / make scoping ────────────────────────────────────────────────────
 describe('local variables', () => {
   it('local stays inside the procedure and make updates it there', () => {
-    const src = [
-      'to f',
-      '  local "x 5',
-      '  make "x 7',
-      '  print :x',
-      'end',
-      'f',
-    ].join('\n');
+    const src = ['to f', '  local "x 5', '  make "x 7', '  print :x', 'end', 'f'].join('\n');
     expect(printed(src)).toEqual(['7']);
     expect(() => run(src + '\nprint :x')).toThrow(/Unknown variable/);
   });
@@ -133,8 +130,7 @@ describe('output and exit', () => {
 
   it('exit leaves a procedure early', () => {
     expect(stitches('to f :n if :n > 3 [ exit ] fd 10 end f 5').length).toBe(0);
-    expect(stitches('to f :n if :n > 3 [ exit ] fd 10 end lock 0 f 1').length)
-      .toBeGreaterThan(0);
+    expect(stitches('to f :n if :n > 3 [ exit ] fd 10 end lock 0 f 1').length).toBeGreaterThan(0);
   });
 
   it('output also stops the procedure when called as a plain command', () => {
@@ -159,8 +155,9 @@ describe('output and exit', () => {
 // ── new math functions ──────────────────────────────────────────────────────
 describe('math functions', () => {
   it('min / max / pow / floor / ceil', () => {
-    expect(printed('print min 3 5 print max 3 5 print pow 2 10 print floor 2.7 print ceil 2.1'))
-      .toEqual(['3', '5', '1024', '2', '3']);
+    expect(
+      printed('print min 3 5 print max 3 5 print pow 2 10 print floor 2.7 print ceil 2.1'),
+    ).toEqual(['3', '5', '1024', '2', '3']);
   });
 
   it('pow that overflows is an error', () => {
@@ -168,15 +165,16 @@ describe('math functions', () => {
   });
 
   it('atan returns a heading-convention angle (0 = north, clockwise)', () => {
-    expect(printed('print atan 1 0 print atan 0 1 print atan 0 -1'))
-      .toEqual(['90', '0', '180']);
+    expect(printed('print atan 1 0 print atan 0 1 print atan 0 -1')).toEqual(['90', '0', '180']);
   });
 
   it('towards and distance measure from the needle', () => {
     expect(printed('print towards 10 0 print distance 3 4')).toEqual(['90', '5']);
     // after moving, both are relative to the new position
-    expect(printed('lock 0 up setxy 10 0 print towards 20 0 print distance 10 10'))
-      .toEqual(['90', '10']);
+    expect(printed('lock 0 up setxy 10 0 print towards 20 0 print distance 10 10')).toEqual([
+      '90',
+      '10',
+    ]);
   });
 });
 
@@ -242,7 +240,7 @@ describe('push and pop', () => {
   it('pop jumps back to the saved position and heading', () => {
     const out = run('lock 0 push rt 45 fd 10 pop print xcor print ycor print heading');
     expect(out.printed).toEqual(['0', '0', '0']);
-    expect(out.events.some(e => e.t === 'jump')).toBe(true);
+    expect(out.events.some((e) => e.t === 'jump')).toBe(true);
   });
 
   it('pop never sews the way back', () => {
@@ -258,7 +256,7 @@ describe('push and pop', () => {
 
   it('pop with an empty stack warns instead of failing', () => {
     const out = run('pop fd 1');
-    expect(out.warnings.some(w => w.includes('pop ignored'))).toBe(true);
+    expect(out.warnings.some((w) => w.includes('pop ignored'))).toBe(true);
   });
 });
 
@@ -275,7 +273,7 @@ describe('setx / sety', () => {
 describe('debugging commands', () => {
   it('mark emits a render-only event at the needle', () => {
     const out = run('lock 0 fd 5 mark');
-    const marks = out.events.filter(e => e.t === 'mark');
+    const marks = out.events.filter((e) => e.t === 'mark');
     expect(marks.length).toBe(1);
     expect(r2(marks[0].y)).toBeCloseTo(5, 1);
   });
@@ -302,20 +300,20 @@ describe('debugging commands', () => {
 describe('source line tagging', () => {
   it('every stitch knows the line that sewed it', () => {
     const out = run('lock 0 fd 5\nrt 90\nfd 5');
-    const lines = new Set(out.events.map(e => e.line));
+    const lines = new Set(out.events.map((e) => e.line));
     expect(lines.has(1)).toBe(true);
     expect(lines.has(3)).toBe(true);
-    expect(out.events.every(e => e.line !== undefined)).toBe(true);
+    expect(out.events.every((e) => e.line !== undefined)).toBe(true);
   });
 
   it('stitches sewn inside a procedure report the call site, not the line of the fd', () => {
     const out = run('lock 0\nto f\nfd 5\nend\nf');
-    expect(out.events.every(e => e.line === 5)).toBe(true);
+    expect(out.events.every((e) => e.line === 5)).toBe(true);
   });
 
   it('lock stitches inherit a neighbouring line', () => {
     const out = run('fd 5');
-    expect(out.events.every(e => e.line !== undefined)).toBe(true);
+    expect(out.events.every((e) => e.line !== undefined)).toBe(true);
   });
 });
 
@@ -345,12 +343,23 @@ describe('did-you-mean suggestions', () => {
 
 // ── reserved words ──────────────────────────────────────────────────────────
 describe('reserved words', () => {
-  it.each(['while', 'for', 'output', 'exit', 'local', 'and', 'or', 'not', 'noise', 'arc', 'push', 'break', 'continue'])(
-    'refuses to redefine "%s"',
-    (w) => {
-      expect(() => run(`to ${w} fd 1 end`)).toThrow(/can't be redefined/);
-    },
-  );
+  it.each([
+    'while',
+    'for',
+    'output',
+    'exit',
+    'local',
+    'and',
+    'or',
+    'not',
+    'noise',
+    'arc',
+    'push',
+    'break',
+    'continue',
+  ])('refuses to redefine "%s"', (w) => {
+    expect(() => run(`to ${w} fd 1 end`)).toThrow(/can't be redefined/);
+  });
 });
 
 // ── examples stay sewable ───────────────────────────────────────────────────

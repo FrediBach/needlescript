@@ -53,7 +53,8 @@ describe('parseParameters', () => {
     it('sets step to (max-min)/100', () => {
       const src = 'let x = 2.5 // [0.5:8]';
       const items = parseParameters(src);
-      const def = (items[0] as { kind: 'param'; def: import('../parse-parameters.ts').ParamDef }).def;
+      const def = (items[0] as { kind: 'param'; def: import('../parse-parameters.ts').ParamDef })
+        .def;
       expect(def.step).toBeCloseTo((8 - 0.5) / 100);
     });
   });
@@ -93,7 +94,8 @@ describe('parseParameters', () => {
     it('recognises [switch:label0,label1]', () => {
       const src = 'let mode = 0 // [switch:hypo,epi]';
       const items = parseParameters(src);
-      const def = (items[0] as { kind: 'param'; def: import('../parse-parameters.ts').ParamDef }).def;
+      const def = (items[0] as { kind: 'param'; def: import('../parse-parameters.ts').ParamDef })
+        .def;
       expect(def.labels).toEqual(['hypo', 'epi']);
     });
   });
@@ -154,14 +156,11 @@ describe('parseParameters', () => {
   });
 
   it('returns items in source order with mixed content', () => {
-    const src = [
-      '// --- A ---',
-      'let x = 1 // [0:10]',
-      '// --- B ---',
-      'let y = 2 // [0:20]',
-    ].join('\n');
+    const src = ['// --- A ---', 'let x = 1 // [0:10]', '// --- B ---', 'let y = 2 // [0:20]'].join(
+      '\n',
+    );
     const items = parseParameters(src);
-    expect(items.map(i => i.kind)).toEqual(['section', 'param', 'section', 'param']);
+    expect(items.map((i) => i.kind)).toEqual(['section', 'param', 'section', 'param']);
   });
 });
 
@@ -170,43 +169,43 @@ describe('parseParameters', () => {
 describe('updateParameter', () => {
   it('updates a let declaration in place', () => {
     const src = 'let radius = 15 // [5:50]';
-    const out  = updateParameter(src, 1, 'radius', 25);
+    const out = updateParameter(src, 1, 'radius', 25);
     expect(out).toBe('let radius = 25 // [5:50]');
   });
 
   it('preserves the annotation comment', () => {
     const src = 'let n = 8 // [4:30] — integer slider';
-    const out  = updateParameter(src, 1, 'n', 12);
+    const out = updateParameter(src, 1, 'n', 12);
     expect(out).toBe('let n = 12 // [4:30] — integer slider');
   });
 
   it('updates a make declaration', () => {
     const src = 'make "radius 15 // [5:50]';
-    const out  = updateParameter(src, 1, 'radius', 30);
+    const out = updateParameter(src, 1, 'radius', 30);
     expect(out).toBe('make "radius 30 // [5:50]');
   });
 
   it('updates a bare assignment', () => {
     const src = 'radius = 15 // [5:50]';
-    const out  = updateParameter(src, 1, 'radius', 5);
+    const out = updateParameter(src, 1, 'radius', 5);
     expect(out).toBe('radius = 5 // [5:50]');
   });
 
   it('handles negative values', () => {
     const src = 'let offset = 5 // [-10:10]';
-    const out  = updateParameter(src, 1, 'offset', -3);
+    const out = updateParameter(src, 1, 'offset', -3);
     expect(out).toBe('let offset = -3 // [-10:10]');
   });
 
   it('handles float values', () => {
     const src = 'let t = 0.5 // [0:1]';
-    const out  = updateParameter(src, 1, 't', 0.75);
+    const out = updateParameter(src, 1, 't', 0.75);
     expect(out).toBe('let t = 0.75 // [0:1]');
   });
 
   it('targets the correct line in multiline source', () => {
     const src = 'let a = 1 // [0:10]\nlet b = 2 // [0:10]\nlet c = 3 // [0:10]';
-    const out  = updateParameter(src, 2, 'b', 9);
+    const out = updateParameter(src, 2, 'b', 9);
     expect(out).toBe('let a = 1 // [0:10]\nlet b = 9 // [0:10]\nlet c = 3 // [0:10]');
   });
 
@@ -217,7 +216,7 @@ describe('updateParameter', () => {
 
   it('formats whole-number floats without decimal point', () => {
     const src = 'let n = 3.5 // [0:10]';
-    const out  = updateParameter(src, 1, 'n', 5.0);
+    const out = updateParameter(src, 1, 'n', 5.0);
     expect(out).toBe('let n = 5 // [0:10]');
   });
 });

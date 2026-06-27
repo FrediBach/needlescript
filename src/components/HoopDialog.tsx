@@ -1,11 +1,7 @@
 import { useEffect } from 'react';
 import type { HoopConfig } from '../data.ts';
 import { HOOPS } from '../data.ts';
-import {
-  Dialog,
-  DialogContent,
-  DialogClose,
-} from '@/components/ui/dialog.tsx';
+import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog.tsx';
 import { buttonVariants } from '@/components/ui/button.tsx';
 import { cn } from '@/lib/utils.ts';
 
@@ -71,13 +67,20 @@ export default function HoopDialog({ open, current, onSelect, onClose }: Props) 
   // but we keep this for belt-and-suspenders consistency)
   useEffect(() => {
     if (!open) return;
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handle = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('keydown', handle);
     return () => document.removeEventListener('keydown', handle);
   }, [open, onClose]);
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
+    >
       <DialogContent
         showCloseButton={false}
         className="max-w-[460px] w-full p-0 gap-0 rounded-xl overflow-hidden bg-card border border-border"
@@ -95,18 +98,21 @@ export default function HoopDialog({ open, current, onSelect, onClose }: Props) 
 
         {/* Grid of hoop options */}
         <div className="grid grid-cols-4 gap-2 p-[14px]">
-          {HOOPS.map(hoop => (
+          {HOOPS.map((hoop) => (
             <button
               key={hoop.id}
               type="button"
               className={cn(
                 buttonVariants({ variant: 'outline' }),
-                "flex flex-col items-center gap-2 py-[13px] pb-[11px] px-2 h-auto",
-                "font-mono text-[10px] text-muted-foreground",
-                "border-[1.5px] transition-colors duration-100",
-                hoop.id === current.id && "border-[var(--gold)] text-foreground",
+                'flex flex-col items-center gap-2 py-[13px] pb-[11px] px-2 h-auto',
+                'font-mono text-[10px] text-muted-foreground',
+                'border-[1.5px] transition-colors duration-100',
+                hoop.id === current.id && 'border-[var(--gold)] text-foreground',
               )}
-              onClick={() => { onSelect(hoop); onClose(); }}
+              onClick={() => {
+                onSelect(hoop);
+                onClose();
+              }}
               aria-pressed={hoop.id === current.id}
             >
               <HoopIcon hoop={hoop} size={38} />

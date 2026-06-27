@@ -18,7 +18,9 @@ export default function StatsChips({ design }: Props) {
   } else if (s) {
     chips.push({ text: `${s.stitches.toLocaleString()} stitches` });
     const yarnM = s.yarnLength / 1000;
-    chips.push({ text: yarnM >= 1 ? `${yarnM.toFixed(1)} m yarn` : `${Math.round(s.yarnLength)} mm yarn` });
+    chips.push({
+      text: yarnM >= 1 ? `${yarnM.toFixed(1)} m yarn` : `${Math.round(s.yarnLength)} mm yarn`,
+    });
     if (s.jumps) chips.push({ text: `${s.jumps} jump${s.jumps > 1 ? 's' : ''}` });
     chips.push({ text: `${s.colorsUsed} colour${s.colorsUsed > 1 ? 's' : ''}` });
     chips.push({ text: `${s.width.toFixed(1)} × ${s.height.toFixed(1)} mm` });
@@ -33,10 +35,10 @@ export default function StatsChips({ design }: Props) {
           key={chip.text}
           variant={chip.type === 'err' ? 'destructive' : 'outline'}
           className={cn(
-            "font-mono text-[10.5px] h-auto py-[3px] px-[8px] rounded-[5px]",
-            "bg-[rgba(0,0,0,0.05)] border-[rgba(0,0,0,0.1)] text-[rgba(0,0,0,0.4)]",
-            chip.type === 'warn' && "border-[var(--gold-60)] text-gold",
-            chip.type === 'err' && "bg-[var(--run-25)] border-[var(--run-50)] text-white",
+            'font-mono text-[10.5px] h-auto py-[3px] px-[8px] rounded-[5px]',
+            'bg-[rgba(0,0,0,0.05)] border-[rgba(0,0,0,0.1)] text-[rgba(0,0,0,0.4)]',
+            chip.type === 'warn' && 'border-[var(--gold-60)] text-gold',
+            chip.type === 'err' && 'bg-[var(--run-25)] border-[var(--run-50)] text-white',
           )}
         >
           {chip.text}

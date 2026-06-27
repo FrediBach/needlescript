@@ -3,11 +3,21 @@ import { toEXP } from '../exp.ts';
 import { run } from '../engine.ts';
 import type { StitchEvent } from '../engine.ts';
 
-function stitch(x: number, y: number, c = 0): StitchEvent { return { t: 'stitch', x, y, c }; }
-function jump(x: number, y: number, c = 0): StitchEvent   { return { t: 'jump',   x, y, c }; }
-function colorEvt(c = 0): StitchEvent                      { return { t: 'color',  x: 0, y: 0, c }; }
-function trimEvt(): StitchEvent                            { return { t: 'trim',   x: 0, y: 0, c: 0 }; }
-function markEvt(): StitchEvent                            { return { t: 'mark',   x: 0, y: 0, c: 0 }; }
+function stitch(x: number, y: number, c = 0): StitchEvent {
+  return { t: 'stitch', x, y, c };
+}
+function jump(x: number, y: number, c = 0): StitchEvent {
+  return { t: 'jump', x, y, c };
+}
+function colorEvt(c = 0): StitchEvent {
+  return { t: 'color', x: 0, y: 0, c };
+}
+function trimEvt(): StitchEvent {
+  return { t: 'trim', x: 0, y: 0, c: 0 };
+}
+function markEvt(): StitchEvent {
+  return { t: 'mark', x: 0, y: 0, c: 0 };
+}
 
 // ── EXP record parser ────────────────────────────────────────────────────────
 interface ExpRecord {
@@ -80,25 +90,25 @@ describe('toEXP', () => {
       const events = [stitch(0, 0), stitch(0, 5), colorEvt(1), stitch(0, 5), stitch(0, 10)];
       const out = toEXP(events);
       const records = parseExpRecords(out);
-      expect(records.some(r => r.type === 'color')).toBe(true);
+      expect(records.some((r) => r.type === 'color')).toBe(true);
     });
 
     it('trim event produces 0x80 0x80 trim record', () => {
       const events = [stitch(0, 0), stitch(0, 5), trimEvt(), stitch(0, 10)];
       const out = toEXP(events);
       const records = parseExpRecords(out);
-      expect(records.some(r => r.type === 'trim')).toBe(true);
+      expect(records.some((r) => r.type === 'trim')).toBe(true);
     });
 
     it('jump event produces 0x80 0x04 jump record', () => {
       const events = [stitch(0, 0), jump(0, 10), stitch(0, 10)];
       const out = toEXP(events);
       const records = parseExpRecords(out);
-      expect(records.some(r => r.type === 'jump')).toBe(true);
+      expect(records.some((r) => r.type === 'jump')).toBe(true);
     });
 
     it('mark events are silently dropped', () => {
-      const withMark    = toEXP([stitch(0, 0), markEvt(), stitch(0, 5)]);
+      const withMark = toEXP([stitch(0, 0), markEvt(), stitch(0, 5)]);
       const withoutMark = toEXP([stitch(0, 0), stitch(0, 5)]);
       expect(withMark).toEqual(withoutMark);
     });
@@ -109,14 +119,14 @@ describe('toEXP', () => {
     it('encodes a vertical stitch correctly (y in 0.1 mm units)', () => {
       // 10 mm → 100 units; split into records of ≤ 127 each
       const out = toEXP([stitch(0, 0), stitch(0, 10)]);
-      const records = parseExpRecords(out).filter(r => r.type === 'stitch');
+      const records = parseExpRecords(out).filter((r) => r.type === 'stitch');
       const totalDY = records.reduce((s, r) => s + r.dy, 0);
       expect(totalDY).toBe(100);
     });
 
     it('encodes a horizontal stitch correctly', () => {
       const out = toEXP([stitch(0, 0), stitch(5, 0)]);
-      const records = parseExpRecords(out).filter(r => r.type === 'stitch');
+      const records = parseExpRecords(out).filter((r) => r.type === 'stitch');
       const totalDX = records.reduce((s, r) => s + r.dx, 0);
       expect(totalDX).toBe(50); // 5 mm × 10 = 50 units
     });
@@ -125,7 +135,7 @@ describe('toEXP', () => {
       // Exercise a real design — deltas must never be ±128
       const result = run('stitchlen 2.2\nrepeat 12 [\n  repeat 36 [ fd 3.4 rt 10 ]\n  rt 30\n]');
       const out = toEXP(result.events);
-      for (let i = 0; i < out.length; ) {
+      for (let i = 0; i < out.length;) {
         if (out[i] === 0x80) {
           // skip 4-byte control record
           i += 4;
@@ -141,9 +151,9 @@ describe('toEXP', () => {
     it('splits large deltas into multiple records (max 127 units each)', () => {
       // 30 mm = 300 units — must be split into multiple records
       const out = toEXP([stitch(0, 0), stitch(0, 30)]);
-      const records = parseExpRecords(out).filter(r => r.type === 'stitch');
+      const records = parseExpRecords(out).filter((r) => r.type === 'stitch');
       expect(records.length).toBeGreaterThan(1); // needs at least 3 records
-      expect(records.every(r => Math.abs(r.dy) <= 127)).toBe(true);
+      expect(records.every((r) => Math.abs(r.dy) <= 127)).toBe(true);
       const totalDY = records.reduce((s, r) => s + r.dy, 0);
       expect(totalDY).toBe(300);
     });
@@ -152,7 +162,7 @@ describe('toEXP', () => {
       // stitch(5,0) → dx=+50 from origin; stitch(0,0) → dx=−50 back.
       // The last stitch record's dx should be −50.
       const out = toEXP([stitch(5, 0), stitch(0, 0)]);
-      const records = parseExpRecords(out).filter(r => r.type === 'stitch');
+      const records = parseExpRecords(out).filter((r) => r.type === 'stitch');
       expect(records.at(-1)?.dx).toBe(-50); // last move: −5 mm × 10 = −50 units
     });
   });

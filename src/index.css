@@ -1,16 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,640&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   /* ── Font stacks ─────────────────────────────────────────────────────── */
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
   /* Use IBM Plex Mono as the app's default "sans" so shadcn base layer applies it */
-  --font-sans: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* ── Border radius ───────────────────────────────────────────────────── */
   --radius-sm: calc(var(--radius) * 0.6);
@@ -21,15 +21,15 @@
 
   /* ── Font size scale ─────────────────────────────────────────────────── */
   /* Use as Tailwind utilities: text-badge, text-label, text-sub… */
-  --text-badge:    10px;    /* very small: badges, bounds labels */
-  --text-label:    11px;   /* labels, group headers, uppercase caps */
-  --text-sub:      11px;   /* secondary labels, playback counter */
-  --text-param:    11.5px; /* parameter names, section notes */
-  --text-code:     12px;   /* console output, code-like text */
-  --text-ui:       12.5px; /* dropdowns, selects, reference entries */
-  --text-body:     13px;   /* default body / REPL */
-  --text-wordmark: 19px;   /* header wordmark */
-  --text-display:  22px;   /* tutorial h1, about title */
+  --text-badge: 10px; /* very small: badges, bounds labels */
+  --text-label: 11px; /* labels, group headers, uppercase caps */
+  --text-sub: 11px; /* secondary labels, playback counter */
+  --text-param: 11.5px; /* parameter names, section notes */
+  --text-code: 12px; /* console output, code-like text */
+  --text-ui: 12.5px; /* dropdowns, selects, reference entries */
+  --text-body: 13px; /* default body / REPL */
+  --text-wordmark: 19px; /* header wordmark */
+  --text-display: 22px; /* tutorial h1, about title */
 
   /* ── shadcn semantic colors (leave unchanged) ────────────────────────── */
   --color-background: var(--background);
@@ -60,58 +60,66 @@
   /* e.g. --color-gold → bg-gold, text-gold, border-gold …              */
 
   /* Surfaces */
-  --color-panel:             var(--bg-panel);
-  --color-panel-raised:      var(--bg-panel-raised);
-  --color-warm-surface:      var(--bg-warm);
-  --color-warm-deep:         var(--bg-warm-deep);
-  --color-canvas:            var(--bg-canvas);
-  --color-canvas-hover:      var(--bg-canvas-hover);
-  --color-fabric:            var(--fabric);
-  --color-fabric-dark:       var(--fabric-dark);
+  --color-panel: var(--bg-panel);
+  --color-panel-raised: var(--bg-panel-raised);
+  --color-warm-surface: var(--bg-warm);
+  --color-warm-deep: var(--bg-warm-deep);
+  --color-canvas: var(--bg-canvas);
+  --color-canvas-hover: var(--bg-canvas-hover);
+  --color-fabric: var(--fabric);
+  --color-fabric-dark: var(--fabric-dark);
   /* Hoop */
-  --color-hoop:              var(--hoop-color);
-  --color-hoop-dark:         var(--hoop-color-dark);
+  --color-hoop: var(--hoop-color);
+  --color-hoop-dark: var(--hoop-color-dark);
   /* Text — cool */
-  --color-pale:              var(--text);
-  --color-dim:               var(--text-muted);
-  --color-faint:             var(--text-faint);
-  --color-tag:               var(--text-tag);
+  --color-pale: var(--text);
+  --color-dim: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-tag: var(--text-tag);
   /* Text — warm */
-  --color-warm-text:         var(--text-warm);
-  --color-warm-text-dim:     var(--text-warm-muted);
-  --color-warm-text-faint:   var(--text-warm-faint);
+  --color-warm-text: var(--text-warm);
+  --color-warm-text-dim: var(--text-warm-muted);
+  --color-warm-text-faint: var(--text-warm-faint);
   /* Text — canvas */
-  --color-on-canvas:         var(--text-on-canvas);
-  --color-on-canvas-dim:     var(--text-on-canvas-dim);
-  --color-on-run:            var(--text-on-run);
+  --color-on-canvas: var(--text-on-canvas);
+  --color-on-canvas-dim: var(--text-on-canvas-dim);
+  --color-on-run: var(--text-on-run);
   /* Borders */
-  --color-warm-edge:         var(--border-warm);
-  --color-warm-edge-sub:     var(--border-warm-sub);
+  --color-warm-edge: var(--border-warm);
+  --color-warm-edge-sub: var(--border-warm-sub);
   /* Gold accent */
-  --color-gold:              var(--gold);
-  --color-gold-hi:           var(--gold-hi);
-  --color-gold-light:        var(--gold-light);
+  --color-gold: var(--gold);
+  --color-gold-hi: var(--gold-hi);
+  --color-gold-light: var(--gold-light);
   /* Run action */
-  --color-run:               var(--run);
-  --color-run-hi:            var(--run-hi);
-  --color-run-dark:          var(--run-dark);
+  --color-run: var(--run);
+  --color-run-hi: var(--run-hi);
+  --color-run-dark: var(--run-dark);
   /* Warm secondary buttons */
-  --color-warm-btn:          var(--warm-btn-bg);
-  --color-warm-btn-edge:     var(--warm-btn-border);
-  --color-warm-btn-hi:       var(--warm-btn-hover-bg);
-  --color-warm-btn-edge-hi:  var(--warm-btn-hover-border);
+  --color-warm-btn: var(--warm-btn-bg);
+  --color-warm-btn-edge: var(--warm-btn-border);
+  --color-warm-btn-hi: var(--warm-btn-hover-bg);
+  --color-warm-btn-edge-hi: var(--warm-btn-hover-border);
   /* Console status */
-  --color-console-ok:        var(--console-ok);
-  --color-console-err:       var(--console-err);
+  --color-console-ok: var(--console-ok);
+  --color-console-err: var(--console-err);
 
   /* ── Animations ──────────────────────────────────────────────────────── */
   @keyframes accordion-down {
-    from { height: 0; }
-    to { height: var(--radix-accordion-content-height, auto); }
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height, auto);
+    }
   }
   @keyframes accordion-up {
-    from { height: var(--radix-accordion-content-height, auto); }
-    to { height: 0; }
+    from {
+      height: var(--radix-accordion-content-height, auto);
+    }
+    to {
+      height: 0;
+    }
   }
 }
 
@@ -128,117 +136,117 @@
      ════════════════════════════════════════════════════════════════════════ */
 
   /* ── Surfaces — cool blue-gray IDE chrome ────────────────────────────── */
-  --bg-app:          #1B2030;   /* outermost app background */
-  --bg-panel:        #252B41;   /* editor, dialog surfaces */
-  --bg-panel-raised: #2D3450;   /* popover / elevated surfaces */
+  --bg-app: #1b2030; /* outermost app background */
+  --bg-panel: #252b41; /* editor, dialog surfaces */
+  --bg-panel-raised: #2d3450; /* popover / elevated surfaces */
 
   /* ── Surfaces — warm sepia (header, parameters panel) ───────────────── */
-  --bg-warm:         #2E2128;   /* header bar, parameters panel */
-  --bg-warm-deep:    #1E1118;   /* deeper warm (numeric inputs) */
+  --bg-warm: #2e2128; /* header bar, parameters panel */
+  --bg-warm-deep: #1e1118; /* deeper warm (numeric inputs) */
 
   /* ── Surfaces — stage, fabric, canvas elements ───────────────────────── */
-  --bg-canvas:       #FFFDF7;   /* stage buttons / playback bar */
-  --bg-canvas-hover: #F5EFE8;   /* hover on canvas-surface elements */
-  --fabric:          #EFE8D8;   /* linen stage background */
-  --fabric-dark:     #E5DCC7;   /* darker linen (playback bar) */
+  --bg-canvas: #fffdf7; /* stage buttons / playback bar */
+  --bg-canvas-hover: #f5efe8; /* hover on canvas-surface elements */
+  --fabric: #efe8d8; /* linen stage background */
+  --fabric-dark: #e5dcc7; /* darker linen (playback bar) */
 
   /* ── Borders ─────────────────────────────────────────────────────────── */
-  --border-warm:     #5A3A30;   /* header border */
-  --border-warm-sub: #4A3632;   /* parameters panel, subtle warm divider */
+  --border-warm: #5a3a30; /* header border */
+  --border-warm-sub: #4a3632; /* parameters panel, subtle warm divider */
 
   /* ── Text — cool blue-gray surfaces ──────────────────────────────────── */
-  --text:            #EDE7DA;   /* primary on dark */
-  --text-muted:      #9BA1BD;   /* secondary / dim on dark */
-  --text-faint:      #6E7494;   /* labels, captions, dropdown headers */
-  --text-tag:        #B0A090;   /* brand tagline */
+  --text: #ede7da; /* primary on dark */
+  --text-muted: #9ba1bd; /* secondary / dim on dark */
+  --text-faint: #6e7494; /* labels, captions, dropdown headers */
+  --text-tag: #b0a090; /* brand tagline */
 
   /* ── Text — warm sepia surfaces ──────────────────────────────────────── */
-  --text-warm:       #D0C5B2;   /* primary on warm */
-  --text-warm-muted: #7A6E68;   /* secondary on warm */
-  --text-warm-faint: #56433F;   /* faint / decorative on warm */
+  --text-warm: #d0c5b2; /* primary on warm */
+  --text-warm-muted: #7a6e68; /* secondary on warm */
+  --text-warm-faint: #56433f; /* faint / decorative on warm */
 
   /* ── Text — fabric / canvas ───────────────────────────────────────────── */
-  --text-on-canvas:     #4A3F2C;   /* text / icons on the fabric canvas */
-  --text-on-canvas-dim: #5A4D35;   /* dim text on canvas */
-  --text-on-run:        #FFF4EA;   /* text on the primary run button */
+  --text-on-canvas: #4a3f2c; /* text / icons on the fabric canvas */
+  --text-on-canvas-dim: #5a4d35; /* dim text on canvas */
+  --text-on-run: #fff4ea; /* text on the primary run button */
 
   /* ── Embroidery hoop ─────────────────────────────────────────────────── */
-  --hoop-color:      #B98B4E;   /* hoop frame amber */
-  --hoop-color-dark: #7E5C2E;   /* hoop frame shadow */
+  --hoop-color: #b98b4e; /* hoop frame amber */
+  --hoop-color-dark: #7e5c2e; /* hoop frame shadow */
 
   /* ── Accent — brand gold ──────────────────────────────────────────────── */
-  --gold:       #CBA16D;
-  --gold-hi:    #DBB17D;   /* brighter: hover / focus */
-  --gold-light: #EBC18D;   /* lightest: text hover */
+  --gold: #cba16d;
+  --gold-hi: #dbb17d; /* brighter: hover / focus */
+  --gold-light: #ebc18d; /* lightest: text hover */
 
   /* ── Actions — run (primary, red) ────────────────────────────────────── */
-  --run:      #C8472F;
-  --run-hi:   #D55036;   /* hover */
-  --run-dark: #A33823;   /* border / pressed */
+  --run: #c8472f;
+  --run-hi: #d55036; /* hover */
+  --run-dark: #a33823; /* border / pressed */
 
   /* ── Actions — warm brown secondary buttons ───────────────────────────── */
-  --warm-btn-bg:           #30262d;
-  --warm-btn-border:       #7A4E3C;
-  --warm-btn-hover-bg:     #502E24;
-  --warm-btn-hover-border: #9A6450;
+  --warm-btn-bg: #30262d;
+  --warm-btn-border: #7a4e3c;
+  --warm-btn-hover-bg: #502e24;
+  --warm-btn-hover-border: #9a6450;
 
   /* ── Status ───────────────────────────────────────────────────────────── */
-  --console-ok:  #9DC08B;
-  --console-err: #E98A77;
+  --console-ok: #9dc08b;
+  --console-err: #e98a77;
 
-  --share-ok-bg:     #1E4030;
-  --share-ok-border: #2E6048;
-  --share-ok-text:   #7DDAAB;
+  --share-ok-bg: #1e4030;
+  --share-ok-border: #2e6048;
+  --share-ok-text: #7ddaab;
 
-  --share-err-bg:     #3D1E1E;
-  --share-err-border: #6A2A2A;
-  --share-err-text:   #F08080;
+  --share-err-bg: #3d1e1e;
+  --share-err-border: #6a2a2a;
+  --share-err-text: #f08080;
 
   /* ── Typography ───────────────────────────────────────────────────────── */
-  --font-mono:  "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
 
   /* Reference in CSS: font-size: var(--fs-label)
      Tailwind equivalent utilities: text-badge, text-label, text-sub … */
-  --fs-badge:    9px;
-  --fs-label:    10px;
-  --fs-sub:      11px;
-  --fs-param:    11.5px;
-  --fs-code:     12px;
-  --fs-ui:       12.5px;
-  --fs-base:     13px;
-  --fs-lg:       14px;
+  --fs-badge: 9px;
+  --fs-label: 10px;
+  --fs-sub: 11px;
+  --fs-param: 11.5px;
+  --fs-code: 12px;
+  --fs-ui: 12.5px;
+  --fs-base: 13px;
+  --fs-lg: 14px;
   --fs-wordmark: 19px;
-  --fs-display:  22px;
+  --fs-display: 22px;
 
   /* ── RGB channel decompositions (enable rgba opacity variants) ────────── */
   /* Usage:  rgba(var(--gold-rgb), 0.45)  →  rgba(217, 164, 65, 0.45)      */
-  --gold-rgb:         217, 164,  65;   /* --gold       #D9A441 */
-  --run-rgb:          200,  71,  47;   /* --run        #C8472F */
-  --border-rgb:        58,  65,  99;   /* shadcn --border #3A4163 */
-  --bg-app-rgb:        27,  32,  48;   /* --bg-app     #1B2030 */
-  --on-canvas-rgb:    125, 100,  60;   /* canvas ui accent */
-  --fabric-grid-rgb:  120, 100,  70;   /* fabric weave pattern */
+  --gold-rgb: 217, 164, 65; /* --gold       #D9A441 */
+  --run-rgb: 200, 71, 47; /* --run        #C8472F */
+  --border-rgb: 58, 65, 99; /* shadcn --border #3A4163 */
+  --bg-app-rgb: 27, 32, 48; /* --bg-app     #1B2030 */
+  --on-canvas-rgb: 125, 100, 60; /* canvas ui accent */
+  --fabric-grid-rgb: 120, 100, 70; /* fabric weave pattern */
 
   /* ── Pre-mixed alpha values (used in box-shadow, pseudo-elements) ─────── */
   /* Gold */
-  --gold-5:   rgba(var(--gold-rgb), 0.05);
-  --gold-10:  rgba(var(--gold-rgb), 0.10);
-  --gold-13:  rgba(var(--gold-rgb), 0.13);
-  --gold-18:  rgba(var(--gold-rgb), 0.18);
-  --gold-20:  rgba(var(--gold-rgb), 0.20);
-  --gold-35:  rgba(var(--gold-rgb), 0.35);
-  --gold-40:  rgba(var(--gold-rgb), 0.40);
-  --gold-45:  rgba(var(--gold-rgb), 0.45);
-  --gold-50:  rgba(var(--gold-rgb), 0.50);
-  --gold-55:  rgba(var(--gold-rgb), 0.55);
-  --gold-60:  rgba(var(--gold-rgb), 0.60);
-  --gold-75:  rgba(var(--gold-rgb), 0.75);
+  --gold-5: rgba(var(--gold-rgb), 0.05);
+  --gold-10: rgba(var(--gold-rgb), 0.1);
+  --gold-13: rgba(var(--gold-rgb), 0.13);
+  --gold-18: rgba(var(--gold-rgb), 0.18);
+  --gold-20: rgba(var(--gold-rgb), 0.2);
+  --gold-35: rgba(var(--gold-rgb), 0.35);
+  --gold-40: rgba(var(--gold-rgb), 0.4);
+  --gold-45: rgba(var(--gold-rgb), 0.45);
+  --gold-50: rgba(var(--gold-rgb), 0.5);
+  --gold-55: rgba(var(--gold-rgb), 0.55);
+  --gold-60: rgba(var(--gold-rgb), 0.6);
+  --gold-75: rgba(var(--gold-rgb), 0.75);
   /* Run */
-  --run-25:   rgba(var(--run-rgb), 0.25);
-  --run-50:   rgba(var(--run-rgb), 0.50);
+  --run-25: rgba(var(--run-rgb), 0.25);
+  --run-50: rgba(var(--run-rgb), 0.5);
   /* On-canvas tint */
-  --on-canvas-10: rgba(var(--on-canvas-rgb), 0.10);
+  --on-canvas-10: rgba(var(--on-canvas-rgb), 0.1);
   --on-canvas-22: rgba(var(--on-canvas-rgb), 0.22);
   --on-canvas-45: rgba(var(--on-canvas-rgb), 0.45);
   /* White overlays */
@@ -246,48 +254,54 @@
   --white-18: rgba(255, 255, 255, 0.18);
   --white-38: rgba(255, 255, 255, 0.38);
   --white-55: rgba(255, 255, 255, 0.55);
-  --white-80: rgba(255, 255, 255, 0.80);
+  --white-80: rgba(255, 255, 255, 0.8);
   /* Border */
-  --border-50: rgba(var(--border-rgb), 0.50);
+  --border-50: rgba(var(--border-rgb), 0.5);
   /* App bg tints */
-  --bg-app-60: rgba(var(--bg-app-rgb), 0.60);
+  --bg-app-60: rgba(var(--bg-app-rgb), 0.6);
 
   /* ════════════════════════════════════════════════════════════════════════
      shadcn/ui CSS variables — always dark (no light mode).
      Kept in oklch for shadcn component compatibility; they approximate
      the app design tokens above (see comments).
      ════════════════════════════════════════════════════════════════════════ */
-  --background:              oklch(0.19 0.024 255);   /* ≈ --bg-app    #1B2030 */
-  --foreground:              oklch(0.93 0.016 80);    /* ≈ --text      #EDE7DA */
-  --card:                    oklch(0.22 0.030 255);   /* ≈ --bg-panel  #252B41 */
-  --card-foreground:         oklch(0.93 0.016 80);
-  --popover:                 oklch(0.26 0.035 255);   /* ≈ --bg-panel-raised #2D3450 */
-  --popover-foreground:      oklch(0.93 0.016 80);
-  --primary:                 oklch(0.54 0.165 27);    /* ≈ --run       #C8472F */
-  --primary-foreground:      oklch(0.98 0.008 80);
-  --secondary:               oklch(0.26 0.035 255);
-  --secondary-foreground:    oklch(0.93 0.016 80);
-  --muted:                   oklch(0.26 0.035 255);
-  --muted-foreground:        oklch(0.67 0.030 255);   /* ≈ --text-muted #9BA1BD */
-  --accent:                  oklch(0.33 0.044 255);   /* ≈ border #3A4163 */
-  --accent-foreground:       oklch(0.93 0.016 80);
-  --destructive:             oklch(0.54 0.165 27);    /* ≈ --run */
-  --destructive-foreground:  oklch(0.98 0.008 80);
-  --border:                  oklch(0.33 0.044 255);   /* ≈ #3A4163 */
-  --input:                   oklch(0.33 0.044 255);
-  --ring:                    oklch(0.73 0.130 70);    /* ≈ --gold #D9A441 */
-  --radius:                  0.375rem;                /* 6px */
+  --background: oklch(0.19 0.024 255); /* ≈ --bg-app    #1B2030 */
+  --foreground: oklch(0.93 0.016 80); /* ≈ --text      #EDE7DA */
+  --card: oklch(0.22 0.03 255); /* ≈ --bg-panel  #252B41 */
+  --card-foreground: oklch(0.93 0.016 80);
+  --popover: oklch(0.26 0.035 255); /* ≈ --bg-panel-raised #2D3450 */
+  --popover-foreground: oklch(0.93 0.016 80);
+  --primary: oklch(0.54 0.165 27); /* ≈ --run       #C8472F */
+  --primary-foreground: oklch(0.98 0.008 80);
+  --secondary: oklch(0.26 0.035 255);
+  --secondary-foreground: oklch(0.93 0.016 80);
+  --muted: oklch(0.26 0.035 255);
+  --muted-foreground: oklch(0.67 0.03 255); /* ≈ --text-muted #9BA1BD */
+  --accent: oklch(0.33 0.044 255); /* ≈ border #3A4163 */
+  --accent-foreground: oklch(0.93 0.016 80);
+  --destructive: oklch(0.54 0.165 27); /* ≈ --run */
+  --destructive-foreground: oklch(0.98 0.008 80);
+  --border: oklch(0.33 0.044 255); /* ≈ #3A4163 */
+  --input: oklch(0.33 0.044 255);
+  --ring: oklch(0.73 0.13 70); /* ≈ --gold #D9A441 */
+  --radius: 0.375rem; /* 6px */
 
   --chart-1: oklch(0.87 0.04 255);
-  --chart-2: oklch(0.67 0.030 255);
-  --chart-3: oklch(0.44 0.040 255);
+  --chart-2: oklch(0.67 0.03 255);
+  --chart-3: oklch(0.44 0.04 255);
   --chart-4: oklch(0.37 0.044 255);
   --chart-5: oklch(0.27 0.035 255);
 }
 
-*, *::before, *::after { box-sizing: border-box; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   margin: 0;
 }
@@ -309,5 +323,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { scroll-behavior: auto !important; }
+  * {
+    scroll-behavior: auto !important;
+  }
 }

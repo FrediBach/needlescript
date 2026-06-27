@@ -8,7 +8,7 @@ const COLLECTION_ID = process.env.JSON_BIN_COLLECTION_ID;
 
 // ── Limits ─────────────────────────────────────────────────────────────────
 const MAX_SOURCE_BYTES = 100_000; // 100 KB
-const RATE_LIMIT_MAX = 10;        // requests per window per IP
+const RATE_LIMIT_MAX = 10; // requests per window per IP
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
 // ── In-memory rate limiter ─────────────────────────────────────────────────
@@ -19,7 +19,7 @@ const rateLimitMap = new Map<string, number[]>();
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  const timestamps = (rateLimitMap.get(ip) ?? []).filter(t => t > cutoff);
+  const timestamps = (rateLimitMap.get(ip) ?? []).filter((t) => t > cutoff);
   if (timestamps.length >= RATE_LIMIT_MAX) return false;
   timestamps.push(now);
   rateLimitMap.set(ip, timestamps);
@@ -38,9 +38,15 @@ async function readBody(req: VercelRequest): Promise<unknown> {
   if (req.body !== undefined) return req.body;
   return new Promise((resolve, reject) => {
     let raw = '';
-    req.on('data', chunk => { raw += chunk; });
+    req.on('data', (chunk) => {
+      raw += chunk;
+    });
     req.on('end', () => {
-      try { resolve(JSON.parse(raw)); } catch { reject(new Error('Invalid JSON')); }
+      try {
+        resolve(JSON.parse(raw));
+      } catch {
+        reject(new Error('Invalid JSON'));
+      }
     });
     req.on('error', reject);
   });

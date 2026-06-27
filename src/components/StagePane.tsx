@@ -34,14 +34,13 @@ function CanvasSwitch({
   title?: string;
 }) {
   return (
-    <label
-      className="flex items-center gap-[5px] cursor-pointer select-none"
-      title={title}
-    >
-      <span className={cn(
-        'font-mono text-[10px] tracking-[0.12em] uppercase transition-colors',
-        checked ? 'text-on-canvas' : 'text-on-canvas/55',
-      )}>
+    <label className="flex items-center gap-[5px] cursor-pointer select-none" title={title}>
+      <span
+        className={cn(
+          'font-mono text-[10px] tracking-[0.12em] uppercase transition-colors',
+          checked ? 'text-on-canvas' : 'text-on-canvas/55',
+        )}
+      >
         {label}
       </span>
       {/* Track */}
@@ -60,20 +59,41 @@ function CanvasSwitch({
         )}
       >
         {/* Thumb */}
-        <span className={cn(
-          'absolute top-[1px] h-[10px] w-[10px] rounded-full bg-[#FFFDF7] shadow-sm transition-transform duration-150',
-          checked ? 'translate-x-[13px]' : 'translate-x-[1px]',
-        )} />
+        <span
+          className={cn(
+            'absolute top-[1px] h-[10px] w-[10px] rounded-full bg-[#FFFDF7] shadow-sm transition-transform duration-150',
+            checked ? 'translate-x-[13px]' : 'translate-x-[1px]',
+          )}
+        />
       </button>
     </label>
   );
 }
 
-export default function StagePane({ design, hoop, scrubPos, onScrubChange, activeLine, lineSegments, warningLoc, showDensity, onToggleDensity, hideJumps, onToggleHideJumps }: Props) {
+export default function StagePane({
+  design,
+  hoop,
+  scrubPos,
+  onScrubChange,
+  activeLine,
+  lineSegments,
+  warningLoc,
+  showDensity,
+  onToggleDensity,
+  hideJumps,
+  onToggleHideJumps,
+}: Props) {
   return (
     <section className={styles.pane}>
       <div className={styles.fabric}>
-        <StageCanvas design={design} hoop={hoop} scrubPos={scrubPos} showDensity={showDensity} hideJumps={hideJumps} warningLoc={warningLoc} />
+        <StageCanvas
+          design={design}
+          hoop={hoop}
+          scrubPos={scrubPos}
+          showDensity={showDensity}
+          hideJumps={hideJumps}
+          warningLoc={warningLoc}
+        />
         <StatsChips design={design} />
         <div className="absolute top-[10px] right-[10px] flex items-center gap-[10px]">
           <CanvasSwitch

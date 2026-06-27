@@ -6,16 +6,21 @@ import type { StitchEvent } from '../engine.ts';
 // plan, in order, plus the §12 open-decision cases that were confirmed.
 
 const evts = (src: string) => run(src).events;
-const stitches = (src: string) => evts(src).filter(e => e.t === 'stitch');
+const stitches = (src: string) => evts(src).filter((e) => e.t === 'stitch');
 const warns = (src: string) => run(src).warnings;
 const sameStream = (a: StitchEvent[], b: StitchEvent[]) => {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
-    const x = a[i], y = b[i];
+    const x = a[i],
+      y = b[i];
     if (
-      x.t !== y.t || x.c !== y.c || (x.u || 0) !== (y.u || 0) ||
-      Math.abs(x.x - y.x) > 1e-9 || Math.abs(x.y - y.y) > 1e-9
-    ) return false;
+      x.t !== y.t ||
+      x.c !== y.c ||
+      (x.u || 0) !== (y.u || 0) ||
+      Math.abs(x.x - y.x) > 1e-9 ||
+      Math.abs(x.y - y.y) > 1e-9
+    )
+      return false;
   }
   return true;
 };
@@ -29,7 +34,7 @@ describe('equivalence pin', () => {
     );
     expect(sameStream(builtin, programmable)).toBe(true);
     // and it really is a column, not an empty stream
-    expect(programmable.filter(e => e.t === 'stitch').length).toBe(101);
+    expect(programmable.filter((e) => e.t === 'stitch').length).toBe(101);
   });
 
   it('holds with underlay and pullcomp engaged too', () => {
@@ -54,8 +59,15 @@ fd 40`;
     const s = stitches(src);
     // anchor, then the alternating "/" and "\" diagonals raked by the lags
     const expected = [
-      [0.0, 0.0], [2.0, 1.2], [-2.0, 0.0], [2.0, 0.4], [-2.0, 2.4],
-      [2.0, 2.8], [-2.0, 1.6], [2.0, 2.0], [-2.0, 4.0],
+      [0.0, 0.0],
+      [2.0, 1.2],
+      [-2.0, 0.0],
+      [2.0, 0.4],
+      [-2.0, 2.4],
+      [2.0, 2.8],
+      [-2.0, 1.6],
+      [2.0, 2.0],
+      [-2.0, 4.0],
     ];
     expected.forEach(([x, y], k) => {
       expect(s[k].x).toBeCloseTo(x, 6);
@@ -85,9 +97,15 @@ arc 90 20`;
   it('uses the normal at each endpoint own lagged arc point (fanned rails)', () => {
     const s = stitches(src);
     const expected = [
-      [0.000, 0.000], [2.069, 1.077], [-1.996, 0.121], [2.021, 0.279],
-      [-1.851, 2.516], [2.182, 2.429], [-1.900, 1.718], [2.117, 1.876],
-      [-1.536, 4.330],
+      [0.0, 0.0],
+      [2.069, 1.077],
+      [-1.996, 0.121],
+      [2.021, 0.279],
+      [-1.851, 2.516],
+      [2.182, 2.429],
+      [-1.9, 1.718],
+      [2.117, 1.876],
+      [-1.536, 4.33],
     ];
     expected.forEach(([x, y], k) => {
       expect(s[k].x).toBeCloseTo(x, 3);
@@ -106,27 +124,55 @@ describe('cursor advance guard rail', () => {
 lock 0 satin @c
 fd 10`;
     const r = run(src);
-    const w = r.warnings.filter(s => /advance must be greater than 0/.test(s));
+    const w = r.warnings.filter((s) => /advance must be greater than 0/.test(s));
     expect(w.length).toBe(1); // one-time per column
     // halts: fd 10 at the 0.1 mm floor ⇒ 100 steps + anchor, finite
-    expect(r.events.filter(e => e.t === 'stitch').length).toBe(101);
+    expect(r.events.filter((e) => e.t === 'stitch').length).toBe(101);
   });
 });
 
 // ── 5: reporter contract — loud, line-numbered type errors ───────────────────
 describe('reporter type errors', () => {
   const cases: [string, string, RegExp][] = [
-    ['wrong arity (3)', 'def c(t,s,i) [ return [0.4,2,2,0,0] ]\nsatin @c\nfd 5', /exactly 4 parameters/],
-    ['wrong arity (5)', 'def c(t,s,i,u,x) [ return [0.4,2,2,0,0] ]\nsatin @c\nfd 5', /exactly 4 parameters/],
-    ['non-list return', 'def c(t,s,i,u) [ return 5 ]\nsatin @c\nfd 5', /must return a list of 5 numbers/],
-    ['4-element return', 'def c(t,s,i,u) [ return [0.4,2,2,0] ]\nsatin @c\nfd 5', /exactly 5 numbers/],
-    ['6-element return', 'def c(t,s,i,u) [ return [0.4,2,2,0,0,0] ]\nsatin @c\nfd 5', /exactly 5 numbers/],
-    ['non-number element', 'def c(t,s,i,u) [ return [0.4,2,[1],0,0] ]\nsatin @c\nfd 5', /rightw \(slot 3 of 5\)/],
+    [
+      'wrong arity (3)',
+      'def c(t,s,i) [ return [0.4,2,2,0,0] ]\nsatin @c\nfd 5',
+      /exactly 4 parameters/,
+    ],
+    [
+      'wrong arity (5)',
+      'def c(t,s,i,u,x) [ return [0.4,2,2,0,0] ]\nsatin @c\nfd 5',
+      /exactly 4 parameters/,
+    ],
+    [
+      'non-list return',
+      'def c(t,s,i,u) [ return 5 ]\nsatin @c\nfd 5',
+      /must return a list of 5 numbers/,
+    ],
+    [
+      '4-element return',
+      'def c(t,s,i,u) [ return [0.4,2,2,0] ]\nsatin @c\nfd 5',
+      /exactly 5 numbers/,
+    ],
+    [
+      '6-element return',
+      'def c(t,s,i,u) [ return [0.4,2,2,0,0,0] ]\nsatin @c\nfd 5',
+      /exactly 5 numbers/,
+    ],
+    [
+      'non-number element',
+      'def c(t,s,i,u) [ return [0.4,2,[1],0,0] ]\nsatin @c\nfd 5',
+      /rightw \(slot 3 of 5\)/,
+    ],
   ];
   for (const [name, src, re] of cases) {
     it(name + ' is a loud, line-numbered error', () => {
       let err: Error | null = null;
-      try { run(src); } catch (e) { err = e as Error; }
+      try {
+        run(src);
+      } catch (e) {
+        err = e as Error;
+      }
       expect(err).not.toBeNull();
       expect(err!.message).toMatch(re);
       expect(err!.message).toMatch(/\(line \d+\)/); // names the line
@@ -168,7 +214,7 @@ lock 0 satin @ch
 fd 40
 satin 0`;
     const r = run(src);
-    const hot = r.density.hotspots.filter(h => h.kind === 'density');
+    const hot = r.density.hotspots.filter((h) => h.kind === 'density');
     expect(hot.length).toBeGreaterThan(0);
     expect(r.density.peak).toBeGreaterThan(3);
     // coordinates + source lines, not suppressed
@@ -177,7 +223,8 @@ satin 0`;
   });
 
   it('the rake is what drives the extra density — crossings raise the peak', () => {
-    const peak = (rake: number) => run(`def c(t,s,i,u) [
+    const peak = (rake: number) =>
+      run(`def c(t,s,i,u) [
   if i % 2 == 0 [ return [0.15, 3, 3, -${rake}, ${rake}] ]
   return [0.15, 3, 3, ${rake}, -${rake}]
 ]
@@ -198,14 +245,14 @@ describe('snag check on realized geometry', () => {
     const src = `def c(t,s,i,u) [ return [0.4, 3, 3, -5, 5] ]
 lock 0 satin @c
 fd 30`;
-    expect(warns(src).some(w => /spans .* mm.*snag/.test(w))).toBe(true);
+    expect(warns(src).some((w) => /spans .* mm.*snag/.test(w))).toBe(true);
   });
 
   it('a perpendicular column of the same half-widths does not snag', () => {
     const src = `def c(t,s,i,u) [ return [0.4, 3, 3, 0, 0] ]
 lock 0 satin @c
 fd 30`;
-    expect(warns(src).some(w => /snag/.test(w))).toBe(false);
+    expect(warns(src).some((w) => /snag/.test(w))).toBe(false);
   });
 });
 
@@ -215,7 +262,7 @@ describe('transform composition', () => {
     const c = 'def c(t,s,i,u) [ return [0.4, 2, 2, 0, 0] ]\n';
     const plain = stitches(c + 'lock 0 satin @c\nfd 20');
     const scaled = stitches(c + 'lock 0 scale 1.5 [ satin @c fd 20 ]');
-    const maxY = (s: StitchEvent[]) => Math.max(...s.map(e => e.y));
+    const maxY = (s: StitchEvent[]) => Math.max(...s.map((e) => e.y));
     // 1.5× the extent…
     expect(maxY(scaled)).toBeCloseTo(maxY(plain) * 1.5, 5);
     // …achieved by more penetrations at the same physical 0.4 mm step, not by
@@ -226,7 +273,7 @@ describe('transform composition', () => {
 
 // ── 10: underlay auto-pick from the max realized width (§9 / §12) ────────────
 describe('underlay auto-pick by max realized width', () => {
-  const U = (src: string) => evts(src).filter(e => e.t === 'stitch' && e.u === 1);
+  const U = (src: string) => evts(src).filter((e) => e.t === 'stitch' && e.u === 1);
   it('a column wide only at its middle gets zigzag underlay along its whole length', () => {
     const u = U(`def c(t,s,i,u) [ let w = sin(s*180)*5\nreturn [0.4, w, w, 0, 0] ]
 underlay "auto
@@ -234,8 +281,8 @@ lock 0 satin @c
 fd 40`);
     expect(u.length).toBeGreaterThan(0);
     // underlay spans the full column, not just the wide middle
-    expect(Math.min(...u.map(e => e.y))).toBeLessThan(2);
-    expect(Math.max(...u.map(e => e.y))).toBeGreaterThan(38);
+    expect(Math.min(...u.map((e) => e.y))).toBeLessThan(2);
+    expect(Math.max(...u.map((e) => e.y))).toBeGreaterThan(38);
   });
 
   it('a uniformly narrow column gets no underlay', () => {
@@ -258,7 +305,7 @@ fd 10 rt 90 fd 10`).printed.map(Number);
     expect(printed[0]).toBeCloseTo(0, 6);
     // the corner is at the midpoint of the assembled 20 mm spine ⇒ s passes
     // ~0.5; were it per-segment it would reset to 0 after the turn.
-    expect(printed.some(s => s > 0.45 && s < 0.55)).toBe(true);
+    expect(printed.some((s) => s > 0.45 && s < 0.55)).toBe(true);
     expect(Math.max(...printed)).toBeLessThan(1);
     // monotone non-decreasing — one continuous normalization, no per-leg reset
     for (let k = 1; k < printed.length; k++)
@@ -270,7 +317,7 @@ fd 10 rt 90 fd 10`).printed.map(Number);
 density 1.0
 satin @c
 fd 10`);
-    expect(w.filter(s => /density is ignored while satin/.test(s)).length).toBe(1);
+    expect(w.filter((s) => /density is ignored while satin/.test(s)).length).toBe(1);
   });
 
   it('numeric satin after @fn returns to the built-in generator', () => {
@@ -284,9 +331,9 @@ trim
 satin 0
 satin 4
 fd 20`);
-    const trimIdx = ev.findIndex(e => e.t === 'trim');
-    const tail = ev.slice(trimIdx + 1).filter(e => e.t === 'stitch');
-    const maxOff = Math.max(...tail.map(e => Math.abs(e.x)));
+    const trimIdx = ev.findIndex((e) => e.t === 'trim');
+    const tail = ev.slice(trimIdx + 1).filter((e) => e.t === 'stitch');
+    const maxOff = Math.max(...tail.map((e) => Math.abs(e.x)));
     expect(maxOff).toBeCloseTo(2, 5); // built-in satin 4 ⇒ ±2, not the reporter's ±1
   });
 });

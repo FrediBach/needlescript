@@ -45,16 +45,14 @@ interface ColorRun {
  * - stroke-width="0.4" reflects typical embroidery thread diameter in mm.
  * - No hoop boundary, density overlay, or debug marks.
  */
-export function toSVG(
-  events: StitchEvent[],
-  name: string,
-  threads: string[],
-): string {
+export function toSVG(events: StitchEvent[], name: string, threads: string[]): string {
   const palette = threads.length > 0 ? threads : ['#000000'];
 
   // ── 1. Bounding box from visible (non-underlay) stitches ─────────────────
-  let minX = Infinity,  maxX = -Infinity;
-  let minY = Infinity,  maxY = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity;
+  let minY = Infinity,
+    maxY = -Infinity;
 
   for (const e of events) {
     if (e.t === 'stitch' && e.u !== 1) {
@@ -76,8 +74,10 @@ export function toSVG(
   }
 
   const PAD = 1; // mm of padding around the design
-  minX -= PAD;  maxX += PAD;
-  minY -= PAD;  maxY += PAD;
+  minX -= PAD;
+  maxX += PAD;
+  minY -= PAD;
+  maxY += PAD;
   const W = maxX - minX;
   const H = maxY - minY;
 
@@ -105,7 +105,6 @@ export function toSVG(
 
   for (const e of events) {
     switch (e.t) {
-
       case 'mark':
         // Debug pins — never exported
         break;
@@ -166,8 +165,8 @@ export function toSVG(
   out.push('<?xml version="1.0" encoding="UTF-8"?>');
   out.push(
     `<svg xmlns="http://www.w3.org/2000/svg"` +
-    ` viewBox="0 0 ${f3(W)} ${f3(H)}"` +
-    ` width="${f2(W)}mm" height="${f2(H)}mm">`,
+      ` viewBox="0 0 ${f3(W)} ${f3(H)}"` +
+      ` width="${f2(W)}mm" height="${f2(H)}mm">`,
   );
   out.push(`  <title>${escapeXml(name)}</title>`);
 
@@ -187,12 +186,12 @@ export function toSVG(
 
     out.push(
       `  <path` +
-      ` fill="none"` +
-      ` stroke="${run.color}"` +
-      ` stroke-width="0.4"` +
-      ` stroke-linecap="round"` +
-      ` stroke-linejoin="round"` +
-      ` d="${dParts.join(' ')}"/>`,
+        ` fill="none"` +
+        ` stroke="${run.color}"` +
+        ` stroke-width="0.4"` +
+        ` stroke-linecap="round"` +
+        ` stroke-linejoin="round"` +
+        ` d="${dParts.join(' ')}"/>`,
     );
   }
 

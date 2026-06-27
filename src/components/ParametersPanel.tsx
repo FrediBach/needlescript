@@ -68,31 +68,39 @@ function SliderRow({ def, onChange, isLocked, onToggleLock }: SliderRowProps) {
     onChange(name, line, snapped);
   }, [inputVal, value, min, max, step, sliderKind, name, line, onChange]);
 
-  const handleInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-    else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const next = snapValue(value + step, min, max, step);
-      setInputVal(formatSliderValue(next, sliderKind));
-      onChange(name, line, next);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const next = snapValue(value - step, min, max, step);
-      setInputVal(formatSliderValue(next, sliderKind));
-      onChange(name, line, next);
-    }
-  }, [value, step, min, max, sliderKind, name, line, onChange]);
+  const handleInputKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+      else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const next = snapValue(value + step, min, max, step);
+        setInputVal(formatSliderValue(next, sliderKind));
+        onChange(name, line, next);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = snapValue(value - step, min, max, step);
+        setInputVal(formatSliderValue(next, sliderKind));
+        onChange(name, line, next);
+      }
+    },
+    [value, step, min, max, sliderKind, name, line, onChange],
+  );
 
-  const handleSliderChange = useCallback((vals: number | readonly number[]) => {
-    const raw = Array.isArray(vals) ? (vals as number[])[0] : (vals as number);
-    const snapped = snapValue(raw, min, max, step);
-    setInputVal(formatSliderValue(snapped, sliderKind));
-    onChange(name, line, snapped);
-  }, [min, max, step, sliderKind, name, line, onChange]);
+  const handleSliderChange = useCallback(
+    (vals: number | readonly number[]) => {
+      const raw = Array.isArray(vals) ? (vals as number[])[0] : (vals as number);
+      const snapped = snapValue(raw, min, max, step);
+      setInputVal(formatSliderValue(snapped, sliderKind));
+      onChange(name, line, snapped);
+    },
+    [min, max, step, sliderKind, name, line, onChange],
+  );
 
   return (
     <div className={styles.paramRow}>
-      <span className={styles.paramName} title={name}>{name}</span>
+      <span className={styles.paramName} title={name}>
+        {name}
+      </span>
       <div className={styles.sliderWrap}>
         <Slider
           min={min}
@@ -111,7 +119,7 @@ function SliderRow({ def, onChange, isLocked, onToggleLock }: SliderRowProps) {
       <Input
         type="number"
         value={inputVal}
-        onChange={e => setInputVal(e.target.value)}
+        onChange={(e) => setInputVal(e.target.value)}
         onBlur={commitInput}
         onKeyDown={handleInputKeyDown}
         className={styles.valueInput}
@@ -128,10 +136,11 @@ function SliderRow({ def, onChange, isLocked, onToggleLock }: SliderRowProps) {
         aria-label={isLocked ? `Unlock ${name}` : `Lock ${name}`}
         aria-pressed={isLocked}
       >
-        {isLocked
-          ? <Lock     size={11} aria-hidden="true" />
-          : <LockOpen size={11} aria-hidden="true" />
-        }
+        {isLocked ? (
+          <Lock size={11} aria-hidden="true" />
+        ) : (
+          <LockOpen size={11} aria-hidden="true" />
+        )}
       </button>
     </div>
   );
@@ -150,15 +159,20 @@ function SwitchRow({ def, onChange, isLocked, onToggleLock }: SwitchRowProps) {
   const { name, value, labels, line } = def;
   const isOn = value !== 0;
   const offLabel = labels?.[0] ?? '0';
-  const onLabel  = labels?.[1] ?? '1';
+  const onLabel = labels?.[1] ?? '1';
 
-  const handleChange = useCallback((checked: boolean) => {
-    onChange(name, line, checked ? 1 : 0);
-  }, [name, line, onChange]);
+  const handleChange = useCallback(
+    (checked: boolean) => {
+      onChange(name, line, checked ? 1 : 0);
+    },
+    [name, line, onChange],
+  );
 
   return (
     <div className={styles.paramRow}>
-      <span className={styles.paramName} title={name}>{name}</span>
+      <span className={styles.paramName} title={name}>
+        {name}
+      </span>
       <div className={styles.switchWrap}>
         <span className={cn(styles.switchLabel, !isOn && styles.switchLabelActive)}>
           {offLabel}
@@ -169,9 +183,7 @@ function SwitchRow({ def, onChange, isLocked, onToggleLock }: SwitchRowProps) {
           aria-label={name}
           className={styles.switch}
         />
-        <span className={cn(styles.switchLabel, isOn && styles.switchLabelActive)}>
-          {onLabel}
-        </span>
+        <span className={cn(styles.switchLabel, isOn && styles.switchLabelActive)}>{onLabel}</span>
       </div>
       <button
         className={cn(styles.lockBtn, isLocked && styles.lockBtnLocked)}
@@ -181,10 +193,11 @@ function SwitchRow({ def, onChange, isLocked, onToggleLock }: SwitchRowProps) {
         aria-label={isLocked ? `Unlock ${name}` : `Lock ${name}`}
         aria-pressed={isLocked}
       >
-        {isLocked
-          ? <Lock     size={11} aria-hidden="true" />
-          : <LockOpen size={11} aria-hidden="true" />
-        }
+        {isLocked ? (
+          <Lock size={11} aria-hidden="true" />
+        ) : (
+          <LockOpen size={11} aria-hidden="true" />
+        )}
       </button>
     </div>
   );
@@ -193,17 +206,17 @@ function SwitchRow({ def, onChange, isLocked, onToggleLock }: SwitchRowProps) {
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export default function ParametersPanel({ source, onParamChange, onAllParamsChange }: Props) {
-  const items   = useMemo(() => parseParameters(source), [source]);
-  const presets = useMemo(() => parsePresets(source),    [source]);
-  const paramCount = items.filter(i => i.kind === 'param').length;
+  const items = useMemo(() => parseParameters(source), [source]);
+  const presets = useMemo(() => parsePresets(source), [source]);
+  const paramCount = items.filter((i) => i.kind === 'param').length;
 
-  const [open, setOpen]               = useState(true);
+  const [open, setOpen] = useState(true);
   const [lockedParams, setLockedParams] = useState<Set<string>>(() => new Set());
   const [activePreset, setActivePreset] = useState<string | null>(null);
 
   // ── Lock toggle ─────────────────────────────────────────────────────────
   const toggleLock = useCallback((name: string) => {
-    setLockedParams(prev => {
+    setLockedParams((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
@@ -212,10 +225,13 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
   }, []);
 
   // ── Wrap onParamChange so any manual edit deselects the active preset ───
-  const handleParamChange = useCallback((name: string, line: number, value: number) => {
-    setActivePreset(null);
-    onParamChange(name, line, value);
-  }, [onParamChange]);
+  const handleParamChange = useCallback(
+    (name: string, line: number, value: number) => {
+      setActivePreset(null);
+      onParamChange(name, line, value);
+    },
+    [onParamChange],
+  );
 
   // ── Randomize (respects locks, clears active preset) ────────────────────
   const handleRandomize = useCallback(() => {
@@ -234,22 +250,25 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
   }, [items, lockedParams, onAllParamsChange]);
 
   // ── Apply preset (overrides locks, sets activePreset) ───────────────────
-  const handleApplyPreset = useCallback((presetName: string) => {
-    const preset = presets.find((p: Preset) => p.name === presetName);
-    if (!preset) return;
-    const changes = items
-      .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
-      .filter(({ def }) => def.name in preset.values)
-      .map(({ def }) => ({
-        name:  def.name,
-        line:  def.line,
-        value: snapValue(preset.values[def.name], def.min, def.max, def.step),
-      }));
-    if (changes.length > 0) {
-      setActivePreset(presetName);
-      onAllParamsChange(changes);
-    }
-  }, [presets, items, onAllParamsChange]);
+  const handleApplyPreset = useCallback(
+    (presetName: string) => {
+      const preset = presets.find((p: Preset) => p.name === presetName);
+      if (!preset) return;
+      const changes = items
+        .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
+        .filter(({ def }) => def.name in preset.values)
+        .map(({ def }) => ({
+          name: def.name,
+          line: def.line,
+          value: snapValue(preset.values[def.name], def.min, def.max, def.step),
+        }));
+      if (changes.length > 0) {
+        setActivePreset(presetName);
+        onAllParamsChange(changes);
+      }
+    },
+    [presets, items, onAllParamsChange],
+  );
 
   // ── Copy current param state as a ready-to-paste @preset comment ────────
   const handleCopy = useCallback(() => {
@@ -257,7 +276,7 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
       .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
       .map(({ def }) => def);
     const assignments = paramDefs
-      .map(def => `${def.name}=${formatPresetValue(def.value)}`)
+      .map((def) => `${def.name}=${formatPresetValue(def.value)}`)
       .join(', ');
     const name = activePreset ?? 'My Preset';
     navigator.clipboard.writeText(`// @preset ${name} : ${assignments}`);
@@ -274,12 +293,14 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
   useEffect(() => {
     if (!contextMenu) return;
     const close = () => setContextMenu(null);
-    const onKey  = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
     document.addEventListener('mousedown', close);
-    document.addEventListener('keydown',   onKey);
+    document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown',   onKey);
+      document.removeEventListener('keydown', onKey);
     };
   }, [contextMenu]);
 
@@ -302,17 +323,18 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
       <div className={styles.header} onContextMenu={handleContextMenu}>
         <button
           className={styles.headerToggle}
-          onClick={() => setOpen(v => !v)}
+          onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           type="button"
         >
           <span className={styles.headerLabel}>Parameters</span>
           <span className={styles.paramCount}>{paramCount}</span>
           <span className={styles.headerSpacer} />
-          {open
-            ? <ChevronUp  size={12} aria-hidden="true" />
-            : <ChevronDown size={12} aria-hidden="true" />
-          }
+          {open ? (
+            <ChevronUp size={12} aria-hidden="true" />
+          ) : (
+            <ChevronDown size={12} aria-hidden="true" />
+          )}
         </button>
         <button
           className={styles.randomizeBtn}
@@ -332,12 +354,18 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
             <select
               className={styles.presetSelect}
               value={activePreset ?? ''}
-              onChange={e => { if (e.target.value) handleApplyPreset(e.target.value); }}
+              onChange={(e) => {
+                if (e.target.value) handleApplyPreset(e.target.value);
+              }}
               aria-label="Presets"
             >
-              <option value="" disabled>— preset —</option>
+              <option value="" disabled>
+                — preset —
+              </option>
               {presets.map((p: Preset) => (
-                <option key={p.name} value={p.name}>{p.name}</option>
+                <option key={p.name} value={p.name}>
+                  {p.name}
+                </option>
               ))}
             </select>
             <ChevronDown size={10} className={styles.presetChevron} aria-hidden="true" />
@@ -387,23 +415,27 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
       )}
 
       {/* ── Context menu portal (right-click on header) ───────────────── */}
-      {contextMenu && createPortal(
-        <div
-          className={styles.contextMenu}
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onMouseDown={e => e.stopPropagation()}
-        >
-          <button
-            className={styles.contextMenuItem}
-            type="button"
-            onClick={() => { handleCopy(); setContextMenu(null); }}
+      {contextMenu &&
+        createPortal(
+          <div
+            className={styles.contextMenu}
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onMouseDown={(e) => e.stopPropagation()}
           >
-            <Copy size={11} aria-hidden="true" />
-            Copy as preset
-          </button>
-        </div>,
-        document.body,
-      )}
+            <button
+              className={styles.contextMenuItem}
+              type="button"
+              onClick={() => {
+                handleCopy();
+                setContextMenu(null);
+              }}
+            >
+              <Copy size={11} aria-hidden="true" />
+              Copy as preset
+            </button>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

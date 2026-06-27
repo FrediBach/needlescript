@@ -3,7 +3,7 @@ import { tokenize, NeedlescriptError } from '../engine.ts';
 import type { Token } from '../engine.ts';
 
 // Helper: extract just the token kinds and values for compact assertions
-const tv = (tokens: Token[]) => tokens.map(t => ({ t: t.t, v: t.v }));
+const tv = (tokens: Token[]) => tokens.map((t) => ({ t: t.t, v: t.v }));
 
 describe('tokenize', () => {
   // ── numbers ────────────────────────────────────────────────────────────────
@@ -89,8 +89,8 @@ describe('tokenize', () => {
   describe('operators', () => {
     it('tokenizes all operators', () => {
       const ops = tv(tokenize('+ - * / < > ='));
-      expect(ops.map(t => t.v)).toEqual(['+', '-', '*', '/', '<', '>', '=']);
-      expect(ops.every(t => t.t === 'op')).toBe(true);
+      expect(ops.map((t) => t.v)).toEqual(['+', '-', '*', '/', '<', '>', '=']);
+      expect(ops.every((t) => t.t === 'op')).toBe(true);
     });
 
     it('records spBefore/spAfter on operators', () => {
@@ -105,7 +105,7 @@ describe('tokenize', () => {
     it('marks Logo-style negative literal: "-5" — spBefore=true, spAfter=false', () => {
       // "fd -5": the minus is preceded by space and glued to the digit
       const toks = tokenize('fd -5');
-      const minus = toks.find(t => t.t === 'op' && t.v === '-')!;
+      const minus = toks.find((t) => t.t === 'op' && t.v === '-')!;
       expect(minus.spBefore).toBe(true);
       expect(minus.spAfter).toBe(false);
     });
@@ -165,13 +165,21 @@ describe('tokenize', () => {
 
     it('error message includes the bad character', () => {
       let msg = '';
-      try { tokenize('$'); } catch (e) { msg = (e as Error).message; }
+      try {
+        tokenize('$');
+      } catch (e) {
+        msg = (e as Error).message;
+      }
       expect(msg).toContain('$');
     });
 
     it('error includes line number', () => {
       let line: number | undefined;
-      try { tokenize('fd 1\n$'); } catch (e) { line = (e as NeedlescriptError).slLine; }
+      try {
+        tokenize('fd 1\n$');
+      } catch (e) {
+        line = (e as NeedlescriptError).slLine;
+      }
       expect(line).toBe(2);
     });
 
@@ -186,10 +194,13 @@ describe('tokenize', () => {
     it('tokenizes "repeat 4 [ fd 10 rt 90 ]" correctly', () => {
       const toks = tv(tokenize('repeat 4 [ fd 10 rt 90 ]'));
       expect(toks).toEqual([
-        { t: 'word', v: 'repeat' }, { t: 'num', v: 4 },
+        { t: 'word', v: 'repeat' },
+        { t: 'num', v: 4 },
         { t: '[', v: undefined },
-        { t: 'word', v: 'fd' }, { t: 'num', v: 10 },
-        { t: 'word', v: 'rt' }, { t: 'num', v: 90 },
+        { t: 'word', v: 'fd' },
+        { t: 'num', v: 10 },
+        { t: 'word', v: 'rt' },
+        { t: 'num', v: 90 },
         { t: ']', v: undefined },
       ]);
     });

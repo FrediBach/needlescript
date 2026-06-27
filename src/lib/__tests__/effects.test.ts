@@ -28,10 +28,10 @@ const r4 = (n: number) => Math.round(n * 1e4) / 1e4;
 
 /** Strip line tags and round coordinates so float noise doesn't matter. */
 function clean(evs: StitchEvent[]) {
-  return evs.map(e => ({ t: e.t, x: r4(e.x), y: r4(e.y), c: e.c, ...(e.u ? { u: e.u } : {}) }));
+  return evs.map((e) => ({ t: e.t, x: r4(e.x), y: r4(e.y), c: e.c, ...(e.u ? { u: e.u } : {}) }));
 }
 
-const stitches = (s: string) => run(s).events.filter(e => e.t === 'stitch');
+const stitches = (s: string) => run(s).events.filter((e) => e.t === 'stitch');
 
 // A reporter that fixes the origin (sin(0) = 0) so the implicit start anchor
 // maps to itself — the one care needed to compare a warp block against warppath
@@ -57,15 +57,16 @@ describe('warp ≡ warppath (exact, like transforms)', () => {
   });
 
   it('the identity reporter is a no-op (== unwrapped)', () => {
-    expect(clean(ev(`${ID}warp @id [ repeat 5 [ fd 8 rt 72 ] ]`)))
-      .toEqual(clean(ev('repeat 5 [ fd 8 rt 72 ]')));
+    expect(clean(ev(`${ID}warp @id [ repeat 5 [ fd 8 rt 72 ] ]`))).toEqual(
+      clean(ev('repeat 5 [ fd 8 rt 72 ]')),
+    );
   });
 
   it('warp actually displaces geometry (not a no-op)', () => {
     const moved = stitches('def sh(p) [ return [p[0] + 5, p[1]] ]\nwarp @sh [ fd 10 ]');
     // every penetration shifted +5 in x from the straight x=0 line
     expect(moved.length).toBeGreaterThan(1);
-    expect(moved.every(e => Math.abs(e.x - 5) < 1e-9)).toBe(true);
+    expect(moved.every((e) => Math.abs(e.x - 5) < 1e-9)).toBe(true);
   });
 
   it('warp draws nothing from the seeded stream (cost 0)', () => {
@@ -110,16 +111,19 @@ describe('humanize determinism and the fork convention', () => {
   });
 
   it('humanize draws exactly one value (fork), regardless of stitch count', () => {
-    const afterHumanize = run('seed 7\nhumanize 0.5 [ repeat 20 [ fd 9 rt 18 ] ]\nprint random(1000)').printed[0];
+    const afterHumanize = run(
+      'seed 7\nhumanize 0.5 [ repeat 20 [ fd 9 rt 18 ] ]\nprint random(1000)',
+    ).printed[0];
     const afterOneDraw = run('seed 7\nlet a = random(1000)\nprint random(1000)').printed[0];
     const afterZeroDraw = run('seed 7\nprint random(1000)').printed[0];
-    expect(afterHumanize).toBe(afterOneDraw);   // exactly one
+    expect(afterHumanize).toBe(afterOneDraw); // exactly one
     expect(afterHumanize).not.toBe(afterZeroDraw); // not zero
   });
 
   it('editing the contents of a humanize block does not reshuffle downstream', () => {
     const few = run('seed 3\nhumanize 0.3 [ fd 5 ]\nprint random(99)').printed[0];
-    const many = run('seed 3\nhumanize 0.3 [ repeat 30 [ fd 5 rt 12 ] ]\nprint random(99)').printed[0];
+    const many = run('seed 3\nhumanize 0.3 [ repeat 30 [ fd 5 rt 12 ] ]\nprint random(99)')
+      .printed[0];
     expect(few).toBe(many); // one draw either way — the whole point of forking
   });
 
@@ -135,12 +139,13 @@ describe('humanize determinism and the fork convention', () => {
   });
 
   it('clamps the amount to 0–2 mm with a warning', () => {
-    expect(warnings('humanize 5 [ fd 5 ]').some(w => /clamped to 2 mm/.test(w))).toBe(true);
+    expect(warnings('humanize 5 [ fd 5 ]').some((w) => /clamped to 2 mm/.test(w))).toBe(true);
   });
 
   it('humanize 0 is a no-op on the geometry', () => {
-    expect(clean(ev('seed 1\nhumanize 0 [ repeat 4 [ fd 10 rt 90 ] ]')))
-      .toEqual(clean(ev('repeat 4 [ fd 10 rt 90 ]')));
+    expect(clean(ev('seed 1\nhumanize 0 [ repeat 4 [ fd 10 rt 90 ] ]'))).toEqual(
+      clean(ev('repeat 4 [ fd 10 rt 90 ]')),
+    );
   });
 
   it('actually perturbs at a non-zero amount', () => {
@@ -164,8 +169,11 @@ describe('humanize block ≡ humanizepath function', () => {
 
 // ── 5: snaptogrid — fixed lattice, frame-invariant, drawless ─────────────────
 const onLattice = (evs: StitchEvent[], cell: number) =>
-  evs.every(e => Math.abs(e.x / cell - Math.round(e.x / cell)) < 1e-9 &&
-    Math.abs(e.y / cell - Math.round(e.y / cell)) < 1e-9);
+  evs.every(
+    (e) =>
+      Math.abs(e.x / cell - Math.round(e.x / cell)) < 1e-9 &&
+      Math.abs(e.y / cell - Math.round(e.y / cell)) < 1e-9,
+  );
 
 // The penetrations a snaptogrid block sews, excluding the entry anchor (the
 // first stitch is thread positioning, like a jump — not a quantized penetration,
@@ -186,7 +194,9 @@ describe('snaptogrid quantizes to a fixed hoop lattice', () => {
     // so the lattice pitch is unchanged whether scale wraps it or not.
     expect(onLattice(penetrations(`lock 0\nscale 3 [ snaptogrid 2 [ ${draw} ] ]`), 2)).toBe(true);
     expect(onLattice(penetrations(`lock 0\nsnaptogrid 2 [ scale 3 [ ${draw} ] ]`), 2)).toBe(true);
-    expect(onLattice(penetrations(`lock 0\ntranslate 5 5 [ snaptogrid 2 [ ${draw} ] ]`), 2)).toBe(true);
+    expect(onLattice(penetrations(`lock 0\ntranslate 5 5 [ snaptogrid 2 [ ${draw} ] ]`), 2)).toBe(
+      true,
+    );
     expect(onLattice(penetrations(`lock 0\nrotate 37 [ snaptogrid 2 [ ${draw} ] ]`), 2)).toBe(true);
   });
 
@@ -196,12 +206,15 @@ describe('snaptogrid quantizes to a fixed hoop lattice', () => {
     const direct = stitches('lock 0\nsnaptogrid 2 [ down setxy(9, 5) ]');
     const viaXform = stitches('lock 0\ntranslate 4 1 [ snaptogrid 2 [ down setxy(5, 4) ] ]');
     const last = (a: StitchEvent[]) => a[a.length - 1];
-    expect([r4(last(direct).x), r4(last(direct).y)])
-      .toEqual([r4(last(viaXform).x), r4(last(viaXform).y)]);
+    expect([r4(last(direct).x), r4(last(direct).y)]).toEqual([
+      r4(last(viaXform).x),
+      r4(last(viaXform).y),
+    ]);
   });
 
   it('draws nothing and does not depend on the seed', () => {
-    const a = run('seed 1\nsnaptogrid 2 [ repeat 6 [ fd 8 rt 60 ] ]\nprint random(1000)').printed[0];
+    const a = run('seed 1\nsnaptogrid 2 [ repeat 6 [ fd 8 rt 60 ] ]\nprint random(1000)')
+      .printed[0];
     const b = run('seed 1\nprint random(1000)').printed[0]; // zero draws
     expect(a).toBe(b);
     const s1 = clean(stitches('seed 1\nsnaptogrid 2 [ repeat 6 [ fd 8 rt 60 ] ]'));
@@ -210,13 +223,18 @@ describe('snaptogrid quantizes to a fixed hoop lattice', () => {
   });
 
   it('rectangular / offset / rotated arity overloads parse and snap', () => {
-    expect(onLattice(penetrations('lock 0\nsnaptogrid 2 4 [ down repeat 6 [ fd 9 rt 60 ] ]'), 2)).toBe(true);
+    expect(
+      onLattice(penetrations('lock 0\nsnaptogrid 2 4 [ down repeat 6 [ fd 9 rt 60 ] ]'), 2),
+    ).toBe(true);
     // offset half a cell: points sit on an offset lattice (x - ox is a multiple)
     const off = penetrations('lock 0\nsnaptogrid(2, 2, 0.5, 0.5) [ down repeat 6 [ fd 9 rt 60 ] ]');
-    expect(off.every(e => Math.abs((e.x - 0.5) / 2 - Math.round((e.x - 0.5) / 2)) < 1e-9)).toBe(true);
+    expect(off.every((e) => Math.abs((e.x - 0.5) / 2 - Math.round((e.x - 0.5) / 2)) < 1e-9)).toBe(
+      true,
+    );
     // rotated grid still parses and runs
-    expect(stitches('lock 0\nsnaptogrid(1.5, 1.5, 0, 0, 30) [ down repeat 6 [ fd 9 rt 60 ] ]').length)
-      .toBeGreaterThan(0);
+    expect(
+      stitches('lock 0\nsnaptogrid(1.5, 1.5, 0, 0, 30) [ down repeat 6 [ fd 9 rt 60 ] ]').length,
+    ).toBeGreaterThan(0);
   });
 
   it('rejects the invalid 3-argument form and non-positive cells', () => {
@@ -237,7 +255,7 @@ describe('snaptogrid collapses ride the tiny-stitch merge', () => {
   it('a too-coarse grid merges stacked penetrations and warns', () => {
     // Stitches ~1 mm apart snapped to a 4 mm grid collapse onto shared nodes.
     const w = warnings('stitchlen 1\nsnaptogrid 4 [ down fd 20 ]');
-    expect(w.some(s => /merged into neighbours/.test(s))).toBe(true);
+    expect(w.some((s) => /merged into neighbours/.test(s))).toBe(true);
   });
 });
 
@@ -245,7 +263,7 @@ describe('snaptogrid collapses ride the tiny-stitch merge', () => {
 describe('after-split effects skip satin columns', () => {
   it('humanize over a satin column warns and does not perturb the rails', () => {
     const w = warnings('seed 1\nhumanize 0.5 [ satin 3 down fd 20 ]');
-    expect(w.some(s => /skips satin columns/.test(s))).toBe(true);
+    expect(w.some((s) => /skips satin columns/.test(s))).toBe(true);
     // rails sew identically to the un-humanized column
     const plain = clean(stitches('satin 3 down fd 20'));
     const jit = clean(stitches('seed 1\nhumanize 0.5 [ satin 3 down fd 20 ]'));
@@ -262,12 +280,12 @@ describe('@name procedure references', () => {
     expect(() => run('warp @fd [ fd 5 ]')).toThrow(/must reference a procedure you defined/);
   });
   it('a reporter that never outputs a value is an error', () => {
-    expect(() => run('def noout(p) [ ]\nwarp @noout [ fd 5 ]'))
-      .toThrow(/never reached output/);
+    expect(() => run('def noout(p) [ ]\nwarp @noout [ fd 5 ]')).toThrow(/never reached output/);
   });
   it('the wrong arity is rejected by name', () => {
-    expect(() => run('def two(a, b) [ return a ]\nwarp @two [ fd 5 ]'))
-      .toThrow(/must take exactly one argument/);
+    expect(() => run('def two(a, b) [ return a ]\nwarp @two [ fd 5 ]')).toThrow(
+      /must take exactly one argument/,
+    );
   });
   it('a funcref is not a number — arithmetic on it is a loud error', () => {
     expect(() => run('def id(p) [ return p ]\nprint @id + 1')).toThrow(/expected a number/);

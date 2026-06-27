@@ -1,6 +1,6 @@
 # NeedleScript: A Complete Tutorial
 
-*From your first stitch to seeded generative fields*
+_From your first stitch to seeded generative fields_
 
 NeedleScript is a Logo-inspired programming language for **generative embroidery**. You write turtle-graphics code — moving a virtual needle around a hoop — and NeedleScript turns your path into machine-ready stitches, previews them, and exports a Tajima `.DST` file you can sew on a real machine.
 
@@ -43,15 +43,15 @@ NeedleScript gives you a **turtle**: an imaginary needle that carries thread. Yo
 
 A few facts to anchor everything else:
 
-- **Units are millimetres.** The virtual hoop is 100 mm across. The *sewable* field is a disc of 47 mm radius around the origin `(0, 0)`, which sits at the centre. Stray outside it and you'll get a hoop-overflow warning.
-- **Heading is in degrees, measured clockwise from north.** `0` faces up, `90` faces right (east), `180` is down, `270` is left. This is the Logo convention and it's used *everywhere* — including the vector and noise functions later on.
+- **Units are millimetres.** The virtual hoop is 100 mm across. The _sewable_ field is a disc of 47 mm radius around the origin `(0, 0)`, which sits at the centre. Stray outside it and you'll get a hoop-overflow warning.
+- **Heading is in degrees, measured clockwise from north.** `0` faces up, `90` faces right (east), `180` is down, `270` is left. This is the Logo convention and it's used _everywhere_ — including the vector and noise functions later on.
 - **Words are case-insensitive.** `FD 10` and `fd 10` are the same.
 - **There are no statement separators.** Whitespace and newlines are interchangeable. You can put a whole program on one line or spread one command across several.
 - **The only everyday value is the number.** Millimetres, degrees, counts, and truth values are all just numbers. (`0` is false, anything else is true. Comparisons return `1` or `0`, and `true`/`false` are literally `1` and `0`.) Lists arrive later as a second value type, but they never reach the stitch stream — they live in your program.
 
-Comments start with `//`, `#`, or `;` and run to the end of the line. A lone `/` is still division — only *two adjacent* slashes start a comment.
+Comments start with `//`, `#`, or `;` and run to the end of the line. A lone `/` is still division — only _two adjacent_ slashes start a comment.
 
-One frame before the commands, especially if your background is software rather than the sewing room. An embroidery machine doesn't *draw* — it punches a needle through fabric at a sequence of points, and what you see is **thread pulled taut between them**. Everything you write here ultimately becomes a list of needle penetrations, and the craft comes down to three things: where the thread goes, how densely it piles up, and how it's secured so it can't unravel. The vocabulary in the next few sections — running stitch, satin, fills — is just different ways of turning your turtle path into those penetrations. You won't need any of the professional commands ([§19](#19-professional-embroidery-and-fabric-physics)) to start: `fd`, `rt`, and `repeat` already sew.
+One frame before the commands, especially if your background is software rather than the sewing room. An embroidery machine doesn't _draw_ — it punches a needle through fabric at a sequence of points, and what you see is **thread pulled taut between them**. Everything you write here ultimately becomes a list of needle penetrations, and the craft comes down to three things: where the thread goes, how densely it piles up, and how it's secured so it can't unravel. The vocabulary in the next few sections — running stitch, satin, fills — is just different ways of turning your turtle path into those penetrations. You won't need any of the professional commands ([§19](#19-professional-embroidery-and-fabric-physics)) to start: `fd`, `rt`, and `repeat` already sew.
 
 ---
 
@@ -80,7 +80,7 @@ You can also jump straight to an absolute coordinate:
 setxy 10 -15
 ```
 
-This moves the needle to the point `(10, -15)`. Used on its own it sews a line *from wherever the turtle was* to that point. (`setx` and `sety` move one axis at a time, and `home` returns to `(0, 0)` facing north.)
+This moves the needle to the point `(10, -15)`. Used on its own it sews a line _from wherever the turtle was_ to that point. (`setx` and `sety` move one axis at a time, and `home` returns to `(0, 0)` facing north.)
 
 ### A note on negative numbers
 
@@ -147,7 +147,7 @@ Each side is longer than the last, spiralling outward.
 
 ## 4. Pen up, pen down, and jumps
 
-So far every move has sewn thread. Often you want to *reposition* the needle without sewing — to start a new motif elsewhere. Lift the pen:
+So far every move has sewn thread. Often you want to _reposition_ the needle without sewing — to start a new motif elsewhere. Lift the pen:
 
 ```text
 arc 360 10        // first circle, sewn
@@ -189,7 +189,7 @@ repeat 5 [
 
 ## 5. Stitch types: the thread vocabulary
 
-Real embroidery isn't one kind of stitch. NeedleScript gives you several, and you switch between them with mode commands. Whatever mode is active applies to subsequent moves. Pick by the shape you're sewing: thin lines and fine detail want running stitch, narrow strips and borders want satin, broad areas want a fill ([§6](#6-fills)). And because thread is glossy, the *direction* your stitches run is itself visible — the same shape can read as two different shades depending on the stitch angle.
+Real embroidery isn't one kind of stitch. NeedleScript gives you several, and you switch between them with mode commands. Whatever mode is active applies to subsequent moves. Pick by the shape you're sewing: thin lines and fine detail want running stitch, narrow strips and borders want satin, broad areas want a fill ([§6](#6-fills)). And because thread is glossy, the _direction_ your stitches run is itself visible — the same shape can read as two different shades depending on the stitch angle.
 
 **Running stitch** is the default — a simple dashed line. Control its stitch length:
 
@@ -198,7 +198,7 @@ stitchlen 2        // 2 mm stitches (clamped to 0.4–12 mm; default 2.5)
 fd 40
 ```
 
-**Satin** is the glossy, solid zigzag used for borders, lettering, and leaves. You set a *width*, and the turtle's path becomes the centre-line (spine) of a filled column:
+**Satin** is the glossy, solid zigzag used for borders, lettering, and leaves. You set a _width_, and the turtle's path becomes the centre-line (spine) of a filled column:
 
 ```text
 satin 3            // 3 mm-wide satin column
@@ -227,7 +227,7 @@ estitch 0          // off
 
 ### Colour and securing
 
-Switch threads with `color n`, where *n* indexes the thread palette. This emits a colour-change stop in the export:
+Switch threads with `color n`, where _n_ indexes the thread palette. This emits a colour-change stop in the export:
 
 ```text
 color 1
@@ -249,7 +249,7 @@ Locks are on by default at a sensible size — you rarely need to set this, but 
 
 ## 6. Fills
 
-A line is one thing; a *filled area* is another. To fill a shape, trace its boundary between `beginfill` and `endfill`. The moves in between define the outline rather than sewing directly, and `endfill` lays down a **tatami fill** (rows of running stitch) covering the enclosed area:
+A line is one thing; a _filled area_ is another. To fill a shape, trace its boundary between `beginfill` and `endfill`. The moves in between define the outline rather than sewing directly, and `endfill` lays down a **tatami fill** (rows of running stitch) covering the enclosed area:
 
 ```text
 fillangle 30                  // fill rows run at 30°
@@ -263,11 +263,11 @@ A few controls shape the fill:
 
 - **`fillangle deg`** sets the direction of the rows (default 0).
 - **`fillspacing mm`** sets row spacing (0.25–5 mm, default 0.4).
-- **`filllen mm`** sets the stitch length *within* the fill (1–7 mm). By default the fill follows `stitchlen`; set `filllen` to override it, or `filllen 0` to follow again. Rows are automatically brick-offset so penetrations don't line up into weak lines.
+- **`filllen mm`** sets the stitch length _within_ the fill (1–7 mm). By default the fill follows `stitchlen`; set `filllen` to override it, or `filllen 0` to follow again. Rows are automatically brick-offset so penetrations don't line up into weak lines.
 
 ### Holes
 
-Here's the powerful part. A pen-up move *inside* a fill starts a new ring, and inner rings become **holes** by the even-odd rule. So a donut is just two concentric circles:
+Here's the powerful part. A pen-up move _inside_ a fill starts a new ring, and inner rings become **holes** by the even-odd rule. So a donut is just two concentric circles:
 
 ```text
 beginfill
@@ -279,7 +279,7 @@ endfill
 
 The fill covers the area between the two circles, leaving the centre empty.
 
-For fills whose rows *follow a curve* — contour lines, a flow field, a grain that bends with the shape — you can hand `fill` a procedure that drives the row direction (and another for the texture), exactly the way `satin @fn` drives a column. That's `fill @fn`, covered in §20.
+For fills whose rows _follow a curve_ — contour lines, a flow field, a grain that bends with the shape — you can hand `fill` a procedure that drives the row direction (and another for the texture), exactly the way `satin @fn` drives a column. That's `fill @fn`, covered in §20.
 
 ---
 
@@ -323,14 +323,14 @@ Two gotchas worth internalising early:
 
 NeedleScript ships a full set of math functions. The ones you'll reach for constantly:
 
-| Function | What it gives you |
-|---|---|
-| `sin deg`, `cos deg` | trigonometry, in **degrees** |
-| `sqrt n`, `abs n`, `round n`, `floor n`, `ceil n` | the usual suspects |
-| `min a b`, `max a b`, `pow a b` | minimum, maximum, power |
-| `atan x y` | the **heading** of vector (x, y): 0 = north, clockwise. `atan 1 0` is 90 |
-| `towards x y` | heading from the needle toward a point. `seth towards 0 0` aims home |
-| `distance x y` | distance from the needle to a point |
+| Function                                          | What it gives you                                                        |
+| ------------------------------------------------- | ------------------------------------------------------------------------ |
+| `sin deg`, `cos deg`                              | trigonometry, in **degrees**                                             |
+| `sqrt n`, `abs n`, `round n`, `floor n`, `ceil n` | the usual suspects                                                       |
+| `min a b`, `max a b`, `pow a b`                   | minimum, maximum, power                                                  |
+| `atan x y`                                        | the **heading** of vector (x, y): 0 = north, clockwise. `atan 1 0` is 90 |
+| `towards x y`                                     | heading from the needle toward a point. `seth towards 0 0` aims home     |
+| `distance x y`                                    | distance from the needle to a point                                      |
 
 And three **reporters** that take no arguments and report the turtle's state: `xcor` and `ycor` (position), `heading` (current heading in degrees). For example, to spiral inward until you're close to the centre:
 
@@ -343,7 +343,7 @@ repeat 200 [
 ]
 ```
 
-> **A classic-syntax trap.** Multi-argument prefix calls parse each argument as a *full expression*, so a trailing operator gets absorbed into the last argument: `distance 0 0 < 47` actually means `distance 0 (0 < 47)`. Parenthesise when you mean the comparison — `(distance 0 0) < 47` — or use call parens, where it can't happen: `distance(0, 0) < 47`. When in doubt, use the parentheses.
+> **A classic-syntax trap.** Multi-argument prefix calls parse each argument as a _full expression_, so a trailing operator gets absorbed into the last argument: `distance 0 0 < 47` actually means `distance 0 (0 < 47)`. Parenthesise when you mean the comparison — `(distance 0 0) < 47` — or use call parens, where it can't happen: `distance(0, 0) < 47`. When in doubt, use the parentheses.
 
 ---
 
@@ -406,12 +406,12 @@ for i = 1 to 12 [
 
 Four control-transfer words, from the smallest jump to the largest:
 
-| Word | Leaves | Notes |
-|---|---|---|
-| `continue` | the current iteration | innermost loop only; the loop then advances normally |
-| `break` | the innermost loop | outer loops keep running |
-| `exit` / bare `return` | the current procedure | unwinds any loops inside it |
-| `output e` / `return e` | the current procedure, *with a value* | for reporters |
+| Word                    | Leaves                                | Notes                                                |
+| ----------------------- | ------------------------------------- | ---------------------------------------------------- |
+| `continue`              | the current iteration                 | innermost loop only; the loop then advances normally |
+| `break`                 | the innermost loop                    | outer loops keep running                             |
+| `exit` / bare `return`  | the current procedure                 | unwinds any loops inside it                          |
+| `output e` / `return e` | the current procedure, _with a value_ | for reporters                                        |
 
 `break` and `continue` work in every loop form and through any nesting of `if`/`else`. With `true` as a literal, the idiomatic search loop is `while true [ … if found [ break ] ]`. A common embroidery pattern — walk until you leave a region:
 
@@ -423,7 +423,7 @@ repeat 30 [
 ]
 ```
 
-One important rule: `break` and `continue` are **lexical**, checked when your program is parsed. They must sit physically inside a loop body in the *same* procedure. A `break` inside a helper procedure can't end a loop in the procedure that called it — for that, use `return`/`exit` to leave the helper.
+One important rule: `break` and `continue` are **lexical**, checked when your program is parsed. They must sit physically inside a loop body in the _same_ procedure. A `break` inside a helper procedure can't end a loop in the procedure that called it — for that, use `return`/`exit` to leave the helper.
 
 ---
 
@@ -472,7 +472,7 @@ def fact(n) [
 ]
 ```
 
-A procedure used as a value *must* actually reach a `return`/`output`, or you get a friendly error. And `return`/`output`/`exit` are only valid inside a procedure.
+A procedure used as a value _must_ actually reach a `return`/`output`, or you get a friendly error. And `return`/`output`/`exit` are only valid inside a procedure.
 
 ### Local scope in practice
 
@@ -495,7 +495,7 @@ NeedleScript has two dialects that **mix freely in the same program** and compil
 - **Modern syntax** — `let x = 5`, `setxy(a, b)`, `def leaf(size) [ … ]`, `return`, `for i = 1 to 10`, `else if`, `%`, `!`, `==`, `true`/`false`, `//` comments.
 - **Classic Logo syntax** — `make "x 5`, `setxy :a :b`, `to leaf :size … end`, `output`, `for "i 1 10 1`, `;` comments. This remains valid forever.
 
-You don't have to choose. The intended idiom is a *mix*: classic prefix words where they read well (`fd 10 rt 90`, `up … down`), and call parentheses wherever expressions nest.
+You don't have to choose. The intended idiom is a _mix_: classic prefix words where they read well (`fd 10 rt 90`, `up … down`), and call parentheses wherever expressions nest.
 
 ### The one rule of call syntax
 
@@ -509,11 +509,11 @@ xcor()                          // zero-argument call
 min(3, 4)   ·   min 3 4         // identical
 ```
 
-That single space is the *entire* rule: glued `(` means argument list, spaced `(` means Logo grouping. Because of it, every classic program keeps its original meaning.
+That single space is the _entire_ rule: glued `(` means argument list, spaced `(` means Logo grouping. Because of it, every classic program keeps its original meaning.
 
 ### Why parentheses pay off
 
-Classic prefix calls have two parsing rules you must hold in your head: multi-argument words absorb a trailing operator into the last argument, while single-argument functions bind tightly. So `random 64 - 32` is `(random 64) - 32`, but `distance 0 0 < 47` is `distance 0 (0 < 47)`. Call parens give every callable *one* rule:
+Classic prefix calls have two parsing rules you must hold in your head: multi-argument words absorb a trailing operator into the last argument, while single-argument functions bind tightly. So `random 64 - 32` is `(random 64) - 32`, but `distance 0 0 < 47` is `distance 0 (0 < 47)`. Call parens give every callable _one_ rule:
 
 ```text
 bloom clamp 2.5 + random 3 2.5 5 :kind          ; classic — correct, but you must count arities to read it
@@ -526,7 +526,7 @@ For anything beyond a simple `fd 10 rt 90`, the parenthesised form is far easier
 
 ## 11. Randomness and determinism
 
-Generative work needs randomness, but embroidery needs *reproducibility* — what you previewed must be exactly what the machine sews. NeedleScript resolves this: **every run is deterministic.** `random`, `gauss`, `noise`, `snoise2/3`, `pick`, `shuffle`, and `scatter` are all driven by a seed (default 42). Reseed at the top of your program:
+Generative work needs randomness, but embroidery needs _reproducibility_ — what you previewed must be exactly what the machine sews. NeedleScript resolves this: **every run is deterministic.** `random`, `gauss`, `noise`, `snoise2/3`, `pick`, `shuffle`, and `scatter` are all driven by a seed (default 42). Reseed at the top of your program:
 
 ```text
 seed 7
@@ -545,7 +545,7 @@ repeat 20 [
 ]
 ```
 
-That scatters twenty small circles of random size and position — but the *same* twenty every time you run it.
+That scatters twenty small circles of random size and position — but the _same_ twenty every time you run it.
 
 ### The fork convention (why your edits stay local)
 
@@ -590,41 +590,41 @@ let c = copy(a)      // deep copy — c is independent
 
 ### The `[` rule
 
-Brackets serve double duty (blocks *and* list literals), so position decides the meaning:
+Brackets serve double duty (blocks _and_ list literals), so position decides the meaning:
 
 - After a header followed by a space (`repeat 4 [ … ]`), or glued to a number or `:var` (`repeat 4[…]`), a `[` is a **block**. Classic programs are untouched.
 - At the start of an expression, `[` is a **list literal**.
 - Glued to a bare name, `)`, or `]`, it's an **index**: `xs[0]`, `pos()[1]`, `grid[i][j]`.
 
-The one sharp edge: `repeat n[ fd 10 ]` with a modern bare name reads as *indexing* `n`. The error message will tell you to add the space.
+The one sharp edge: `repeat n[ fd 10 ]` with a modern bare name reads as _indexing_ `n`. The error message will tell you to add the space.
 
 ### Loud over convenient
 
-Mistakes that other languages quietly tolerate are errors here, because a wrong index in embroidery is a wrong stitch: a non-integer or out-of-range index, a list used in a condition (`if xs [ … ]` → "use `len(xs) > 0`"), a list in arithmetic (`[1, 2] + 1`), or a list handed to a scalar command (`fd [1, 2]`). Each error names the operation and the line. The one exception is equality: `=`/`==` compare lists *deeply* (with the usual tolerance), and a number never equals a list — that's simply `0`, not an error.
+Mistakes that other languages quietly tolerate are errors here, because a wrong index in embroidery is a wrong stitch: a non-integer or out-of-range index, a list used in a condition (`if xs [ … ]` → "use `len(xs) > 0`"), a list in arithmetic (`[1, 2] + 1`), or a list handed to a scalar command (`fd [1, 2]`). Each error names the operation and the line. The one exception is equality: `=`/`==` compare lists _deeply_ (with the usual tolerance), and a number never equals a list — that's simply `0`, not an error.
 
 ### List functions
 
 All list functions are **call-syntax only** — `len(xs)`, never `len xs`. The full toolkit:
 
-| Function | Returns / effect |
-|---|---|
-| `range(n)` · `range(a, b)` · `range(a, b, s)` | `[0…n-1]` / `[a…b-1]` / stepped — 0-based, end-exclusive |
-| `filled(n, v)` | a list of *n* deep copies of *v* |
-| `len(xs)` · `islist(v)` | element count · `1`/`0` |
-| `first(xs)` · `last(xs)` | `xs[0]` · `xs[-1]` |
-| `append(xs, v)` · `prepend(xs, v)` | **mutate**: add at end / front |
-| `insertat(xs, i, v)` · `removeat(xs, i)` | **mutate**: insert at *i* / remove *i* (and return it) |
-| `concat(a, b)` | new list (shallow — elements shared) |
-| `slice(xs, a)` · `slice(xs, a, b)` | new list, Python semantics, negatives allowed |
-| `reverse(xs)` · `sort(xs)` | **new** lists (pure, so they compose); `sort` is numbers-only, ascending, stable |
-| `copy(xs)` | deep copy |
-| `indexof(xs, v)` · `contains(xs, v)` | first index (deep compare) or −1 · `1`/`0` |
-| `sum(xs)` · `mean(xs)` · `minof(xs)` · `maxof(xs)` | aggregates; `sum([])` is 0, the others error on empty |
-| `pick(xs)` | random element — seeded, 1 draw |
-| `shuffle(xs)` | new shuffled list — seeded, forks (see above) |
-| `pos()` · `setpos(p)` | the needle's position as `[x, y]` · move there (`setpos` makes record/replay symmetric) |
+| Function                                           | Returns / effect                                                                        |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `range(n)` · `range(a, b)` · `range(a, b, s)`      | `[0…n-1]` / `[a…b-1]` / stepped — 0-based, end-exclusive                                |
+| `filled(n, v)`                                     | a list of _n_ deep copies of _v_                                                        |
+| `len(xs)` · `islist(v)`                            | element count · `1`/`0`                                                                 |
+| `first(xs)` · `last(xs)`                           | `xs[0]` · `xs[-1]`                                                                      |
+| `append(xs, v)` · `prepend(xs, v)`                 | **mutate**: add at end / front                                                          |
+| `insertat(xs, i, v)` · `removeat(xs, i)`           | **mutate**: insert at _i_ / remove _i_ (and return it)                                  |
+| `concat(a, b)`                                     | new list (shallow — elements shared)                                                    |
+| `slice(xs, a)` · `slice(xs, a, b)`                 | new list, Python semantics, negatives allowed                                           |
+| `reverse(xs)` · `sort(xs)`                         | **new** lists (pure, so they compose); `sort` is numbers-only, ascending, stable        |
+| `copy(xs)`                                         | deep copy                                                                               |
+| `indexof(xs, v)` · `contains(xs, v)`               | first index (deep compare) or −1 · `1`/`0`                                              |
+| `sum(xs)` · `mean(xs)` · `minof(xs)` · `maxof(xs)` | aggregates; `sum([])` is 0, the others error on empty                                   |
+| `pick(xs)`                                         | random element — seeded, 1 draw                                                         |
+| `shuffle(xs)`                                      | new shuffled list — seeded, forks (see above)                                           |
+| `pos()` · `setpos(p)`                              | the needle's position as `[x, y]` · move there (`setpos` makes record/replay symmetric) |
 
-> **`push`/`pop` are taken** — they save and restore the *turtle state* (section 4), not lists. To grow a list, use `append(xs, v)`.
+> **`push`/`pop` are taken** — they save and restore the _turtle state_ (section 4), not lists. To grow a list, use `append(xs, v)`.
 
 Here's a list-driven palette cycle:
 
@@ -640,26 +640,26 @@ for i = 0 to 11 [
 
 ## 13. Generative math: scalars, noise, vectors
 
-Lists make data representable; the generative-math builtins make it *generatable*. Three conventions, stated once and used everywhere: **a point is `[x, y]`, a path is a list of points, a region is a closed path** (the closing segment is implicit). Every function speaks that vocabulary, so the output of one feeds the input of the next. These are all **call-syntax only.**
+Lists make data representable; the generative-math builtins make it _generatable_. Three conventions, stated once and used everywhere: **a point is `[x, y]`, a path is a list of points, a region is a closed path** (the closing segment is implicit). Every function speaks that vocabulary, so the output of one feeds the input of the next. These are all **call-syntax only.**
 
 ### Scalar shaping
 
-| Function | Returns |
-|---|---|
-| `lerp(a, b, t)` | `a + (b − a)·t`, with *t* unclamped |
-| `remap(v, inlo, inhi, outlo, outhi)` | linear remap, unclamped |
-| `clamp(v, lo, hi)` | `min(hi, max(lo, v))` |
-| `smoothstep(e0, e1, x)` | a Hermite ease from 0 to 1 |
-| `gauss(mu, sigma)` | seeded normal distribution (Box-Muller, exactly 2 draws) |
+| Function                             | Returns                                                  |
+| ------------------------------------ | -------------------------------------------------------- |
+| `lerp(a, b, t)`                      | `a + (b − a)·t`, with _t_ unclamped                      |
+| `remap(v, inlo, inhi, outlo, outhi)` | linear remap, unclamped                                  |
+| `clamp(v, lo, hi)`                   | `min(hi, max(lo, v))`                                    |
+| `smoothstep(e0, e1, x)`              | a Hermite ease from 0 to 1                               |
+| `gauss(mu, sigma)`                   | seeded normal distribution (Box-Muller, exactly 2 draws) |
 
 ### Noise — the heart of organic design
 
 Noise gives you smooth, continuous randomness — perfect for natural-looking drift, where nearby points have similar values.
 
-| Function | Returns |
-|---|---|
-| `snoise2(x, y)` · `snoise3(x, y, z)` | seeded simplex noise in **−1…1**. (Legacy `noise`/`noise2` return 0…1.) The *z* axis is for **variation, not space** — `snoise3(x/14, y/14, motif * 50)` gives each motif its own field |
-| `fbm2(x, y, octaves)` | fractal sum of `snoise2` — lacunarity 2.0, gain 0.5, octaves 1–8, normalised to ≈ −1…1 |
+| Function                             | Returns                                                                                                                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `snoise2(x, y)` · `snoise3(x, y, z)` | seeded simplex noise in **−1…1**. (Legacy `noise`/`noise2` return 0…1.) The _z_ axis is for **variation, not space** — `snoise3(x/14, y/14, motif * 50)` gives each motif its own field |
+| `fbm2(x, y, octaves)`                | fractal sum of `snoise2` — lacunarity 2.0, gain 0.5, octaves 1–8, normalised to ≈ −1…1                                                                                                  |
 
 The key technique is to **sample noise slowly**: divide your coordinates by 10–20 before feeding them in, so the field changes gradually as the turtle moves. The README's opening example does exactly this — strands drift through a noise field, each step turning to face a heading read from the noise at its current position:
 
@@ -687,17 +687,17 @@ Fourteen strands start at random points and flow along the same underlying noise
 
 One angle rule governs everything here: **headings use turtle degrees** (0 = north, clockwise positive), matching `seth`, `atan`, and `towards`.
 
-| Function | Returns |
-|---|---|
-| `vadd(a, b)` · `vsub(a, b)` | a new point |
-| `vscale(a, s)` · `vlerp(a, b, t)` | a new point |
-| `vdot(a, b)` · `vlen(a)` · `vdist(a, b)` | a number |
-| `vnorm(a)` | the unit vector (the zero vector is an **error**, never a silent `[0,0]`) |
-| `vrot(a, deg)` | rotated **clockwise** for positive deg (matches `rt`) |
-| `vheading(a)` | the turtle heading of a vector (≡ `atan a[0] a[1]`) |
-| `vfromheading(deg, len)` | the inverse — `vfromheading(heading, 1)` is the needle's direction |
+| Function                                 | Returns                                                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------- |
+| `vadd(a, b)` · `vsub(a, b)`              | a new point                                                               |
+| `vscale(a, s)` · `vlerp(a, b, t)`        | a new point                                                               |
+| `vdot(a, b)` · `vlen(a)` · `vdist(a, b)` | a number                                                                  |
+| `vnorm(a)`                               | the unit vector (the zero vector is an **error**, never a silent `[0,0]`) |
+| `vrot(a, deg)`                           | rotated **clockwise** for positive deg (matches `rt`)                     |
+| `vheading(a)`                            | the turtle heading of a vector (≡ `atan a[0] a[1]`)                       |
+| `vfromheading(deg, len)`                 | the inverse — `vfromheading(heading, 1)` is the needle's direction        |
 
-> **There is no operator broadcasting.** `[1, 2] + [3, 4]` is a loud error (with a hint to use `vadd` for element-wise, or `concat` to join). This is deliberate and audience-specific: in Python that expression means *concatenation*, and silently giving it vector semantics would be a bug that sews before anyone notices.
+> **There is no operator broadcasting.** `[1, 2] + [3, 4]` is a loud error (with a hint to use `vadd` for element-wise, or `concat` to join). This is deliberate and audience-specific: in Python that expression means _concatenation_, and silently giving it vector semantics would be a bug that sews before anyone notices.
 
 ---
 
@@ -705,17 +705,17 @@ One angle rule governs everything here: **headings use turtle degrees** (0 = nor
 
 Once you can build lists of points, you can treat them as paths and curves, then convert them into evenly-spaced stitches.
 
-| Function | Returns |
-|---|---|
-| `pathlen(path)` | total polyline length |
-| `resample(path, mm)` | a new path whose segments are each exactly *mm* long (last may be shorter; first and last preserved) — **the bridge between math-space curves and physical stitch spacing** |
-| `chaikin(path, n)` | corner-cutting smoothing, *n* iterations (1–6) |
-| `catmull(points, mm)` | a Catmull-Rom spline through the control points, resampled |
-| `bezier(p0, c0, c1, p1, mm)` | a cubic Bézier, resampled |
-| `centroid(path)` · `bbox(path)` | the centroid point · `[minx, miny, maxx, maxy]` |
-| `sewpath(path)` | **command**: exactly `for p in path [ setpos(p) ]` — pen state, stitch mode, satin, and auto-split all apply as if you'd walked it by hand |
+| Function                        | Returns                                                                                                                                                                     |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pathlen(path)`                 | total polyline length                                                                                                                                                       |
+| `resample(path, mm)`            | a new path whose segments are each exactly _mm_ long (last may be shorter; first and last preserved) — **the bridge between math-space curves and physical stitch spacing** |
+| `chaikin(path, n)`              | corner-cutting smoothing, _n_ iterations (1–6)                                                                                                                              |
+| `catmull(points, mm)`           | a Catmull-Rom spline through the control points, resampled                                                                                                                  |
+| `bezier(p0, c0, c1, p1, mm)`    | a cubic Bézier, resampled                                                                                                                                                   |
+| `centroid(path)` · `bbox(path)` | the centroid point · `[minx, miny, maxx, maxy]`                                                                                                                             |
+| `sewpath(path)`                 | **command**: exactly `for p in path [ setpos(p) ]` — pen state, stitch mode, satin, and auto-split all apply as if you'd walked it by hand                                  |
 
-The pattern is: *build a smooth curve in math space, resample it to your stitch length, then sew it.* For example, a smooth wave through five control points:
+The pattern is: _build a smooth curve in math space, resample it to your stitch length, then sew it._ For example, a smooth wave through five control points:
 
 ```text
 let pts = [[-40, 0], [-20, 18], [0, -18], [20, 18], [40, 0]]
@@ -730,15 +730,15 @@ Because `sewpath` honours the current stitch mode, switching `satin 3` on before
 
 ## 15. Generators: scatter, Voronoi, hull
 
-These functions *generate* point sets and regions — the raw material of generative tessellation and stippling. All are seeded (see [section 11](#11-randomness-and-determinism)).
+These functions _generate_ point sets and regions — the raw material of generative tessellation and stippling. All are seeded (see [section 11](#11-randomness-and-determinism)).
 
-| Function | Returns |
-|---|---|
-| `scatter(mindist)` · `scatter(mindist, region)` | Poisson-disc (Bridson) points — no two closer than *mindist* — over the sewable field, or inside a region. Capped at 20,000 points |
-| `voronoi(points)` · `voronoi(points, region)` | one Voronoi cell (a region) per input point, **in input order**, clipped to the sewable disc or a given region |
-| `triangulate(points)` | Delaunay triangles, as a list of 3-point regions |
-| `hull(points)` | the convex hull as a region, counter-clockwise |
-| `relax(points, n)` | *n* rounds of Lloyd's relaxation — each point moves to its Voronoi cell's centroid, evening out spacing for stippling |
+| Function                                        | Returns                                                                                                                            |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `scatter(mindist)` · `scatter(mindist, region)` | Poisson-disc (Bridson) points — no two closer than _mindist_ — over the sewable field, or inside a region. Capped at 20,000 points |
+| `voronoi(points)` · `voronoi(points, region)`   | one Voronoi cell (a region) per input point, **in input order**, clipped to the sewable disc or a given region                     |
+| `triangulate(points)`                           | Delaunay triangles, as a list of 3-point regions                                                                                   |
+| `hull(points)`                                  | the convex hull as a region, counter-clockwise                                                                                     |
+| `relax(points, n)`                              | _n_ rounds of Lloyd's relaxation — each point moves to its Voronoi cell's centroid, evening out spacing for stippling              |
 
 The canonical pipeline is `scatter → voronoi → offsetpath → resample → sewpath`. Here's a cracked-tile / stained-glass effect:
 
@@ -763,13 +763,13 @@ For organic stippling, run `relax` on your scattered points first — a few roun
 
 For precise shape manipulation, NeedleScript wraps the Clipper2 library on integer micro-coordinates, so results are exact and platform-stable.
 
-| Function | Returns |
-|---|---|
+| Function                 | Returns                                                                                                                                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `offsetpath(region, mm)` | a **list** of regions — positive inflates, negative shrinks. Shrinking may split a shape into several, or into **none** (an empty list, not an error — loops over it simply do nothing). Round joins |
-| `clippaths(a, b, "op)` | a boolean of two regions; *op* ∈ `"union` `"intersect` `"difference` `"xor`; returns a **list** of regions |
-| `inpath(p, region)` | `1`/`0` by the even-odd rule (consistent with fills) |
+| `clippaths(a, b, "op)`   | a boolean of two regions; _op_ ∈ `"union` `"intersect` `"difference` `"xor`; returns a **list** of regions                                                                                           |
+| `inpath(p, region)`      | `1`/`0` by the even-odd rule (consistent with fills)                                                                                                                                                 |
 
-Two things to internalise. First, `offsetpath` and `clippaths` always return *lists* of regions, because these operations can produce multiple pieces (or zero) — so you iterate the result:
+Two things to internalise. First, `offsetpath` and `clippaths` always return _lists_ of regions, because these operations can produce multiple pieces (or zero) — so you iterate the result:
 
 ```text
 let shrunk = offsetpath(myShape, -2)
@@ -788,7 +788,7 @@ Combine these with the generators and you can do things like: scatter points, bu
 
 ## 17. Transforms: stamping motifs
 
-You often want the *same* motif in many places — rotated, scaled, mirrored — without rewriting it each time. That is exactly what transforms give you: a command takes its arguments **then a block**, applies a coordinate transform to whatever that block draws, and restores the previous frame afterwards. It is the same stack discipline you already know from `push`/`pop`, but operating on a 2-D coordinate frame instead of the turtle pose.
+You often want the _same_ motif in many places — rotated, scaled, mirrored — without rewriting it each time. That is exactly what transforms give you: a command takes its arguments **then a block**, applies a coordinate transform to whatever that block draws, and restores the previous frame afterwards. It is the same stack discipline you already know from `push`/`pop`, but operating on a 2-D coordinate frame instead of the turtle pose.
 
 Draw a motif once, in its own local frame:
 
@@ -816,11 +816,11 @@ The full vocabulary: `translate dx dy`, `rotate deg`, `rotateabout deg cx cy`, `
 
 ### The turtle doesn't know it's been transformed
 
-This is the rule that keeps transforms predictable. **Inside a transform block the turtle still lives in plain local coordinates** — `xcor`, `ycor`, `distance`, `pos()` all report pre-transform values, and only the *emitted stitches* are mapped to the hoop. So a guard like `if distance(0, 0) > 44 [ return ]` behaves the same whether or not a transform wraps it, and a motif that uses `random` draws the *same* numbers no matter where you stamp it. Wrapping a motif in a transform never reshuffles anything downstream — the determinism promise holds. The history queries (`coverat` and friends) follow the same rule: you pass local points and the engine maps them through the transform, so `coverat(pos())` reads the right patch of fabric in any frame.
+This is the rule that keeps transforms predictable. **Inside a transform block the turtle still lives in plain local coordinates** — `xcor`, `ycor`, `distance`, `pos()` all report pre-transform values, and only the _emitted stitches_ are mapped to the hoop. So a guard like `if distance(0, 0) > 44 [ return ]` behaves the same whether or not a transform wraps it, and a motif that uses `random` draws the _same_ numbers no matter where you stamp it. Wrapping a motif in a transform never reshuffles anything downstream — the determinism promise holds. The history queries (`coverat` and friends) follow the same rule: you pass local points and the engine maps them through the transform, so `coverat(pos())` reads the right patch of fabric in any frame.
 
 ### Transforms sew like real embroidery, not stretched geometry
 
-A transform maps the turtle's *path*; stitch-length splitting, satin width and the physics layer are all applied **afterwards, in hoop space**. So `scale 3 [ fd 30 ]` sews nine tidy 2.5 mm stitches across 90 mm — not three 7.5 mm stitches stretched thin. Satin width follows the transform perpendicular to travel (under `scalexy 2 1`, a north-running column widens and an east-running one doesn't), and `pullcomp` — a real-millimetre fabric constant — is never scaled.
+A transform maps the turtle's _path_; stitch-length splitting, satin width and the physics layer are all applied **afterwards, in hoop space**. So `scale 3 [ fd 30 ]` sews nine tidy 2.5 mm stitches across 90 mm — not three 7.5 mm stitches stretched thin. Satin width follows the transform perpendicular to travel (under `scalexy 2 1`, a north-running column widens and an east-running one doesn't), and `pullcomp` — a real-millimetre fabric constant — is never scaled.
 
 ### Transforming data, not just drawing
 
@@ -844,7 +844,7 @@ One caution: `scale`, `rotate`, `translate`, `mirror`, `skew`, `transform` (and 
 
 ## 18. Effects: warp, humanize, snaptogrid
 
-Transforms are the *linear* case of a bigger idea. A transform maps every emitted point through a fixed matrix; an **effect** maps it through an arbitrary function. Effects sit on the same block-scoped stack and nest freely with transforms — same discipline, but nonlinear and, in two cases, stochastic. They all read as "run this block, but pass the emitted points through *this* map."
+Transforms are the _linear_ case of a bigger idea. A transform maps every emitted point through a fixed matrix; an **effect** maps it through an arbitrary function. Effects sit on the same block-scoped stack and nest freely with transforms — same discipline, but nonlinear and, in two cases, stochastic. They all read as "run this block, but pass the emitted points through _this_ map."
 
 ```text
 scale 1.5 [
@@ -858,13 +858,13 @@ scale 1.5 [
 
 Inside-out: draw the leaf, humanize its penetrations, ripple the result, scale that. The one thing to internalise is **where in the pipeline each effect runs**, because it changes what they do:
 
-| Effect | What it is | Runs… |
-|---|---|---|
-| `warp @fn` | a geometric deformation (shader) | **before** stitch splitting — it bends the path, which is then split into clean stitches |
-| `humanize amount` | hand-stitched jitter | **after** splitting — it nudges the final needle points |
-| `snaptogrid …` | grid quantizing | **after** splitting — it snaps the final needle points to a lattice |
+| Effect            | What it is                       | Runs…                                                                                    |
+| ----------------- | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `warp @fn`        | a geometric deformation (shader) | **before** stitch splitting — it bends the path, which is then split into clean stitches |
+| `humanize amount` | hand-stitched jitter             | **after** splitting — it nudges the final needle points                                  |
+| `snaptogrid …`    | grid quantizing                  | **after** splitting — it snaps the final needle points to a lattice                      |
 
-`warp` bends the *curve* and lets the splitter make tidy physical stitches along it; `humanize`/`snaptogrid` perturb *individual penetrations* (jittering or snapping the path before splitting would resample the irregularity away, or interpolate stitches back off the grid).
+`warp` bends the _curve_ and lets the splitter make tidy physical stitches along it; `humanize`/`snaptogrid` perturb _individual penetrations_ (jittering or snapping the path before splitting would resample the irregularity away, or interpolate stitches back off the grid).
 
 ### `warp @fn` — the shader, and the `@name` reference
 
@@ -891,7 +891,7 @@ The `@name` syntax is new: it's a reference to a reporter, the one new kind of v
 humanize 0.3 [ repeat 4 [ fd 20 rt 90 ] ]
 ```
 
-`humanize` offsets each penetration by a small amount (in mm, 0–2). The craft is in *how*: it uses **coherent** seeded noise (slow `snoise2` at each point), so neighbouring stitches drift together like a real hand — not independent per-stitch jitter, which reads as damage. And it **forks**, drawing exactly one value from the seeded stream (§11), so dropping a `humanize` block shifts everything downstream by one draw, never by however many stitches were inside. Re-running with the same seed reproduces the same imperfections.
+`humanize` offsets each penetration by a small amount (in mm, 0–2). The craft is in _how_: it uses **coherent** seeded noise (slow `snoise2` at each point), so neighbouring stitches drift together like a real hand — not independent per-stitch jitter, which reads as damage. And it **forks**, drawing exactly one value from the seeded stream (§11), so dropping a `humanize` block shifts everything downstream by one draw, never by however many stitches were inside. Re-running with the same seed reproduces the same imperfections.
 
 ### `snaptogrid …` — the cross-stitch grid
 
@@ -899,7 +899,7 @@ humanize 0.3 [ repeat 4 [ fd 20 rt 90 ] ]
 snaptogrid 2 [ repeat 4 [ fd 20 rt 90 ] ]
 ```
 
-`snaptogrid` snaps each penetration to a lattice. Its special trick is **frame-invariance**: a grid belongs to the fabric, not the motif, so the lattice is fixed in hoop space **outside** any enclosing transform. Stamp the same motif at four places with `translate` and all four snap to the *same* lattice — they register across the whole piece. `scale 2 [ snaptogrid 1 [ … ] ]` does **not** make a 2 mm grid; the lattice stays 1 mm and the scaled motif simply lands on different nodes. It overloads by arity for rectangular, offset and rotated grids (`snaptogrid cellx celly ox oy ang [ … ]`), is pure and drawless (its result doesn't even depend on the seed), and merges any penetrations a coarse grid collapses onto one node (with the usual tiny-stitch warning). Like `humanize`, it leaves satin columns alone — quantizing a satin rail wrecks the column — and warns once if it finds one.
+`snaptogrid` snaps each penetration to a lattice. Its special trick is **frame-invariance**: a grid belongs to the fabric, not the motif, so the lattice is fixed in hoop space **outside** any enclosing transform. Stamp the same motif at four places with `translate` and all four snap to the _same_ lattice — they register across the whole piece. `scale 2 [ snaptogrid 1 [ … ] ]` does **not** make a 2 mm grid; the lattice stays 1 mm and the scaled motif simply lands on different nodes. It overloads by arity for rectangular, offset and rotated grids (`snaptogrid cellx celly ox oy ang [ … ]`), is pure and drawless (its result doesn't even depend on the seed), and merges any penetrations a coarse grid collapses onto one node (with the usual tiny-stitch warning). Like `humanize`, it leaves satin columns alone — quantizing a satin rail wrecks the column — and warns once if it finds one.
 
 ### Effects on data, not just drawing
 
@@ -918,7 +918,7 @@ let pixels = snappath(scatter(8), 2)                 // Poisson dots on a 2 mm g
 
 ## 19. Professional embroidery and fabric physics
 
-Geometry that looks right on screen doesn't automatically *sew* right. Thread tension pulls fabric inward, stitches sink into the material, tight curves crowd the needle, and layered stitching becomes a stiff, puckered patch. The following commands compensate for the physics. They are **opt-in** — without them, your program sews exactly as written.
+Geometry that looks right on screen doesn't automatically _sew_ right. Thread tension pulls fabric inward, stitches sink into the material, tight curves crowd the needle, and layered stitching becomes a stiff, puckered patch. The following commands compensate for the physics. They are **opt-in** — without them, your program sews exactly as written.
 
 ### The fast path: fabric presets
 
@@ -928,13 +928,13 @@ The quickest route is to declare your fabric, which sets sensible defaults for e
 fabric "knit       ; pull comp 0.5, auto underlay, lighter satin, density limit 1.2
 ```
 
-| Fabric | Pull comp | Coverage limit | Notes |
-|---|---|---|---|
-| `"woven` | 0.2 mm | 3.5 layers | the baseline |
-| `"knit` | 0.5 mm | 3.0 layers | satin density floored at 0.45 mm |
-| `"stretch` | 0.6 mm | 2.8 layers | satin density floored at 0.5 mm |
-| `"denim` / `"canvas` | 0.15 mm | 4.0 layers | stable, tolerates dense stitching |
-| `"fleece` | 0.3 mm | 2.6 layers | doubled underlay, suggests a topping |
+| Fabric               | Pull comp | Coverage limit | Notes                                |
+| -------------------- | --------- | -------------- | ------------------------------------ |
+| `"woven`             | 0.2 mm    | 3.5 layers     | the baseline                         |
+| `"knit`              | 0.5 mm    | 3.0 layers     | satin density floored at 0.45 mm     |
+| `"stretch`           | 0.6 mm    | 2.8 layers     | satin density floored at 0.5 mm      |
+| `"denim` / `"canvas` | 0.15 mm   | 4.0 layers     | stable, tolerates dense stitching    |
+| `"fleece`            | 0.3 mm    | 2.6 layers     | doubled underlay, suggests a topping |
 
 Any explicit command after `fabric` overrides that part of the preset.
 
@@ -944,12 +944,12 @@ Thread tension shrinks stitching along the stitch axis — a 4 mm satin column a
 
 ### Underlay — `underlay`, `fillunderlay`
 
-Underlay is stabilising stitching sewn automatically *underneath* the visible layer — the single biggest difference between hobby and professional digitizing. It anchors the fabric to the backing, stops it shifting, and lifts the top stitching out of the material. It's sewn in correct machine order (before the top layer), shown thinner and lighter in the preview, and identical to normal stitches in exports.
+Underlay is stabilising stitching sewn automatically _underneath_ the visible layer — the single biggest difference between hobby and professional digitizing. It anchors the fabric to the backing, stops it shifting, and lifts the top stitching out of the material. It's sewn in correct machine order (before the top layer), shown thinner and lighter in the preview, and identical to normal stitches in exports.
 
-| Command | Modes |
-|---|---|
-| `underlay "auto` | for satin: `"center` (a spine, out and back), `"edge` (runs offset to ±30% width), `"zigzag` (open zigzag at 60% width plus a return run), `"off`. `"auto` picks by width — under 1.5 mm none, under 4 mm center, wider gets zigzag |
-| `fillunderlay "auto` | for fills: `"tatami` (sparse cross-grain pass), `"edge` (a run tracing the boundary), `"off`. `"auto` = tatami, plus the edge run on areas over 100 mm² |
+| Command              | Modes                                                                                                                                                                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `underlay "auto`     | for satin: `"center` (a spine, out and back), `"edge` (runs offset to ±30% width), `"zigzag` (open zigzag at 60% width plus a return run), `"off`. `"auto` picks by width — under 1.5 mm none, under 4 mm center, wider gets zigzag |
+| `fillunderlay "auto` | for fills: `"tatami` (sparse cross-grain pass), `"edge` (a run tracing the boundary), `"off`. `"auto` = tatami, plus the edge run on areas over 100 mm²                                                                             |
 
 A satin column is buffered while you draw it and sewn — underlay first, then the zigzag — when it ends (a pen up, mode change, colour change, trim, fill, or end of program). The turtle's position and heading are unaffected.
 
@@ -959,9 +959,9 @@ On a tight satin curve the inner edge gets the same number of penetrations as th
 
 ### Local density — `maxdensity n` plus the heatmap
 
-The physical quantity that matters most is **thread coverage**: millimetres of thread per mm² of fabric, expressed in *layers* (one layer is a clean satin column or tatami fill). Past about 2.5–3.5 layers, depending on fabric, embroidery stops behaving like fabric — needles deflect, thread breaks, the patch puckers. Every run computes a 1 mm coverage grid (deliberate tie-off micro-stitches are excluded so thread ends don't read as false hotspots). Hotspots above the limit produce warnings **with coordinates and the source lines that caused them**, and repeated penetrations in the same hole are flagged separately.
+The physical quantity that matters most is **thread coverage**: millimetres of thread per mm² of fabric, expressed in _layers_ (one layer is a clean satin column or tatami fill). Past about 2.5–3.5 layers, depending on fabric, embroidery stops behaving like fabric — needles deflect, thread breaks, the patch puckers. Every run computes a 1 mm coverage grid (deliberate tie-off micro-stitches are excluded so thread ends don't read as false hotspots). Hotspots above the limit produce warnings **with coordinates and the source lines that caused them**, and repeated penetrations in the same hole are flagged separately.
 
-The stage has a heatmap toggle (orange from about 1.2 layers, red from 3), and the stats row shows the peak. `maxdensity n` tunes the threshold (default 3.5); `maxdensity 0` silences it. Some constructions legitimately run hot — a satin border over a fill edge measures about 4 layers — and the right move is to raise the limit *knowingly*, as the bundled **patch** example does.
+The stage has a heatmap toggle (orange from about 1.2 layers, red from 3), and the stats row shows the peak. `maxdensity n` tunes the threshold (default 3.5); `maxdensity 0` silences it. Some constructions legitimately run hot — a satin border over a fill edge measures about 4 layers — and the right move is to raise the limit _knowingly_, as the bundled **patch** example does.
 
 ### Automatic trims — `autotrim mm`
 
@@ -971,11 +971,11 @@ Travels of 7 mm or more (configurable 3–30; `autotrim 0` off) automatically ge
 
 ## 20. Programmable satin, fills, and closed-loop generation
 
-The professional layer in §19 *shapes* the built-in stitches. The three features here go further: they let you replace the stitch generators themselves with your own reporters, and even read the fabric back as you sew. This is the most advanced corner of NeedleScript — and it reuses machinery you already know: the `@name` procedure references from [§18](#18-effects-warp-humanize-snaptogrid), and the coverage grid from [§19](#19-professional-embroidery-and-fabric-physics).
+The professional layer in §19 _shapes_ the built-in stitches. The three features here go further: they let you replace the stitch generators themselves with your own reporters, and even read the fabric back as you sew. This is the most advanced corner of NeedleScript — and it reuses machinery you already know: the `@name` procedure references from [§18](#18-effects-warp-humanize-snaptogrid), and the coverage grid from [§19](#19-professional-embroidery-and-fabric-physics).
 
 ### Programmable satin — `satin @fn`
 
-The built-in `satin` gives you one column shape: a centred zigzag of a fixed width. Sometimes you want a *different* column entirely — a leaf that tapers to nothing at both tips, a woven cross-hatch, a column that's fatter on one side. Hand `satin` a **procedure reference** (the same `@name` value `warp` takes, from §18) instead of a width, and your reporter draws the column:
+The built-in `satin` gives you one column shape: a centred zigzag of a fixed width. Sometimes you want a _different_ column entirely — a leaf that tapers to nothing at both tips, a woven cross-hatch, a column that's fatter on one side. Hand `satin` a **procedure reference** (the same `@name` value `warp` takes, from §18) instead of a width, and your reporter draws the column:
 
 ```text
 def leaf(t, s, i, u) [
@@ -989,7 +989,7 @@ satin 0                               // a number (or 0) disengages, flushing th
 
 The reporter is asked, once per stitch pair as the engine walks the spine, for five numbers: `[advance, leftw, rightw, leftlag, rightlag]`, all in mm. `advance` is how far to step the cursor forward before the next pair — dynamic density, and the one value that **must be positive** (it's the guarantee the walk ends). `leftw`/`rightw` are the two rails' half-widths (so `leftw ≠ rightw` gives an asymmetric column for free). `leftlag`/`rightlag` slide each rail endpoint forward (+) or back (−) along the spine before the width is applied.
 
-It's told where it is: `t` is the cursor's arc-length in real mm (so spatial patterns don't rescale with column length), `s` the same position normalized 0..1 (handy for tapers and tips, because the whole column is buffered before it sews), `i` the 0-based pair index, and `u` the local heading. Returning the constant `[0.4, 2, 2, 0, 0]` is *exactly* `satin 4` — a perpendicular bite. The interesting part is the two lags: give them opposite signs and the stitch rakes into a diagonal; flip that rake every other pair with `i`, and successive diagonals **cross each other** — woven satin — yet the cursor still only ever moves forward:
+It's told where it is: `t` is the cursor's arc-length in real mm (so spatial patterns don't rescale with column length), `s` the same position normalized 0..1 (handy for tapers and tips, because the whole column is buffered before it sews), `i` the 0-based pair index, and `u` the local heading. Returning the constant `[0.4, 2, 2, 0, 0]` is _exactly_ `satin 4` — a perpendicular bite. The interesting part is the two lags: give them opposite signs and the stitch rakes into a diagonal; flip that rake every other pair with `i`, and successive diagonals **cross each other** — woven satin — yet the cursor still only ever moves forward:
 
 ```text
 def crosshatch(t, s, i, u) [
@@ -1006,7 +1006,7 @@ Because `satin @fn` **is** the generator — not an after-split effect — it si
 
 ### Programmable fills — `fill @fn`
 
-`satin @fn` lets you draw a column; `fill @fn` lets you drive a *fill*. It arms the **next** `beginfill … endfill` with up to two reporters — a **direction field** and a **stitch shaper** — and the engine does the hard part: placing rows that follow your field while keeping them an even distance apart, clipping to holes, and running the whole physics pipeline. The marquee result is the **directional fill**, where the rows curve to follow the work instead of running in straight parallel lines:
+`satin @fn` lets you draw a column; `fill @fn` lets you drive a _fill_. It arms the **next** `beginfill … endfill` with up to two reporters — a **direction field** and a **stitch shaper** — and the engine does the hard part: placing rows that follow your field while keeping them an even distance apart, clipping to holes, and running the whole physics pipeline. The marquee result is the **directional fill**, where the rows curve to follow the work instead of running in straight parallel lines:
 
 ```text
 def contour(p) [
@@ -1018,7 +1018,7 @@ beginfill
 endfill                          // the generator runs at endfill
 ```
 
-A direction reporter takes the local point `p = [x, y]` and returns a single turtle heading (0 = north, clockwise). The engine threads **streamlines** through that field and lays one fill row along each. You can instead (or also) supply a *shape* reporter for the texture:
+A direction reporter takes the local point `p = [x, y]` and returns a single turtle heading (0 = north, clockwise). The engine threads **streamlines** through that field and lays one fill row along each. You can instead (or also) supply a _shape_ reporter for the texture:
 
 ```text
 def texture(p, row, v) [
@@ -1028,24 +1028,24 @@ def texture(p, row, v) [
 fill shape @texture
 ```
 
-The shaper is told the penetration position `p`, the 0-based `row` index, and `v` (0..1 across the field), and returns three numbers: the **spacing** to the next row (mm, must be positive — it's sampled once per row, since it's the gap *between* rows), the stitch **length** along the row (mm, 1–7), and the brick **phase** (0..1; 0.5 is standard tatami offset). Vary spacing with `v` and the rows fan apart — a graded-density fill; read `coverat(p)` and you can thin the fill where it's already covered. `fill @name` with no keyword is shorthand for the direction channel, the usual case.
+The shaper is told the penetration position `p`, the 0-based `row` index, and `v` (0..1 across the field), and returns three numbers: the **spacing** to the next row (mm, must be positive — it's sampled once per row, since it's the gap _between_ rows), the stitch **length** along the row (mm, 1–7), and the brick **phase** (0..1; 0.5 is standard tatami offset). Vary spacing with `v` and the rows fan apart — a graded-density fill; read `coverat(p)` and you can thin the fill where it's already covered. `fill @name` with no keyword is shorthand for the direction channel, the usual case.
 
-The engine guarantees the two things a hand-rolled fill gets wrong. **Coverage:** rows stay evenly spaced no matter how the field curves (a constant field reduces *exactly* to built-in tatami — that's the correctness pin). **Termination:** two finite budgets — a per-streamline length cap and a finite seed budget — mean a vortex, a singularity, or a chaotic field yields a finite fill *with warnings*, never a hang. A field that converges to a point legitimately piles thread there; that's surfaced honestly on the density heatmap rather than hidden, and you re-seed or raise `maxdensity` knowingly.
+The engine guarantees the two things a hand-rolled fill gets wrong. **Coverage:** rows stay evenly spaced no matter how the field curves (a constant field reduces _exactly_ to built-in tatami — that's the correctness pin). **Termination:** two finite budgets — a per-streamline length cap and a finite seed budget — mean a vortex, a singularity, or a chaotic field yields a finite fill _with warnings_, never a hang. A field that converges to a point legitimately piles thread there; that's surfaced honestly on the density heatmap rather than hidden, and you re-seed or raise `maxdensity` knowingly.
 
 Like `satin @fn`, this **is** the generator, so it composes the same way: reporters see local space and the engine maps through the transform afterward (a directional fill under `scale 1.5` covers 1.5× the area at physical spacing; the field rotates with the work under `rotate`), `pullcomp`/`fillunderlay`/`humanize`/the density grid all still apply, and the generator draws no randomness of its own — so a `snoise2` flow-field fill is fully reproducible. `fill`, `dir` and `shape` are Core words (though `dir`/`shape` are only special right after `fill`, so variables by those names still work), and a malformed reporter is a loud, line-numbered error. (See the bundled **custom fill** example.)
 
 ### Reading coverage back — stitch-history queries
 
-Everything above *writes* coverage. You can also *read* it mid-program and branch on it — the step from open-loop to closed-loop generation. Five **pure reporters** expose the very grid the heatmap draws:
+Everything above _writes_ coverage. You can also _read_ it mid-program and branch on it — the step from open-loop to closed-loop generation. Five **pure reporters** expose the very grid the heatmap draws:
 
-| Call | Returns |
-|---|---|
-| `coverat(p)` | coverage at `p` in **layers** (the heatmap / `maxdensity` unit) |
-| `coverat(p, r)` | coverage averaged over radius `r` mm — for asking about an area |
-| `countat(p)` | penetration count in the 1 mm cell at `p` |
-| `nearestsewn(p)` | the closest prior penetration as `[x, y]`, or `[]` if none yet |
-| `sewnwithin(p, r)` | a list of prior penetrations within `r` mm of `p` |
-| `stitchedpoints()` | a deep-copied snapshot of every penetration so far, as a path |
+| Call               | Returns                                                         |
+| ------------------ | --------------------------------------------------------------- |
+| `coverat(p)`       | coverage at `p` in **layers** (the heatmap / `maxdensity` unit) |
+| `coverat(p, r)`    | coverage averaged over radius `r` mm — for asking about an area |
+| `countat(p)`       | penetration count in the 1 mm cell at `p`                       |
+| `nearestsewn(p)`   | the closest prior penetration as `[x, y]`, or `[]` if none yet  |
+| `sewnwithin(p, r)` | a list of prior penetrations within `r` mm of `p`               |
+| `stitchedpoints()` | a deep-copied snapshot of every penetration so far, as a path   |
 
 The headline is `coverat`: "how full is the fabric here?", in the unit you already know. A stipple that fills toward an even target instead of clumping:
 
@@ -1063,15 +1063,15 @@ repeat 4000 [
 
 Three rules keep this honest:
 
-- **Pure and deterministic.** The queries draw *nothing* from the random stream and emit *nothing* — they are reads. Branching on them is still a function of `(seed, source)`, so "same seed → same design" holds. Only your own `random`/`gauss` calls ever touch the seed.
-- **Committed, in sewing order.** A query sees every penetration committed *so far* and nothing sewn later. The one catch is buffered satin: a column isn't in the grid until it flushes (pen-up, `trim`, a mode change), so check coverage *after* the stroke, not mid-column. Tie-off locks are excluded, exactly as they are from the heatmap — so a query reports the same number the heatmap shows.
+- **Pure and deterministic.** The queries draw _nothing_ from the random stream and emit _nothing_ — they are reads. Branching on them is still a function of `(seed, source)`, so "same seed → same design" holds. Only your own `random`/`gauss` calls ever touch the seed.
+- **Committed, in sewing order.** A query sees every penetration committed _so far_ and nothing sewn later. The one catch is buffered satin: a column isn't in the grid until it flushes (pen-up, `trim`, a mode change), so check coverage _after_ the stroke, not mid-column. Tie-off locks are excluded, exactly as they are from the heatmap — so a query reports the same number the heatmap shows.
 - **O(local), not O(history).** `coverat`/`countat` are single grid-cell lookups; `nearestsewn`/`sewnwithin` are backed by the same bucketing, so "what's near here" never walks all 60,000 stitches. Reach for them before scanning `stitchedpoints()`.
 
 Coverage is a property of the **fabric**, so the grid lives in hoop space — but query points follow the usual turtle rule: you pass them in local coordinates and the engine maps them through the current transform, so `coverat(pos())` reads the right spot whether or not a transform wraps it. (Points returned by `nearestsewn`/`sewnwithin`/`stitchedpoints` come back in hoop space — they're facts about the fabric, not the motif.)
 
-One hazard worth naming: a loop that runs *until a condition over history* is met can run forever if the target is unreachable, and the op/stitch limits will stop it (the error now hints that a feedback loop may not be terminating). Give such a loop a hard ceiling — `repeat 5000 [ … if done [ break ] ]`, never `while not done [ … ]`. The bundled **stipple** example models this.
+One hazard worth naming: a loop that runs _until a condition over history_ is met can run forever if the target is unreachable, and the op/stitch limits will stop it (the error now hints that a feedback loop may not be terminating). Give such a loop a hard ceiling — `repeat 5000 [ … if done [ break ] ]`, never `while not done [ … ]`. The bundled **stipple** example models this.
 
-Because they're reporters, they compose with effects: a `warp` whose displacement reads `coverat` becomes *reactive* — wobble more where the fabric is sparse, hold steady where it's dense:
+Because they're reporters, they compose with effects: a `warp` whose displacement reads `coverat` becomes _reactive_ — wobble more where the fabric is sparse, hold steady where it's dense:
 
 ```text
 def adaptive(p) [
@@ -1087,12 +1087,12 @@ def adaptive(p) [
 
 Generative designs surprise you. These tools tell you what actually happened.
 
-| Tool | What it does |
-|---|---|
-| `print expr` | log a value to the console |
-| `print "label expr` | the same, with a label — `print "radius :r` prints `radius: 1.5` |
-| `mark` | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats |
-| `assert cond` | stop with an error (and line number) if the condition is false — ideal for geometric invariants: `assert (distance 0 0) < 47` |
+| Tool                | What it does                                                                                                                                                    |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `print expr`        | log a value to the console                                                                                                                                      |
+| `print "label expr` | the same, with a label — `print "radius :r` prints `radius: 1.5`                                                                                                |
+| `mark`              | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats |
+| `assert cond`       | stop with an error (and line number) if the condition is false — ideal for geometric invariants: `assert (distance 0 0) < 47`                                   |
 
 Beyond commands, the playground itself is a debugger:
 
@@ -1118,20 +1118,20 @@ repeat 50 [
 
 NeedleScript guards both your browser and your machine. Hit one of these and you'll get a clear error rather than a hang or a damaged garment:
 
-| Limit | Value |
-|---|---|
-| Max stitches per design | 60,000 |
-| Max interpreter operations | 2,000,000 (catches infinite loops and runaway recursion) |
-| Max call depth | 200 |
-| Max `repeat` / `for` iterations | 200,000 |
-| Max list length | 100,000 elements |
-| Max total live list cells | 1,000,000 |
-| Max list nesting depth | 16 |
-| Max `scatter` output | 20,000 points |
-| Max `voronoi` / `triangulate` / `hull` / `relax` input | 10,000 points |
-| Max `offsetpath` / `clippaths` input | 50,000 vertices per call |
-| Stitch length | clamped to 0.4–12 mm |
-| Sub-0.4 mm moves | merged into neighbours (too short to sew safely), with a warning |
+| Limit                                                  | Value                                                            |
+| ------------------------------------------------------ | ---------------------------------------------------------------- |
+| Max stitches per design                                | 60,000                                                           |
+| Max interpreter operations                             | 2,000,000 (catches infinite loops and runaway recursion)         |
+| Max call depth                                         | 200                                                              |
+| Max `repeat` / `for` iterations                        | 200,000                                                          |
+| Max list length                                        | 100,000 elements                                                 |
+| Max total live list cells                              | 1,000,000                                                        |
+| Max list nesting depth                                 | 16                                                               |
+| Max `scatter` output                                   | 20,000 points                                                    |
+| Max `voronoi` / `triangulate` / `hull` / `relax` input | 10,000 points                                                    |
+| Max `offsetpath` / `clippaths` input                   | 50,000 vertices per call                                         |
+| Stitch length                                          | clamped to 0.4–12 mm                                             |
+| Sub-0.4 mm moves                                       | merged into neighbours (too short to sew safely), with a warning |
 
 ---
 
@@ -1139,7 +1139,7 @@ NeedleScript guards both your browser and your machine. Hit one of these and you
 
 When a design is ready, **Download .DST** produces a standard Tajima file: 3-byte ternary delta records, moves longer than 12.1 mm split automatically, colour changes as stop records, trims as triple jumps, and a correct 512-byte header. Load it onto any machine, or into commercial software for a final check.
 
-You can also bring artwork *in*: **Import SVG** (a button, or drag and drop) converts an SVG into *editable* NeedleScript code. Filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, and colours map to the nearest thread. It supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, plus groups and transforms — a great way to start from a logo and then make it generative.
+You can also bring artwork _in_: **Import SVG** (a button, or drag and drop) converts an SVG into _editable_ NeedleScript code. Filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, and colours map to the nearest thread. It supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, plus groups and transforms — a great way to start from a logo and then make it generative.
 
 ---
 
@@ -1189,7 +1189,7 @@ Read it top to bottom:
 - `stem` walks step by step, reading a heading from `snoise2` sampled slowly (coordinates over 18) so neighbouring stems flow coherently, and bails out with `return` if it reaches the hoop edge.
 - The scene sets a fabric (so underlay and pull compensation come along for free), seeds the RNG for reproducibility, and sews eighteen stems from random low starting points, trimming the connector thread after each.
 
-Change `seed 11` to any other number and you get a completely different — but equally coherent, and equally reproducible — meadow. That is the whole promise of NeedleScript: designs that genuinely *generate*, while sewing out exactly as previewed.
+Change `seed 11` to any other number and you get a completely different — but equally coherent, and equally reproducible — meadow. That is the whole promise of NeedleScript: designs that genuinely _generate_, while sewing out exactly as previewed.
 
 ### Where to go next
 

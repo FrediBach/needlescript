@@ -4,13 +4,25 @@ import type { HoopConfig } from '../data.ts';
 import type { WarningLocation } from '../lib/engine.ts';
 import { THREADS } from '../data.ts';
 import {
-  canvasJumpThread, canvasNeedlePoint, canvasHoopOverlay, canvasHoopBoundary,
-  canvasGridCm, canvasNeedleMarker, canvasDebugPinFill, canvasDebugPinStroke,
-  canvasDragRectBorder, canvasDragRectFill,
-  canvasZoomBadgeBg, canvasZoomBadgeText,
-  canvasDensityHot, canvasDensityWarm,
-  canvasWarnMarkerFill, canvasWarnMarkerStroke, canvasWarnMarkerCore,
-  fontMono, fsBase,
+  canvasJumpThread,
+  canvasNeedlePoint,
+  canvasHoopOverlay,
+  canvasHoopBoundary,
+  canvasGridCm,
+  canvasNeedleMarker,
+  canvasDebugPinFill,
+  canvasDebugPinStroke,
+  canvasDragRectBorder,
+  canvasDragRectFill,
+  canvasZoomBadgeBg,
+  canvasZoomBadgeText,
+  canvasDensityHot,
+  canvasDensityWarm,
+  canvasWarnMarkerFill,
+  canvasWarnMarkerStroke,
+  canvasWarnMarkerCore,
+  fontMono,
+  fsBase,
 } from '../theme.ts';
 
 interface Props {
@@ -32,21 +44,28 @@ type Viewport = {
 
 /** Cached rendering transform so pointer handlers can convert CSS px → mm. */
 type RenderTransform = {
-  scale: number;  // physical px per mm (current, possibly zoomed)
-  cx: number;     // canvas center x in physical px
-  cy: number;     // canvas center y in physical px
+  scale: number; // physical px per mm (current, possibly zoomed)
+  cx: number; // canvas center x in physical px
+  cy: number; // canvas center y in physical px
   viewCX: number; // viewport center x in mm
   viewCY: number; // viewport center y in mm
 };
 
 type DragState = {
-  startX: number;   // CSS px, relative to canvas top-left
+  startX: number; // CSS px, relative to canvas top-left
   startY: number;
   currentX: number;
   currentY: number;
 };
 
-export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJumps, warningLoc }: Props) {
+export default function StageCanvas({
+  design,
+  hoop,
+  scrubPos,
+  showDensity,
+  hideJumps,
+  warningLoc,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<RenderTransform | null>(null);
 
@@ -61,9 +80,19 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJ
     if (!container) return;
     const box = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    canvas.width  = Math.max(1, Math.round(box.width  * dpr));
+    canvas.width = Math.max(1, Math.round(box.width * dpr));
     canvas.height = Math.max(1, Math.round(box.height * dpr));
-    transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, hideJumps, viewport, warningLoc);
+    transformRef.current = draw(
+      canvas,
+      design,
+      hoop,
+      scrubPos,
+      dpr,
+      showDensity,
+      hideJumps,
+      viewport,
+      warningLoc,
+    );
   }, [design, hoop, scrubPos, showDensity, hideJumps, viewport, warningLoc]);
 
   // ── redraw on container resize ───────────────────────────────────────────
@@ -75,9 +104,19 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJ
       if (!container) return;
       const box = container.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      canvas.width  = Math.max(1, Math.round(box.width  * dpr));
+      canvas.width = Math.max(1, Math.round(box.width * dpr));
       canvas.height = Math.max(1, Math.round(box.height * dpr));
-      transformRef.current = draw(canvas, design, hoop, scrubPos, dpr, showDensity, hideJumps, viewport, warningLoc);
+      transformRef.current = draw(
+        canvas,
+        design,
+        hoop,
+        scrubPos,
+        dpr,
+        showDensity,
+        hideJumps,
+        viewport,
+        warningLoc,
+      );
     });
     ro.observe(canvas.parentElement!);
     return () => ro.disconnect();
@@ -94,54 +133,60 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJ
     canvas.setPointerCapture(e.pointerId);
   }, []);
 
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!dragState) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setDragState(prev => prev ? { ...prev, currentX: x, currentY: y } : null);
-  }, [dragState]);
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (!dragState) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      setDragState((prev) => (prev ? { ...prev, currentX: x, currentY: y } : null));
+    },
+    [dragState],
+  );
 
-  const handlePointerUp = useCallback((_e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!dragState) return;
+  const handlePointerUp = useCallback(
+    (_e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (!dragState) return;
 
-    const { startX, startY, currentX, currentY } = dragState;
-    setDragState(null);
+      const { startX, startY, currentX, currentY } = dragState;
+      setDragState(null);
 
-    const dx = currentX - startX;
-    const dy = currentY - startY;
+      const dx = currentX - startX;
+      const dy = currentY - startY;
 
-    // Ignore tiny drags (accidental clicks, double-click pair)
-    if (Math.abs(dx) < 10 || Math.abs(dy) < 10) return;
+      // Ignore tiny drags (accidental clicks, double-click pair)
+      if (Math.abs(dx) < 10 || Math.abs(dy) < 10) return;
 
-    const t = transformRef.current;
-    if (!t) return;
+      const t = transformRef.current;
+      if (!t) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const { scale, cx, cy, viewCX, viewCY } = t;
+      const dpr = window.devicePixelRatio || 1;
+      const { scale, cx, cy, viewCX, viewCY } = t;
 
-    // CSS pixels → mm using current (possibly zoomed) transform
-    const cssToMmX = (cssX: number) => viewCX + (cssX * dpr - cx) / scale;
-    const cssToMmY = (cssY: number) => viewCY - (cssY * dpr - cy) / scale;
+      // CSS pixels → mm using current (possibly zoomed) transform
+      const cssToMmX = (cssX: number) => viewCX + (cssX * dpr - cx) / scale;
+      const cssToMmY = (cssY: number) => viewCY - (cssY * dpr - cy) / scale;
 
-    const mmX1 = cssToMmX(startX);
-    const mmY1 = cssToMmY(startY);
-    const mmX2 = cssToMmX(currentX);
-    const mmY2 = cssToMmY(currentY);
+      const mmX1 = cssToMmX(startX);
+      const mmY1 = cssToMmY(startY);
+      const mmX2 = cssToMmX(currentX);
+      const mmY2 = cssToMmY(currentY);
 
-    const halfW = Math.abs(mmX2 - mmX1) / 2;
-    const halfH = Math.abs(mmY2 - mmY1) / 2;
-    if (halfW < 0.01 || halfH < 0.01) return;
+      const halfW = Math.abs(mmX2 - mmX1) / 2;
+      const halfH = Math.abs(mmY2 - mmY1) / 2;
+      if (halfW < 0.01 || halfH < 0.01) return;
 
-    setViewport({
-      centerX: (mmX1 + mmX2) / 2,
-      centerY: (mmY1 + mmY2) / 2,
-      halfW,
-      halfH,
-    });
-  }, [dragState]);
+      setViewport({
+        centerX: (mmX1 + mmX2) / 2,
+        centerY: (mmY1 + mmY2) / 2,
+        halfW,
+        halfH,
+      });
+    },
+    [dragState],
+  );
 
   const handleDoubleClick = useCallback(() => {
     // Only reset if currently zoomed in; no-op when already at default view
@@ -161,17 +206,19 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJ
     const autoFit = computeAutoFitScale(canvas.width, canvas.height, design, hoop);
     if (autoFit === 0) return null;
     const zoomed = Math.min(
-      canvas.width  / (2 * viewport.halfW),
+      canvas.width / (2 * viewport.halfW),
       canvas.height / (2 * viewport.halfH),
     );
     return zoomed / autoFit;
   })();
 
   // Drag rectangle in CSS px
-  const dragRect = dragState && (
-    Math.abs(dragState.currentX - dragState.startX) > 2 ||
-    Math.abs(dragState.currentY - dragState.startY) > 2
-  ) ? dragState : null;
+  const dragRect =
+    dragState &&
+    (Math.abs(dragState.currentX - dragState.startX) > 2 ||
+      Math.abs(dragState.currentY - dragState.startY) > 2)
+      ? dragState
+      : null;
 
   return (
     <>
@@ -182,8 +229,12 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJ
         onPointerUp={handlePointerUp}
         onDoubleClick={handleDoubleClick}
         style={{
-          position: 'absolute', inset: 0, width: '100%', height: '100%',
-          display: 'block', cursor: 'crosshair',
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          display: 'block',
+          cursor: 'crosshair',
         }}
       />
 
@@ -192,9 +243,9 @@ export default function StageCanvas({ design, hoop, scrubPos, showDensity, hideJ
         <div
           style={{
             position: 'absolute',
-            left:   Math.min(dragRect.startX,   dragRect.currentX),
-            top:    Math.min(dragRect.startY,   dragRect.currentY),
-            width:  Math.abs(dragRect.currentX - dragRect.startX),
+            left: Math.min(dragRect.startX, dragRect.currentX),
+            top: Math.min(dragRect.startY, dragRect.currentY),
+            width: Math.abs(dragRect.currentX - dragRect.startX),
             height: Math.abs(dragRect.currentY - dragRect.startY),
             border: canvasDragRectBorder,
             background: canvasDragRectFill,
@@ -243,7 +294,8 @@ function draw(
 ): RenderTransform {
   const ctx = canvas.getContext('2d');
   if (!ctx) return { scale: 1, cx: 0, cy: 0, viewCX: 0, viewCY: 0 };
-  const w = canvas.width, h = canvas.height;
+  const w = canvas.width,
+    h = canvas.height;
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);
@@ -257,16 +309,17 @@ function draw(
   let viewCY: number;
 
   if (viewport) {
-    scale  = Math.min(w / (2 * viewport.halfW), h / (2 * viewport.halfH));
+    scale = Math.min(w / (2 * viewport.halfW), h / (2 * viewport.halfH));
     viewCX = viewport.centerX;
     viewCY = viewport.centerY;
   } else {
-    scale  = autoFitScale;
+    scale = autoFitScale;
     viewCX = 0;
     viewCY = 0;
   }
 
-  const cx = w / 2, cy = h / 2;
+  const cx = w / 2,
+    cy = h / 2;
   const X = (mx: number) => cx + (mx - viewCX) * scale;
   const Y = (my: number) => cy - (my - viewCY) * scale; // y-up in mm
 
@@ -278,7 +331,8 @@ function draw(
   if (pts.length === 0) return { scale, cx, cy, viewCX, viewCY };
 
   // Jumps (under the thread) — hidden when hideJumps is active
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   if (!hideJumps) {
     ctx.setLineDash([4 * dpr, 4 * dpr]);
     ctx.strokeStyle = canvasJumpThread;
@@ -287,7 +341,7 @@ function draw(
     for (let i = 1; i < upto; i++) {
       if (pts[i].t === 'jump') {
         ctx.moveTo(X(pts[i - 1].x), Y(pts[i - 1].y));
-        ctx.lineTo(X(pts[i].x),     Y(pts[i].y));
+        ctx.lineTo(X(pts[i].x), Y(pts[i].y));
       }
     }
     ctx.stroke();
@@ -300,11 +354,12 @@ function draw(
   let runU = false;
   ctx.beginPath();
   for (let j = 1; j < upto; j++) {
-    const p = pts[j], q = pts[j - 1];
+    const p = pts[j],
+      q = pts[j - 1];
     if (p.t !== 'stitch') continue;
     const pu = p.u === 1;
-    if (hideJumps && pu) continue;         // skip underlay stitches
-    if (hideJumps && q.u === 1) continue;  // don't draw from an underlay position
+    if (hideJumps && pu) continue; // skip underlay stitches
+    if (hideJumps && q.u === 1) continue; // don't draw from an underlay position
     if (p.c !== runColor || pu !== runU) {
       if (runColor !== null) ctx.stroke();
       runColor = p.c;
@@ -339,9 +394,8 @@ function draw(
     for (const c of cells) {
       if (c.layers < 1.2) continue;
       const hot = Math.min(1, c.layers / 4);
-      ctx.fillStyle = c.layers >= 3
-        ? canvasDensityHot(0.18 + hot * 0.42)
-        : canvasDensityWarm(0.10 + hot * 0.30);
+      ctx.fillStyle =
+        c.layers >= 3 ? canvasDensityHot(0.18 + hot * 0.42) : canvasDensityWarm(0.1 + hot * 0.3);
       const x0 = X(c.ix * cellMM);
       const y0 = Y((c.iy + 1) * cellMM);
       ctx.fillRect(x0, y0, cellMM * scale + 0.5, cellMM * scale + 0.5);
@@ -359,14 +413,15 @@ function draw(
   }
 
   // Debug pins from the `mark` command
-  const visibleMarks = design.marks.filter(mk => mk.at <= upto);
+  const visibleMarks = design.marks.filter((mk) => mk.at <= upto);
   if (visibleMarks.length) {
     const r = 6 * dpr;
     ctx.font = `${Math.round(fsBase * 0.7) * dpr}px ${fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     visibleMarks.forEach((mk, i) => {
-      const mx = X(mk.x), my = Y(mk.y);
+      const mx = X(mk.x),
+        my = Y(mk.y);
       ctx.beginPath();
       ctx.arc(mx, my, r, 0, 6.2832);
       ctx.fillStyle = canvasDebugPinFill;
@@ -493,7 +548,7 @@ function drawGrid(
 
   ctx.save();
   ctx.strokeStyle = canvasGridCm;
-  ctx.lineWidth   = dpr;
+  ctx.lineWidth = dpr;
   ctx.beginPath();
 
   // Vertical lines at each 10 mm X tick
@@ -527,7 +582,7 @@ function drawHoop(
   canvasW: number,
   canvasH: number,
 ) {
-  const rx = (hoop.widthMM  / 2) * scale;
+  const rx = (hoop.widthMM / 2) * scale;
   const ry = (hoop.heightMM / 2) * scale;
 
   // Hoop center in canvas-pixel space (may be off-center when zoomed)
@@ -568,16 +623,19 @@ function addHoopPath(
     ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   } else {
     const r = Math.min(5 * scale, rx * 0.12, ry * 0.12);
-    const x = cx - rx, y = cy - ry, w = rx * 2, h = ry * 2;
+    const x = cx - rx,
+      y = cy - ry,
+      w = rx * 2,
+      h = ry * 2;
     ctx.moveTo(x + r, y);
     ctx.lineTo(x + w - r, y);
-    ctx.arcTo(x + w, y,       x + w, y + r,     r);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
     ctx.lineTo(x + w, y + h - r);
-    ctx.arcTo(x + w, y + h,   x + w - r, y + h, r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
     ctx.lineTo(x + r, y + h);
-    ctx.arcTo(x,     y + h,   x,     y + h - r, r);
-    ctx.lineTo(x,     y + r);
-    ctx.arcTo(x,     y,       x + r, y,          r);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
     ctx.closePath();
   }
 }

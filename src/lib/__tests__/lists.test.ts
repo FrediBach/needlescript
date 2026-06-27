@@ -14,8 +14,9 @@ const printed = (src: string) => run(src).printed;
 function expectEquivalent(a: string, b: string) {
   const ra = run(a);
   const rb = run(b);
-  expect(ra.events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u })))
-    .toEqual(rb.events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u })));
+  expect(ra.events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u }))).toEqual(
+    rb.events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u })),
+  );
   expect(ra.printed).toEqual(rb.printed);
 }
 
@@ -28,29 +29,32 @@ describe('[ disambiguation (test #1–5)', () => {
   });
 
   it('glued [ after a modern bare ident in a header errors with the add-a-space hint (test #2)', () => {
-    expect(() => run('let n = 2 repeat n[0]'))
-      .toThrow(/"\[" glued to "n" reads as indexing — add a space before the block/);
-    expect(() => run('let n = 2 repeat n[ fd 10 ]'))
-      .toThrow(/reads as indexing — add a space before the block/);
+    expect(() => run('let n = 2 repeat n[0]')).toThrow(
+      /"\[" glued to "n" reads as indexing — add a space before the block/,
+    );
+    expect(() => run('let n = 2 repeat n[ fd 10 ]')).toThrow(
+      /reads as indexing — add a space before the block/,
+    );
   });
 
   it('spaced [ after a variable in statement position suggests gluing (test #2)', () => {
-    expect(() => run('let xs = [1] xs [0]'))
-      .toThrow(/to index "xs", glue the bracket to the name/);
+    expect(() => run('let xs = [1] xs [0]')).toThrow(/to index "xs", glue the bracket to the name/);
   });
 
   it('nested literals, trailing comma, [] and missing commas (test #3)', () => {
     expect(printed('let a = [1, [2, 3],] print a')).toEqual(['[1, [2, 3]]']);
     expect(printed('print len([])')).toEqual(['0']);
     expect(printed('print []')).toEqual(['[]']);
-    expect(() => run('let a = [1 2]'))
-      .toThrow(/Expected , or \] in a list.*separate elements with commas/);
+    expect(() => run('let a = [1 2]')).toThrow(
+      /Expected , or \] in a list.*separate elements with commas/,
+    );
   });
 
   it('index chains: pos()[i], grid[i][j], literal[i] (test #4)', () => {
     expect(printed('up setxy 7 9 print pos()[0] print pos()[1]')).toEqual(['7', '9']);
-    expect(printed('let grid = [[1, 2], [3, 4]] let i = 1 let j = 0 print grid[i][j]'))
-      .toEqual(['3']);
+    expect(printed('let grid = [[1, 2], [3, 4]] let i = 1 let j = 0 print grid[i][j]')).toEqual([
+      '3',
+    ]);
     expect(printed('print [10, 20][1]')).toEqual(['20']);
   });
 
@@ -60,8 +64,9 @@ describe('[ disambiguation (test #1–5)', () => {
 
   it('indexing the result of an index parses; calling it is a runtime error', () => {
     expect(printed('let xs = [[1, 2]] print xs[0][1]')).toEqual(['2']);
-    expect(() => run('let xs = [[1]] print xs[0](2)'))
-      .toThrow(/a list value can't be called like a procedure/);
+    expect(() => run('let xs = [[1]] print xs[0](2)')).toThrow(
+      /a list value can't be called like a procedure/,
+    );
   });
 });
 
@@ -69,13 +74,16 @@ describe('[ disambiguation (test #1–5)', () => {
 describe('reference semantics and equality (test #6)', () => {
   it('assignment shares the list; copy() does not', () => {
     expect(printed('let a = [1, 2, 3] let b = a b[0] = 9 print a')).toEqual(['[9, 2, 3]']);
-    expect(printed('let a = [1, [2]] let c = copy(a) c[1][0] = 9 print a print c'))
-      .toEqual(['[1, [2]]', '[1, [9]]']);
+    expect(printed('let a = [1, [2]] let c = copy(a) c[1][0] = 9 print a print c')).toEqual([
+      '[1, [2]]',
+      '[1, [9]]',
+    ]);
   });
 
   it('concat is shallow: elements are shared references', () => {
-    expect(printed('let a = [[1]] let c = concat(a, [[2]]) a[0][0] = 7 print c'))
-      .toEqual(['[[7], [2]]']);
+    expect(printed('let a = [[1]] let c = concat(a, [[2]]) a[0][0] = 7 print c')).toEqual([
+      '[[7], [2]]',
+    ]);
   });
 
   it('deep == with the 1e-9 tolerance', () => {
@@ -110,20 +118,25 @@ describe('truthiness errors (test #7)', () => {
 // ── 8: indexing edges ────────────────────────────────────────────────────────
 describe('indexing (test #8)', () => {
   it('0-based, negatives count from the end', () => {
-    expect(printed('let xs = [4, 5, 6] print xs[0] print xs[-1] print xs[-3]'))
-      .toEqual(['4', '6', '4']);
+    expect(printed('let xs = [4, 5, 6] print xs[0] print xs[-1] print xs[-3]')).toEqual([
+      '4',
+      '6',
+      '4',
+    ]);
   });
 
   it('out of range errors in both directions, with index and length', () => {
-    expect(() => run('print [1, 2, 3][3]'))
-      .toThrow(/index 3 is out of range \(the list has 3 elements\)/);
+    expect(() => run('print [1, 2, 3][3]')).toThrow(
+      /index 3 is out of range \(the list has 3 elements\)/,
+    );
     expect(() => run('print [1, 2, 3][-4]')).toThrow(/out of range/);
     expect(() => run('print [][0]')).toThrow(/out of range/);
   });
 
   it('non-integer index errors; near-integer float dust is accepted', () => {
-    expect(() => run('print [1, 2][1.5]'))
-      .toThrow(/index 1.5 isn't a whole number — use floor\(\) deliberately/);
+    expect(() => run('print [1, 2][1.5]')).toThrow(
+      /index 1.5 isn't a whole number — use floor\(\) deliberately/,
+    );
     expect(printed('print [4, 5, 6][0.9999999999]')).toEqual(['5']);
     expect(printed('print [4, 5, 6][3 / 1 - 1]')).toEqual(['6']);
   });
@@ -134,10 +147,10 @@ describe('indexing (test #8)', () => {
 
   it('index assignment and compound chains', () => {
     expect(printed('let xs = [1, 2] xs[0] = 5 print xs')).toEqual(['[5, 2]']);
-    expect(printed('let g = [[0, 1], [2, 3]] g[1][0] += 10 print g'))
-      .toEqual(['[[0, 1], [12, 3]]']);
-    expect(printed('let xs = [8] xs[0] /= 2 xs[0] *= 3 xs[0] -= 2 print xs'))
-      .toEqual(['[10]']);
+    expect(printed('let g = [[0, 1], [2, 3]] g[1][0] += 10 print g')).toEqual([
+      '[[0, 1], [12, 3]]',
+    ]);
+    expect(printed('let xs = [8] xs[0] /= 2 xs[0] *= 3 xs[0] -= 2 print xs')).toEqual(['[10]']);
   });
 });
 
@@ -166,18 +179,23 @@ describe('for-in (test #10)', () => {
   });
 
   it('length is captured at loop entry — appending does not extend the loop', () => {
-    expect(printed('let xs = [1, 2] for x in xs [ print x append(xs, 9) ] print len(xs)'))
-      .toEqual(['1', '2', '4']);
+    expect(printed('let xs = [1, 2] for x in xs [ print x append(xs, 9) ] print len(xs)')).toEqual([
+      '1',
+      '2',
+      '4',
+    ]);
   });
 
   it('elements are read live — mutating an unreached element is visible', () => {
-    expect(printed('let xs = [1, 2, 3] for x in xs [ print x if x = 1 [ xs[2] = 99 ] ]'))
-      .toEqual(['1', '2', '99']);
+    expect(printed('let xs = [1, 2, 3] for x in xs [ print x if x = 1 [ xs[2] = 99 ] ]')).toEqual([
+      '1',
+      '2',
+      '99',
+    ]);
   });
 
   it('the loop variable does not leak', () => {
-    expect(() => run('for x in [1] [ fd 1 ] print x'))
-      .toThrow(/never assigned on this path/);
+    expect(() => run('for x in [1] [ fd 1 ] print x')).toThrow(/never assigned on this path/);
   });
 
   it('a non-list errors', () => {
@@ -185,8 +203,10 @@ describe('for-in (test #10)', () => {
   });
 
   it('works over nested elements with destructuring', () => {
-    expect(printed('for p in [[1, 2], [3, 4]] [ let [x, y] = p print x * y ]'))
-      .toEqual(['2', '12']);
+    expect(printed('for p in [[1, 2], [3, 4]] [ let [x, y] = p print x * y ]')).toEqual([
+      '2',
+      '12',
+    ]);
   });
 });
 
@@ -208,22 +228,24 @@ describe('builtins (test #11)', () => {
   });
 
   it('len, islist, first, last', () => {
-    expect(printed('print len([4, 5]) print islist([]) print islist(3)'))
-      .toEqual(['2', '1', '0']);
+    expect(printed('print len([4, 5]) print islist([]) print islist(3)')).toEqual(['2', '1', '0']);
     expect(printed('print first([4, 5]) print last([4, 5])')).toEqual(['4', '5']);
     expect(() => run('print first([])')).toThrow(/first of an empty list/);
     expect(() => run('print last([])')).toThrow(/last of an empty list/);
   });
 
   it('mutators: append, prepend, insertat, removeat', () => {
-    expect(printed('let xs = [2] append(xs, 3) prepend(xs, 1) print xs'))
-      .toEqual(['[1, 2, 3]']);
-    expect(printed('let xs = [1, 3] insertat(xs, 1, 2) insertat(xs, 3, 4) print xs'))
-      .toEqual(['[1, 2, 3, 4]']);
-    expect(() => run('let xs = [1] insertat(xs, 3, 0)'))
-      .toThrow(/insertat: index 3 is out of range \(0…1 allowed\)/);
-    expect(printed('let xs = [5, 6, 7] let v = removeat(xs, 1) print v print xs'))
-      .toEqual(['6', '[5, 7]']);
+    expect(printed('let xs = [2] append(xs, 3) prepend(xs, 1) print xs')).toEqual(['[1, 2, 3]']);
+    expect(printed('let xs = [1, 3] insertat(xs, 1, 2) insertat(xs, 3, 4) print xs')).toEqual([
+      '[1, 2, 3, 4]',
+    ]);
+    expect(() => run('let xs = [1] insertat(xs, 3, 0)')).toThrow(
+      /insertat: index 3 is out of range \(0…1 allowed\)/,
+    );
+    expect(printed('let xs = [5, 6, 7] let v = removeat(xs, 1) print v print xs')).toEqual([
+      '6',
+      '[5, 7]',
+    ]);
     expect(printed('let xs = [1, 2] removeat(xs, 0) print xs')).toEqual(['[2]']);
     expect(() => run('let xs = [] removeat(xs, 0)')).toThrow(/out of range/);
   });
@@ -237,23 +259,29 @@ describe('builtins (test #11)', () => {
   });
 
   it('reverse and sort are pure (new lists)', () => {
-    expect(printed('let xs = [3, 1, 2] print sort(xs) print reverse(xs) print xs'))
-      .toEqual(['[1, 2, 3]', '[2, 1, 3]', '[3, 1, 2]']);
-    expect(() => run('print sort([1, [2]])'))
-      .toThrow(/sort can only sort numbers — element 1 is a list/);
+    expect(printed('let xs = [3, 1, 2] print sort(xs) print reverse(xs) print xs')).toEqual([
+      '[1, 2, 3]',
+      '[2, 1, 3]',
+      '[3, 1, 2]',
+    ]);
+    expect(() => run('print sort([1, [2]])')).toThrow(
+      /sort can only sort numbers — element 1 is a list/,
+    );
   });
 
   it('indexof and contains use deep, tolerant comparison', () => {
     expect(printed('print indexof([1, 2], 2.0000000001)')).toEqual(['1']);
-    expect(printed('print indexof([[1], [2]], [2]) print indexof([1], 9)'))
-      .toEqual(['1', '-1']);
-    expect(printed('print contains([1, [2, 3]], [2, 3]) print contains([], 1)'))
-      .toEqual(['1', '0']);
+    expect(printed('print indexof([[1], [2]], [2]) print indexof([1], 9)')).toEqual(['1', '-1']);
+    expect(printed('print contains([1, [2, 3]], [2, 3]) print contains([], 1)')).toEqual([
+      '1',
+      '0',
+    ]);
   });
 
   it('aggregates: sum([]) is 0, the rest error on empty', () => {
-    expect(printed('print sum([1, 2, 3]) print mean([2, 4]) print minof([3, 1]) print maxof([3, 9])'))
-      .toEqual(['6', '3', '1', '9']);
+    expect(
+      printed('print sum([1, 2, 3]) print mean([2, 4]) print minof([3, 1]) print maxof([3, 9])'),
+    ).toEqual(['6', '3', '1', '9']);
     expect(printed('print sum([])')).toEqual(['0']);
     expect(() => run('print mean([])')).toThrow(/mean of an empty list/);
     expect(() => run('print minof([])')).toThrow(/minof of an empty list/);
@@ -262,10 +290,7 @@ describe('builtins (test #11)', () => {
   });
 
   it('pos()/setpos(p) make record/replay symmetric', () => {
-    expectEquivalent(
-      'up setpos([10, 20]) down fd 5',
-      'up setxy 10 20 down fd 5',
-    );
+    expectEquivalent('up setpos([10, 20]) down fd 5', 'up setxy 10 20 down fd 5');
     expect(() => run('setpos([1])')).toThrow(/setpos expected \[x, y\]/);
     expect(() => run('setpos(5)')).toThrow(/"setpos" expected a list/);
   });
@@ -283,8 +308,9 @@ describe('builtins (test #11)', () => {
   });
 
   it('push stays the turtle stack; the arity error hints at append', () => {
-    expect(() => run('let xs = [] push(xs, 1)'))
-      .toThrow(/to add a value to a list, use append\(xs, v\)/);
+    expect(() => run('let xs = [] push(xs, 1)')).toThrow(
+      /to add a value to a list, use append\(xs, v\)/,
+    );
   });
 });
 
@@ -331,12 +357,15 @@ describe('type guards (test #13)', () => {
   });
 
   it('arithmetic rejects lists, with hints at the vector functions (RFC-3 §2)', () => {
-    expect(() => run('print [1] + 1'))
-      .toThrow(/"\+" on lists — use vadd\(a, b\) for element-wise, concat\(a, b\) to join/);
-    expect(() => run('print 1 - [1, 2, 3]'))
-      .toThrow(/"-" on lists — use vsub\(a, b\) for element-wise/);
-    expect(() => run('print [1, 2] * 2'))
-      .toThrow(/"\*" on lists — use vscale\(a, s\) to scale a point/);
+    expect(() => run('print [1] + 1')).toThrow(
+      /"\+" on lists — use vadd\(a, b\) for element-wise, concat\(a, b\) to join/,
+    );
+    expect(() => run('print 1 - [1, 2, 3]')).toThrow(
+      /"-" on lists — use vsub\(a, b\) for element-wise/,
+    );
+    expect(() => run('print [1, 2] * 2')).toThrow(
+      /"\*" on lists — use vscale\(a, s\) to scale a point/,
+    );
     expect(() => run('let xs = [1] print -xs')).toThrow(/"-" expected a number/);
   });
 
@@ -359,8 +388,7 @@ describe('limits (test #14)', () => {
   });
 
   it('max total live cells 1,000,000', () => {
-    expect(() => run('repeat 11 [ let xs = filled(100000, 0) ]'))
-      .toThrow(/Too many list cells/);
+    expect(() => run('repeat 11 [ let xs = filled(100000, 0) ]')).toThrow(/Too many list cells/);
   });
 
   it('max nesting depth 16', () => {
@@ -369,22 +397,25 @@ describe('limits (test #14)', () => {
     const ok = '['.repeat(16) + '1' + ']'.repeat(16);
     expect(() => run(`let xs = ${ok}`)).not.toThrow();
     // mutation can't sneak past the cap either
-    expect(() => run(`let a = ${'['.repeat(16) + '1' + ']'.repeat(16)} let b = [] append(b, a)`))
-      .toThrow(/nesting deeper than 16/);
+    expect(() =>
+      run(`let a = ${'['.repeat(16) + '1' + ']'.repeat(16)} let b = [] append(b, a)`),
+    ).toThrow(/nesting deeper than 16/);
   });
 
   it('element reads count toward the op budget', () => {
     // sum(xs) costs xs.length ops via tickN. Use enough iterations to exceed LIMITS.maxOps.
     const listSize = 50000;
     const iters = Math.ceil(LIMITS.maxOps / listSize) + 10;
-    expect(() => run(`let xs = range(${listSize}) repeat ${iters} [ let s = sum(xs) ]`))
-      .toThrow(/ran too long/);
+    expect(() => run(`let xs = range(${listSize}) repeat ${iters} [ let s = sum(xs) ]`)).toThrow(
+      /ran too long/,
+    );
   });
 
   it('a cyclic list errors loudly instead of hanging', () => {
     // append(b, a) then append(a, b) makes a cycle — printing must not hang
-    expect(() => run('let a = [] let b = [] append(b, a) append(a, b) print a'))
-      .toThrow(NeedlescriptError);
+    expect(() => run('let a = [] let b = [] append(b, a) append(a, b) print a')).toThrow(
+      NeedlescriptError,
+    );
   });
 });
 
@@ -413,15 +444,18 @@ describe('legacy syntax meets lists', () => {
     // index through a bare read instead — :xs[0] would read the [0] as a
     // separate (and invalid) statement, because legacy tokens predate indexing
     expect(printed('make "xs [4, 5] print xs[0]')).toEqual(['4']);
-    expect(() => run('make "xs [4, 5] print :xs[0]'))
-      .toThrow(/a list literal can't be a statement/);
+    expect(() => run('make "xs [4, 5] print :xs[0]')).toThrow(
+      /a list literal can't be a statement/,
+    );
   });
 
   it('procedures pass and return lists', () => {
-    expect(printed('def mid(a, b) [ return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] ] print mid([0, 0], [4, 6])'))
-      .toEqual(['[2, 3]']);
-    expect(printed('def naturals(n) [ return range(n) ] print len(naturals(4))'))
-      .toEqual(['4']);
+    expect(
+      printed(
+        'def mid(a, b) [ return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] ] print mid([0, 0], [4, 6])',
+      ),
+    ).toEqual(['[2, 3]']);
+    expect(printed('def naturals(n) [ return range(n) ] print len(naturals(4))')).toEqual(['4']);
   });
 });
 
@@ -436,7 +470,7 @@ describe('lists never reach the stitch pipeline', () => {
       for p in path [ setpos(p) ]
     `;
     const r = run(recordReplay);
-    expect(r.events.filter(e => e.t === 'stitch').length).toBeGreaterThan(5);
+    expect(r.events.filter((e) => e.t === 'stitch').length).toBeGreaterThan(5);
     expect(r.warnings).toEqual(run(recordReplay).warnings);
   });
 });

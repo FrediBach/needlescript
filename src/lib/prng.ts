@@ -45,10 +45,14 @@ function hash2(seed: number, ix: number, iy: number): number {
 export function makeNoise(seed: number): (x: number, y?: number) => number {
   const fade = (t: number) => t * t * (3 - 2 * t);
   return (x: number, y = 0) => {
-    const ix = Math.floor(x), iy = Math.floor(y);
-    const u = fade(x - ix), v = fade(y - iy);
-    const a = hash2(seed, ix, iy), b = hash2(seed, ix + 1, iy);
-    const c = hash2(seed, ix, iy + 1), d = hash2(seed, ix + 1, iy + 1);
+    const ix = Math.floor(x),
+      iy = Math.floor(y);
+    const u = fade(x - ix),
+      v = fade(y - iy);
+    const a = hash2(seed, ix, iy),
+      b = hash2(seed, ix + 1, iy);
+    const c = hash2(seed, ix, iy + 1),
+      d = hash2(seed, ix + 1, iy + 1);
     return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
   };
 }

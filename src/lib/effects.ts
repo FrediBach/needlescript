@@ -44,8 +44,10 @@ export function humanizeMap(
 ): PointMap {
   // Two large, decorrelated offsets into noise space — one per output axis.
   const r = makeRNG(childSeed);
-  const ox1 = r() * 1000, oy1 = r() * 1000;
-  const ox2 = r() * 1000 + 2000, oy2 = r() * 1000 + 2000;
+  const ox1 = r() * 1000,
+    oy1 = r() * 1000;
+  const ox2 = r() * 1000 + 2000,
+    oy2 = r() * 1000 + 2000;
   const k = 1 / 14; // the slow-wander frequency
   return (x: number, y: number): Pt => [
     x + amount * snoise2(x * k + ox1, y * k + oy1),
@@ -71,10 +73,12 @@ export function snapMap(
   angDeg: number,
 ): PointMap {
   const ang = angDeg * DEG;
-  const ca = Math.cos(ang), sa = Math.sin(ang);
+  const ca = Math.cos(ang),
+    sa = Math.sin(ang);
   return (x: number, y: number): Pt => {
     // Into the grid frame (translate to origin, then rotate).
-    const tx = x - ox, ty = y - oy;
+    const tx = x - ox,
+      ty = y - oy;
     const gx = tx * ca - ty * sa;
     const gy = tx * sa + ty * ca;
     // Snap to the nearest lattice node.
@@ -95,16 +99,37 @@ export function snapMap(
  * free. Returns the resolved PointMap.
  */
 export function snapMapFromSpec(nums: number[], fail: (msg: string) => Error): PointMap {
-  let cx: number, cy: number, ox = 0, oy = 0, ang = 0;
+  let cx: number,
+    cy: number,
+    ox = 0,
+    oy = 0,
+    ang = 0;
   switch (nums.length) {
-    case 1: cx = cy = nums[0]; break;
-    case 2: cx = nums[0]; cy = nums[1]; break;
-    case 4: cx = nums[0]; cy = nums[1]; ox = nums[2]; oy = nums[3]; break;
-    case 5: cx = nums[0]; cy = nums[1]; ox = nums[2]; oy = nums[3]; ang = nums[4]; break;
+    case 1:
+      cx = cy = nums[0];
+      break;
+    case 2:
+      cx = nums[0];
+      cy = nums[1];
+      break;
+    case 4:
+      cx = nums[0];
+      cy = nums[1];
+      ox = nums[2];
+      oy = nums[3];
+      break;
+    case 5:
+      cx = nums[0];
+      cy = nums[1];
+      ox = nums[2];
+      oy = nums[3];
+      ang = nums[4];
+      break;
     default:
       throw fail(
         'takes a cell size as 1, 2, 4 or 5 numbers ' +
-        '(cell | cellx celly | cellx celly ox oy | cellx celly ox oy ang), got ' + nums.length,
+          '(cell | cellx celly | cellx celly ox oy | cellx celly ox oy ang), got ' +
+          nums.length,
       );
   }
   if (!(cx > 0) || !(cy > 0)) throw fail('cell size must be a positive number');

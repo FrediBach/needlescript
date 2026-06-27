@@ -88,7 +88,8 @@ export const mScale = (s: number): Mat => mScaleXY(s, s);
  * is bit-identical to vrot, so xrotate ≡ vrot on every vertex.
  */
 export function mRotate(deg: number): Mat {
-  const c = Math.cos(deg * DEG), s = Math.sin(deg * DEG);
+  const c = Math.cos(deg * DEG),
+    s = Math.sin(deg * DEG);
   // x' = x·cos + y·sin ; y' = −x·sin + y·cos  (clockwise)
   return [c, -s, s, c, 0, 0];
 }
@@ -104,7 +105,8 @@ export function mRotateAbout(deg: number, cx: number, cy: number): Mat {
  */
 export function mMirror(deg: number): Mat {
   // Unit direction of the mirror line, in turtle space.
-  const ux = Math.sin(deg * DEG), uy = Math.cos(deg * DEG);
+  const ux = Math.sin(deg * DEG),
+    uy = Math.cos(deg * DEG);
   return [2 * ux * ux - 1, 2 * ux * uy, 2 * ux * uy, 2 * uy * uy - 1, 0, 0];
 }
 
@@ -117,8 +119,14 @@ export function mSkew(ax: number, ay: number): Mat {
 }
 
 /** Raw 2×3 affine escape hatch for the power user. */
-export const mRaw = (a: number, b: number, c: number, d: number, e: number, f: number): Mat =>
-  [a, b, c, d, e, f];
+export const mRaw = (a: number, b: number, c: number, d: number, e: number, f: number): Mat => [
+  a,
+  b,
+  c,
+  d,
+  e,
+  f,
+];
 
 /** Map every point of a path through the matrix, returning a new array. */
-export const applyPath = (m: Mat, pts: Pt[]): Pt[] => pts.map(p => apply(m, p[0], p[1]));
+export const applyPath = (m: Mat, pts: Pt[]): Pt[] => pts.map((p) => apply(m, p[0], p[1]));

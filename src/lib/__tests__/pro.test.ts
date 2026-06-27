@@ -7,9 +7,9 @@ import { EXAMPLES } from '../../data.ts';
 // ── helpers ────────────────────────────────────────────────────────────────
 
 const evts = (src: string) => run(src).events;
-const stitches = (src: string) => evts(src).filter(e => e.t === 'stitch');
-const underlay = (src: string) => evts(src).filter(e => e.t === 'stitch' && e.u === 1);
-const topping = (src: string) => evts(src).filter(e => e.t === 'stitch' && !e.u);
+const stitches = (src: string) => evts(src).filter((e) => e.t === 'stitch');
+const underlay = (src: string) => evts(src).filter((e) => e.t === 'stitch' && e.u === 1);
+const topping = (src: string) => evts(src).filter((e) => e.t === 'stitch' && !e.u);
 
 // ── satin buffering ─────────────────────────────────────────────────────────
 describe('satin column buffering', () => {
@@ -20,20 +20,23 @@ describe('satin column buffering', () => {
   });
 
   it('does not disturb the turtle while the column is buffered', () => {
-    expect(run('satin 3 fd 10 print xcor print ycor print heading').printed)
-      .toEqual(['0', '10', '0']);
+    expect(run('satin 3 fd 10 print xcor print ycor print heading').printed).toEqual([
+      '0',
+      '10',
+      '0',
+    ]);
   });
 
   it('flushes before a pen-up jump, keeping machine order', () => {
     const ev = evts('lock 0 satin 3 fd 10 up fd 5');
-    const jumpIdx = ev.findIndex(e => e.t === 'jump');
+    const jumpIdx = ev.findIndex((e) => e.t === 'jump');
     expect(jumpIdx).toBeGreaterThan(20); // satin sewn first
-    expect(ev.slice(0, jumpIdx).every(e => e.t === 'stitch')).toBe(true);
+    expect(ev.slice(0, jumpIdx).every((e) => e.t === 'stitch')).toBe(true);
   });
 
   it('flushes before colour changes, trims, fills, and program end', () => {
     const c = evts('lock 0 satin 3 fd 10 color 1 fd 5');
-    expect(c.findIndex(e => e.t === 'color')).toBeGreaterThan(20);
+    expect(c.findIndex((e) => e.t === 'color')).toBeGreaterThan(20);
     const t = evts('lock 0 autotrim 0 satin 3 fd 10 trim');
     expect(t[t.length - 1].t).toBe('trim');
     // program end flush
@@ -45,14 +48,14 @@ describe('satin column buffering', () => {
 describe('satin underlay', () => {
   it('center underlay sews a spine under the column, before the topping', () => {
     const ev = evts('lock 0 underlay "center satin 3 fd 10');
-    const u = ev.filter(e => e.u === 1);
-    const top = ev.filter(e => e.t === 'stitch' && !e.u);
+    const u = ev.filter((e) => e.u === 1);
+    const top = ev.filter((e) => e.t === 'stitch' && !e.u);
     expect(u.length).toBeGreaterThanOrEqual(8); // out + back at ~2.5 mm
     // spine stays on the centre line
-    expect(u.every(e => Math.abs(e.x) < 0.2)).toBe(true);
+    expect(u.every((e) => Math.abs(e.x) < 0.2)).toBe(true);
     // all underlay comes before the topping zigzag
     const lastU = ev.lastIndexOf(u[u.length - 1]);
-    const firstTopZig = ev.findIndex(e => e.t === 'stitch' && !e.u && Math.abs(e.x) > 1);
+    const firstTopZig = ev.findIndex((e) => e.t === 'stitch' && !e.u && Math.abs(e.x) > 1);
     expect(lastU).toBeLessThan(firstTopZig);
     expect(top.length).toBeGreaterThan(20);
   });
@@ -60,7 +63,7 @@ describe('satin underlay', () => {
   it('edge underlay runs offset from the centre line', () => {
     const u = underlay('lock 0 underlay "edge satin 3 fd 10');
     expect(u.length).toBeGreaterThan(0);
-    const offsets = u.map(e => Math.abs(e.x)).filter(v => v > 0.1);
+    const offsets = u.map((e) => Math.abs(e.x)).filter((v) => v > 0.1);
     expect(offsets.length).toBeGreaterThan(4);
     // offset ≈ 30% of width = 0.9 mm
     expect(Math.max(...offsets)).toBeLessThan(1.6);
@@ -69,19 +72,19 @@ describe('satin underlay', () => {
 
   it('zigzag underlay zigzags at ~60% width and returns to the start', () => {
     const u = underlay('lock 0 underlay "zigzag satin 5 fd 10');
-    const wide = u.filter(e => Math.abs(e.x) > 0.8);
+    const wide = u.filter((e) => Math.abs(e.x) > 0.8);
     expect(wide.length).toBeGreaterThan(2);
     // 60% of half-width = 1.5 mm; never as wide as the topping (2.5)
-    expect(Math.max(...u.map(e => Math.abs(e.x)))).toBeLessThan(1.8);
+    expect(Math.max(...u.map((e) => Math.abs(e.x)))).toBeLessThan(1.8);
   });
 
   it('auto underlay scales with column width', () => {
     expect(underlay('lock 0 underlay "auto satin 1 fd 10').length).toBe(0); // too thin
     const center = underlay('lock 0 underlay "auto satin 3 fd 10');
     expect(center.length).toBeGreaterThan(0);
-    expect(center.every(e => Math.abs(e.x) < 0.2)).toBe(true); // spine only
+    expect(center.every((e) => Math.abs(e.x) < 0.2)).toBe(true); // spine only
     const zig = underlay('lock 0 underlay "auto satin 6 fd 10');
-    expect(zig.some(e => Math.abs(e.x) > 1)).toBe(true); // zigzag pass
+    expect(zig.some((e) => Math.abs(e.x) > 1)).toBe(true); // zigzag pass
   });
 
   it('is off by default and switchable off again', () => {
@@ -100,7 +103,7 @@ describe('pull compensation', () => {
   it('widens satin columns against fabric pull', () => {
     const plain = stitches('lock 0 satin 3 fd 10');
     const comp = stitches('lock 0 pullcomp 0.6 satin 3 fd 10');
-    const w = (s: StitchEvent[]) => Math.max(...s.map(e => Math.abs(e.x)));
+    const w = (s: StitchEvent[]) => Math.max(...s.map((e) => Math.abs(e.x)));
     expect(w(plain)).toBeCloseTo(1.5, 1);
     expect(w(comp)).toBeCloseTo(1.8, 1);
   });
@@ -110,8 +113,8 @@ describe('pull compensation', () => {
     const plain = stitches(square);
     const comp = stitches('pullcomp 0.5 ' + square);
     // fillangle 0 → rows run along x; boundary spans x 0..20, y 0..20
-    const maxX = (s: StitchEvent[]) => Math.max(...s.map(e => e.x));
-    const minX = (s: StitchEvent[]) => Math.min(...s.map(e => e.x));
+    const maxX = (s: StitchEvent[]) => Math.max(...s.map((e) => e.x));
+    const minX = (s: StitchEvent[]) => Math.min(...s.map((e) => e.x));
     expect(maxX(plain)).toBeLessThanOrEqual(20.05);
     expect(minX(plain)).toBeGreaterThanOrEqual(-0.05);
     expect(maxX(comp)).toBeGreaterThan(20.3);
@@ -119,7 +122,7 @@ describe('pull compensation', () => {
   });
 
   it('clamps to the safe range', () => {
-    expect(run('pullcomp 5 satin 3 fd 5').warnings.some(w => w.includes('clamped'))).toBe(true);
+    expect(run('pullcomp 5 satin 3 fd 5').warnings.some((w) => w.includes('clamped'))).toBe(true);
   });
 });
 
@@ -131,7 +134,7 @@ describe('short-stitch (curve physics)', () => {
   const fromCenter = (e: StitchEvent) => Math.hypot(e.x - 8, e.y);
 
   it('pulls alternate inner stitches inward on tight curves', () => {
-    const shortened = stitches(CURVE).filter(e => {
+    const shortened = stitches(CURVE).filter((e) => {
       const d = fromCenter(e);
       return d > 5.6 && d < 6.8;
     });
@@ -139,7 +142,7 @@ describe('short-stitch (curve physics)', () => {
   });
 
   it('shortstitch 0 disables it', () => {
-    const shortened = stitches('shortstitch 0 ' + CURVE).filter(e => {
+    const shortened = stitches('shortstitch 0 ' + CURVE).filter((e) => {
       const d = fromCenter(e);
       return d > 5.6 && d < 6.8;
     });
@@ -147,8 +150,9 @@ describe('short-stitch (curve physics)', () => {
   });
 
   it('does not touch straight columns or retraced columns', () => {
-    expect(stitches('lock 0 satin 3 fd 10 bk 10').length)
-      .toBe(stitches('shortstitch 0 lock 0 satin 3 fd 10 bk 10').length);
+    expect(stitches('lock 0 satin 3 fd 10 bk 10').length).toBe(
+      stitches('shortstitch 0 lock 0 satin 3 fd 10 bk 10').length,
+    );
     const a = run('lock 0 satin 3 fd 10 bk 10').events;
     const b = run('shortstitch 0 lock 0 satin 3 fd 10 bk 10').events;
     expect(a).toEqual(b);
@@ -156,7 +160,7 @@ describe('short-stitch (curve physics)', () => {
 
   it('warns when the column is wider than the curve allows', () => {
     const { warnings } = run('stitchlen 1 satin 8 arc 90 3');
-    expect(warnings.some(w => w.includes('wider than the curve'))).toBe(true);
+    expect(warnings.some((w) => w.includes('wider than the curve'))).toBe(true);
   });
 });
 
@@ -221,10 +225,10 @@ describe('fabric presets', () => {
   it('knit turns on pull comp and underlay', () => {
     const plain = stitches('lock 0 satin 3 fd 10');
     const knit = run('lock 0 fabric "knit satin 3 fd 10');
-    const top = knit.events.filter(e => e.t === 'stitch' && !e.u);
-    const w = (s: StitchEvent[]) => Math.max(...s.map(e => Math.abs(e.x)));
+    const top = knit.events.filter((e) => e.t === 'stitch' && !e.u);
+    const w = (s: StitchEvent[]) => Math.max(...s.map((e) => Math.abs(e.x)));
     expect(w(top)).toBeGreaterThan(w(plain) + 0.15); // pullcomp 0.5
-    expect(knit.events.some(e => e.u === 1)).toBe(true); // auto underlay
+    expect(knit.events.some((e) => e.u === 1)).toBe(true); // auto underlay
   });
 
   it('knit enforces a lighter satin density (wider spacing)', () => {
@@ -236,14 +240,14 @@ describe('fabric presets', () => {
 
   it('explicit commands after the preset override it', () => {
     const overridden = topping('lock 0 fabric "knit pullcomp 0 underlay "off satin 3 fd 10');
-    expect(Math.max(...overridden.map(e => Math.abs(e.x)))).toBeCloseTo(1.5, 1);
+    expect(Math.max(...overridden.map((e) => Math.abs(e.x)))).toBeCloseTo(1.5, 1);
   });
 
   it('fleece doubles the underlay and suggests a topping', () => {
     const out = run('lock 0 fabric "fleece satin 5 fd 10');
-    expect(out.warnings.some(w => w.includes('topping'))).toBe(true);
+    expect(out.warnings.some((w) => w.includes('topping'))).toBe(true);
     const woven = underlay('lock 0 fabric "woven satin 5 fd 10');
-    const fleece = out.events.filter(e => e.u === 1);
+    const fleece = out.events.filter((e) => e.u === 1);
     expect(fleece.length).toBeGreaterThan(woven.length);
   });
 
@@ -263,28 +267,30 @@ describe('fabric presets', () => {
 describe('autotrim', () => {
   it('inserts a trim before long jumps (default 7 mm)', () => {
     const ev = evts('lock 0 fd 5 up fd 10 down fd 5');
-    const trimIdx = ev.findIndex(e => e.t === 'trim');
-    const jumpIdx = ev.findIndex(e => e.t === 'jump');
+    const trimIdx = ev.findIndex((e) => e.t === 'trim');
+    const jumpIdx = ev.findIndex((e) => e.t === 'jump');
     expect(trimIdx).toBeGreaterThan(-1);
     expect(trimIdx).toBeLessThan(jumpIdx);
   });
 
   it('leaves short hops alone', () => {
-    expect(evts('lock 0 fd 5 up fd 5 down fd 5').some(e => e.t === 'trim')).toBe(false);
+    expect(evts('lock 0 fd 5 up fd 5 down fd 5').some((e) => e.t === 'trim')).toBe(false);
   });
 
   it('autotrim n changes the threshold; autotrim 0 disables', () => {
-    expect(evts('lock 0 autotrim 3 fd 5 up fd 5 down fd 5').some(e => e.t === 'trim')).toBe(true);
-    expect(evts('lock 0 autotrim 0 fd 5 up fd 30 down fd 5').some(e => e.t === 'trim')).toBe(false);
+    expect(evts('lock 0 autotrim 3 fd 5 up fd 5 down fd 5').some((e) => e.t === 'trim')).toBe(true);
+    expect(evts('lock 0 autotrim 0 fd 5 up fd 30 down fd 5').some((e) => e.t === 'trim')).toBe(
+      false,
+    );
   });
 
   it('never trims when nothing has been sewn yet', () => {
-    expect(evts('lock 0 up setxy 20 20 down fd 5').some(e => e.t === 'trim')).toBe(false);
+    expect(evts('lock 0 up setxy 20 20 down fd 5').some((e) => e.t === 'trim')).toBe(false);
   });
 
   it('does not double-trim after an explicit trim', () => {
     const ev = evts('lock 0 fd 5 trim up fd 20 down fd 5');
-    expect(ev.filter(e => e.t === 'trim').length).toBe(1);
+    expect(ev.filter((e) => e.t === 'trim').length).toBe(1);
   });
 
   it('applyAutoTrim measures multi-jump travels as one', () => {
@@ -312,13 +318,13 @@ describe('density analysis', () => {
     const d = densityMap(ev, 1, 3);
     expect(d.peak).toBeGreaterThan(3);
     expect(d.peak).toBeLessThan(4);
-    expect(d.hotspots.some(h => h.kind === 'density' && h.lines.includes(4))).toBe(true);
+    expect(d.hotspots.some((h) => h.kind === 'density' && h.lines.includes(4))).toBe(true);
   });
 
   it('flags same-hole stacking', () => {
     const ev: StitchEvent[] = [];
     for (let i = 0; i < 6; i++) ev.push({ t: 'stitch', x: 3, y: 3, c: 0, line: 7 });
-    const stack = densityMap(ev, 1, 3).hotspots.find(h => h.kind === 'stack');
+    const stack = densityMap(ev, 1, 3).hotspots.find((h) => h.kind === 'stack');
     expect(stack).toBeDefined();
     expect(stack!.value).toBe(6);
     expect(stack!.lines).toEqual([7]);
@@ -326,21 +332,23 @@ describe('density analysis', () => {
 
   it('a single satin column reads ≈1 layer and stays quiet', () => {
     const out = run('satin 3 fd 20');
-    expect(out.warnings.filter(w => w.includes('layers of thread')).length).toBe(0);
+    expect(out.warnings.filter((w) => w.includes('layers of thread')).length).toBe(0);
     expect(out.density.peak).toBeGreaterThan(0.5);
     expect(out.density.peak).toBeLessThan(2.5);
   });
 
   it('three stacked satin layers do trigger it, with source lines', () => {
     const out = run('satin 3\nfd 20 bk 20 fd 20');
-    expect(out.warnings.some(w => w.includes('layers of thread') && w.includes('line'))).toBe(true);
+    expect(out.warnings.some((w) => w.includes('layers of thread') && w.includes('line'))).toBe(
+      true,
+    );
   });
 
   it('maxdensity tunes the threshold; 0 silences it', () => {
     const strict = run('maxdensity 1 satin 3 fd 20');
-    expect(strict.warnings.some(w => w.includes('layers of thread'))).toBe(true);
+    expect(strict.warnings.some((w) => w.includes('layers of thread'))).toBe(true);
     const off = run('maxdensity 0 satin 3 fd 20 bk 20 fd 20');
-    expect(off.warnings.some(w => w.includes('layers of thread'))).toBe(false);
+    expect(off.warnings.some((w) => w.includes('layers of thread'))).toBe(false);
   });
 
   it('lock stitches are not counted as design density', () => {
@@ -362,18 +370,25 @@ describe('underlay in exports and stats', () => {
   it('underlay stitches are real stitches in stats and DST', () => {
     const plain = run('lock 0 satin 4 fd 10');
     const pro = run('lock 0 underlay "zigzag satin 4 fd 10');
-    expect(designStats(pro.events).stitches)
-      .toBeGreaterThan(designStats(plain.events).stitches);
+    expect(designStats(pro.events).stitches).toBeGreaterThan(designStats(plain.events).stitches);
     expect(toDST(pro.events).length).toBeGreaterThan(toDST(plain.events).length);
   });
 
   it('underlay events carry source lines for debugging', () => {
     const u = underlay('lock 0\nunderlay "center\nsatin 3 fd 10');
-    expect(u.every(e => e.line !== undefined)).toBe(true);
+    expect(u.every((e) => e.line !== undefined)).toBe(true);
   });
 
   it('reserved words include the pro commands', () => {
-    for (const w of ['fabric', 'underlay', 'fillunderlay', 'pullcomp', 'shortstitch', 'autotrim', 'maxdensity'])
+    for (const w of [
+      'fabric',
+      'underlay',
+      'fillunderlay',
+      'pullcomp',
+      'shortstitch',
+      'autotrim',
+      'maxdensity',
+    ])
       expect(() => run(`to ${w} fd 1 end`)).toThrow(/can't be redefined/);
   });
 
@@ -387,7 +402,9 @@ describe('underlay in exports and stats', () => {
 
   it.each(Object.keys(EXAMPLES))('"%s" sews without density or stacking warnings', (key) => {
     const out = run(EXAMPLES[key]);
-    const flagged = out.warnings.filter(w => w.includes('layers of thread') || w.includes('same hole'));
+    const flagged = out.warnings.filter(
+      (w) => w.includes('layers of thread') || w.includes('same hole'),
+    );
     if (DENSE_BY_DESIGN.has(key)) return; // dense by design — see note above
     expect(flagged).toEqual([]);
   });

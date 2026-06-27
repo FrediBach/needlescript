@@ -1,6 +1,7 @@
 // ---------- Shared types ----------
 
-export type TokenType = 'num' | 'var' | 'qword' | 'word' | 'pref' | 'op' | '[' | ']' | '(' | ')' | ',';
+export type TokenType =
+  'num' | 'var' | 'qword' | 'word' | 'pref' | 'op' | '[' | ']' | '(' | ')' | ',';
 
 export interface Token {
   t: TokenType;
@@ -70,7 +71,15 @@ export type ASTNode =
   | { k: 'to'; name: string; params: string[]; body: ASTNode[]; line: number }
   | { k: 'repeat'; count: ExprNode; body: ASTNode[]; line: number }
   | { k: 'while'; cond: ExprNode; body: ASTNode[]; line: number }
-  | { k: 'for'; varName: string; from: ExprNode; to: ExprNode; step: ExprNode; body: ASTNode[]; line: number }
+  | {
+      k: 'for';
+      varName: string;
+      from: ExprNode;
+      to: ExprNode;
+      step: ExprNode;
+      body: ASTNode[];
+      line: number;
+    }
   | { k: 'forin'; varName: string; list: ExprNode; body: ASTNode[]; line: number }
   | { k: 'if'; cond: ExprNode; body: ASTNode[]; elseBody: ASTNode[] | null; line: number }
   | { k: 'transform'; name: string; args: ExprNode[]; body: ASTNode[]; line: number }
@@ -102,7 +111,12 @@ export type ExprNode =
 
 // ---------- Density analysis types ----------
 
-export interface DensityCell { ix: number; iy: number; count: number; layers: number }
+export interface DensityCell {
+  ix: number;
+  iy: number;
+  count: number;
+  layers: number;
+}
 
 export interface DensityHotspot {
   x: number;

@@ -48,45 +48,57 @@ const PEC_BLOCK_HEADER_SIZE = 16;
  */
 function emitCoord(val: number, forceLong: boolean, flag: number, out: number[]): void {
   if (!forceLong && val > -64 && val < 63) {
-    out.push(val & 0x7F);
+    out.push(val & 0x7f);
   } else {
-    const word = (val & 0xFFF) | 0x8000 | (flag << 8);
-    out.push((word >> 8) & 0xFF, word & 0xFF);
+    const word = (val & 0xfff) | 0x8000 | (flag << 8);
+    out.push((word >> 8) & 0xff, word & 0xff);
   }
 }
 
 export function toPES(events: StitchEvent[], label?: string): Uint8Array {
   // ── Phase 1: Build PEC stitch byte array ────────────────────────────────────
   const stitchBytes: number[] = [];
-  let cx = 0, cy = 0;         // current position in 0.1 mm units
-  let numColors = 1;           // total thread colour count
-  let colorToggle = true;      // alternates 0x02/0x01 in colour-change records
-  let minX = 0, maxX = 0, minY = 0, maxY = 0;
+  let cx = 0,
+    cy = 0; // current position in 0.1 mm units
+  let numColors = 1; // total thread colour count
+  let colorToggle = true; // alternates 0x02/0x01 in colour-change records
+  let minX = 0,
+    maxX = 0,
+    minY = 0,
+    maxY = 0;
   let hasPts = false;
 
   /** Emit one delta step and update tracked position/bounds. */
   function emitStep(dx: number, dy: number, isJump: boolean, flag: number): void {
     emitCoord(dx, isJump, flag, stitchBytes);
     emitCoord(dy, isJump, flag, stitchBytes);
-    cx += dx; cy += dy;
+    cx += dx;
+    cy += dy;
     if (!isJump) {
-      if (!hasPts) { minX = maxX = cx; minY = maxY = cy; hasPts = true; }
-      else {
-        if (cx < minX) minX = cx; if (cx > maxX) maxX = cx;
-        if (cy < minY) minY = cy; if (cy > maxY) maxY = cy;
+      if (!hasPts) {
+        minX = maxX = cx;
+        minY = maxY = cy;
+        hasPts = true;
+      } else {
+        if (cx < minX) minX = cx;
+        if (cx > maxX) maxX = cx;
+        if (cy < minY) minY = cy;
+        if (cy > maxY) maxY = cy;
       }
     }
   }
 
   /** Split a large move into at most 2047-unit steps and emit each step. */
   function emitMove(tx: number, ty: number, isJump: boolean, flag: number): void {
-    let dx = tx - cx, dy = ty - cy;
+    let dx = tx - cx,
+      dy = ty - cy;
     do {
       const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 2047));
       const sx = steps > 1 ? Math.round(dx / steps) : dx;
       const sy = steps > 1 ? Math.round(dy / steps) : dy;
       emitStep(sx, sy, isJump, flag);
-      dx = tx - cx; dy = ty - cy;
+      dx = tx - cx;
+      dy = ty - cy;
     } while (dx !== 0 || dy !== 0);
   }
 
@@ -95,7 +107,7 @@ export function toPES(events: StitchEvent[], label?: string): Uint8Array {
 
     if (e.t === 'color') {
       // PEC colour-change record: 0xFE 0xB0 then alternating 0x02 / 0x01
-      stitchBytes.push(0xFE, 0xB0, colorToggle ? 0x02 : 0x01);
+      stitchBytes.push(0xfe, 0xb0, colorToggle ? 0x02 : 0x01);
       colorToggle = !colorToggle;
       numColors++;
       continue;
@@ -110,7 +122,8 @@ export function toPES(events: StitchEvent[], label?: string): Uint8Array {
       continue;
     }
 
-    const tx = Math.round(e.x * 10), ty = Math.round(e.y * 10);
+    const tx = Math.round(e.x * 10),
+      ty = Math.round(e.y * 10);
     if (e.t === 'jump') {
       emitMove(tx, ty, true, PEC_JUMP_FLAG);
     } else {
@@ -118,7 +131,7 @@ export function toPES(events: StitchEvent[], label?: string): Uint8Array {
     }
   }
 
-  stitchBytes.push(0xFF); // end-of-stitches marker
+  stitchBytes.push(0xff); // end-of-stitches marker
 
   // ── Phase 2: Assemble the binary buffer ─────────────────────────────────────
   const stitchBlockLen = PEC_BLOCK_HEADER_SIZE + stitchBytes.length;
@@ -126,12 +139,12 @@ export function toPES(events: StitchEvent[], label?: string): Uint8Array {
   const thumbnailBytes = PEC_THUMBNAIL_BYTES * (1 + numColors);
 
   const totalSize =
-    8 +                    // magic "#PES0001"
-    PES_SECTION_SIZE +     // PES section (PEC offset field + padding)
-    PEC_HEADER_SIZE +      // PEC header
+    8 + // magic "#PES0001"
+    PES_SECTION_SIZE + // PES section (PEC offset field + padding)
+    PEC_HEADER_SIZE + // PEC header
     PEC_BLOCK_HEADER_SIZE +
     stitchBytes.length +
-    thumbnailBytes;        // zeroed thumbnail (already zero-initialised)
+    thumbnailBytes; // zeroed thumbnail (already zero-initialised)
 
   const buf = new Uint8Array(totalSize);
   let o = 0;
@@ -141,10 +154,10 @@ export function toPES(events: StitchEvent[], label?: string): Uint8Array {
   for (let i = 0; i < 8; i++) buf[o++] = magic.charCodeAt(i);
 
   // — PEC offset (uint32 LE) ————————————————————————————————————————————————
-  buf[o++] = PEC_OFFSET & 0xFF;
-  buf[o++] = (PEC_OFFSET >> 8) & 0xFF;
-  buf[o++] = (PEC_OFFSET >> 16) & 0xFF;
-  buf[o++] = (PEC_OFFSET >> 24) & 0xFF;
+  buf[o++] = PEC_OFFSET & 0xff;
+  buf[o++] = (PEC_OFFSET >> 8) & 0xff;
+  buf[o++] = (PEC_OFFSET >> 16) & 0xff;
+  buf[o++] = (PEC_OFFSET >> 24) & 0xff;
 
   // — 10-byte zeroed PES section ————————————————————————————————————————————
   o += 10; // already zero-initialised
@@ -157,17 +170,20 @@ export function toPES(events: StitchEvent[], label?: string): Uint8Array {
     .slice(0, 16)
     .padEnd(16, ' ');
 
-  buf[o++] = 0x4C; buf[o++] = 0x41; buf[o++] = 0x3A; // "LA:"
+  buf[o++] = 0x4c;
+  buf[o++] = 0x41;
+  buf[o++] = 0x3a; // "LA:"
   for (let i = 0; i < 16; i++) buf[o++] = rawLabel.charCodeAt(i);
-  buf[o++] = 0x0D; // CR
+  buf[o++] = 0x0d; // CR
 
   // 12 spaces, 0xFF, 0x00
   for (let i = 0; i < 12; i++) buf[o++] = 0x20;
-  buf[o++] = 0xFF; buf[o++] = 0x00;
+  buf[o++] = 0xff;
+  buf[o++] = 0x00;
 
   // Icon byte stride + height
   buf[o++] = PEC_ICON_STRIDE; // 6
-  buf[o++] = PEC_ICON_H;      // 38
+  buf[o++] = PEC_ICON_H; // 38
 
   // 12 spaces before colour-index list
   for (let i = 0; i < 12; i++) buf[o++] = 0x20;
@@ -175,7 +191,7 @@ export function toPES(events: StitchEvent[], label?: string): Uint8Array {
   // Colour-index list: [numChanges, idx0, idx1, ...]
   // numChanges = numColors - 1; indices are simplified sequential values
   buf[o++] = numColors - 1;
-  for (let i = 0; i < numColors - 1; i++) buf[o++] = i & 0xFF;
+  for (let i = 0; i < numColors - 1; i++) buf[o++] = i & 0xff;
 
   // Pad the colour section to exactly 463 bytes (spaces fill remaining slots)
   for (let i = numColors; i < 463; i++) buf[o++] = 0x20;
@@ -183,19 +199,26 @@ export function toPES(events: StitchEvent[], label?: string): Uint8Array {
   // Total PEC header bytes written: 20 + 14 + 2 + 12 + 463 = 511 ✓
 
   // — PEC block header (16 bytes) ———————————————————————————————————————————
-  buf[o++] = 0x00; buf[o++] = 0x00;
+  buf[o++] = 0x00;
+  buf[o++] = 0x00;
   // stitch_block_length as uint24 LE
-  buf[o++] = stitchBlockLen & 0xFF;
-  buf[o++] = (stitchBlockLen >> 8) & 0xFF;
-  buf[o++] = (stitchBlockLen >> 16) & 0xFF;
-  buf[o++] = 0x31; buf[o++] = 0xFF; buf[o++] = 0xF0;
+  buf[o++] = stitchBlockLen & 0xff;
+  buf[o++] = (stitchBlockLen >> 8) & 0xff;
+  buf[o++] = (stitchBlockLen >> 16) & 0xff;
+  buf[o++] = 0x31;
+  buf[o++] = 0xff;
+  buf[o++] = 0xf0;
   // Design dimensions in 0.1 mm units (uint16 LE each)
   const designW = Math.max(0, maxX - minX);
   const designH = Math.max(0, maxY - minY);
-  buf[o++] = designW & 0xFF; buf[o++] = (designW >> 8) & 0xFF;
-  buf[o++] = designH & 0xFF; buf[o++] = (designH >> 8) & 0xFF;
-  buf[o++] = 0xE0; buf[o++] = 0x01; // 0x01E0 fixed
-  buf[o++] = 0xB0; buf[o++] = 0x01; // 0x01B0 fixed
+  buf[o++] = designW & 0xff;
+  buf[o++] = (designW >> 8) & 0xff;
+  buf[o++] = designH & 0xff;
+  buf[o++] = (designH >> 8) & 0xff;
+  buf[o++] = 0xe0;
+  buf[o++] = 0x01; // 0x01E0 fixed
+  buf[o++] = 0xb0;
+  buf[o++] = 0x01; // 0x01B0 fixed
 
   // — Stitch data ———————————————————————————————————————————————————————————
   for (const b of stitchBytes) buf[o++] = b;

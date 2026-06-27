@@ -4,7 +4,16 @@
 // results, no floating-point drift between machines. Scaled on the way in,
 // unscaled on the way out.
 
-import { JoinType, EndType, FillRule, inflatePaths, intersect, union, difference, xor } from 'clipper2-ts';
+import {
+  JoinType,
+  EndType,
+  FillRule,
+  inflatePaths,
+  intersect,
+  union,
+  difference,
+  xor,
+} from 'clipper2-ts';
 import type { Path64, Paths64 } from 'clipper2-ts';
 import { NeedlescriptError } from './errors.ts';
 import type { Pt } from './genmath.ts';
@@ -21,8 +30,8 @@ const toPath64 = (region: Pt[]): Path64 =>
 
 const fromPaths64 = (paths: Paths64): Pt[][] =>
   paths
-    .map(path => path.map(p => [p.x / SCALE, p.y / SCALE] as Pt))
-    .filter(path => path.length >= 3);
+    .map((path) => path.map((p) => [p.x / SCALE, p.y / SCALE] as Pt))
+    .filter((path) => path.length >= 3);
 
 function checkVertexBudget(what: string, count: number, line?: number) {
   if (count > MAX_CLIP_VERTICES)
@@ -41,8 +50,12 @@ function checkVertexBudget(what: string, count: number, line?: number) {
 export function offsetRegion(region: Pt[], delta: number, line?: number): Pt[][] {
   checkVertexBudget('offsetpath', region.length, line);
   const out = inflatePaths(
-    [toPath64(region)], delta * SCALE,
-    JoinType.Round, EndType.Polygon, 2, ARC_TOLERANCE,
+    [toPath64(region)],
+    delta * SCALE,
+    JoinType.Round,
+    EndType.Polygon,
+    2,
+    ARC_TOLERANCE,
   );
   return fromPaths64(out);
 }
@@ -54,10 +67,18 @@ export function clipRegions(a: Pt[], b: Pt[], op: string, line?: number): Pt[][]
   const sb: Paths64 = [toPath64(b)];
   let out: Paths64;
   switch (op) {
-    case 'union': out = union(sa, sb, FillRule.EvenOdd); break;
-    case 'intersect': out = intersect(sa, sb, FillRule.EvenOdd); break;
-    case 'difference': out = difference(sa, sb, FillRule.EvenOdd); break;
-    case 'xor': out = xor(sa, sb, FillRule.EvenOdd); break;
+    case 'union':
+      out = union(sa, sb, FillRule.EvenOdd);
+      break;
+    case 'intersect':
+      out = intersect(sa, sb, FillRule.EvenOdd);
+      break;
+    case 'difference':
+      out = difference(sa, sb, FillRule.EvenOdd);
+      break;
+    case 'xor':
+      out = xor(sa, sb, FillRule.EvenOdd);
+      break;
     default:
       // unreachable: the parser validates the quoted op word
       throw new NeedlescriptError(`clippaths doesn't know "${op}"`, line);

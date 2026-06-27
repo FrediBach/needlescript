@@ -28,17 +28,16 @@ export default function Splitter({ orientation, onDrag, onReset }: Props) {
     // Full-screen transparent cover — captures all mouse events so the
     // Monaco / canvas iframes cannot swallow them during a drag.
     const cover = document.createElement('div');
-    cover.style.cssText =
-      `position:fixed;inset:0;z-index:9999;cursor:${cursor}`;
+    cover.style.cssText = `position:fixed;inset:0;z-index:9999;cursor:${cursor}`;
     document.body.appendChild(cover);
-    document.body.style.cursor    = cursor;
+    document.body.style.cursor = cursor;
     document.body.style.userSelect = 'none';
 
     let lastPos = orientation === 'horizontal' ? e.clientX : e.clientY;
     setActive(true);
 
     function onMouseMove(ev: MouseEvent) {
-      const pos   = orientation === 'horizontal' ? ev.clientX : ev.clientY;
+      const pos = orientation === 'horizontal' ? ev.clientX : ev.clientY;
       const delta = pos - lastPos;
       lastPos = pos;
       if (delta !== 0) onDrag(delta);
@@ -47,21 +46,19 @@ export default function Splitter({ orientation, onDrag, onReset }: Props) {
     function onMouseUp() {
       setActive(false);
       cover.remove();
-      document.body.style.cursor     = '';
+      document.body.style.cursor = '';
       document.body.style.userSelect = '';
       window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup',   onMouseUp);
+      window.removeEventListener('mouseup', onMouseUp);
     }
 
     window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup',   onMouseUp);
+    window.addEventListener('mouseup', onMouseUp);
   }
 
-  const cls = [
-    styles.splitter,
-    styles[orientation],
-    active ? styles.active : '',
-  ].filter(Boolean).join(' ');
+  const cls = [styles.splitter, styles[orientation], active ? styles.active : '']
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div

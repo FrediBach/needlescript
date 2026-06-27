@@ -25,22 +25,26 @@ const MAX_DELTA = 127;
 
 export function toEXP(events: StitchEvent[], _label?: string): Uint8Array {
   const bytes: number[] = [];
-  let cx = 0, cy = 0; // current position in 0.1 mm units
+  let cx = 0,
+    cy = 0; // current position in 0.1 mm units
 
   /**
    * Emit a move towards (tx, ty), split into ≤ MAX_DELTA steps.
    * `isJump` prepends [0x80, 0x04] before each step's coordinate pair.
    */
   function emitMove(tx: number, ty: number, isJump: boolean): void {
-    let dx = tx - cx, dy = ty - cy;
+    let dx = tx - cx,
+      dy = ty - cy;
     do {
       const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / MAX_DELTA));
       const sx = steps > 1 ? Math.round(dx / steps) : dx;
       const sy = steps > 1 ? Math.round(dy / steps) : dy;
       if (isJump) bytes.push(0x80, 0x04);
-      bytes.push(sx & 0xFF, sy & 0xFF);
-      cx += sx; cy += sy;
-      dx = tx - cx; dy = ty - cy;
+      bytes.push(sx & 0xff, sy & 0xff);
+      cx += sx;
+      cy += sy;
+      dx = tx - cx;
+      dy = ty - cy;
     } while (dx !== 0 || dy !== 0);
   }
 
@@ -57,7 +61,8 @@ export function toEXP(events: StitchEvent[], _label?: string): Uint8Array {
       continue;
     }
 
-    const tx = Math.round(e.x * 10), ty = Math.round(e.y * 10);
+    const tx = Math.round(e.x * 10),
+      ty = Math.round(e.y * 10);
     emitMove(tx, ty, e.t === 'jump');
   }
 

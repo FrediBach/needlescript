@@ -13,11 +13,11 @@ import { cn } from '@/lib/utils.ts';
 
 const SPEEDS = [
   { value: 0.125, label: '⅛×' },
-  { value: 0.25,  label: '¼×' },
-  { value: 0.5,   label: '½×' },
-  { value: 1,     label: '1×' },
-  { value: 2,     label: '2×' },
-  { value: 4,     label: '4×' },
+  { value: 0.25, label: '¼×' },
+  { value: 0.5, label: '½×' },
+  { value: 1, label: '1×' },
+  { value: 2, label: '2×' },
+  { value: 4, label: '4×' },
 ];
 
 interface Props {
@@ -29,7 +29,14 @@ interface Props {
   highlightLines: number[];
 }
 
-export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine, lineSegments, highlightLines }: Props) {
+export default function PlaybackBar({
+  total,
+  scrubPos,
+  onScrubChange,
+  activeLine,
+  lineSegments,
+  highlightLines,
+}: Props) {
   const [playingForTotal, setPlayingForTotal] = useState<number | null>(null);
   const playing = playingForTotal === total;
   const playReqRef = useRef<number | null>(null);
@@ -62,7 +69,7 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
     let pos = scrubPos >= total ? 0 : scrubPos;
     setPlayingForTotal(total);
     function step() {
-      const perFrame = Math.max(1, Math.round(total / 420 * speedRef.current));
+      const perFrame = Math.max(1, Math.round((total / 420) * speedRef.current));
       pos += perFrame;
       if (pos >= total) {
         onScrubChange(total);
@@ -81,10 +88,13 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
     else startPlay();
   }, [playing, stopPlay, startPlay]);
 
-  const handleScrub = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    stopPlay();
-    onScrubChange(Number(e.target.value));
-  }, [stopPlay, onScrubChange]);
+  const handleScrub = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      stopPlay();
+      onScrubChange(Number(e.target.value));
+    },
+    [stopPlay, onScrubChange],
+  );
 
   const handleSpeedChange = useCallback((value: string | null) => {
     if (value) setSpeed(Number(value));
@@ -102,7 +112,7 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
 
   const hi = highlightLines.length ? new Set(highlightLines) : null;
 
-  const totalStr  = total.toLocaleString();
+  const totalStr = total.toLocaleString();
   const paddedPos = scrubPos.toLocaleString().padStart(totalStr.length, '\u2007');
   const paddedLine = (activeLine ?? 0).toString().padStart(4, '\u2007');
 
@@ -115,9 +125,9 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
         onClick={handlePlayClick}
         aria-label={playing ? 'Pause stitch sequence' : 'Play stitch sequence'}
         className={cn(
-          "w-[34px] h-[30px] font-mono text-body",
-          "bg-canvas border-[var(--on-canvas-45)] text-on-canvas",
-          "hover:bg-canvas-hover hover:text-on-canvas",
+          'w-[34px] h-[30px] font-mono text-body',
+          'bg-canvas border-[var(--on-canvas-45)] text-on-canvas',
+          'hover:bg-canvas-hover hover:text-on-canvas',
         )}
       >
         {playing ? '❚❚' : '▶'}
@@ -129,16 +139,18 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
           aria-label="Playback speed"
           title="Playback speed"
           className={cn(
-            "h-[30px] w-auto font-mono text-sub px-1.5",
-            "bg-canvas border-[var(--on-canvas-45)] text-on-canvas",
-            "hover:bg-canvas-hover",
+            'h-[30px] w-auto font-mono text-sub px-1.5',
+            'bg-canvas border-[var(--on-canvas-45)] text-on-canvas',
+            'hover:bg-canvas-hover',
           )}
         >
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="font-mono text-[11px] min-w-[60px]">
-          {SPEEDS.map(s => (
-            <SelectItem key={s.value} value={String(s.value)}>{s.label}</SelectItem>
+          {SPEEDS.map((s) => (
+            <SelectItem key={s.value} value={String(s.value)}>
+              {s.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -162,7 +174,7 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
         >
           {lineSegments.map((seg, i) => {
             const nextStart = lineSegments[i + 1]?.start ?? total;
-            const isActive  = i === activeSegIdx;
+            const isActive = i === activeSegIdx;
             return (
               <rect
                 key={i}
@@ -182,20 +194,21 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
           })}
           {/* Warning highlight overlay — marks the parts where the hovered
               hotspot warning was stitched. Drawn above the base strip. */}
-          {hi && lineSegments.map((seg, i) => {
-            if (!hi.has(seg.line)) return null;
-            const nextStart = lineSegments[i + 1]?.start ?? total;
-            return (
-              <rect
-                key={`hl-${i}`}
-                x={seg.start}
-                y={0}
-                width={nextStart - seg.start}
-                height={1}
-                fill="rgba(200,38,24,0.78)"
-              />
-            );
-          })}
+          {hi &&
+            lineSegments.map((seg, i) => {
+              if (!hi.has(seg.line)) return null;
+              const nextStart = lineSegments[i + 1]?.start ?? total;
+              return (
+                <rect
+                  key={`hl-${i}`}
+                  x={seg.start}
+                  y={0}
+                  width={nextStart - seg.start}
+                  height={1}
+                  fill="rgba(200,38,24,0.78)"
+                />
+              );
+            })}
         </svg>
       </div>
 
@@ -205,7 +218,8 @@ export default function PlaybackBar({ total, scrubPos, onScrubChange, activeLine
           className={styles.lineInfo}
           style={activeLine === null ? { visibility: 'hidden' } : undefined}
         >
-          {' · line '}{paddedLine}
+          {' · line '}
+          {paddedLine}
         </span>
       </span>
     </div>

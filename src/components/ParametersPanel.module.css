@@ -3,8 +3,8 @@
    palette stays in sync with the rest of the app.                          */
 
 .panel {
-  background:  var(--bg-warm);
-  border-top:  1px solid var(--border-warm-sub);
+  background: var(--bg-warm);
+  border-top: 1px solid var(--border-warm-sub);
   flex-shrink: 0;
 }
 
@@ -36,7 +36,9 @@
   transition: color 0.15s;
 }
 
-.headerToggle:hover { color: var(--text-warm); }
+.headerToggle:hover {
+  color: var(--text-warm);
+}
 
 .randomizeBtn {
   display: flex;
@@ -51,7 +53,9 @@
   border-radius: 3px;
   cursor: pointer;
   color: var(--text-warm);
-  transition: color 0.15s, background-color 0.15s;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
 }
 
 .randomizeBtn:hover {
@@ -59,8 +63,12 @@
   background-color: var(--text-warm-faint);
 }
 
-.headerLabel  { flex-shrink: 0; }
-.headerSpacer { flex: 1; }
+.headerLabel {
+  flex-shrink: 0;
+}
+.headerSpacer {
+  flex: 1;
+}
 
 .paramCount {
   display: inline-flex;
@@ -98,7 +106,7 @@
 .presetSelect {
   width: 100%;
   height: 26px;
-  padding: 0 20px 0 8px;   /* right room for chevron */
+  padding: 0 20px 0 8px; /* right room for chevron */
   background: var(--bg-warm-deep);
   border: 1px solid var(--border-warm-sub);
   border-radius: 4px;
@@ -111,9 +119,11 @@
   transition: border-color 0.15s;
 }
 
-.presetSelect:hover  { border-color: var(--text-warm-muted); }
+.presetSelect:hover {
+  border-color: var(--text-warm-muted);
+}
 
-.presetSelect:focus  {
+.presetSelect:focus {
   outline: none;
   border-color: var(--gold);
   box-shadow: 0 0 0 2px var(--gold-20);
@@ -146,7 +156,9 @@
   border-radius: 3px;
   cursor: pointer;
   color: var(--text-warm-faint);
-  transition: color 0.15s, background-color 0.15s;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
 }
 
 .copyBtn:hover {
@@ -162,9 +174,16 @@
   padding: 2px 0 10px;
 }
 
-.body::-webkit-scrollbar       { width: 4px; }
-.body::-webkit-scrollbar-track { background: transparent; }
-.body::-webkit-scrollbar-thumb { background: var(--text-warm-faint); border-radius: 2px; }
+.body::-webkit-scrollbar {
+  width: 4px;
+}
+.body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.body::-webkit-scrollbar-thumb {
+  background: var(--text-warm-faint);
+  border-radius: 2px;
+}
 
 /* ── Section header (inline divider) ─────────────────────────────────────── */
 
@@ -207,9 +226,15 @@
     grid-template-columns: 1fr auto auto;
     grid-template-rows: auto auto;
   }
-  .paramName  { grid-column: 1 / -1; }
-  .switchWrap { grid-column: 1 / 3; }
-  .lockBtn    { grid-column: 3; }
+  .paramName {
+    grid-column: 1 / -1;
+  }
+  .switchWrap {
+    grid-column: 1 / 3;
+  }
+  .lockBtn {
+    grid-column: 3;
+  }
 }
 
 /* ── Parameter name label ────────────────────────────────────────────────── */
@@ -221,7 +246,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1;
-  padding-top: 11px;   /* vertically align with slider thumb centre */
+  padding-top: 11px; /* vertically align with slider thumb centre */
   min-width: 0;
 }
 
@@ -235,18 +260,18 @@
 }
 
 /* Track */
-.slider [data-slot="slider-track"] {
+.slider [data-slot='slider-track'] {
   background: var(--border-warm-sub) !important;
   height: 3px !important;
 }
 
 /* Filled range */
-.slider [data-slot="slider-range"] {
+.slider [data-slot='slider-range'] {
   background: var(--gold) !important;
 }
 
 /* Thumb — hollow ring, larger hit target */
-.slider [data-slot="slider-thumb"] {
+.slider [data-slot='slider-thumb'] {
   width: 18px !important;
   height: 18px !important;
   border-width: 2px !important;
@@ -255,9 +280,9 @@
   box-shadow: none !important;
 }
 
-.slider [data-slot="slider-thumb"]:hover,
-.slider [data-slot="slider-thumb"]:focus-visible,
-.slider [data-slot="slider-thumb"]:active {
+.slider [data-slot='slider-thumb']:hover,
+.slider [data-slot='slider-thumb']:focus-visible,
+.slider [data-slot='slider-thumb']:active {
   background: var(--bg-warm) !important;
   border-color: var(--gold-hi) !important;
   box-shadow: 0 0 0 4px var(--gold-18) !important;
@@ -291,25 +316,29 @@
   flex-shrink: 0;
 }
 
-.valueInput:hover  { border-color: var(--text-warm-muted) !important; }
+.valueInput:hover {
+  border-color: var(--text-warm-muted) !important;
+}
 .valueInput:focus-within,
-.valueInput:focus  {
+.valueInput:focus {
   border-color: var(--gold) !important;
   box-shadow: 0 0 0 2px var(--gold-20) !important;
   outline: none !important;
 }
 
 .valueInput::-webkit-outer-spin-button,
-.valueInput::-webkit-inner-spin-button { -webkit-appearance: none; }
+.valueInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
 
 /* ── Switch row ─────────────────────────────────────────────────────────── */
 
 .switchWrap {
-  grid-column: 2 / 4;   /* span controls + value-input columns so lock lands in col 4 */
+  grid-column: 2 / 4; /* span controls + value-input columns so lock lands in col 4 */
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-top: 8px;   /* align with name label */
+  padding-top: 8px; /* align with name label */
 }
 
 .switchLabel {
@@ -321,9 +350,13 @@
   min-width: 24px;
 }
 
-.switchLabel:first-child { text-align: right; }
+.switchLabel:first-child {
+  text-align: right;
+}
 
-.switchLabelActive { color: var(--text-warm); }
+.switchLabelActive {
+  color: var(--text-warm);
+}
 
 /* Override shadcn Switch to use gold + warm palette */
 .switch {
@@ -334,7 +367,7 @@
   background: var(--gold) !important;
 }
 
-.switch [data-slot="switch-thumb"] {
+.switch [data-slot='switch-thumb'] {
   background: var(--text-warm) !important;
 }
 
@@ -377,7 +410,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-top: 10px;  /* align icon with slider thumb / param name */
+  padding-top: 10px; /* align icon with slider thumb / param name */
   align-self: start;
   width: 20px;
   background: transparent;
@@ -386,11 +419,15 @@
   cursor: pointer;
   color: var(--text-warm-faint);
   opacity: 0;
-  transition: color 0.15s, opacity 0.15s;
+  transition:
+    color 0.15s,
+    opacity 0.15s;
 }
 
 /* Reveal on row hover so unlocked buttons don't add visual noise at rest */
-.paramRow:hover .lockBtn { opacity: 1; }
+.paramRow:hover .lockBtn {
+  opacity: 1;
+}
 
 /* Locked state — always visible, gold tint */
 .lockBtnLocked {

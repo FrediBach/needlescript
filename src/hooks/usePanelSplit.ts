@@ -9,15 +9,13 @@ import { useState, useCallback, useEffect, useRef } from 'react';
  */
 export function usePanelSplit() {
   const [leftWidth, setLeftWidth] = useState<number>(() =>
-    Math.max(330, Math.round(window.innerWidth * 0.44))
+    Math.max(330, Math.round(window.innerWidth * 0.44)),
   );
 
   // On small screens CSS Grid owns sizing; skip inline-width entirely.
-  const [isMobile, setIsMobile] = useState(() =>
-    window.matchMedia('(max-width: 880px)').matches
-  );
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 880px)').matches);
   useEffect(() => {
-    const mq      = window.matchMedia('(max-width: 880px)');
+    const mq = window.matchMedia('(max-width: 880px)');
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
@@ -27,7 +25,7 @@ export function usePanelSplit() {
 
   const handleHorizDrag = useCallback((delta: number) => {
     const total = mainRef.current?.offsetWidth ?? window.innerWidth;
-    setLeftWidth(w => Math.max(240, Math.min(w + delta, total - 240)));
+    setLeftWidth((w) => Math.max(240, Math.min(w + delta, total - 240)));
   }, []);
 
   const handleHorizReset = useCallback(() => {

@@ -26,7 +26,7 @@ function expectEquivalent(modern: string, legacy: string) {
 /** Like expectEquivalent, but ignores source-line tags (different layouts). */
 function expectEquivalentIgnoringLines(modern: string, legacy: string) {
   const strip = (evs: StitchEvent[]) => evs.map(({ t, x, y, c, u }) => ({ t, x, y, c, u }));
-  const stripWarn = (w: string[]) => w.map(s => s.replace(/lines? [\d, ]+/g, 'line N'));
+  const stripWarn = (w: string[]) => w.map((s) => s.replace(/lines? [\d, ]+/g, 'line N'));
   const a = run(modern);
   const b = run(legacy);
   expect(strip(a.events)).toEqual(strip(b.events));
@@ -50,8 +50,10 @@ describe('let and assignment', () => {
 
   it('assignment updates a local in scope, else writes a global (test #2)', () => {
     // local stays local: the global g is untouched by the in-proc assignment
-    expect(printed('let g = 1 def f() [ let g = 5 g = 9 print g ] f() print g'))
-      .toEqual(['9', '1']);
+    expect(printed('let g = 1 def f() [ let g = 5 g = 9 print g ] f() print g')).toEqual([
+      '9',
+      '1',
+    ]);
     // no local in scope → make semantics create/update a global
     expect(printed('def f() [ made = 7 ] f() print made')).toEqual(['7']);
   });
@@ -125,8 +127,9 @@ describe('def and return', () => {
     // parse-time arity is known up front (like legacy "to") …
     expect(() => parse(tokenize('print f(2) def f(n) [ return n * 2 ]'))).not.toThrow();
     // … and mutually-referencing procedures work end to end
-    expect(printed('def f(n) [ return g(n) + 1 ] def g(n) [ return n * 2 ] print f(3)'))
-      .toEqual(['7']);
+    expect(printed('def f(n) [ return g(n) + 1 ] def g(n) [ return n * 2 ] print f(3)')).toEqual([
+      '7',
+    ]);
   });
 });
 
@@ -149,8 +152,7 @@ describe('keyword for', () => {
   });
 
   it('the counter does not leak (test #5)', () => {
-    expect(() => run('for i = 1 to 3 [ fd 1 ] print i'))
-      .toThrow(/never assigned on this path/);
+    expect(() => run('for i = 1 to 3 [ fd 1 ] print i')).toThrow(/never assigned on this path/);
   });
 });
 
@@ -193,7 +195,10 @@ describe('modern operators', () => {
   });
 
   it('! ≡ not (test #7)', () => {
-    expectEquivalent('print !0 print !5 print !(1 = 2)', 'print not 0 print not 5 print not ( 1 = 2 )');
+    expectEquivalent(
+      'print !0 print !5 print !(1 = 2)',
+      'print not 0 print not 5 print not ( 1 = 2 )',
+    );
   });
 
   it('== ≡ = including the 1e-9 tolerance (test #7)', () => {
@@ -231,7 +236,7 @@ describe('legacy preservation', () => {
   it('two legacy qwords on one line still lex separately (test #9)', () => {
     expect(printed('make "x 5 print "y 6')).toEqual(['y: 6']);
     const toks = tokenize('make "x 5 print "y 6');
-    expect(toks.filter(t => t.t === 'qword').map(t => t.v)).toEqual(['x', 'y']);
+    expect(toks.filter((t) => t.t === 'qword').map((t) => t.v)).toEqual(['x', 'y']);
   });
 
   it('fd (10) stays Logo grouping; fd(10) is a call; fd ( 10 ) groups (test #10)', () => {
@@ -275,8 +280,7 @@ describe('definition-time collision errors (§4.3)', () => {
   });
 
   it('assigning to a procedure name errors (test #13)', () => {
-    expect(() => run('def f(n) [ fd n ] f = 1'))
-      .toThrow(/"f" is already a procedure \(line 1\)/);
+    expect(() => run('def f(n) [ fd n ] f = 1')).toThrow(/"f" is already a procedure \(line 1\)/);
   });
 
   it('let colliding with a procedure errors in any order (test #13)', () => {
@@ -315,7 +319,9 @@ describe('call and comma errors', () => {
   it('wrong arity in call parens names the callee (test #14)', () => {
     expect(() => run('fd min(3)')).toThrow(/min\(…\) expects 2 arguments, got 1/);
     expect(() => run('fd(1, 2)')).toThrow(/fd\(…\) expects 1 argument, got 2/);
-    expect(() => run('def f(a, b) [ fd a fd b ] f(1)')).toThrow(/f\(…\) expects 2 arguments, got 1/);
+    expect(() => run('def f(a, b) [ fd a fd b ] f(1)')).toThrow(
+      /f\(…\) expects 2 arguments, got 1/,
+    );
   });
 
   it('commas outside call parens error (test #14)', () => {
@@ -335,15 +341,16 @@ describe('structure errors', () => {
   });
 
   it('reads of declared-but-unset variables error at runtime (test #16)', () => {
-    expect(() => run('if 0 [ x = 1 ] print x'))
-      .toThrow(/Variable "x" was never assigned on this path/);
+    expect(() => run('if 0 [ x = 1 ] print x')).toThrow(
+      /Variable "x" was never assigned on this path/,
+    );
   });
 
   it('unknown names suggest across both namespaces (test #17)', () => {
-    expect(() => run('let radius = 5 fd radiu'))
-      .toThrow(/did you mean the variable "radius"/);
-    expect(() => run('def grow(n) [ return n ] fd gros(1)'))
-      .toThrow(/did you mean the procedure "grow"/);
+    expect(() => run('let radius = 5 fd radiu')).toThrow(/did you mean the variable "radius"/);
+    expect(() => run('def grow(n) [ return n ] fd gros(1)')).toThrow(
+      /did you mean the procedure "grow"/,
+    );
     expect(() => run('fd stich(2)')).toThrow(/Unknown name/);
   });
 });
@@ -468,6 +475,6 @@ describe('meadow — modern and legacy twins (test #19)', () => {
   });
 
   it('actually sews something', () => {
-    expect(events(modern).filter(e => e.t === 'stitch').length).toBeGreaterThan(500);
+    expect(events(modern).filter((e) => e.t === 'stitch').length).toBeGreaterThan(500);
   });
 });
