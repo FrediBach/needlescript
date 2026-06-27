@@ -1,43 +1,43 @@
 // Horizontal lines stacked in a circle, with the vertical gap
-// between them driven by two out-of-sync sine LFOs. Where the
-// LFOs reinforce, gaps stretch; where they cancel, lines crowd —
-// so the stack reads as a slow wave of breathing density.
+// between them driven by two out-of-sync sine LFOs. Boustrophedon
+// ordering — alternate rows sew right-to-left — so the jump from
+// one row to the next is a short vertical step, not a full-width
+// diagonal back to the left edge.
 
 let radius = 44              // circle radius (inside the 47 mm field)
 let baseGap = 1.6            // average gap between lines (mm)
 let swing = 1.2              // how far the LFOs push the gap (mm)
 
-// two LFO "speeds" in degrees of phase advanced per line.
-// deliberately incommensurate so they drift in and out of sync.
 let speedA = 23
 let speedB = 37
 
 let phaseA = 0
-let phaseB = 90              // start a quarter-turn apart
+let phaseB = 90
 
-let y = -radius              // begin at the bottom of the circle
+let y = 0 - radius           // begin at the bottom of the circle
+let goingEast = 1            // direction toggle for the boustrophedon
 
 color 1
 stitchlen 2.5
 
 while y < radius [
-  // half-chord of the circle at this height: the line's reach.
-  // guard the sqrt against tiny negatives at the very edges.
   let half = sqrt(max(0, radius * radius - y * y))
 
   if half > 0.5 [
-    up setxy(0 - half, y) down     // jump to the left edge of this row
-    fd 0                           // (no-op; heading stays east after setxy below)
-    seth 90                        // face east
-    fd half * 2                    // sew the full horizontal chord
-    trim
+    if goingEast [
+      up setxy(0 - half, y) down    // enter at the left edge
+      seth 90                       // face east
+    ] else [
+      up setxy(half, y) down        // enter at the right edge
+      seth 270                      // face west
+    ]
+    fd half * 2                     // sew the full chord
+    goingEast = 1 - goingEast       // flip for the next row
   ]
 
-  // advance both LFOs and combine them into one gap value
   phaseA += speedA
   phaseB += speedB
   let gap = baseGap + swing * sin(phaseA) + swing * sin(phaseB)
 
-  // keep the gap sane near the poles even if the LFOs dip low
   y += max(0.6, gap)
 ]
