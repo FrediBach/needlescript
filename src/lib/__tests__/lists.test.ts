@@ -6,7 +6,7 @@
 // suites double as that regression guarantee).
 
 import { describe, it, expect } from 'vitest';
-import { run, NeedlescriptError } from '../engine.ts';
+import { run, NeedlescriptError, LIMITS } from '../engine.ts';
 
 const printed = (src: string) => run(src).printed;
 
@@ -374,7 +374,10 @@ describe('limits (test #14)', () => {
   });
 
   it('element reads count toward the op budget', () => {
-    expect(() => run('let xs = range(50000) repeat 40 [ let s = sum(xs) ]'))
+    // sum(xs) costs xs.length ops via tickN. Use enough iterations to exceed LIMITS.maxOps.
+    const listSize = 50000;
+    const iters = Math.ceil(LIMITS.maxOps / listSize) + 10;
+    expect(() => run(`let xs = range(${listSize}) repeat ${iters} [ let s = sum(xs) ]`))
       .toThrow(/ran too long/);
   });
 

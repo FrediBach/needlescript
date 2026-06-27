@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { run, NeedlescriptError } from '../engine.ts';
+import { run, NeedlescriptError, LIMITS } from '../engine.ts';
 import type { StitchEvent } from '../engine.ts';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -473,10 +473,12 @@ describe('run — safety limits', () => {
   });
 
   it('exceeding maxOps throws (infinite loop detection)', () => {
-    // Each iteration of the loop ticks the ops counter multiple times.
-    // repeat 200000 [ rt 1 ] = 200000 * (1 tick for repeat body eval + 1 tick for rt + 1 for arg) ≈ 600k
-    // Need something that ticks >2M times. Use nested repeats: 1000 * 1000 * 3 = 3M
-    expect(() => run('repeat 1000 [ repeat 1000 [ rt 1 lt 1 ] ]')).toThrow(NeedlescriptError);
+    // `repeat` does NOT tick per iteration; ops come from statements and expressions.
+    // Cost of `repeat n [ repeat n [ rt 1 lt 1 ] ]`:
+    //   outer: 2 (stmt + count expr) + n × (inner: 2 + n × 4) ≈ 4n²
+    // Choose n so that 4n² >> LIMITS.maxOps.
+    const n = Math.ceil(Math.sqrt(LIMITS.maxOps / 4)) + 100;
+    expect(() => run(`repeat ${n} [ repeat ${n} [ rt 1 lt 1 ] ]`)).toThrow(NeedlescriptError);
   });
 });
 
