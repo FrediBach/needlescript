@@ -138,7 +138,8 @@ describe('output and exit', () => {
   });
 
   it('using a procedure as a value without output is an error', () => {
-    expect(() => run('to f fd 1 end print f')).toThrow(/never reached "output"/);
+    // RFC DX item 6: parse-time reporter-path check promotes this to a compile error.
+    expect(() => run('to f fd 1 end print f')).toThrow(/may finish without returning a value/);
   });
 
   it('output / exit at the top level are errors', () => {

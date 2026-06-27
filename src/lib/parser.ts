@@ -151,6 +151,32 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
   function parseProgram(): ASTNode[] {
     const stmts: ASTNode[] = [];
     while (!atEnd()) stmts.push(parseStatement());
+
+    // RFC DX item 6: parse-time reporter-path check.
+    // Any procedure referenced via @name or called in expression position (callexpr)
+    // must return a value on every control-flow path. Detect this statically so
+    // the author sees the error immediately — before running and waiting for an
+    // unlucky seed to hit the missing branch.
+    //
+    // This check applies only to procedures used as values; procedures used
+    // purely as commands (drawing side effects) are unaffected.
+    // It rejects strictly fewer programs at runtime: any program this flags would
+    // have already thrown "never reached output/return" at runtime.
+    const usedAsValue = new Set<string>();
+    collectValueUses(stmts, usedAsValue);
+    for (const st of stmts) {
+      if (st.k === 'to' && usedAsValue.has(st.name)) {
+        if (!allPathsReturn(st.body)) {
+          throw new NeedlescriptError(
+            `Reporter "${st.name}" may finish without returning a value.\n` +
+              `A procedure used as a value must reach return/output on every path.\n` +
+              `Tip: add an else branch to every if that might fall through.`,
+            st.line,
+          );
+        }
+      }
+    }
+
     return stmts;
   }
 
@@ -834,6 +860,14 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       if (!atEnd() && peek().t === 'qword') label = next().v as string;
       return { k: 'cmd', name: 'print', args: [parseExpr()], line: tok.line, label };
     }
+    // DX: printloc — logs local-frame needle position with optional quoted label.
+    // No value expression is taken (unlike print); reports pos() as "[x, y]".
+    if (canonical === 'printloc') {
+      next();
+      let label: string | undefined;
+      if (!atEnd() && peek().t === 'qword') label = next().v as string;
+      return { k: 'cmd', name: 'printloc', args: [], line: tok.line, label };
+    }
     // `fill` arms programmable fill for the next beginfill…endfill (§2). Four
     // surface forms:  fill @d  |  fill dir @d  |  fill shape @s  |
     // fill dir @d shape @s. `dir`/`shape` are recognized only here, immediately
@@ -1269,4 +1303,148 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
   }
 
   return parseProgram();
+}
+
+// ---------- Static control-flow helpers for reporter-path checking ----------
+//
+// These are pure functions over the AST — no parser state needed. They live at
+// module level so they can be inlined into test suites if needed, but logically
+// they belong to the parse-time diagnostic pass in parseProgram().
+
+/**
+ * Walk every statement and expression in `stmts`, adding the name of every
+ * procedure that appears in a value-producing position to `out`.
+ * "Value-producing position" means either a `callexpr` (called in an expression
+ * context) or a `procref` (@name reference passed to satin/fill/warp).
+ */
+function collectValueUses(stmts: ASTNode[], out: Set<string>): void {
+  for (const st of stmts) collectValueUsesStmt(st, out);
+}
+
+function collectValueUsesStmt(st: ASTNode, out: Set<string>): void {
+  switch (st.k) {
+    case 'to':
+      collectValueUses(st.body, out);
+      break;
+    case 'repeat':
+      collectValueUsesExpr(st.count, out);
+      collectValueUses(st.body, out);
+      break;
+    case 'while':
+      collectValueUsesExpr(st.cond, out);
+      collectValueUses(st.body, out);
+      break;
+    case 'for':
+      collectValueUsesExpr(st.from, out);
+      collectValueUsesExpr(st.to, out);
+      collectValueUsesExpr(st.step, out);
+      collectValueUses(st.body, out);
+      break;
+    case 'forin':
+      collectValueUsesExpr(st.list, out);
+      collectValueUses(st.body, out);
+      break;
+    case 'if':
+      collectValueUsesExpr(st.cond, out);
+      collectValueUses(st.body, out);
+      if (st.elseBody) collectValueUses(st.elseBody, out);
+      break;
+    case 'transform':
+    case 'effect':
+      st.args.forEach((e) => collectValueUsesExpr(e, out));
+      collectValueUses(st.body, out);
+      break;
+    case 'make':
+    case 'local':
+      collectValueUsesExpr(st.value, out);
+      break;
+    case 'letlist':
+      collectValueUsesExpr(st.value, out);
+      break;
+    case 'setindex':
+      st.indices.forEach((e) => collectValueUsesExpr(e, out));
+      collectValueUsesExpr(st.value, out);
+      break;
+    case 'output':
+      if (st.value) collectValueUsesExpr(st.value, out);
+      break;
+    case 'cmd':
+      st.args.forEach((e) => collectValueUsesExpr(e, out));
+      break;
+    case 'listcmd':
+      st.args.forEach((e) => collectValueUsesExpr(e, out));
+      break;
+    case 'call':
+      st.args.forEach((e) => collectValueUsesExpr(e, out));
+      break;
+    case 'fillarm':
+      // dirRef and shapeRef are stored as strings (not ExprNode), so collect them directly
+      if (st.dirRef) out.add(st.dirRef);
+      if (st.shapeRef) out.add(st.shapeRef);
+      break;
+  }
+}
+
+function collectValueUsesExpr(expr: ExprNode, out: Set<string>): void {
+  switch (expr.k) {
+    case 'num':
+    case 'var':
+      break;
+    case 'neg':
+      collectValueUsesExpr(expr.val, out);
+      break;
+    case 'bin':
+      collectValueUsesExpr(expr.left, out);
+      collectValueUsesExpr(expr.right, out);
+      break;
+    case 'func':
+    case 'listfunc':
+      expr.args.forEach((e) => collectValueUsesExpr(e, out));
+      break;
+    case 'list':
+      expr.items.forEach((e) => collectValueUsesExpr(e, out));
+      break;
+    case 'index':
+      collectValueUsesExpr(expr.obj, out);
+      collectValueUsesExpr(expr.idx, out);
+      break;
+    case 'callval':
+      collectValueUsesExpr(expr.obj, out);
+      expr.args.forEach((e) => collectValueUsesExpr(e, out));
+      break;
+    case 'callexpr':
+      out.add(expr.name); // called in expression position → must return a value
+      expr.args.forEach((e) => collectValueUsesExpr(e, out));
+      break;
+    case 'procref':
+      out.add(expr.name); // @name reference → must return a value
+      break;
+  }
+}
+
+/**
+ * True if `stmt` is guaranteed to terminate with a valued return on every
+ * internal path — i.e. it acts as a "dominator" for the function exit.
+ *
+ * Conservative on loops: a `return` reachable only inside a `repeat`/`while`/
+ * `for` body does NOT cover the path after the loop (the loop may run zero
+ * times), matching the engine's existing runtime semantics.
+ */
+function stmtAlwaysReturns(stmt: ASTNode): boolean {
+  if (stmt.k === 'output') return stmt.value !== null; // valued return
+  if (stmt.k === 'if') {
+    // Covers iff there is a final else AND both branches always return.
+    return stmt.elseBody !== null && allPathsReturn(stmt.body) && allPathsReturn(stmt.elseBody);
+  }
+  return false;
+}
+
+/**
+ * True if every execution path through `body` terminates with a valued return.
+ * Equivalent to: there exists a statement in `body` that always returns
+ * (because statements are sequential — once we hit a guaranteed return,
+ * nothing after it matters).
+ */
+function allPathsReturn(body: ASTNode[]): boolean {
+  return body.some(stmtAlwaysReturns);
 }

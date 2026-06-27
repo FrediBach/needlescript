@@ -132,6 +132,14 @@ arc 360 15
 
 This sews a full circle of radius 15 mm. The first number is how many degrees of turn to make in total; the second is the radius. **Positive curves right, negative curves left.** A half-circle is `arc 180 15`. Arcs work with every stitch mode, so you can sew curved satin columns, which traditional software makes painful.
 
+For a complete circle you can also write:
+
+```text
+circle 15
+```
+
+`circle r` is exactly `arc 360 r` — a single-argument shorthand that names the shape directly.
+
 Inside a `repeat`, the word `repcount` gives you the current iteration as a 1-based counter — useful when each repetition should differ slightly:
 
 ```text
@@ -147,16 +155,35 @@ Each side is longer than the last, spiralling outward.
 
 ## 4. Pen up, pen down, and jumps
 
-So far every move has sewn thread. Often you want to _reposition_ the needle without sewing — to start a new motif elsewhere. Lift the pen:
+So far every move has sewn thread. Often you want to _reposition_ the needle without sewing — to start a new motif elsewhere. The cleanest way is `moveto`:
 
 ```text
 arc 360 10        // first circle, sewn
 
+moveto 30 0       // jump to (30, 0) without sewing — pen state preserved
+
+arc 360 10        // second circle, 30 mm to the right
+```
+
+`moveto x y` (alias: `jump`) repositions the needle as a jump and faithfully restores the pen state it found: if the pen was down it ends down, if it was up it ends up. The classic idiom `up setxy 30 0 down` does the same thing but requires the error-prone bookkeeping of matching every `up` with a `down`.
+
+**`gohome`** is a pen-safe return to the origin — exactly `moveto 0 0`. It jumps without sewing and does _not_ reset the heading (add `seth 0` if you want a full neutral reset):
+
+```text
+fd 40                // sew outward
+gohome               // jump back to (0, 0), pen restored, heading unchanged
+seth 0               // optional: face north again
+```
+
+**A note on `home`:** the classic `home` command returns to `(0, 0)` _and resets the heading to 0_, but if the pen is **down** it **sews a line** back to the origin first. That's usually not what you want when repositioning. For a non-sewing return, use `moveto 0 0` or `gohome`.
+
+The raw `up`/`down` commands are still there for cases where you deliberately want the pen up:
+
+```text
 up                // needle up — travel without sewing
 setxy 30 0
 down              // needle down — sewing resumes
-
-arc 360 10        // second circle, 30 mm to the right
+arc 360 10
 ```
 
 While the pen is up, moves become **jumps** — shown as dashed lines in the preview and not sewn as stitches. `up` and `down` have classic aliases (`penup`/`pu`, `pendown`/`pd`) if you prefer them.
@@ -167,7 +194,7 @@ There's a problem hiding here: that jump between circles leaves a thread strung 
 
 ```text
 arc 360 10
-up setxy 30 0 down
+moveto 30 0
 trim                  // cut the connector thread
 arc 360 10
 ```
@@ -233,7 +260,7 @@ Switch threads with `color n`, where _n_ indexes the thread palette. This emits 
 color 1
 arc 360 15
 color 2            // next motif sews in thread 2
-up setxy 0 -30 down
+moveto 0 -30
 arc 360 15
 ```
 
@@ -253,7 +280,7 @@ A line is one thing; a _filled area_ is another. To fill a shape, trace its boun
 
 ```text
 fillangle 30                  // fill rows run at 30°
-up setxy -26 -15 down
+moveto -26 -15
 beginfill
   repeat 6 [ fd 30 rt 60 ]    // trace a hexagon
 endfill
@@ -271,9 +298,9 @@ Here's the powerful part. A pen-up move _inside_ a fill starts a new ring, and i
 
 ```text
 beginfill
-  arc 360 25            // outer ring
-  up setxy 8 0 down     // lift, reposition to start the inner ring
-  arc 360 12            // inner ring — becomes a hole
+  circle 25             // outer ring
+  moveto 8 0            // reposition to start the inner ring (pen below stays down)
+  circle 12             // inner ring — becomes a hole
 endfill
 ```
 
@@ -539,8 +566,8 @@ The simplest source of variation is `random n`, returning a reproducible number 
 ```text
 seed 3
 repeat 20 [
-  up setxy(random(60) - 30, random(60) - 30) down
-  arc 360 random(4) + 1
+  moveto random(60) - 30, random(60) - 30
+  circle random(4) + 1
   trim
 ]
 ```
@@ -675,7 +702,7 @@ def strand() [
 seed 9
 stitchlen 2
 repeat 14 [
-  up setxy(random(64) - 32, random(64) - 32) down
+  moveto random(64) - 32, random(64) - 32
   strand()
   trim
 ]
@@ -989,12 +1016,28 @@ satin 0                               // a number (or 0) disengages, flushing th
 
 The reporter is asked, once per stitch pair as the engine walks the spine, for five numbers: `[advance, leftw, rightw, leftlag, rightlag]`, all in mm. `advance` is how far to step the cursor forward before the next pair — dynamic density, and the one value that **must be positive** (it's the guarantee the walk ends). `leftw`/`rightw` are the two rails' half-widths (so `leftw ≠ rightw` gives an asymmetric column for free). `leftlag`/`rightlag` slide each rail endpoint forward (+) or back (−) along the spine before the width is applied.
 
-It's told where it is: `t` is the cursor's arc-length in real mm (so spatial patterns don't rescale with column length), `s` the same position normalized 0..1 (handy for tapers and tips, because the whole column is buffered before it sews), `i` the 0-based pair index, and `u` the local heading. Returning the constant `[0.4, 2, 2, 0, 0]` is _exactly_ `satin 4` — a perpendicular bite. The interesting part is the two lags: give them opposite signs and the stitch rakes into a diagonal; flip that rake every other pair with `i`, and successive diagonals **cross each other** — woven satin — yet the cursor still only ever moves forward:
+Three **satin-tuple helpers** (library tier, call-syntax only) build that list by intent rather than by memorising the five slots:
+
+| Helper                              | Expands to                                                      |
+| ----------------------------------- | --------------------------------------------------------------- |
+| `satinpair(advance, width)`         | `[advance, width, width, 0, 0]` — the common perpendicular bite |
+| `satinasym(advance, leftw, rightw)` | `[advance, leftw, rightw, 0, 0]` — asymmetric column            |
+| `satinrake(advance, width, lag)`    | `[advance, width, width, -lag, lag]` — diagonal rake            |
+
+So the leaf above can be written as:
+
+```text
+def leaf(t, s, i, u) [
+  return satinpair(0.45, sin(s * 180) * 2.2)
+]
+```
+
+It's told where it is: `t` is the cursor's arc-length in real mm (so spatial patterns don't rescale with column length), `s` the same position normalized 0..1 (handy for tapers and tips, because the whole column is buffered before it sews), `i` the 0-based pair index, and `u` the local heading. Returning the constant `satinpair(0.4, 2)` is _exactly_ `satin 4`. The interesting part is the two lags: give them opposite signs and the stitch rakes into a diagonal; flip that rake every other pair with `i`, and successive diagonals **cross each other** — woven satin — yet the cursor still only ever moves forward:
 
 ```text
 def crosshatch(t, s, i, u) [
-  if mod(i, 2) == 0 [ return [0.4, 2, 2, -0.8, 0.8] ]   // "/"
-  return [0.4, 2, 2, 0.8, -0.8]                          // "\", so they cross
+  if mod(i, 2) == 0 [ return satinrake(0.4, 2,  0.8) ]   // "/"
+  return satinrake(0.4, 2, -0.8)                          // "\", so they cross
 ]
 maxdensity 5                          // crossings stack thread — allow it knowingly
 satin @crosshatch
@@ -1002,7 +1045,7 @@ fd 40
 satin 0
 ```
 
-Because `satin @fn` **is** the generator — not an after-split effect — it sits upstream of the whole physics layer. The reporter works in spine-local space and the engine maps its output to the hoop afterward, so a custom column composes with transforms and `warp` exactly like the built-in one (`scale 1.5` sews 1.5× the extent at physical spacing, not stretched stitches), and `pullcomp`, `underlay`, the snag check and the density heatmap all still apply. Like `warp`, the generator draws no randomness of its own — it's reproducible unless your reporter calls `random`/`snoise2`. A reporter with the wrong number of parameters, or one that doesn't return five numbers, is a loud, line-numbered error. (See the bundled **custom satin** example.)
+Because `satin @fn` **is** the generator — not an after-split effect — it sits upstream of the whole physics layer. The reporter works in spine-local space and the engine maps its output to the hoop afterward, so a custom column composes with transforms and `warp` exactly like the built-in one (`scale 1.5` sews 1.5× the extent at physical spacing, not stretched stitches), and `pullcomp`, `underlay`, the snag check and the density heatmap all still apply. Like `warp`, the generator draws no randomness of its own — it's reproducible unless your reporter calls `random`/`snoise2`. A reporter that may finish without returning a value on some control-flow path is caught at **parse time**, not at runtime — you'll see the error immediately and can add the missing `else` branch before waiting for an unlucky seed. A reporter with the wrong number of parameters, or one that doesn't return five numbers, is a separate, line-numbered error. (See the bundled **custom satin** example.)
 
 ### Programmable fills — `fill @fn`
 
@@ -1022,13 +1065,16 @@ A direction reporter takes the local point `p = [x, y]` and returns a single tur
 
 ```text
 def texture(p, row, v) [
-  //       spacing  len  phase
-  return [0.4, 2.5, 0.5]         // exactly the built-in tatami row
+  return tatamirow(0.4, 2.5)          // exactly the built-in tatami row
 ]
 fill shape @texture
 ```
 
+**`tatamirow(spacing, len)`** (or `tatamirow(spacing, len, phase)` for an explicit brick phase) is a library helper that builds the three-slot contract list `[spacing, len, phase]`, defaulting the phase to the standard 0.5 brick offset. It's a call-syntax-only expression — just like `satinpair` for satin — so you compose by intent rather than by remembering slot order.
+
 The shaper is told the penetration position `p`, the 0-based `row` index, and `v` (0..1 across the field), and returns three numbers: the **spacing** to the next row (mm, must be positive — it's sampled once per row, since it's the gap _between_ rows), the stitch **length** along the row (mm, 1–7), and the brick **phase** (0..1; 0.5 is standard tatami offset). Vary spacing with `v` and the rows fan apart — a graded-density fill; read `coverat(p)` and you can thin the fill where it's already covered. `fill @name` with no keyword is shorthand for the direction channel, the usual case.
+
+The same **parse-time reporter-path check** that applies to satin reporters applies here: a fill reporter that may reach the end of its body without a `return` is rejected at compile time with a message naming the procedure and suggesting an `else` branch — so you see the bug immediately rather than waiting for a specific seed.
 
 The engine guarantees the two things a hand-rolled fill gets wrong. **Coverage:** rows stay evenly spaced no matter how the field curves (a constant field reduces _exactly_ to built-in tatami — that's the correctness pin). **Termination:** two finite budgets — a per-streamline length cap and a finite seed budget — mean a vortex, a singularity, or a chaotic field yields a finite fill _with warnings_, never a hang. A field that converges to a point legitimately piles thread there; that's surfaced honestly on the density heatmap rather than hidden, and you re-seed or raise `maxdensity` knowingly.
 
@@ -1087,27 +1133,30 @@ def adaptive(p) [
 
 Generative designs surprise you. These tools tell you what actually happened.
 
-| Tool                | What it does                                                                                                                                                    |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `print expr`        | log a value to the console                                                                                                                                      |
-| `print "label expr` | the same, with a label — `print "radius :r` prints `radius: 1.5`                                                                                                |
-| `mark`              | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats |
-| `assert cond`       | stop with an error (and line number) if the condition is false — ideal for geometric invariants: `assert (distance 0 0) < 47`                                   |
+| Tool                | What it does                                                                                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `print expr`        | log a value to the console                                                                                                                                                                       |
+| `print "label expr` | the same, with a label — `print "radius r` prints `radius: 1.5`                                                                                                                                  |
+| `printloc`          | log the needle's current local-frame position: `loc: [12.5, -3.0]`. Under a transform the coordinates reflect the turtle's own frame — which is usually what you want when debugging motif logic |
+| `printloc "label`   | the same, with a custom label — `printloc "here` prints `here: [x, y]`                                                                                                                           |
+| `mark`              | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats                                  |
+| `assert cond`       | stop with an error (and line number) if the condition is false — ideal for geometric invariants: `assert (distance 0 0) < 47`                                                                    |
 
 Beyond commands, the playground itself is a debugger:
 
 - The **playback scrubber** steps through the design stitch by stitch, and the **source line being sewn is highlighted in the editor** — the fastest way to answer "which line made this stitch?"
 - **Did-you-mean** suggestions catch typos across every namespace: `Unknown command "stichlen" — did you mean the command "stitchlen"?`
 - **Warnings** surface non-fatal issues as chips and console lines: clamped values, merged tiny stitches, unclosed fills, hoop overflow, excessive density.
+- **Parse-time reporter-path check** — a reporter that might finish without reaching `return` on some control-flow path (for example, an `if` with no matching `else`) is rejected at compile time with an error that names the procedure and suggests the fix. You see the bug immediately rather than waiting for a seed that happens to hit the missing branch.
 
 A typical use of `assert` to guard a generative loop:
 
 ```text
 seed 5
 repeat 50 [
-  up setxy(random(80) - 40, random(80) - 40) down
+  moveto random(80) - 40, random(80) - 40
   assert (distance 0 0) < 47        // catch any point that escaped the field
-  arc 360 1.5
+  circle 1.5
   trim
 ]
 ```
@@ -1177,7 +1226,7 @@ stitchlen 2
 color 1
 repeat 18 [
   // start each stem somewhere along the bottom half of the field
-  up setxy(random(70) - 35, random(30) - 38) down
+  moveto random(70) - 35, random(30) - 38
   stem(round(random(14)) + 14)
   trim
 ]

@@ -578,6 +578,39 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         tickN(p.length, line);
         return path(p.map((pt) => fn(pt[0], pt[1])));
       }
+
+      // ---- DX: satin-tuple helpers ----
+      // Build the 5-slot contract list by intent rather than memorising slot order.
+      case 'satinpair': {
+        // satinpair(advance, width) ≡ [advance, width, width, 0, 0]
+        const advance = sc(0),
+          width = sc(1);
+        return allocList([advance, width, width, 0, 0], line);
+      }
+      case 'satinrake': {
+        // satinrake(advance, width, lag) ≡ [advance, width, width, -lag, lag]
+        const advance = sc(0),
+          width = sc(1),
+          lag = sc(2);
+        return allocList([advance, width, width, -lag, lag], line);
+      }
+      case 'satinasym': {
+        // satinasym(advance, leftw, rightw) ≡ [advance, leftw, rightw, 0, 0]
+        const advance = sc(0),
+          leftw = sc(1),
+          rightw = sc(2);
+        return allocList([advance, leftw, rightw, 0, 0], line);
+      }
+
+      // ---- DX: fill-shaper helper ----
+      case 'tatamirow': {
+        // tatamirow(spacing, len) ≡ [spacing, len, 0.5]  (standard brick offset)
+        // tatamirow(spacing, len, phase) ≡ [spacing, len, phase]
+        const spacing = sc(0),
+          len = sc(1);
+        const phase = args.length >= 3 ? sc(2) : 0.5;
+        return allocList([spacing, len, phase], line);
+      }
     }
     throw new NeedlescriptError(`Unknown function ${name}`, line);
   }
@@ -1507,6 +1540,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           printed.push((st.label ? st.label + ': ' : '') + formatVal(vals[0]));
           return;
         }
+        if (st.name === 'printloc') {
+          // DX: printloc — logs local-frame needle position, like pos() formatted.
+          // Reports m.x / m.y (local turtle coordinates, same as pos()).
+          printed.push((st.label ?? 'loc') + ': [' + formatNum(m.x) + ', ' + formatNum(m.y) + ']');
+          return;
+        }
         if (st.name === 'assert') {
           if (truthy(vals[0], 'assert', st.line) === 0)
             throw new NeedlescriptError('assert failed — the condition is 0 (false)', st.line);
@@ -1577,6 +1616,30 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           case 'arc':
             m.arc(a[0], a[1]);
+            return;
+          // DX: moveto — reposition without sewing, pen state preserved.
+          // Equivalent to: save pen → up → setxy → restore pen.
+          case 'moveto': {
+            const wasDown = m.penDown;
+            m.flushSatin();
+            m.penDown = false;
+            m.setXY(a[0], a[1]);
+            m.penDown = wasDown;
+            return;
+          }
+          // DX: gohome — pen-safe return to origin (≡ moveto 0 0).
+          // Does NOT reset heading; use seth 0 separately if needed.
+          case 'gohome': {
+            const wasDown = m.penDown;
+            m.flushSatin();
+            m.penDown = false;
+            m.setXY(0, 0);
+            m.penDown = wasDown;
+            return;
+          }
+          // DX: circle r — full closed circle (≡ arc 360 r).
+          case 'circle':
+            m.arc(360, a[0]);
             return;
           case 'push':
             m.pushState();

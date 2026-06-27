@@ -14,6 +14,8 @@ export const ALIASES: Record<string, string> = {
   clearscreen: 'cs',
   clear: 'cs',
   stitchlength: 'stitchlen',
+  // DX improvements
+  jump: 'moveto', // embroiderer term for a non-sewing travel
 };
 
 export const BUILTIN_ARITY: Record<string, number> = {
@@ -30,6 +32,12 @@ export const BUILTIN_ARITY: Record<string, number> = {
   sety: 1,
   seth: 1,
   arc: 2,
+  // DX: moveto x y — reposition without sewing, pen state restored afterward.
+  // gohome — pen-safe return to origin (≡ moveto 0 0).
+  // circle r — full circle (≡ arc 360 r).
+  moveto: 2,
+  gohome: 0,
+  circle: 1,
   push: 0,
   pop: 0,
   stitchlen: 1,
@@ -52,6 +60,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
   trim: 0,
   seed: 1,
   print: 1,
+  printloc: 0,
   mark: 0,
   assert: 1,
 };
@@ -246,6 +255,12 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   warppath: { min: 2, max: 2 }, // warppath(path, @fn)
   humanizepath: { min: 2, max: 2 }, // humanizepath(path, amount)
   snappath: { min: 2, max: 6 }, // snappath(path, cell | …grid spec)
+  // DX: satin-tuple helpers — build the 5-number contract list by intent
+  satinpair: { min: 2, max: 2 }, // (advance, width)  ≡ [advance, width, width, 0, 0]
+  satinrake: { min: 3, max: 3 }, // (advance, width, lag) ≡ [advance, width, width, -lag, lag]
+  satinasym: { min: 3, max: 3 }, // (advance, leftw, rightw) ≡ [advance, leftw, rightw, 0, 0]
+  // DX: fill-shaper helper — build the 3-number contract list for a standard tatami row
+  tatamirow: { min: 2, max: 3 }, // (spacing, len) or (spacing, len, phase) ≡ [spacing, len, phase]
 };
 
 /** GEN_FUNCS whose given argument is a quoted word, with the allowed words. */

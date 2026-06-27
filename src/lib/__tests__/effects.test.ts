@@ -280,7 +280,10 @@ describe('@name procedure references', () => {
     expect(() => run('warp @fd [ fd 5 ]')).toThrow(/must reference a procedure you defined/);
   });
   it('a reporter that never outputs a value is an error', () => {
-    expect(() => run('def noout(p) [ ]\nwarp @noout [ fd 5 ]')).toThrow(/never reached output/);
+    // RFC DX item 6: parse-time reporter-path check promotes this to a compile error.
+    expect(() => run('def noout(p) [ ]\nwarp @noout [ fd 5 ]')).toThrow(
+      /may finish without returning a value/,
+    );
   });
   it('the wrong arity is rejected by name', () => {
     expect(() => run('def two(a, b) [ return a ]\nwarp @two [ fd 5 ]')).toThrow(

@@ -17,7 +17,7 @@ def strand() [
 seed 9
 stitchlen 2
 repeat 14 [
-  up setxy(random(64) - 32, random(64) - 32) down
+  moveto random(64) - 32, random(64) - 32
   strand()
   trim
 ]
@@ -170,19 +170,22 @@ Inside call parentheses the ambiguity disappears: `setxy(-6, -21)` and `fd(10 - 
 
 ## Movement
 
-| Command             | Aliases                      | Effect                                                                                                                                                                                                                                     |
-| ------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `fd n`              | `forward`                    | sew forward _n_ mm (long moves auto-split at `stitchlen`)                                                                                                                                                                                  |
-| `bk n`              | `back`, `backward`           | sew backward _n_ mm                                                                                                                                                                                                                        |
-| `rt deg` / `lt deg` | `right` / `left`             | turn right / left                                                                                                                                                                                                                          |
-| `arc deg radius`    |                              | sew along a circle of _radius_, turning _deg_ in total — positive curves right, negative curves left. Works with every stitch mode (satin arcs!)                                                                                           |
-| `up` / `down`       | `penup`/`pu`, `pendown`/`pd` | needle up = travel as a jump · needle down = sew                                                                                                                                                                                           |
-| `setxy x y`         |                              | move to an absolute position                                                                                                                                                                                                               |
-| `setx x` / `sety y` |                              | move one axis at a time                                                                                                                                                                                                                    |
-| `seth deg`          | `setheading`                 | set the heading absolutely                                                                                                                                                                                                                 |
-| `home`              |                              | return to `(0, 0)`, heading `0`                                                                                                                                                                                                            |
-| `push` / `pop`      |                              | save the needle state (position, heading, pen) on a stack · jump back to it without sewing. Perfect for branching structures — no more sewing back out of every branch. Max 500 saved states; `pop` on an empty stack warns and is ignored |
-| `cs`                | `clearscreen`, `clear`       | accepted for Logo familiarity; does nothing                                                                                                                                                                                                |
+| Command             | Aliases                      | Effect                                                                                                                                                                                                                                               |
+| ------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fd n`              | `forward`                    | sew forward _n_ mm (long moves auto-split at `stitchlen`)                                                                                                                                                                                            |
+| `bk n`              | `back`, `backward`           | sew backward _n_ mm                                                                                                                                                                                                                                  |
+| `rt deg` / `lt deg` | `right` / `left`             | turn right / left                                                                                                                                                                                                                                    |
+| `arc deg radius`    |                              | sew along a circle of _radius_, turning _deg_ in total — positive curves right, negative curves left. Works with every stitch mode (satin arcs!)                                                                                                     |
+| `circle r`          |                              | full closed circle of radius _r_ — exactly `arc 360 r`. Works in all stitch modes                                                                                                                                                                    |
+| `up` / `down`       | `penup`/`pu`, `pendown`/`pd` | needle up = travel as a jump · needle down = sew                                                                                                                                                                                                     |
+| `setxy x y`         |                              | move to an absolute position                                                                                                                                                                                                                         |
+| `setx x` / `sety y` |                              | move one axis at a time                                                                                                                                                                                                                              |
+| `seth deg`          | `setheading`                 | set the heading absolutely                                                                                                                                                                                                                           |
+| `home`              |                              | return to `(0, 0)`, heading `0`. **Warning:** if the pen is _down_, this sews a line straight back to the origin. For a non-sewing return use `moveto 0 0` or `gohome`                                                                               |
+| `moveto x y`        | `jump`                       | **jump to `(x, y)` without sewing.** Pen state is preserved: if the pen was down it ends down and the next move sews normally. Equivalent to `up setxy x y down` when pen is down, or `up setxy x y` when already up. Respects the current transform |
+| `gohome`            |                              | pen-safe return to origin (`moveto 0 0`): jumps to `(0, 0)` without sewing, pen state preserved. Does _not_ reset heading — add `seth 0` for a full neutral reset                                                                                    |
+| `push` / `pop`      |                              | save the needle state (position, heading, pen) on a stack · jump back to it without sewing. Perfect for branching structures — no more sewing back out of every branch. Max 500 saved states; `pop` on an empty stack warns and is ignored           |
+| `cs`                | `clearscreen`, `clear`       | accepted for Logo familiarity; does nothing                                                                                                                                                                                                          |
 
 ## Control flow
 
@@ -822,7 +825,26 @@ The two lags placed **independently** are the whole trick: `leftlag = rightlag =
 
 All inputs and outputs are in **spine-local space** — the reporter never sees hoop coordinates. The engine maps its output to the hoop _after_ it returns, which is why custom columns compose with transforms and `warp` exactly like built-in satin: `scale 1.5 [ satin @col … ]` sews 1.5× the extent with physical spacing intact (more stitches, not stretched ones), and a `warp` outside deforms the emitted rails. Because `satin @fn` **is** the generator (not an after-split effect), it sits upstream of the whole physics layer: `pullcomp` still widens its rails, `underlay "auto` picks by the column's widest realized width, the snag check measures the realized chord, and over-dense or over-curved columns warn through the existing checks. Like `warp`, the generator itself draws **nothing** from the seeded stream — it's seeded only if your reporter calls `random`/`snoise2`, so a purely geometric reporter is trivially reproducible.
 
-A malformed reporter is a loud, line-numbered error (wrong arity, no `return`, a non-list or wrong-length return, a non-number slot) — the same posture as the `warp` reporter checks. `satin` and `@name` are **Core** and can't be redefined; the reporter is ordinary user code. The equivalence pin holds exactly: `satin 4` produces a byte-identical stream to `satin @c` where `def c(t, s, i, u) [ return [0.4, 2, 2, 0, 0] ]`.
+A malformed reporter is a loud, line-numbered error (wrong arity, no `return`, a non-list or wrong-length return, a non-number slot) — the same posture as the `warp` reporter checks. A reporter that may finish **without** reaching `return` on some control-flow path is caught at **parse time** (not at runtime), naming the procedure and suggesting an `else` branch. `satin` and `@name` are **Core** and can't be redefined; the reporter is ordinary user code. The equivalence pin holds exactly: `satin 4` produces a byte-identical stream to `satin @c` where `def c(t, s, i, u) [ return [0.4, 2, 2, 0, 0] ]`.
+
+**Satin-tuple helpers** (library tier, shadowable with a note):
+
+| Helper                              | Expands to                                                                       |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| `satinpair(advance, width)`         | `[advance, width, width, 0, 0]` — symmetric perpendicular bite (the common case) |
+| `satinasym(advance, leftw, rightw)` | `[advance, leftw, rightw, 0, 0]` — asymmetric column, no rake                    |
+| `satinrake(advance, width, lag)`    | `[advance, width, width, -lag, lag]` — symmetric width raked into a diagonal     |
+
+These are pure expression functions (call-syntax only, zero RNG draws), so they compose freely inside any reporter. Example — alternate rake direction for a woven crosshatch:
+
+```text
+def crosshatch(t, s, i, u) [
+  if mod(i, 2) = 0 [ return satinrake(0.4, 2,  0.8) ]   // "/"
+  return satinrake(0.4, 2, -0.8)                          // "\"
+]
+satin @crosshatch
+fd 50
+```
 
 (See the bundled **custom satin** example — a leaf taper, a woven crosshatch, a ripple edge and an asymmetric ramp, side by side.)
 
@@ -852,6 +874,24 @@ Two channels, either or both (it mirrors custom satin's _shape + traversal_ spli
 The shaper's inputs are `p` (local penetration position, for spatially-varying texture and `coverat(p)` reads), `row` (0-based streamline index in placement order), and `v` (0..1 cross-field position, assigned by placement order). `spacing` is sampled once **per row** at its seed (it's the gap to the next row, so it can't vary continuously _along_ a row); `len`/`phase` are sampled **per penetration**. `phase = 0.5` reproduces standard brick tatami.
 
 **Coverage is the engine's job.** Naively integrating one streamline at a time clumps and gaps; the engine uses evenly-spaced streamline placement (Jobard–Lefer) so rows stay a uniform distance apart even though the direction is arbitrary. A constant field reduces _exactly_ to parallel tatami scan lines — the equivalence pin: a plain `beginfill … endfill` is **byte-identical** to the same region armed with `def d(p) [ return 0 ]` and `def s(p, row, v) [ return [0.4, <stitchlen>, 0.5] ]`.
+
+**Fill-row helper** (library tier, shadowable with a note):
+
+| Helper                           | Expands to                                                 |
+| -------------------------------- | ---------------------------------------------------------- |
+| `tatamirow(spacing, len)`        | `[spacing, len, 0.5]` — a standard brick-offset tatami row |
+| `tatamirow(spacing, len, phase)` | `[spacing, len, phase]` — explicit brick phase             |
+
+`tatamirow` is a pure expression function (call-syntax only, zero RNG draws). Example — rows that fan open toward one side:
+
+```text
+def thin(p, row, v) [
+  return tatamirow(remap(v, 0, 1, 0.4, 1.1), 2.5)
+]
+fill dir @grain shape @thin
+```
+
+A reporter that may finish without reaching `return` on some path is caught at **parse time**, naming the procedure and suggesting an `else` branch — the same rule as satin reporters (see above).
 
 **Termination is guaranteed by two finite budgets**, not by trusting the field: each streamline halts at a length cap (so a streamline that spirals forever is truncated, with a one-time warning), and seeding draws from a finite budget (so a pathological field can't seed forever). A vortex, a singularity, or a chaotic field therefore produces a _finite, possibly imperfect fill with warnings_ — never a hang. A convergent field legitimately piles thread near its pole; that is **not** smoothed away — it surfaces honestly through the density heatmap, and you re-seed, accept it, or raise `maxdensity` knowingly.
 
@@ -905,15 +945,18 @@ Travels of 7 mm or more (configurable 3–30, `autotrim 0` off) automatically ge
 
 ## Debugging
 
-| Tool                | What it does                                                                                                                                                                               |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `print expr`        | log a value to the console                                                                                                                                                                 |
-| `print "label expr` | …with a label: `print "radius :r` → `radius: 1.5`                                                                                                                                          |
-| `mark`              | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats                            |
-| `assert cond`       | stop with an error (and line number) if the condition is false — great for geometric invariants (`assert (distance 0 0) < 47`)                                                             |
-| Playback scrubber   | scrub the design stitch by stitch; the **source line being sewn is highlighted** in the editor and shown in the playback bar                                                               |
-| Did-you-mean        | typos in commands, variables, and procedure names suggest the closest match across every namespace, labelled by kind: `Unknown command "stichlen" — did you mean the command "stitchlen"?` |
-| Warnings            | non-fatal issues surface as chips and console lines: clamped values, merged tiny stitches, unclosed fills, hoop overflow, excessive density                                                |
+| Tool                      | What it does                                                                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `print expr`              | log a value to the console                                                                                                                                                                                                                                   |
+| `print "label expr`       | …with a label: `print "radius :r` → `radius: 1.5`                                                                                                                                                                                                            |
+| `printloc`                | log the needle's current local-frame position: `loc: [12.5, -3.0]`. The coordinates are what `pos()` returns — local-frame, so under a transform they reflect what the turtle "thinks"                                                                       |
+| `printloc "label`         | …with a custom label: `printloc "origin` → `origin: [0, 0]`                                                                                                                                                                                                  |
+| `mark`                    | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats                                                                                              |
+| `assert cond`             | stop with an error (and line number) if the condition is false — great for geometric invariants (`assert (distance 0 0) < 47`)                                                                                                                               |
+| Playback scrubber         | scrub the design stitch by stitch; the **source line being sewn is highlighted** in the editor and shown in the playback bar                                                                                                                                 |
+| Did-you-mean              | typos in commands, variables, and procedure names suggest the closest match across every namespace, labelled by kind: `Unknown command "stichlen" — did you mean the command "stitchlen"?`                                                                   |
+| Warnings                  | non-fatal issues surface as chips and console lines: clamped values, merged tiny stitches, unclosed fills, hoop overflow, excessive density                                                                                                                  |
+| Parse-time reporter check | a reporter procedure used via `@name` or in expression position that may finish without `return`ing on some path is rejected at **parse time** with a message naming the procedure — no more waiting for a lucky/unlucky seed to hit the silent fall-through |
 
 ## Safety limits
 
