@@ -61,6 +61,7 @@ import sinewavesRaw from '../examples/sinewaves.ns?raw';
 import quantizedRaw from '../examples/quantized.ns?raw';
 import customsatinRaw from '../examples/customsatin.ns?raw';
 import customfillRaw from '../examples/customfill.ns?raw';
+import functionalRaw from '../examples/functional.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -158,6 +159,7 @@ export const EXAMPLES: Record<string, string> = {
   quantized: quantizedRaw,
   'custom satin': customsatinRaw,
   'custom fill': customfillRaw,
+  'functional': functionalRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -236,6 +238,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'warpedlines1',
       'warpedlines2',
       'warpedlines3',
+      'functional'
     ],
   },
 ];

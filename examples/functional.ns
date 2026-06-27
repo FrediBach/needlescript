@@ -1,0 +1,248 @@
+// =====================================================================
+//  FUNCTIONAL STITCHES — structural embroidery, not decoration
+// =====================================================================
+//  A sampler of stitches that DO a job: hold seams, take strain,
+//  finish raw edges, and open holes that won't fray. Each one is a
+//  technique borrowed straight from the sewing room and rebuilt as a
+//  reusable NeedleScript procedure you can drop into real work.
+//
+//  Laid out as a 2x3 grid of stations across the hoop:
+//
+//     [ bartack ]      [ box-X tack ]     [ eyelet ]
+//     [ buttonhole ]   [ blanket edge ]   [ seam: bean+lock ]
+//
+//  Run it, then scrub the playback to watch each station sew. Toggle
+//  the density heatmap — the bartack and box-X are MEANT to run hot;
+//  that concentrated thread is the strength.
+// =====================================================================
+
+fabric "denim          // stable base that tolerates dense, strong stitching
+seed 7
+stitchlen 2
+
+// grid geometry: two rows, three columns of stations
+let colx = -30         // x of the left column
+let colstep = 24       // spacing between columns
+let rowy = 22          // y of the top row
+let rowstep = 28       // vertical spacing between rows
+
+// ---------------------------------------------------------------------
+//  helper: jump to a station centre without sewing a connector thread
+// ---------------------------------------------------------------------
+def goto(x, y) [
+  up
+  setxy(x, y)
+  down
+]
+
+
+// =====================================================================
+//  1. BARTACK  —  the workhorse reinforcement
+// =====================================================================
+//  A short, very dense satin block sewn ACROSS a stress point: the
+//  ends of a pocket opening, the base of a fly, belt loops, zipper
+//  stops. It is just a narrow satin column, kept short and packed
+//  tight so the thread itself becomes the structure.
+//
+//  Real bartacks are sewn in two passes — a looser anchoring pass,
+//  then a dense covering pass over the top. We do exactly that.
+// ---------------------------------------------------------------------
+def bartack(length, width) [
+  // pass 1 — anchoring pass, open spacing, tacks the fabric down
+  density 0.8
+  satin width
+  seth 90              // lay the tack horizontally
+  fd length
+  satin 0
+
+  // pass 2 — covering pass, very dense, back over the same span
+  goto(xcor - length, ycor)
+  density 0.3          // packed tight: this is where the strength is
+  satin width
+  seth 90
+  fd length
+  satin 0
+  density 0.4          // restore the default for whatever comes next
+]
+
+
+// =====================================================================
+//  2. BOX-X TACK  —  for the corners of patch pockets & strap ends
+// =====================================================================
+//  A stitched rectangle with both diagonals sewn across it. Spreads
+//  load over an area instead of a line — the classic way to anchor a
+//  pocket corner or the end of a backpack strap so it can't peel off.
+//
+//  We bean-stitch the whole figure so every leg is sewn three times:
+//  triple the thread, triple the hold.
+// ---------------------------------------------------------------------
+def boxtack(size) [
+  let h = size / 2
+  bean 3               // every line sewn 3x — bold and strong
+
+  // trace the box outline
+  goto(xcor - h, ycor - h)
+  seth 90  fd size     // bottom
+  seth 0   fd size     // right
+  seth 270 fd size     // top
+  seth 180 fd size     // left, closing the box
+
+  // now the two diagonals across it, corner to corner
+  seth 45  fd size * sqrt 2       // bottom-left to top-right
+  seth 180 fd size                // run along the top edge to the next corner
+  seth 315 fd size * sqrt 2       // top-left to bottom-right
+
+  bean 1               // bean off
+]
+
+
+// =====================================================================
+//  3. EYELET  —  a hole that won't fray
+// =====================================================================
+//  A ring of dense satin worked around an opening: lace-up eyelets,
+//  drawstring exits, grommet holes. The satin column is bent into a
+//  full circle by `arc`, leaving a clean centre for the cord while the
+//  packed thread stops the fabric from running.
+//
+//  Two concentric satin rings make a heavier, grommet-like edge.
+// ---------------------------------------------------------------------
+def eyelet(radius) [
+  density 0.35
+  // outer ring
+  goto(xcor + radius, ycor)
+  seth 0               // tangent to the circle at the start point
+  satin 2
+  arc 360 radius
+  satin 0
+
+  // inner ring, tight against the hole for a reinforced lip
+  goto(xcor + radius - 1.5, ycor)
+  satin 1.4
+  arc 360 radius - 1.5
+  satin 0
+  density 0.4
+]
+
+
+// =====================================================================
+//  4. BUTTONHOLE  —  two satin bars + two end bartacks
+// =====================================================================
+//  A working buttonhole is a long slot finished so the cut edge can't
+//  unravel under the button's pull. Construction: a dense satin bar
+//  down each side of the slit, capped at each end by a short bartack
+//  running crosswise to stop the ends from splitting.
+//
+//  `gap` is the slit width (where you'd cut); `length` is the slot.
+// ---------------------------------------------------------------------
+def buttonhole(length, gap) [
+  let half = gap / 2
+  density 0.3          // buttonholes are always tightly packed
+
+  // left bar — satin column running the length of the slot
+  goto(xcor - half, ycor - length / 2)
+  satin 1.6
+  seth 0  fd length
+  satin 0
+
+  // right bar — back down the other side of the slit
+  goto(xcor + half, ycor + length / 2)
+  satin 1.6
+  seth 180  fd length
+  satin 0
+
+  // top bartack — caps the slot end, sewn across the full width
+  goto(xcor - half - 1, ycor)
+  satin 1.4
+  seth 90  fd gap + 2
+  satin 0
+
+  // bottom bartack — caps the other end
+  goto(xcor - half - 1, ycor - length)
+  satin 1.4
+  seth 90  fd gap + 2
+  satin 0
+
+  density 0.4
+]
+
+
+// =====================================================================
+//  5. BLANKET EDGE  —  finishing a raw edge so it can't fray
+// =====================================================================
+//  Blanket stitch (`estitch`) throws perpendicular prongs to the left
+//  of travel — exactly the edging used to bind blankets, felt applique,
+//  and raw seam allowances. Walk it along the edge you want to lock
+//  down and the prongs wrap the rim.
+//
+//  Here we finish the rim of a small disc to show the bound edge.
+// ---------------------------------------------------------------------
+def blanketedge(radius) [
+  goto(xcor + radius, ycor)
+  seth 0               // start tangent so prongs point outward along the rim
+  estitch 3            // 3 mm prongs, spaced by stitchlen
+  arc 360 radius
+  estitch 0
+]
+
+
+// =====================================================================
+//  6. REINFORCED SEAM  —  bean-stitched run that locks at both ends
+// =====================================================================
+//  Sometimes the structural job is just "join two things and don't let
+//  go." A bean stitch sews each step three times for a thick, secure
+//  line — far stronger than a single running stitch — and `lock` ties
+//  the ends so nothing can pull free. This is your go-to topstitch for
+//  load-bearing seams.
+// ---------------------------------------------------------------------
+def reinforcedseam(length) [
+  lock 1.2             // beefy tie-in / tie-off at the ends of the run
+  bean 3               // each stitch sewn 3x — a strong, bold seam line
+  goto(xcor, ycor - length / 2)
+  seth 0  fd length
+  bean 1
+  lock 0.7             // back to the default lock size
+]
+
+
+// =====================================================================
+//  THE SAMPLER  —  sew all six stations on the grid
+// =====================================================================
+
+// ---- top row -------------------------------------------------------
+color 1
+
+goto(colx, rowy)
+bartack(12, 2.5)                       // station 1: bartack
+trim
+
+goto(colx + colstep, rowy)
+boxtack(14)                            // station 2: box-X tack
+trim
+
+goto(colx + colstep * 2, rowy)
+eyelet(5)                              // station 3: eyelet
+trim
+
+// ---- bottom row ----------------------------------------------------
+color 2
+
+goto(colx, rowy - rowstep)
+buttonhole(16, 3)                      // station 4: working buttonhole
+trim
+
+goto(colx + colstep, rowy - rowstep)
+blanketedge(9)                         // station 5: blanket-bound edge
+trim
+
+goto(colx + colstep * 2, rowy - rowstep)
+reinforcedseam(18)                     // station 6: reinforced seam
+trim
+
+// ---------------------------------------------------------------------
+//  Try next:
+//   - bump `density` lower (0.25) on the bartack pass-2 for even more
+//     thread — watch the heatmap go red where the strength lives.
+//   - chain bartacks along a line to reinforce a long pocket mouth.
+//   - wrap any station in `scale 1.4 [ ... ]` to resize it; the satin
+//     spacing stays physical, so the reinforcement density is preserved.
+// ---------------------------------------------------------------------
