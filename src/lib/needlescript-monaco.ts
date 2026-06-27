@@ -342,6 +342,16 @@ const NS_ITEMS: NSItem[] = [
     params: [['degrees', 'radius']],
   },
   {
+    label: 'circle',
+    kindName: 'function',
+    detail: 'full circle of radius r (≡ arc 360 r)',
+    documentation:
+      'Sew a full closed circle of radius r — exactly `arc 360 r`. Works in every stitch mode (satin ring, bean loop, etc.).\n\nDraw cost: 0. Byte-identical to `arc 360 r`.',
+    insertText: 'circle ${1:radius}',
+    isSnippet: true,
+    params: [['radius']],
+  },
+  {
     label: 'setxy',
     kindName: 'function',
     detail: 'move to absolute position',
@@ -392,8 +402,36 @@ const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'return to (0,0), heading 0',
     documentation:
-      'Return to origin (0, 0) with heading 0 (north). Sews/jumps depending on pen state.',
+      'Return to origin (0, 0) with heading 0 (north). Sews/jumps depending on pen state.\n\n**Warning:** if the pen is *down*, this **sews a line** back to the origin. For a non-sewing return use `moveto 0 0` or `gohome`.',
     insertText: 'home',
+  },
+  {
+    label: 'moveto',
+    kindName: 'function',
+    detail: 'jump to (x, y) without sewing',
+    documentation:
+      'Reposition the needle to `(x, y)` as a jump, **without sewing**. Pen state is preserved: if the pen was down it ends down and the next move sews normally; if up it stays up.\n\nEquivalent to `up setxy x y down` when pen is down, or `up setxy x y` when pen is already up. Respects the current transform.\n\nAlias: `jump`\n\nDraw cost: 0.\n\n```\nrepeat 18 [\n  moveto random(70) - 35, random(30) - 38\n  stem(14)\n  trim\n]\n```',
+    insertText: 'moveto ${1:x} ${2:y}',
+    isSnippet: true,
+    params: [['x', 'y']],
+  },
+  {
+    label: 'jump',
+    kindName: 'function',
+    detail: 'jump to (x, y) — alias for moveto',
+    documentation:
+      'Alias for `moveto`. The embroidery industry term for a non-sewing travel. Pen state preserved.',
+    insertText: 'jump ${1:x} ${2:y}',
+    isSnippet: true,
+    params: [['x', 'y']],
+  },
+  {
+    label: 'gohome',
+    kindName: 'function',
+    detail: 'pen-safe return to origin (≡ moveto 0 0)',
+    documentation:
+      'Jump to `(0, 0)` without sewing — pen state preserved. Does **not** reset heading; add `seth 0` for a full neutral reset.\n\nEquivalent to `moveto 0 0`. Contrast with `home`, which sews a line back when the pen is down.\n\nDraw cost: 0.',
+    insertText: 'gohome',
   },
   {
     label: 'push',
@@ -590,7 +628,7 @@ const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'satin column width (mm) — or @reporter',
     documentation:
-      'Zigzag satin column of this width; penetration spacing set by `density`. `satin 0` returns to running stitch. Width > ~8 mm risks snagging.\n\n**Programmable satin:** `satin @fn` engages a user *shape reporter* that controls the column per stitch pair instead of the built-in generator. The reporter takes `(t, s, i, u)` — cursor arc-length (mm), normalized position (0..1), 0-based pair index, local heading — and returns `[advance, leftw, rightw, leftlag, rightlag]` (all mm; `advance` > 0). Independent left/right longitudinal lags let a column rake steeply enough to cross its own line (woven satin). `density` is ignored while a reporter is engaged. `satin 4 ≡ satin @c` where `def c(t,s,i,u) [ return [0.4,2,2,0,0] ]`.',
+      'Zigzag satin column of this width; penetration spacing set by `density`. `satin 0` returns to running stitch. Width > ~8 mm risks snagging.\n\n**Programmable satin:** `satin @fn` engages a user *shape reporter* that controls the column per stitch pair. The reporter takes `(t, s, i, u)` — cursor arc-length (mm), normalized position (0..1), 0-based pair index, local heading — and returns `[advance, leftw, rightw, leftlag, rightlag]` (all mm; `advance` > 0). A reporter that may not return on every path is caught at **parse time**.\n\n**Tuple helpers** (call-syntax, library tier):\n- `satinpair(adv, w)` → `[adv, w, w, 0, 0]` — symmetric perpendicular bite\n- `satinasym(adv, lw, rw)` → `[adv, lw, rw, 0, 0]` — asymmetric column\n- `satinrake(adv, w, lag)` → `[adv, w, w, -lag, lag]` — diagonal rake / crosshatch\n\n`satin 4 ≡ satin @c` where `def c(t,s,i,u) [ return satinpair(0.4, 2) ]`.',
     insertText: 'satin ${1:width}',
     isSnippet: true,
     params: [['width']],
@@ -796,6 +834,14 @@ const NS_ITEMS: NSItem[] = [
     insertText: 'print ${1:value}',
     isSnippet: true,
     params: [['value']],
+  },
+  {
+    label: 'printloc',
+    kindName: 'function',
+    detail: 'log needle position to console',
+    documentation:
+      'Log the current needle position to the console as `loc: [x, y]`.\n\nCoordinates are in the **local (turtle) frame** — the same as `pos()`. Under a transform they reflect what the turtle "thinks", which is what you usually want when debugging motif logic.\n\n`printloc "label` uses a custom label instead of `loc`.\n\nDraw cost: 0. Never exported.\n\n```\nfd 20  rt 45  fd 10\nprintloc "after-elbow\n// prints: after-elbow: [7.07, 27.07]\n```',
+    insertText: 'printloc',
   },
   {
     label: 'mark',
@@ -1630,6 +1676,53 @@ const NS_ITEMS: NSItem[] = [
     isSnippet: true,
     params: [['path', 'cell']],
   },
+
+  // ── Satin-tuple helpers (library tier) ──────────────────────────────────
+  {
+    label: 'satinpair',
+    kindName: 'function',
+    detail: 'symmetric satin tuple: [adv, w, w, 0, 0]',
+    documentation:
+      'Build the 5-slot satin reporter contract by intent.\n\n`satinpair(advance, width)` → `[advance, width, width, 0, 0]`\n\nThe common case: a symmetric perpendicular bite of the given width. Equivalent to the built-in `satin` generator.\n\nDraw cost: 0. Library tier — shadowable with a note.\n\n```\ndef leaf(t, s, i, u) [\n  return satinpair(0.45, sin(s * 180) * 2.2)\n]\n```',
+    insertText: 'satinpair(${1:advance}, ${2:width})',
+    isSnippet: true,
+    params: [['advance', 'width']],
+  },
+  {
+    label: 'satinrake',
+    kindName: 'function',
+    detail: 'raked satin tuple: [adv, w, w, -lag, lag]',
+    documentation:
+      'Build the 5-slot satin reporter contract by intent.\n\n`satinrake(advance, width, lag)` → `[advance, width, width, -lag, lag]`\n\nRakes the stitch into a diagonal by `lag` mm. Alternating the sign each pair makes successive diagonals cross — woven / crosshatch satin.\n\nDraw cost: 0. Library tier — shadowable with a note.\n\n```\ndef crosshatch(t, s, i, u) [\n  if mod(i, 2) = 0 [ return satinrake(0.4, 2, 0.8) ]\n  return satinrake(0.4, 2, -0.8)\n]\n```',
+    insertText: 'satinrake(${1:advance}, ${2:width}, ${3:lag})',
+    isSnippet: true,
+    params: [['advance', 'width', 'lag']],
+  },
+  {
+    label: 'satinasym',
+    kindName: 'function',
+    detail: 'asymmetric satin tuple: [adv, lw, rw, 0, 0]',
+    documentation:
+      'Build the 5-slot satin reporter contract by intent.\n\n`satinasym(advance, leftw, rightw)` → `[advance, leftw, rightw, 0, 0]`\n\nAsymmetric column: left and right rail widths are different, no rake.\n\nDraw cost: 0. Library tier — shadowable with a note.',
+    insertText: 'satinasym(${1:advance}, ${2:leftw}, ${3:rightw})',
+    isSnippet: true,
+    params: [['advance', 'leftw', 'rightw']],
+  },
+
+  // ── Fill-shaper helper (library tier) ────────────────────────────────────
+  {
+    label: 'tatamirow',
+    kindName: 'function',
+    detail: 'fill row tuple: [spacing, len, phase]',
+    documentation:
+      'Build the 3-slot fill shape reporter contract by intent.\n\n`tatamirow(spacing, len)` → `[spacing, len, 0.5]` — standard brick offset\n`tatamirow(spacing, len, phase)` → `[spacing, len, phase]` — explicit phase\n\nUsed inside a `fill shape @fn` reporter to return the row descriptor without memorising slot order. `phase = 0.5` is the standard tatami brick offset.\n\nDraw cost: 0. Library tier — shadowable with a note.\n\n```\ndef thin(p, row, v) [\n  return tatamirow(remap(v, 0, 1, 0.4, 1.1), 2.5)\n]\nfill shape @thin\n```',
+    insertText: 'tatamirow(${1:spacing}, ${2:len})',
+    isSnippet: true,
+    params: [
+      ['spacing', 'len'],
+      ['spacing', 'len', 'phase'],
+    ],
+  },
   {
     label: 'coverat',
     kindName: 'function',
@@ -1938,6 +2031,10 @@ export function registerNeedlescript(monaco: Monaco): void {
       'setheading',
       'home',
       'arc',
+      'circle',
+      'moveto',
+      'jump',
+      'gohome',
       'push',
       'pop',
       'cs',
@@ -1974,6 +2071,7 @@ export function registerNeedlescript(monaco: Monaco): void {
       'trim',
       'seed',
       'print',
+      'printloc',
       'mark',
       'assert',
       'fabric',
@@ -2074,6 +2172,12 @@ export function registerNeedlescript(monaco: Monaco): void {
       'warppath',
       'humanizepath',
       'snappath',
+      // satin-tuple helpers
+      'satinpair',
+      'satinrake',
+      'satinasym',
+      // fill-shaper helper
+      'tatamirow',
       // stitch-history queries (closed-loop generation)
       'coverat',
       'countat',
