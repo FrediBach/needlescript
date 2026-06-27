@@ -1,6 +1,6 @@
 import { useReducer, useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { run, designStats, NeedlescriptError } from './lib/engine.ts';
 import type { StitchEvent, DesignStats, DensityResult, WarningLocation } from './lib/engine.ts';
+import { useCompiler } from './hooks/useCompiler.ts';
 import { toDST } from './lib/dst.ts';
 import { toPES } from './lib/pes.ts';
 import { toEXP } from './lib/exp.ts';
@@ -71,6 +71,7 @@ interface ProgramState {
 }
 
 type ProgramAction =
+  | { type: 'run/compiling' }
   | { type: 'run/success'; design: DesignState; scrubPos: number }
   | { type: 'run/error' }
   | { type: 'scrub'; pos: number }
@@ -78,6 +79,8 @@ type ProgramAction =
 
 function programReducer(state: ProgramState, action: ProgramAction): ProgramState {
   switch (action.type) {
+    case 'run/compiling':
+      return state; // no visual state change yet; placeholder for a future spinner
     case 'run/success':
       return { ...state, design: action.design, scrubPos: action.scrubPos };
     case 'run/error':
@@ -138,66 +141,73 @@ export default function App() {
     [],
   );
 
+  const { compile } = useCompiler();
+
   const runProgram = useCallback(
-    (src: string, designName: string) => {
+    async (src: string, designName: string) => {
       const t0 = performance.now();
       // A fresh compile invalidates any hovered warning marker.
       setHoverWarn(null);
       // Separator with a human-readable timestamp so consecutive compiles are
       // visually distinguishable in the console.
       addMsg(new Date().toLocaleTimeString(), 'time');
-      try {
-        const result = run(src);
-        const pts: StitchEvent[] = [];
-        const marks: DebugMark[] = [];
-        for (const e of result.events) {
-          if (e.t === 'stitch' || e.t === 'jump') pts.push(e);
-          else if (e.t === 'mark') marks.push({ x: e.x, y: e.y, at: pts.length });
-        }
-        const stats = designStats(result.events);
-        const warnings: string[] = [...result.warnings];
-        // Map each engine warning to its location (hotspot warnings only). Indices
-        // refer to result.warnings, so App-appended warnings below get no location.
-        const locByIndex = new Map<number, WarningLocation>();
-        for (const wl of result.warningLocations ?? []) locByIndex.set(wl.index, wl);
+      dispatch({ type: 'run/compiling' });
 
-        // density check
-        const density = stats.stitches / Math.max(1, stats.width * stats.height);
-        if (density > 4)
-          warnings.push(
-            `very dense (${density.toFixed(1)} st/mm² avg) — may pucker; raise stitchlen or shrink repeats`,
-          );
+      const response = await compile(src);
 
-        const ms = Math.round(performance.now() - t0);
-        result.printed.forEach((p) => addMsg(p, 'print'));
-        addMsg(
-          `sewed ${stats.stitches.toLocaleString()} stitches in ${ms} ms` +
-            (result.locks
-              ? ` · secured ${result.locks} thread end${result.locks === 1 ? '' : 's'}`
-              : ''),
-          'ok',
-        );
-        warnings.forEach((w, i) => addMsg(w, 'warn', locByIndex.get(i)));
+      // null means a newer compile superseded this one — discard silently.
+      if (response === null) return;
 
-        const newDesign: DesignState = {
-          events: result.events,
-          pts,
-          marks,
-          density: result.density,
-          stats,
-          warnings,
-          name: designName,
-          ok: true,
-        };
-        dispatch({ type: 'run/success', design: newDesign, scrubPos: pts.length });
-      } catch (err) {
-        const msg =
-          err instanceof NeedlescriptError || err instanceof Error ? err.message : String(err);
-        addMsg(msg, 'err');
+      if (!response.ok) {
+        addMsg(response.message, 'err');
         dispatch({ type: 'run/error' });
+        return;
       }
+
+      const { result, stats } = response;
+      const pts: StitchEvent[] = [];
+      const marks: DebugMark[] = [];
+      for (const e of result.events) {
+        if (e.t === 'stitch' || e.t === 'jump') pts.push(e);
+        else if (e.t === 'mark') marks.push({ x: e.x, y: e.y, at: pts.length });
+      }
+      const warnings: string[] = [...result.warnings];
+      // Map each engine warning to its location (hotspot warnings only). Indices
+      // refer to result.warnings, so App-appended warnings below get no location.
+      const locByIndex = new Map<number, WarningLocation>();
+      for (const wl of result.warningLocations ?? []) locByIndex.set(wl.index, wl);
+
+      // density check
+      const density = stats.stitches / Math.max(1, stats.width * stats.height);
+      if (density > 4)
+        warnings.push(
+          `very dense (${density.toFixed(1)} st/mm² avg) — may pucker; raise stitchlen or shrink repeats`,
+        );
+
+      const ms = Math.round(performance.now() - t0);
+      result.printed.forEach((p) => addMsg(p, 'print'));
+      addMsg(
+        `sewed ${stats.stitches.toLocaleString()} stitches in ${ms} ms` +
+          (result.locks
+            ? ` · secured ${result.locks} thread end${result.locks === 1 ? '' : 's'}`
+            : ''),
+        'ok',
+      );
+      warnings.forEach((w, i) => addMsg(w, 'warn', locByIndex.get(i)));
+
+      const newDesign: DesignState = {
+        events: result.events,
+        pts,
+        marks,
+        density: result.density,
+        stats,
+        warnings,
+        name: designName,
+        ok: true,
+      };
+      dispatch({ type: 'run/success', design: newDesign, scrubPos: pts.length });
     },
-    [addMsg],
+    [addMsg, compile],
   );
 
   const {
