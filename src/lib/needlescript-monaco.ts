@@ -1723,12 +1723,42 @@ function getSignatureContext(
   return null;
 }
 
+// ── Helper: convert a character offset to a 1-based line number ──────────────
+//
+// Counts newline characters in `text` up to `offset`. Used by extractUserSymbols
+// to attach definition locations to user-defined symbols.
+
+function offsetToLine(text: string, offset: number): number {
+  let line = 1;
+  const end = Math.min(offset, text.length);
+  for (let i = 0; i < end; i++) {
+    if (text[i] === '\n') line++;
+  }
+  return line;
+}
+
+// ── Helper: return only the code portion of a source line ────────────────────
+//
+// Strips content starting from the first line-comment marker (// # ;) so the
+// folding-range provider ignores brackets that appear inside comments.
+
+function codePortionOfLine(line: string): string {
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if ((c === '/' && line[i + 1] === '/') || c === '#' || c === ';') {
+      return line.slice(0, i);
+    }
+  }
+  return line;
+}
+
 // ── Helper: scan document text for user-defined procedures and variables ──────
 interface UserSymbol {
   label: string;
   kindName: 'function' | 'variable';
   detail: string;
   params?: string[]; // parameter names (for procedures)
+  line: number; // 1-based line number of the definition in the source
 }
 
 function extractUserSymbols(text: string): UserSymbol[] {
@@ -1749,7 +1779,13 @@ function extractUserSymbols(text: string): UserSymbol[] {
     const name = m[1].toLowerCase();
     const rawParams = m[2].trim();
     const params = rawParams ? rawParams.split(',').map((p) => p.trim().replace(/^:/, '')) : [];
-    add({ label: name, kindName: 'function', detail: `procedure(${params.join(', ')})`, params });
+    add({
+      label: name,
+      kindName: 'function',
+      detail: `procedure(${params.join(', ')})`,
+      params,
+      line: offsetToLine(text, m.index),
+    });
   }
 
   // Classic procedure: to name :a :b
@@ -1763,19 +1799,35 @@ function extractUserSymbols(text: string): UserSymbol[] {
           .filter(Boolean)
           .map((p) => p.replace(/^:/, ''))
       : [];
-    add({ label: name, kindName: 'function', detail: `procedure(${params.join(', ')})`, params });
+    add({
+      label: name,
+      kindName: 'function',
+      detail: `procedure(${params.join(', ')})`,
+      params,
+      line: offsetToLine(text, m.index),
+    });
   }
 
   // Modern variable: let name =
   const letVar = /\blet\s+([a-z_][a-z0-9_]*)\s*[=]/gi;
   while ((m = letVar.exec(text)) !== null) {
-    add({ label: m[1].toLowerCase(), kindName: 'variable', detail: 'variable' });
+    add({
+      label: m[1].toLowerCase(),
+      kindName: 'variable',
+      detail: 'variable',
+      line: offsetToLine(text, m.index),
+    });
   }
 
   // Classic variable: make "name
   const makeVar = /\bmake\s+"([a-z_][a-z0-9_]*)/gi;
   while ((m = makeVar.exec(text)) !== null) {
-    add({ label: m[1].toLowerCase(), kindName: 'variable', detail: 'variable (make)' });
+    add({
+      label: m[1].toLowerCase(),
+      kindName: 'variable',
+      detail: 'variable (make)',
+      line: offsetToLine(text, m.index),
+    });
   }
 
   return symbols;
@@ -2179,10 +2231,21 @@ export function registerNeedlescript(monaco: Monaco): void {
 
   // ── Language configuration ────────────────────────────────────────
   // Enables auto-close brackets, comment toggling, etc. as Monaco features.
+  //
+  // Comment style note: NeedleScript accepts three line-comment starters —
+  // `//` (canonical), `#` (legacy), and `;` (legacy). The Monarch tokenizer
+  // colours all three correctly. Monaco only supports a single `lineComment`
+  // value, so `//` is registered as the toggle-comment character (Cmd/Ctrl+/).
+  // `#` and `;` are intentionally kept as tokenizer-only aliases.
   monaco.languages.setLanguageConfiguration('needlescript', {
     comments: {
       lineComment: '//',
     },
+    // Custom word pattern — matches the real tokenizer `isWordChar` rule which
+    // accepts letters, digits, underscore, dot, and `?` in identifiers.  Without
+    // this, Monaco's default `\w+` pattern would split `is.ok?` into three
+    // separate words, breaking double-click selection, hover, and completion.
+    wordPattern: /[A-Za-z_][A-Za-z0-9_.?]*/,
     brackets: [
       ['[', ']'],
       ['(', ')'],
@@ -2269,25 +2332,45 @@ export function registerNeedlescript(monaco: Monaco): void {
       const wordAtPos = model.getWordAtPosition(position);
       if (!wordAtPos) return null;
 
-      const item = NS_ITEM_MAP.get(wordAtPos.word.toLowerCase());
-      if (!item) return null;
+      const wordLower = wordAtPos.word.toLowerCase();
 
-      // Build signature from params (first overload)
-      let sigLine = `**${item.label}**`;
-      if (item.params) {
-        const firstOverload = item.params[0];
-        if (firstOverload.length > 0) {
-          sigLine += ` \`(${firstOverload.join(', ')})\``;
-        } else {
-          // zero-arg reporter
-          sigLine += ' *(reporter)*';
+      // ── Built-in hover ───────────────────────────────────────────
+      const item = NS_ITEM_MAP.get(wordLower);
+      if (item) {
+        // Build signature from params (first overload)
+        let sigLine = `**${item.label}**`;
+        if (item.params) {
+          const firstOverload = item.params[0];
+          if (firstOverload.length > 0) {
+            sigLine += ` \`(${firstOverload.join(', ')})\``;
+          } else {
+            // zero-arg reporter
+            sigLine += ' *(reporter)*';
+          }
         }
+
+        const content = `${sigLine}\n\n${item.documentation}`;
+
+        return {
+          contents: [{ value: content, isTrusted: true }],
+        };
       }
 
-      const content = `${sigLine}\n\n${item.documentation}`;
+      // ── User-defined symbol hover ────────────────────────────────
+      const userSymbols = extractUserSymbols(model.getValue());
+      const sym = userSymbols.find((s) => s.label === wordLower);
+      if (!sym) return null;
+
+      let sigLine = `**${sym.label}**`;
+      if (sym.kindName === 'function') {
+        const paramStr = sym.params && sym.params.length > 0 ? sym.params.join(', ') : '';
+        sigLine += ` \`(${paramStr})\`  *(user procedure, line ${sym.line})*`;
+      } else {
+        sigLine += `  *(user variable, line ${sym.line})*`;
+      }
 
       return {
-        contents: [{ value: content, isTrusted: true }],
+        contents: [{ value: sigLine, isTrusted: false }],
       };
     },
   });
@@ -2309,58 +2392,172 @@ export function registerNeedlescript(monaco: Monaco): void {
       const ctx = getSignatureContext(textBefore);
       if (!ctx) return null;
 
+      // ── Built-in signature help ──────────────────────────────────
       const item = NS_ITEM_MAP.get(ctx.name);
-      if (!item || !item.params) return null;
+      if (item && item.params) {
+        // Build one SignatureInformation per overload
+        const signatures = item.params.map((paramNames) => {
+          const label =
+            paramNames.length > 0 ? `${item.label}(${paramNames.join(', ')})` : `${item.label}()`;
 
-      // Build one SignatureInformation per overload
-      const signatures = item.params.map((paramNames) => {
-        const label =
-          paramNames.length > 0 ? `${item.label}(${paramNames.join(', ')})` : `${item.label}()`;
+          // Compute label ranges for each parameter
+          const parameters = paramNames.map((paramName) => {
+            const start = label.indexOf(paramName);
+            const end = start + paramName.length;
+            return {
+              label: [start, end] as [number, number],
+              documentation: undefined,
+            };
+          });
 
-        // Compute label ranges for each parameter
-        const parameters = paramNames.map((paramName) => {
-          const start = label.indexOf(paramName);
-          const end = start + paramName.length;
           return {
-            label: [start, end] as [number, number],
-            documentation: undefined,
+            label,
+            documentation: {
+              value: item.documentation,
+              isTrusted: true,
+            } as IMarkdownString,
+            parameters,
           };
         });
 
-        return {
-          label,
-          documentation: {
-            value: item.documentation,
-            isTrusted: true,
-          } as IMarkdownString,
-          parameters,
-        };
-      });
+        if (signatures.length === 0) return null;
 
-      if (signatures.length === 0) return null;
-
-      // For overloaded functions (e.g. range, scatter), pick the overload
-      // that best fits the number of arguments typed so far.
-      let activeSignature = 0;
-      const paramCount = ctx.paramIndex + 1;
-      for (let i = 0; i < signatures.length; i++) {
-        if (signatures[i].parameters.length >= paramCount) {
-          activeSignature = i;
-          break;
+        // For overloaded functions (e.g. range, scatter), pick the overload
+        // that best fits the number of arguments typed so far.
+        let activeSignature = 0;
+        const paramCount = ctx.paramIndex + 1;
+        for (let i = 0; i < signatures.length; i++) {
+          if (signatures[i].parameters.length >= paramCount) {
+            activeSignature = i;
+            break;
+          }
         }
+
+        // Cap the active parameter index at the last parameter in this overload
+        const sig = signatures[activeSignature];
+        const activeParam = Math.min(ctx.paramIndex, sig.parameters.length - 1);
+
+        return {
+          value: {
+            signatures,
+            activeSignature,
+            activeParameter: Math.max(0, activeParam),
+          },
+          dispose() {},
+        };
       }
 
-      // Cap the active parameter index at the last parameter in this overload
-      const sig = signatures[activeSignature];
-      const activeParam = Math.min(ctx.paramIndex, sig.parameters.length - 1);
+      // ── User-defined procedure signature help ────────────────────
+      const userSymbols = extractUserSymbols(model.getValue());
+      const userProc = userSymbols.find((s) => s.label === ctx.name && s.kindName === 'function');
+      if (!userProc || !userProc.params) return null;
+
+      const paramNames = userProc.params;
+      const procLabel = `${userProc.label}(${paramNames.join(', ')})`;
+      const parameters = paramNames.map((pname) => {
+        const start = procLabel.indexOf(pname);
+        const end = start + pname.length;
+        return { label: [start, end] as [number, number], documentation: undefined };
+      });
+
+      const activeParam =
+        paramNames.length > 0 ? Math.min(ctx.paramIndex, paramNames.length - 1) : 0;
 
       return {
         value: {
-          signatures,
-          activeSignature,
+          signatures: [
+            {
+              label: procLabel,
+              documentation: {
+                value: `User-defined procedure (line ${userProc.line}).`,
+                isTrusted: false,
+              } as IMarkdownString,
+              parameters,
+            },
+          ],
+          activeSignature: 0,
           activeParameter: Math.max(0, activeParam),
         },
         dispose() {},
+      };
+    },
+  });
+
+  // ── Folding range provider ────────────────────────────────────────
+  // Produces fold regions for:
+  //   • [ … ]  blocks — for repeat/if/while/for/def/transform bodies
+  //   • to … end  blocks — classic Logo procedure definitions
+  // Comments are stripped from each line before scanning, so brackets
+  // inside // # ; comments do not produce ghost fold regions.
+  monaco.languages.registerFoldingRangeProvider('needlescript', {
+    provideFoldingRanges(model: MonacoEditor.ITextModel) {
+      const lineCount = model.getLineCount();
+      const ranges: languages.FoldingRange[] = [];
+
+      // Stack of line numbers where an unmatched `[` was seen
+      const bracketStack: number[] = [];
+      // Stack of line numbers where `to name …` was seen
+      const toStack: number[] = [];
+
+      for (let lineNum = 1; lineNum <= lineCount; lineNum++) {
+        const codeLine = codePortionOfLine(model.getLineContent(lineNum));
+
+        // Scan for `[` and `]` in the code portion of this line
+        for (let ci = 0; ci < codeLine.length; ci++) {
+          const ch = codeLine[ci];
+          if (ch === '[') {
+            bracketStack.push(lineNum);
+          } else if (ch === ']') {
+            if (bracketStack.length > 0) {
+              const startLine = bracketStack.pop()!;
+              if (startLine < lineNum) {
+                ranges.push({ start: startLine, end: lineNum });
+              }
+            }
+          }
+        }
+
+        // Detect `to name …` procedure header lines
+        if (/^\s*to\s+[a-z_]/i.test(codeLine)) {
+          toStack.push(lineNum);
+        } else if (/^\s*end(\s|$)/i.test(codeLine) && toStack.length > 0) {
+          const startLine = toStack.pop()!;
+          if (startLine < lineNum) {
+            ranges.push({ start: startLine, end: lineNum });
+          }
+        }
+      }
+
+      return ranges;
+    },
+  });
+
+  // ── Definition provider ───────────────────────────────────────────
+  // F12 / Ctrl+click on a user-defined procedure name or variable
+  // jumps to the line where it is defined.  Built-in names are ignored
+  // (they have no source location within the user's file).
+  monaco.languages.registerDefinitionProvider('needlescript', {
+    provideDefinition(model: MonacoEditor.ITextModel, position: IPos) {
+      const wordAtPos = model.getWordAtPosition(position);
+      if (!wordAtPos) return null;
+
+      const wordLower = wordAtPos.word.toLowerCase();
+
+      // Only navigate for user-defined symbols; built-ins have no source location.
+      if (NS_ITEM_MAP.has(wordLower)) return null;
+
+      const userSymbols = extractUserSymbols(model.getValue());
+      const sym = userSymbols.find((s) => s.label === wordLower);
+      if (!sym) return null;
+
+      return {
+        uri: model.uri,
+        range: {
+          startLineNumber: sym.line,
+          startColumn: 1,
+          endLineNumber: sym.line,
+          endColumn: model.getLineLength(sym.line) + 1,
+        },
       };
     },
   });

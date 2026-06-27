@@ -12,20 +12,20 @@ The repo contains two build targets: a Vite-based playground app and a publishab
 
 ## Quick command reference
 
-| Purpose              | Command                    |
-| -------------------- | -------------------------- |
-| Run tests            | `npm test`                 |
-| Watch tests          | `npm run test:watch`       |
-| Test coverage        | `npm run test:coverage`    |
-| Format code          | `npm run format`           |
-| Check formatting     | `npx prettier --check .`   |
-| Lint                 | `npm run lint`             |
-| Build app            | `npm run build`            |
-| Build library        | `npm run build:lib`        |
-| Validate library     | `npm run check:lib`        |
-| React Doctor         | `npm run doctor`           |
-| Find dead code       | `npm run knip`             |
-| Check outdated pkgs  | `npm outdated`             |
+| Purpose             | Command                  |
+| ------------------- | ------------------------ |
+| Run tests           | `npm test`               |
+| Watch tests         | `npm run test:watch`     |
+| Test coverage       | `npm run test:coverage`  |
+| Format code         | `npm run format`         |
+| Check formatting    | `npx prettier --check .` |
+| Lint                | `npm run lint`           |
+| Build app           | `npm run build`          |
+| Build library       | `npm run build:lib`      |
+| Validate library    | `npm run check:lib`      |
+| React Doctor        | `npm run doctor`         |
+| Find dead code      | `npm run knip`           |
+| Check outdated pkgs | `npm outdated`           |
 
 ## Testing
 

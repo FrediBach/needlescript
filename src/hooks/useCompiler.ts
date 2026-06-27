@@ -73,7 +73,8 @@ export function useCompiler() {
           });
         }, COMPILE_TIMEOUT_MS);
 
-        proxyRef.current!.compile(source, seed)
+        proxyRef
+          .current!.compile(source, seed)
           .then((res) => {
             if (settled) return; // already timed out
             settled = true;

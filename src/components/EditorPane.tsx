@@ -20,6 +20,9 @@ interface Props {
   isDragging: boolean;
   activeLine: number | null; // source line currently sewing (playback), 1-based
   onWarnHover: (loc: WarningLocation | null) => void;
+  /** Compiler error markers to display as squiggles in the editor.
+   *  Pass an empty array (or omit) to clear any existing markers. */
+  errorMarkers?: ReadonlyArray<{ message: string; line: number }>;
   style?: React.CSSProperties;
 }
 
@@ -42,6 +45,7 @@ export default function EditorPane({
   isDragging,
   activeLine,
   onWarnHover,
+  errorMarkers,
   style,
 }: Props) {
   const [replValue, setReplValue] = useState('');
@@ -176,6 +180,35 @@ export default function EditorPane({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
+  // ── Error marker squiggles ──────────────────────────────────────
+  // Reflects compile errors (populated only after an explicit run) as red
+  // underline decorations.  Cleared immediately when a new run succeeds.
+  useEffect(() => {
+    const ed = editorRef.current;
+    if (!ed || !monaco) return;
+    const model = ed.getModel();
+    if (!model) return;
+
+    if (!errorMarkers || errorMarkers.length === 0) {
+      monaco.editor.setModelMarkers(model, 'needlescript', []);
+      return;
+    }
+
+    monaco.editor.setModelMarkers(
+      model,
+      'needlescript',
+      errorMarkers.map(({ message, line }) => ({
+        severity: monaco.MarkerSeverity.Error,
+        startLineNumber: line,
+        startColumn: 1,
+        endLineNumber: line,
+        endColumn: model.getLineLength(line) + 1,
+        message,
+        source: 'NeedleScript',
+      })),
+    );
+  }, [errorMarkers, monaco]);
+
   // ── REPL ─────────────────────────────────────────────────────────────
   const handleReplKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -247,7 +280,8 @@ export default function EditorPane({
             // Visible features to keep
             lineNumbers: 'on',
             lineDecorationsWidth: 8, // remove glyph margin / extra gutter width
-            folding: false,
+            folding: true,
+            showFoldingControls: 'mouseover',
             // Disable features that add visual noise for a simple scripting editor
             minimap: { enabled: false },
             overviewRulerLanes: 0,

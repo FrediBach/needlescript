@@ -159,7 +159,7 @@ export const EXAMPLES: Record<string, string> = {
   quantized: quantizedRaw,
   'custom satin': customsatinRaw,
   'custom fill': customfillRaw,
-  'functional': functionalRaw,
+  functional: functionalRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -238,7 +238,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'warpedlines1',
       'warpedlines2',
       'warpedlines3',
-      'functional'
+      'functional',
     ],
   },
 ];

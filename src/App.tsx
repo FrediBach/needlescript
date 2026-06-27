@@ -1,4 +1,13 @@
-import { useReducer, useState, useCallback, useRef, useMemo, useEffect, lazy, Suspense } from 'react';
+import {
+  useReducer,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  useEffect,
+  lazy,
+  Suspense,
+} from 'react';
 import type { StitchEvent, DesignStats, DensityResult, WarningLocation } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
 import { toDST } from './lib/dst.ts';
@@ -126,6 +135,9 @@ export default function App() {
   const [showDensity, setShowDensity] = useState(false);
   const [hideJumps, setHideJumps] = useState(false);
   const [showReference, setShowReference] = useState(false);
+  // Compiler error markers fed into the editor as red squiggles.
+  // Set after an explicit run that fails; cleared when a run succeeds.
+  const [errorMarkers, setErrorMarkers] = useState<Array<{ message: string; line: number }>>([]);
   // Location of the warning currently hovered in the console — drives the
   // preview marker and playback-bar part highlight. null = nothing hovered.
   const [hoverWarn, setHoverWarn] = useState<WarningLocation | null>(null);
@@ -169,6 +181,15 @@ export default function App() {
       if (!response.ok) {
         addMsg(response.message, 'err');
         dispatch({ type: 'run/error' });
+        // Surface compiler error as a squiggle on the reported line (if available).
+        if (response.slLine !== undefined) {
+          // Strip the "  (line N)" suffix appended by NeedlescriptError since the
+          // marker already pins the message to the exact line.
+          const cleanMsg = response.message.replace(/\s*\(line\s+\d+\)\s*$/i, '');
+          setErrorMarkers([{ message: cleanMsg, line: response.slLine }]);
+        } else {
+          setErrorMarkers([]);
+        }
         return;
       }
 
@@ -213,6 +234,7 @@ export default function App() {
         name: designName,
         ok: true,
       };
+      setErrorMarkers([]);
       dispatch({ type: 'run/success', design: newDesign, scrubPos: pts.length });
     },
     [addMsg, compile],
@@ -396,6 +418,7 @@ export default function App() {
           isDragging={isDragging}
           activeLine={activeLine}
           onWarnHover={setHoverWarn}
+          errorMarkers={errorMarkers}
           style={!isMobile ? { width: leftWidth, flexShrink: 0 } : undefined}
         />
         {!isMobile && (
