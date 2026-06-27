@@ -1,5 +1,5 @@
 import type { Monaco } from '@monaco-editor/react';
-import type { editor as MonacoEditor } from 'monaco-editor';
+import type { editor as MonacoEditor, languages, IMarkdownString } from 'monaco-editor';
 import {
   bgApp,
   bgPanel,
@@ -2079,7 +2079,7 @@ export function registerNeedlescript(monaco: Monaco): void {
         [/\s+/, ''],
       ],
     },
-  } as Monaco['languages']['IMonarchLanguage']);
+  } as languages.IMonarchLanguage);
 
   // ── Custom dark theme ─────────────────────────────────────────────
   // All colours sourced from src/theme.ts to stay in sync with the
@@ -2224,7 +2224,7 @@ export function registerNeedlescript(monaco: Monaco): void {
         documentation: {
           value: item.documentation,
           isTrusted: true,
-        } as Monaco['languages']['IMarkdownString'],
+        } as IMarkdownString,
         insertText: item.insertText,
         insertTextRules: item.isSnippet ? SNIPPET_RULE : undefined,
         range,
@@ -2332,7 +2332,7 @@ export function registerNeedlescript(monaco: Monaco): void {
           documentation: {
             value: item.documentation,
             isTrusted: true,
-          } as Monaco['languages']['IMarkdownString'],
+          } as IMarkdownString,
           parameters,
         };
       });
