@@ -156,7 +156,6 @@ function ElementRow({
         'flex items-center gap-2 px-2 py-1 border-b border-foreground/5 text-[12px]',
         selected && 'bg-primary/10',
         focused && 'ring-1 ring-inset ring-primary/40',
-        !el.include && 'opacity-45',
         isDragging && 'opacity-70',
       )}
       onClick={(e) => onSelect(el.id, e.metaKey || e.ctrlKey || e.shiftKey)}
@@ -177,48 +176,55 @@ function ElementRow({
         onClick={(e) => e.stopPropagation()}
         aria-label="include"
       />
-      <span
-        className="h-3.5 w-3.5 shrink-0 rounded-[2px] border border-foreground/15"
-        style={{ background: doc.palette[el.threadIndex] ?? '#000' }}
-      />
-      {editing ? (
-        <Input
-          autoFocus
-          defaultValue={el.name}
-          className="h-6 flex-1 text-[12px]"
-          onClick={(e) => e.stopPropagation()}
-          onBlur={(e) => {
-            update((d) => renameElement(d, el.id, e.target.value || el.name));
-            setEditing(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-            if (e.key === 'Escape') setEditing(false);
-          }}
-        />
-      ) : (
+      <div
+        className={cn(
+          'flex flex-1 items-center gap-2 overflow-hidden',
+          !el.include && 'opacity-40',
+        )}
+      >
         <span
-          className="flex-1 truncate font-mono"
-          title={el.name}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            setEditing(true);
-          }}
-        >
-          {el.name}
+          className="h-3.5 w-3.5 shrink-0 rounded-[2px] border border-foreground/15"
+          style={{ background: doc.palette[el.threadIndex] ?? '#000' }}
+        />
+        {editing ? (
+          <Input
+            autoFocus
+            defaultValue={el.name}
+            className="h-6 flex-1 text-[12px]"
+            onClick={(e) => e.stopPropagation()}
+            onBlur={(e) => {
+              update((d) => renameElement(d, el.id, e.target.value || el.name));
+              setEditing(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Escape') setEditing(false);
+            }}
+          />
+        ) : (
+          <span
+            className="flex-1 truncate font-mono"
+            title={el.name}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setEditing(true);
+            }}
+          >
+            {el.name}
+          </span>
+        )}
+        <Badge variant={flag ? 'destructive' : 'secondary'} className="text-[9px] px-1">
+          {flag ?? el.geomType}
+        </Badge>
+        <span className="w-14 shrink-0 text-right tabular-nums text-muted-foreground">
+          {el.areaMm2.toFixed(0)}
         </span>
-      )}
-      <Badge variant={flag ? 'destructive' : 'secondary'} className="text-[9px] px-1">
-        {flag ?? el.geomType}
-      </Badge>
-      <span className="w-14 text-right tabular-nums text-muted-foreground">
-        {el.areaMm2.toFixed(0)}
-      </span>
-      <div onClick={(e) => e.stopPropagation()}>
-        <ThreadDot doc={doc} el={el} update={update} />
-      </div>
-      <div onClick={(e) => e.stopPropagation()}>
-        <StrategyCell el={el} update={update} />
+        <div onClick={(e) => e.stopPropagation()}>
+          <ThreadDot doc={doc} el={el} update={update} />
+        </div>
+        <div onClick={(e) => e.stopPropagation()}>
+          <StrategyCell el={el} update={update} />
+        </div>
       </div>
     </div>
   );

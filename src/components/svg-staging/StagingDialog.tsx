@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { XIcon } from 'lucide-react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -122,14 +124,21 @@ export default function StagingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="flex h-[95vh] w-[95vw] max-w-[95vw] flex-col gap-0 p-0"
+        showCloseButton={false}
         onKeyDown={onKeyDown}
       >
-        <DialogHeader className="flex flex-row items-center justify-between gap-4 border-b border-foreground/10 p-3">
+        <DialogHeader className="flex flex-row items-center gap-4 border-b border-foreground/10 p-3 pr-2">
           <DialogTitle className="shrink-0 font-mono text-[13px]">
             SVG import — {doc.name}.svg
             {compiling && <span className="ml-2 text-muted-foreground">compiling…</span>}
           </DialogTitle>
           <GlobalToolbar doc={doc} update={update} />
+          <DialogClose
+            render={<Button variant="ghost" size="icon-sm" className="ml-auto shrink-0" />}
+          >
+            <XIcon />
+            <span className="sr-only">Close</span>
+          </DialogClose>
         </DialogHeader>
 
         <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
@@ -176,7 +185,7 @@ export default function StagingDialog({
           </ResizablePanel>
         </ResizablePanelGroup>
 
-        <DialogFooter className="flex flex-row items-center justify-between gap-4 border-t border-foreground/10 p-3">
+        <DialogFooter className="mx-0 mb-0 flex flex-row items-center justify-between gap-4 border-t border-foreground/10 p-3">
           <ValidationSummary doc={doc} design={design} onSelect={(id) => pickElement(id)} />
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-[11px]">
