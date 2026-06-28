@@ -108,7 +108,7 @@ export default function GlobalToolbar({ doc, update }: Props) {
       {/* scale */}
       <Popover>
         <PopoverTrigger render={<Button variant="outline" size="sm" className="h-7 text-[11px]" />}>
-          scale {doc.scaleFactor}×
+          scale {doc.scaleFactor.toFixed(2)}×
         </PopoverTrigger>
         <PopoverContent className="w-56">
           <Label className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">

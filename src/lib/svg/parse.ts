@@ -294,10 +294,9 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
     const threadIndex =
       colorSrc !== null ? (threadMap[colorSrc] ?? threadForColor(colorSrc, palette)) : 0;
 
-    const strategy =
-      flags.outsideHoop || flags.degenerate
-        ? { kind: 'skip' as const }
-        : autoSuggest(geomType, rings, s.fill, s.stroke, s.strokeWidth);
+    const strategy = flags.degenerate
+      ? { kind: 'skip' as const }
+      : autoSuggest(geomType, rings, s.fill, s.stroke, s.strokeWidth);
 
     elements.push({
       id: `el${idx}`,
@@ -314,7 +313,7 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
       threadIndex,
       holeMap,
       order: order++,
-      include: !(flags.outsideHoop || flags.degenerate),
+      include: !flags.degenerate,
       flags,
       groupId: s.groupId,
     });
@@ -361,7 +360,7 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
   }
   let autoScale = 1;
   if (maxRadius > SEWABLE_RADIUS) {
-    autoScale = SEWABLE_RADIUS / maxRadius;
+    autoScale = Math.round((SEWABLE_RADIUS / maxRadius) * 100) / 100;
     const r2 = autoScale * autoScale;
     for (const el of elements) {
       if (!el.rings.length) continue;
@@ -370,10 +369,8 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
       );
       el.bbox = bboxOf(el.rings);
       el.areaMm2 *= r2;
-      // Clear the outsideHoop flag — geometry now fits.
+      // Clear the outsideHoop flag — geometry now fits inside the disc.
       delete el.flags.outsideHoop;
-      // Re-enable if it was only excluded due to being outside the hoop.
-      if (!el.flags.degenerate && !el.flags.unsupported) el.include = true;
     }
   }
 
