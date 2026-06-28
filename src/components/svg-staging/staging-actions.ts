@@ -7,6 +7,7 @@ import type {
   Strategy,
   StrategyKind,
   SewOrderKey,
+  BBox,
 } from '@/lib/engine';
 import { defaultStrategy } from '@/lib/engine';
 
@@ -139,4 +140,29 @@ export function autoOrder(doc: StagedDocument, key: SewOrderKey): StagedDocument
     ...mapElements(doc, (el) => ({ ...el, order: orderById.get(el.id) ?? el.order })),
     sewOrderKey: key,
   };
+}
+
+/**
+ * Apply a new absolute scale factor to all element geometry.
+ * The ratio `newFactor / doc.scaleFactor` is multiplied into every ring
+ * coordinate, bbox, and areaMm2 so that all consumers (emit, overlays,
+ * hit-testing) see the updated geometry without extra wiring.
+ */
+export function setScale(doc: StagedDocument, newFactor: number): StagedDocument {
+  const ratio = newFactor / doc.scaleFactor;
+  if (Math.abs(ratio - 1) < 1e-9) return { ...doc, scaleFactor: newFactor };
+  const r2 = ratio * ratio;
+  const scaleEl = (el: ElementModel): ElementModel => {
+    const rings = el.rings.map((ring) =>
+      ring.map(([x, y]) => [x * ratio, y * ratio] as [number, number]),
+    );
+    const scaledBbox: BBox = {
+      minX: el.bbox.minX * ratio,
+      minY: el.bbox.minY * ratio,
+      maxX: el.bbox.maxX * ratio,
+      maxY: el.bbox.maxY * ratio,
+    };
+    return { ...el, rings, bbox: scaledBbox, areaMm2: el.areaMm2 * r2 };
+  };
+  return { ...mapElements(doc, scaleEl), scaleFactor: newFactor };
 }

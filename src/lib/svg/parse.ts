@@ -359,6 +359,7 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
     sewOrderKey: 'depth',
     keepGroups: true,
     resampleMM: 2.5,
+    scaleFactor: 1,
     seed: 1,
     palette,
     threadMap,

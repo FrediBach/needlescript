@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { setGlobal, autoOrder, remapSourceColor } from './staging-actions';
+import { setGlobal, autoOrder, remapSourceColor, setScale } from './staging-actions';
 
 const FABRICS: Fabric[] = ['woven', 'knit', 'stretch', 'denim', 'canvas', 'fleece'];
 
@@ -102,6 +102,32 @@ export default function GlobalToolbar({ doc, update }: Props) {
               update((d) => setGlobal(d, { resampleMM: raw }));
             }}
           />
+        </PopoverContent>
+      </Popover>
+
+      {/* scale */}
+      <Popover>
+        <PopoverTrigger render={<Button variant="outline" size="sm" className="h-7 text-[11px]" />}>
+          scale {doc.scaleFactor}×
+        </PopoverTrigger>
+        <PopoverContent className="w-56">
+          <Label className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+            Import scale
+          </Label>
+          <Slider
+            className="mt-2"
+            min={0.1}
+            max={5}
+            step={0.05}
+            value={[doc.scaleFactor]}
+            onValueChange={(vals) => {
+              const raw = Array.isArray(vals) ? vals[0] : (vals as number);
+              update((d) => setScale(d, raw));
+            }}
+          />
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            1× = fitted size · adjust if SVG dimensions are wrong
+          </p>
         </PopoverContent>
       </Popover>
 

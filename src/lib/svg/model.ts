@@ -130,6 +130,13 @@ export interface StagedDocument {
   keepGroups: boolean;
   /** mm spacing every curve is resampled to before sewing. */
   resampleMM: number;
+  /**
+   * Uniform scale applied on top of the parser's initial fit-to-hoop scale.
+   * 1.0 = no change; 2.0 = twice as large. Applied in-place to all ring
+   * coordinates so every consumer (emit, overlays, hit-test) sees the
+   * correct geometry without extra wiring.
+   */
+  scaleFactor: number;
   seed: number;
   /** palette hex colours, indexed by threadIndex. */
   palette: string[];

@@ -159,8 +159,9 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
   // 1. provenance header
   lines.push(`// imported from ${doc.name}.svg — ${date}`);
   lines.push(
-    `// fabric "${doc.fabric}", resample ${fmt(doc.resampleMM)} mm, ` +
-      `${rows.length} element${rows.length === 1 ? '' : 's'}, seed ${doc.seed}`,
+    `// fabric "${doc.fabric}", resample ${fmt(doc.resampleMM)} mm` +
+      (doc.scaleFactor !== 1 ? `, scale ${fmt(doc.scaleFactor)}×` : '') +
+      `, ${rows.length} element${rows.length === 1 ? '' : 's'}, seed ${doc.seed}`,
   );
   lines.push('');
 

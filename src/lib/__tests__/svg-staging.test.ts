@@ -275,6 +275,7 @@ function mkDoc(elements: ElementModel[]): StagedDocument {
     sewOrderKey: 'depth',
     keepGroups: true,
     resampleMM: 2.5,
+    scaleFactor: 1,
     seed: 1,
     palette: PALETTE,
     threadMap: {},
