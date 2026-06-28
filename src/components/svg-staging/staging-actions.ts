@@ -9,7 +9,7 @@ import type {
   SewOrderKey,
   BBox,
 } from '@/lib/engine';
-import { defaultStrategy } from '@/lib/engine';
+import { defaultStrategy, bboxOutsideDisc, SEWABLE_RADIUS, autoSuggest } from '@/lib/engine';
 
 function mapElements(doc: StagedDocument, fn: (el: ElementModel) => ElementModel): StagedDocument {
   return { ...doc, elements: doc.elements.map(fn) };
@@ -147,6 +147,11 @@ export function autoOrder(doc: StagedDocument, key: SewOrderKey): StagedDocument
  * The ratio `newFactor / doc.scaleFactor` is multiplied into every ring
  * coordinate, bbox, and areaMm2 so that all consumers (emit, overlays,
  * hit-testing) see the updated geometry without extra wiring.
+ *
+ * After scaling, `outsideHoop` flags are recomputed and `include` / strategy
+ * are updated at hoop-boundary crossings:
+ *   - Newly outside → disable the element.
+ *   - Newly inside  → re-enable and auto-suggest a strategy.
  */
 export function setScale(doc: StagedDocument, newFactor: number): StagedDocument {
   const ratio = newFactor / doc.scaleFactor;
@@ -162,7 +167,34 @@ export function setScale(doc: StagedDocument, newFactor: number): StagedDocument
       maxX: el.bbox.maxX * ratio,
       maxY: el.bbox.maxY * ratio,
     };
-    return { ...el, rings, bbox: scaledBbox, areaMm2: el.areaMm2 * r2 };
+    const areaMm2 = el.areaMm2 * r2;
+
+    const wasOutside = el.flags.outsideHoop ?? false;
+    const isOutside = bboxOutsideDisc(scaledBbox, SEWABLE_RADIUS);
+    const flags = { ...el.flags, outsideHoop: isOutside || undefined };
+    if (!isOutside) delete flags.outsideHoop;
+
+    // Recompute include at boundary crossings only (preserve manual overrides).
+    let include = el.include;
+    if (!wasOutside && isOutside) {
+      include = false;
+    } else if (wasOutside && !isOutside && !flags.degenerate && !flags.unsupported) {
+      include = true;
+    }
+
+    // Restore a sensible strategy when an element re-enters the hoop.
+    let strategy = el.strategy;
+    if (wasOutside && !isOutside && strategy.kind === 'skip' && !flags.degenerate) {
+      strategy = autoSuggest(
+        el.geomType,
+        rings,
+        el.sourceFill,
+        el.sourceStroke,
+        el.sourceStrokeWidth,
+      );
+    }
+
+    return { ...el, rings, bbox: scaledBbox, areaMm2, flags, include, strategy };
   };
   return { ...mapElements(doc, scaleEl), scaleFactor: newFactor };
 }

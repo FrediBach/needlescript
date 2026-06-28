@@ -81,7 +81,7 @@ export type {
   SewOrderKey,
   BBox,
 } from './svg/model.ts';
-export { defaultStrategy, bboxOf, bboxOutsideDisc } from './svg/model.ts';
+export { defaultStrategy, bboxOf, bboxOutsideDisc, SEWABLE_RADIUS } from './svg/model.ts';
 export {
   computeHoleMap,
   netFillArea,

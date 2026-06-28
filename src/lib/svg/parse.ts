@@ -25,14 +25,12 @@ import { autoSuggest } from './strategies.ts';
 import {
   bboxOf,
   bboxOutsideDisc,
+  SEWABLE_RADIUS,
   type ElementModel,
   type GeomType,
   type StagedDocument,
 } from './model.ts';
 import { computeHoleMap, netFillArea, isClosedRing, selfIntersects } from './geometry.ts';
-
-/** Sewable disc radius in mm (matches machine.ts LIMITS.sewableRadius). */
-const SEWABLE_RADIUS = 47;
 
 export interface ParseOptions {
   /** max dimension (mm) to fit the imported artwork into. */
@@ -349,6 +347,36 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
 
   if (!elements.length) throw new Error('No stitchable outlines found in this SVG.');
 
+  // Auto-fit: if any ring point sits outside the sewable disc, scale everything
+  // down uniformly so the artwork fits. This ensures all non-degenerate elements
+  // start enabled and the import is always centred in the hoop.
+  let maxRadius = 0;
+  for (const el of elements) {
+    for (const ring of el.rings) {
+      for (const [x, y] of ring) {
+        const r = Math.hypot(x, y);
+        if (r > maxRadius) maxRadius = r;
+      }
+    }
+  }
+  let autoScale = 1;
+  if (maxRadius > SEWABLE_RADIUS) {
+    autoScale = SEWABLE_RADIUS / maxRadius;
+    const r2 = autoScale * autoScale;
+    for (const el of elements) {
+      if (!el.rings.length) continue;
+      el.rings = el.rings.map((ring) =>
+        ring.map(([x, y]) => [x * autoScale, y * autoScale] as [number, number]),
+      );
+      el.bbox = bboxOf(el.rings);
+      el.areaMm2 *= r2;
+      // Clear the outsideHoop flag — geometry now fits.
+      delete el.flags.outsideHoop;
+      // Re-enable if it was only excluded due to being outside the hoop.
+      if (!el.flags.degenerate && !el.flags.unsupported) el.include = true;
+    }
+  }
+
   // default sew order: depth (large area first) so fills sit under detail
   const ordered = elements.slice().sort((a, b) => b.areaMm2 - a.areaMm2);
   ordered.forEach((el, i) => (el.order = i));
@@ -359,7 +387,7 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
     sewOrderKey: 'depth',
     keepGroups: true,
     resampleMM: 2.5,
-    scaleFactor: 1,
+    scaleFactor: autoScale,
     seed: 1,
     palette,
     threadMap,

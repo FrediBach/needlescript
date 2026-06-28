@@ -201,3 +201,6 @@ export function bboxOutsideDisc(bbox: BBox, radius: number): boolean {
   ];
   return corners.some(([x, y]) => Math.hypot(x, y) > radius);
 }
+
+/** Sewable disc radius in mm — matches machine.ts LIMITS.sewableRadius. */
+export const SEWABLE_RADIUS = 47;
