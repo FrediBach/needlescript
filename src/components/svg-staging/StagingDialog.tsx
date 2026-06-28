@@ -142,7 +142,7 @@ export default function StagingDialog({
         </DialogHeader>
 
         <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
-          <ResizablePanel defaultSize={25} minSize={15}>
+          <ResizablePanel defaultSize={35} minSize={20}>
             <ElementList
               doc={doc}
               selectedIds={selectedIds}
@@ -155,7 +155,7 @@ export default function StagingDialog({
             />
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={50} minSize={30}>
+          <ResizablePanel defaultSize={47} minSize={30}>
             <PreviewPane
               doc={doc}
               design={design}
@@ -173,7 +173,7 @@ export default function StagingDialog({
             />
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={25} minSize={15}>
+          <ResizablePanel defaultSize={18} minSize={12}>
             <div className="h-full overflow-auto">
               <Inspector
                 doc={doc}
