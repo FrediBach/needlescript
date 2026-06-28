@@ -1,9 +1,14 @@
 import { useState, useCallback, useRef } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import { svgToCode } from '../lib/svg-importer.ts';
+import { parseSvgToModel } from '../lib/svg/parse.ts';
+import type { StagedDocument } from '../lib/engine.ts';
 import { THREADS } from '../data.ts';
 
 type AddMsg = (text: string, type?: 'info' | 'ok' | 'err' | 'print' | 'warn' | 'time') => void;
+type ImportMode = 'quick' | 'options';
+
+const PREF_KEY = 'ns-svg-import-pref';
 
 interface UseSvgImportOptions {
   /** Max dimension (mm) to fit imported SVG into the current hoop. */
@@ -14,14 +19,21 @@ interface UseSvgImportOptions {
 }
 
 /**
- * Handles all SVG-import concerns: file-picker click, <input> onChange,
- * and the drag-enter / drag-over / drag-leave / drop events on the app root.
+ * Handles all SVG-import concerns: the two-speed chooser (Quick import vs.
+ * Import with options…), file-picker, drag-and-drop, and opening the staging
+ * workspace. Quick import is unchanged from the original one-shot path.
  */
 export function useSvgImport({ fitMM, runProgram, setSource, addMsg }: UseSvgImportOptions) {
   const [isDragging, setIsDragging] = useState(false);
   const svgFileRef = useRef<HTMLInputElement>(null);
+  const modeRef = useRef<ImportMode>('quick');
 
-  const importSVGText = useCallback(
+  // chooser (shown for drag-drop, or when no preference is pinned)
+  const [pending, setPending] = useState<{ text: string; filename: string } | null>(null);
+  // staging workspace
+  const [stagingDoc, setStagingDoc] = useState<StagedDocument | null>(null);
+
+  const quickImport = useCallback(
     (text: string, filename: string) => {
       try {
         const res = svgToCode(text, { fitMM, palette: THREADS, name: filename, maxSegments: 1400 });
@@ -47,7 +59,29 @@ export function useSvgImport({ fitMM, runProgram, setSource, addMsg }: UseSvgImp
     [fitMM, runProgram, setSource, addMsg],
   );
 
-  const handleSVGImport = useCallback(() => {
+  const openStaging = useCallback(
+    (text: string, filename: string) => {
+      try {
+        const { doc } = parseSvgToModel(text, { palette: THREADS, name: filename, fitMM });
+        setStagingDoc(doc);
+      } catch (err) {
+        addMsg(`SVG import failed: ${err instanceof Error ? err.message : err}`, 'err');
+      }
+    },
+    [fitMM, addMsg],
+  );
+
+  const process = useCallback(
+    (text: string, filename: string, mode: ImportMode) => {
+      if (mode === 'quick') quickImport(text, filename);
+      else openStaging(text, filename);
+    },
+    [quickImport, openStaging],
+  );
+
+  // Header dropdown items call this with the chosen mode, then open the picker.
+  const requestImport = useCallback((mode: ImportMode) => {
+    modeRef.current = mode;
     svgFileRef.current?.click();
   }, []);
 
@@ -56,23 +90,21 @@ export function useSvgImport({ fitMM, runProgram, setSource, addMsg }: UseSvgImp
       const file = e.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = () => importSVGText(String(reader.result), file.name);
+      reader.onload = () => process(String(reader.result), file.name, modeRef.current);
       reader.onerror = () => addMsg(`could not read ${file.name}`, 'err');
       reader.readAsText(file);
       e.target.value = '';
     },
-    [importSVGText, addMsg],
+    [process, addMsg],
   );
 
   const handleDragEnter = useCallback((e: DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   }, []);
-
   const handleDragOver = useCallback((e: DragEvent) => {
     e.preventDefault();
   }, []);
-
   const handleDragLeave = useCallback(() => {
     setIsDragging(false);
   }, []);
@@ -83,25 +115,51 @@ export function useSvgImport({ fitMM, runProgram, setSource, addMsg }: UseSvgImp
       setIsDragging(false);
       const f = e.dataTransfer?.files?.[0];
       if (!f) return;
-      if (/\.svg$/i.test(f.name) || f.type === 'image/svg+xml') {
-        const reader = new FileReader();
-        reader.onload = () => importSVGText(String(reader.result), f.name);
-        reader.readAsText(f);
-      } else {
+      if (!/\.svg$/i.test(f.name) && f.type !== 'image/svg+xml') {
         addMsg('only .svg files can be imported', 'err');
+        return;
       }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result);
+        const pref = localStorage.getItem(PREF_KEY) as ImportMode | null;
+        // A stray drop never silently rewrites the program: show the chooser
+        // unless the user pinned a preference.
+        if (pref === 'quick' || pref === 'options') process(text, f.name, pref);
+        else setPending({ text, filename: f.name });
+      };
+      reader.readAsText(f);
     },
-    [importSVGText, addMsg],
+    [process, addMsg],
   );
+
+  // chooser resolution
+  const chooseImport = useCallback(
+    (mode: ImportMode, remember: boolean) => {
+      if (remember) localStorage.setItem(PREF_KEY, mode);
+      if (pending) process(pending.text, pending.filename, mode);
+      setPending(null);
+    },
+    [pending, process],
+  );
+
+  const cancelChooser = useCallback(() => setPending(null), []);
+  const closeStaging = useCallback(() => setStagingDoc(null), []);
 
   return {
     isDragging,
     svgFileRef,
-    handleSVGImport,
     handleFileInput,
     handleDragEnter,
     handleDragOver,
     handleDragLeave,
     handleDrop,
+    // two-speed chooser + staging
+    requestImport,
+    pending,
+    chooseImport,
+    cancelChooser,
+    stagingDoc,
+    closeStaging,
   };
 }

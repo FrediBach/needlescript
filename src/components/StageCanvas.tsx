@@ -32,6 +32,17 @@ interface Props {
   showDensity: boolean;
   hideJumps: boolean;
   warningLoc: WarningLocation | null;
+  /** SVG-import staging overlays drawn above the stitches (optional). */
+  overlays?: CanvasOverlay[];
+  /** Click-to-pick handler in mm space, for canvas → row linking (optional). */
+  onPick?: (mm: { x: number; y: number }) => void;
+}
+
+/** A set of rings drawn over the stitches for the staging workspace. */
+export interface CanvasOverlay {
+  rings: [number, number][][];
+  /** ghost = faint excluded outline · overlay = source artwork · highlight = selection */
+  kind: 'ghost' | 'overlay' | 'highlight';
 }
 
 /** Viewport in mm-space. When null the view auto-fits the hoop. */
@@ -65,6 +76,8 @@ export default function StageCanvas({
   showDensity,
   hideJumps,
   warningLoc,
+  overlays,
+  onPick,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<RenderTransform | null>(null);
@@ -92,8 +105,9 @@ export default function StageCanvas({
       hideJumps,
       viewport,
       warningLoc,
+      overlays,
     );
-  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport, warningLoc]);
+  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport, warningLoc, overlays]);
 
   // ── redraw on container resize ───────────────────────────────────────────
   useEffect(() => {
@@ -116,11 +130,12 @@ export default function StageCanvas({
         hideJumps,
         viewport,
         warningLoc,
+        overlays,
       );
     });
     ro.observe(canvas.parentElement!);
     return () => ro.disconnect();
-  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport, warningLoc]);
+  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport, warningLoc, overlays]);
 
   // ── pointer handlers ─────────────────────────────────────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -195,6 +210,24 @@ export default function StageCanvas({
     }
   }, [viewport]);
 
+  // ── click-to-pick (canvas → row linking) ─────────────────────────────────
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!onPick) return;
+      const canvas = canvasRef.current;
+      const t = transformRef.current;
+      if (!canvas || !t) return;
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const cssX = e.clientX - rect.left;
+      const cssY = e.clientY - rect.top;
+      const mmX = t.viewCX + (cssX * dpr - t.cx) / t.scale;
+      const mmY = t.viewCY - (cssY * dpr - t.cy) / t.scale;
+      onPick({ x: mmX, y: mmY });
+    },
+    [onPick],
+  );
+
   // ── derive zoom level for indicator ─────────────────────────────────────
   // Computed directly from canvasRef + viewport during render so the badge
   // always reflects the new viewport in the same render pass that sets it
@@ -228,6 +261,7 @@ export default function StageCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onDoubleClick={handleDoubleClick}
+        onClick={handleClick}
         style={{
           position: 'absolute',
           inset: 0,
@@ -291,6 +325,7 @@ function draw(
   hideJumps: boolean,
   viewport: Viewport | null,
   warningLoc: WarningLocation | null,
+  overlays: CanvasOverlay[] = [],
 ): RenderTransform {
   const ctx = canvas.getContext('2d');
   if (!ctx) return { scale: 1, cx: 0, cy: 0, viewCX: 0, viewCY: 0 };
@@ -325,6 +360,8 @@ function draw(
 
   drawGrid(ctx, scale, cx, cy, viewCX, viewCY, w, h, dpr);
   drawHoop(ctx, hoop, scale, cx, cy, viewCX, viewCY, w, h);
+
+  drawOverlays(ctx, overlays, X, Y, dpr);
 
   const pts = design.pts;
   const upto = Math.min(pts.length, scrubPos || 0);
@@ -449,7 +486,63 @@ function draw(
     }
   }
 
+  // Selection highlight drawn last so it sits above the stitches.
+  drawOverlays(ctx, overlays, X, Y, dpr, 'highlight');
+
   return { scale, cx, cy, viewCX, viewCY };
+}
+
+/** Draw staging overlays (ghost outlines, source artwork, selection highlight). */
+function drawOverlays(
+  ctx: CanvasRenderingContext2D,
+  overlays: CanvasOverlay[],
+  X: (mx: number) => number,
+  Y: (my: number) => number,
+  dpr: number,
+  only?: CanvasOverlay['kind'],
+) {
+  if (!overlays || !overlays.length) return;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  for (const ov of overlays) {
+    if (only && ov.kind !== only) continue;
+    if (ov.kind === 'ghost') {
+      ctx.strokeStyle = 'rgba(120,110,90,0.45)';
+      ctx.setLineDash([3 * dpr, 3 * dpr]);
+      ctx.lineWidth = 1 * dpr;
+    } else if (ov.kind === 'overlay') {
+      ctx.strokeStyle = 'rgba(60,120,200,0.55)';
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1 * dpr;
+    } else {
+      // highlight — heavy, non-colour affordance for colour-vision safety
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+      ctx.setLineDash([]);
+      ctx.lineWidth = 3.5 * dpr;
+    }
+    for (const ring of ov.rings) {
+      if (ring.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(X(ring[0][0]), Y(ring[0][1]));
+      for (let i = 1; i < ring.length; i++) ctx.lineTo(X(ring[i][0]), Y(ring[i][1]));
+      ctx.stroke();
+    }
+    if (ov.kind === 'highlight') {
+      // inner dark stroke so the halo reads on light fabric too
+      ctx.strokeStyle = 'rgba(20,20,20,0.9)';
+      ctx.lineWidth = 1.4 * dpr;
+      for (const ring of ov.rings) {
+        if (ring.length < 2) continue;
+        ctx.beginPath();
+        ctx.moveTo(X(ring[0][0]), Y(ring[0][1]));
+        for (let i = 1; i < ring.length; i++) ctx.lineTo(X(ring[i][0]), Y(ring[i][1]));
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
 }
 
 /** Prominent warning marker: halo + white/red rings + crosshair + centre dot. */

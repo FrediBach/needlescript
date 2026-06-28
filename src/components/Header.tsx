@@ -35,7 +35,7 @@ export type ExportFormat = 'dst' | 'pes' | 'exp' | 'svg';
 interface Props {
   hoop: HoopConfig;
   onOpenHoopDialog: () => void;
-  onSVGImport: () => void;
+  onSVGImport: (mode: 'quick' | 'options') => void;
   onExampleSelect: (key: string) => void;
   onRun: () => void;
   onDownload: (format: ExportFormat) => void;
@@ -238,7 +238,7 @@ interface HamburgerProps {
   hoop: HoopConfig;
   onOpenHoopDialog: () => void;
   onExampleSelect: (key: string) => void;
-  onSVGImport: () => void;
+  onSVGImport: (mode: 'quick' | 'options') => void;
   onDownload: (fmt: ExportFormat) => void;
   onShare: () => Promise<void>;
 }
@@ -310,9 +310,13 @@ function HamburgerMenu({
           <DropdownMenuLabel className="text-label tracking-[0.13em] uppercase text-faint px-2 py-1">
             Import
           </DropdownMenuLabel>
-          <DropdownMenuItem className="lg:hidden" onClick={onSVGImport}>
+          <DropdownMenuItem className="lg:hidden" onClick={() => onSVGImport('quick')}>
             <UploadIcon className="size-3.5 opacity-55" />
-            Import SVG
+            Quick import
+          </DropdownMenuItem>
+          <DropdownMenuItem className="lg:hidden" onClick={() => onSVGImport('options')}>
+            <UploadIcon className="size-3.5 opacity-55" />
+            Import with options…
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
@@ -391,13 +395,23 @@ export default function Header({
 
       {/* ══ IMPORT SVG (lg+ only) ═════════════════════════════════════════════ */}
       <div className="hidden lg:flex items-center gap-1.5">
-        <Tooltip>
-          <TooltipTrigger onClick={onSVGImport} className={blueBtn} aria-label="Import an SVG file">
+        <DropdownMenu>
+          <DropdownMenuTrigger className={blueBtn} aria-label="Import an SVG file">
             <UploadIcon className="size-3.5 opacity-65" />
             Import SVG
-          </TooltipTrigger>
-          <TooltipContent side="bottom">Convert an SVG file to NeedleScript code</TooltipContent>
-        </Tooltip>
+            <ChevronDownIcon className="size-3 opacity-65" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => onSVGImport('quick')}>
+              <UploadIcon className="size-3.5 opacity-55" />
+              Quick import
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSVGImport('options')}>
+              <UploadIcon className="size-3.5 opacity-55" />
+              Import with options…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* ══ FLEX SPACER ══════════════════════════════════════════════════════ */}

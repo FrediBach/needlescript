@@ -67,3 +67,39 @@ export { toSVG } from './svg.ts';
 export { toDST } from './dst.ts';
 export { toPES } from './pes.ts';
 export { toEXP } from './exp.ts';
+
+// SVG-import staging (pure modules; the DOM parser lives in svg/parse.ts).
+export type {
+  ElementModel,
+  StagedDocument,
+  Strategy,
+  StrategyKind,
+  GeomType,
+  RingHole,
+  ElementFlags,
+  Fabric,
+  SewOrderKey,
+  BBox,
+} from './svg/model.ts';
+export { defaultStrategy, bboxOf, bboxOutsideDisc } from './svg/model.ts';
+export {
+  computeHoleMap,
+  netFillArea,
+  perimeterToAreaRatio,
+  selfIntersects,
+  signedArea,
+  orientationOf,
+  pointInPolygon,
+  isClosedRing,
+} from './svg/geometry.ts';
+export {
+  STRATEGIES,
+  STRATEGY_ORDER,
+  eligibleStrategies,
+  isClosedGeom,
+  autoSuggest,
+  type ParamControl,
+  type StrategyDef,
+} from './svg/strategies.ts';
+export { emit, resampleRing, type EmitResult, type EmitOptions } from './svg/emit.ts';
+export { parseColorStr, nearestThread, threadForColor, buildThreadMap } from './svg/thread-map.ts';

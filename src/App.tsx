@@ -26,7 +26,10 @@ import EditorPane from './components/EditorPane.tsx';
 import StagePane from './components/StagePane.tsx';
 import Splitter from './components/Splitter.tsx';
 const ReferenceDialog = lazy(() => import('./components/ReferenceDialog.tsx'));
+const StagingDialog = lazy(() => import('./components/svg-staging/StagingDialog.tsx'));
 import HoopDialog from './components/HoopDialog.tsx';
+import { Toaster } from '@/components/ui/sonner.tsx';
+import ImportChooser from './components/svg-staging/ImportChooser.tsx';
 
 export interface LineSegment {
   line: number;
@@ -243,12 +246,17 @@ export default function App() {
   const {
     isDragging,
     svgFileRef,
-    handleSVGImport,
     handleFileInput,
     handleDragEnter,
     handleDragOver,
     handleDragLeave,
     handleDrop,
+    requestImport,
+    pending,
+    chooseImport,
+    cancelChooser,
+    stagingDoc,
+    closeStaging,
   } = useSvgImport({ fitMM, runProgram, setSource, addMsg });
 
   const { handleShare } = useShare({
@@ -304,6 +312,26 @@ export default function App() {
       runProgram(src, name);
     },
     [runProgram],
+  );
+
+  // `@`-referenceable reporters defined in the current editor program, for the
+  // staging workspace's directional-fill field picker.
+  const svgReporters = useMemo(() => {
+    const out: string[] = [];
+    const re = /\bdef\s+([A-Za-z_]\w*)\s*\(/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(source)) !== null) out.push(m[1]);
+    return out;
+  }, [source]);
+
+  const handleStagingCommit = useCallback(
+    (code: string, mode: 'replace' | 'append') => {
+      const next = mode === 'append' ? `${sourceRef.current}\n\n${code}` : code;
+      setSource(next);
+      runProgram(next, 'import');
+      closeStaging();
+    },
+    [runProgram, closeStaging],
   );
 
   const handleDownload = useCallback(
@@ -401,7 +429,7 @@ export default function App() {
       <Header
         hoop={selectedHoop}
         onOpenHoopDialog={() => setShowHoopDialog(true)}
-        onSVGImport={handleSVGImport}
+        onSVGImport={requestImport}
         onExampleSelect={handleExampleSelect}
         onRun={handleRun}
         onDownload={handleDownload}
@@ -458,6 +486,25 @@ export default function App() {
         style={{ display: 'none' }}
         onChange={handleFileInput}
       />
+
+      <ImportChooser pending={pending} onChoose={chooseImport} onCancel={cancelChooser} />
+
+      <Suspense fallback={stagingDoc ? <DialogSpinner /> : null}>
+        {stagingDoc && (
+          <StagingDialog
+            open={true}
+            onOpenChange={(o) => {
+              if (!o) closeStaging();
+            }}
+            initialDoc={stagingDoc}
+            hoop={selectedHoop}
+            reporters={svgReporters}
+            onCommit={handleStagingCommit}
+          />
+        )}
+      </Suspense>
+
+      <Toaster />
     </div>
   );
 }
