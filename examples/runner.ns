@@ -1,0 +1,58 @@
+// --- A sprinter's silhouette, walked as a dashed path ---
+// Same leaning, curved figure as before, but instead of solid `fd` moves
+// we step along it in `cell`-sized units, sewing only the first `ink`
+// fraction of each cell and jumping the rest. Raise `gapratio` and the
+// line dissolves into sparser and sparser dashes.
+//
+//   seg(len, head, cell, gapratio): travel `len` mm along heading `head`,
+//   broken into dashes. Each `cell` = one dash + one gap; `gapratio` (0..1)
+//   is the gap's share, so ink = cell * (1 - gapratio).
+def seg(len, head, cell, gapratio) [
+  seth head
+  let ink = cell * (1 - gapratio)
+  let travelled = 0
+  while travelled + cell <= len [
+    down  fd ink            // sew the dash
+    up    fd cell - ink     // jump the gap
+    travelled += cell
+  ]
+  // finish any remainder so every copy ends at the same height
+  let rest = len - travelled
+  if rest > 0 [
+    down  fd min(rest, ink)
+    if rest > ink [ up  fd rest - ink ]
+  ]
+]
+
+// The runner: five segments swinging around a forward `lean`.
+// `cell` and `gapratio` are threaded straight through to every dash.
+def runner(lean, cell, gapratio) [
+  seg(9,  lean,     cell, gapratio)   // back leg / push-off
+  seg(5,  lean - 8, cell, gapratio)   // hip straightens
+  seg(12, lean + 6, cell, gapratio)   // torso pitched forward
+  seg(6,  lean - 4, cell, gapratio)   // shoulders ease back
+  seg(4,  lean + 2, cell, gapratio)   // head
+]
+
+seed 3
+stitchlen 1.5              // dashes themselves stay finely stitched
+bean 3
+color 5
+home
+
+// --- Repeat horizontally, each copy dashier than the last ---
+let count = 20
+let startx = -38
+let gapx = 3.5
+let cell = 2              // dash+gap period stays constant; only the RATIO grows
+
+repeat count [
+  let i = repcount - 1                  // 0-based
+
+  // gap-to-line ratio climbs: 0.15 (almost solid) → ~0.87 (mostly gaps)
+  let gapratio = 0.1 + i * 0.042
+
+  up  setxy(startx + i * gapx, -18)  down
+  runner(16, cell, gapratio)
+  trim
+]

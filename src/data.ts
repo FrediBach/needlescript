@@ -63,6 +63,7 @@ import customsatinRaw from '../examples/customsatin.ns?raw';
 import customfillRaw from '../examples/customfill.ns?raw';
 import functionalRaw from '../examples/functional.ns?raw';
 import ornalineRaw from '../examples/ornaline.ns?raw';
+import runnerRaw from '../examples/runner.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -162,6 +163,7 @@ export const EXAMPLES: Record<string, string> = {
   'custom fill': customfillRaw,
   functional: functionalRaw,
   ornaline: ornalineRaw,
+  runner: runnerRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -221,6 +223,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'ampmod2',
       'sinewaves',
       'quantized',
+      'runner'
     ],
   },
   {
