@@ -130,9 +130,9 @@ export default function StagingDialog({
         <DialogHeader className="flex flex-row items-center gap-4 border-b border-foreground/10 p-3 pr-2">
           <DialogTitle className="shrink-0 font-mono text-[13px]">
             SVG import — {doc.name}.svg
-            {compiling && <span className="ml-2 text-muted-foreground">compiling…</span>}
           </DialogTitle>
           <GlobalToolbar doc={doc} update={update} />
+          {compiling && <span className="ml-2 text-muted-foreground">compiling…</span>}
           <DialogClose
             render={<Button variant="ghost" size="icon-sm" className="ml-auto shrink-0" />}
           >

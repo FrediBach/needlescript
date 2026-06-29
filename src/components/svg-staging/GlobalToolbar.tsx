@@ -31,6 +31,7 @@ interface Props {
 
 export default function GlobalToolbar({ doc, update }: Props) {
   const sources = Object.keys(doc.threadMap);
+
   return (
     <div className="flex flex-wrap items-center gap-3 text-[11px]">
       {/* fabric */}
@@ -85,7 +86,7 @@ export default function GlobalToolbar({ doc, update }: Props) {
       {/* resample */}
       <Popover>
         <PopoverTrigger render={<Button variant="outline" size="sm" className="h-7 text-[11px]" />}>
-          resample {doc.resampleMM} mm
+          resample {doc.resampleMM.toFixed(2)} mm
         </PopoverTrigger>
         <PopoverContent className="w-56">
           <Label className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
