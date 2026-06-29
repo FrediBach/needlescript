@@ -1,0 +1,62 @@
+// ============================================================
+//  ornaline — stamp an "ornament" motif repeatedly along a line
+//
+//  line  : a path (list of [x,y] points) — the spine to follow
+//  motif : a path authored in local space, running along +x,
+//          with y as the perpendicular amplitude. x in mm.
+//  arcLength  : arc-length spacing between successive stamps (mm)
+//  amp   : amplitude scale for the motif's y-axis (1 = as authored)
+//
+//  Returns one continuous path you can sewpath() in any mode.
+// ============================================================
+
+def ornapath(line, motif, arcLength, amp) [
+  // even anchors along the spine; segment length = arcLength
+  let spine = resample(line, arcLength)
+  let out = []
+  let mw = motifwidth(motif)          // how far along +x one motif spans
+
+  // walk the spine, placing a motif between each pair of anchors
+  for i = 0 to len(spine) - 2 [
+    let a = spine[i]
+    let b = spine[i + 1]
+    let h = vheading(vsub(b, a))       // local tangent as a turtle heading
+    // map every motif point into hoop space at this anchor
+    for q in motif [
+      // scale x to fill exactly one arcLength, scale y by amp
+      let localValue = [ q[0] / mw * arcLength, q[1] * amp ]
+      // rotate from "+x = east" into the spine's heading, then place it
+      let placed = vadd(a, vrot(localValue, h - 90))
+      append(out, placed)
+    ]
+  ]
+  return out
+]
+
+// how far the motif reaches along its own +x axis (for normalising the arcLength)
+def motifwidth(motif) [
+  let box = bbox(motif)               // [minx, miny, maxx, maxy]
+  let w = box[2] - box[0]
+  if w < 0.001 [ return 1 ]           // guard a vertical/degenerate motif
+  return w
+]
+
+// the convenience command: build it and sew it in the current mode
+def ornaline(line, motif, arcLength, amp) [
+  sewpath(ornapath(line, motif, arcLength, amp))
+]
+
+seed 3
+stitchlen 1.5
+
+// the spine to decorate
+let pts  = [[-40, -10], [-15, 12], [10, -12], [38, 8]]
+let line = catmull(pts, 8)
+
+// one ornament cell: a little arch, authored along +x (0..1), y is amplitude
+let wave = [[0, 0], [0.25, 1], [0.5, 0], [0.5, -1], [0.75, 0], [1, 2], [1, 0]]
+
+satin 1
+moveto -40 -10
+down
+ornaline(line, wave, 6, 1)        // stamp every 6 mm, full amplitude
