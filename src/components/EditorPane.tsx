@@ -45,6 +45,9 @@ interface Props {
   onReplCommand?: (line: string) => Promise<void>;
   /** Sorted list of saved snippet names — drives /load and /remove autocomplete. */
   savedSnippetNames?: string[];
+  /** The active snippet name (set by /save or /load, cleared by loading external content).
+   *  Shown as a badge; non-null means /autosave is available. */
+  activeSnippetName?: string | null;
   style?: React.CSSProperties;
 }
 
@@ -87,6 +90,7 @@ export default function EditorPane({
   aiIsGenerating,
   onReplCommand,
   savedSnippetNames,
+  activeSnippetName,
   style,
 }: Props) {
   const [replValue, setReplValue] = useState('');
@@ -527,13 +531,16 @@ export default function EditorPane({
       return '/ai create … · /ai improve … · /ai fix … · /ai explain … · /ai help';
     }
     if (replValue.startsWith('/')) {
-      return '/share · /save [name] · /load [name] · /remove <name> · /ai help';
+      return '/share · /save [name] · /load [name] · /autosave · /remove <name> · /ai help';
+    }
+    if (activeSnippetName) {
+      return `editing "${activeSnippetName}" — /autosave to save · press Enter to append and run`;
     }
     if (aiHasApiKey) {
       return 'type a command or /ai · press Enter to append and run (↑ history)';
     }
     return 'type a command · press Enter to append and run (↑ history) · /ai apikey …';
-  }, [replValue, aiHasApiKey]);
+  }, [replValue, activeSnippetName, aiHasApiKey]);
 
   // ─────────────────────────────────────────────────────────────────────
   return (
@@ -673,6 +680,16 @@ export default function EditorPane({
         {aiSelectedModel && aiHasApiKey && !aiIsGenerating && (
           <span className={styles.modelBadge} title={`AI model: ${aiSelectedModel}`}>
             {aiSelectedModel.split('/').pop()?.split('-').slice(0, 3).join('-') ?? aiSelectedModel}
+          </span>
+        )}
+
+        {/* Active snippet badge — shows when /autosave is available */}
+        {activeSnippetName && (
+          <span
+            className={styles.snippetBadge}
+            title={`Active snippet: "${activeSnippetName}" — /autosave to save changes`}
+          >
+            {activeSnippetName}
           </span>
         )}
       </div>

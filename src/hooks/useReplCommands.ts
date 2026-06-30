@@ -188,6 +188,15 @@ interface UseReplCommandsOptions {
   runProgram: (src: string, name: string) => Promise<void>;
   addMsg: AddMsg;
   handleShare: () => Promise<void>;
+  /** Called whenever a named snippet becomes the active context (save/load)
+   *  or is cleared (null). Owned by App.tsx to avoid circular hook deps. */
+  onActiveSnippetChange: (name: string | null) => void;
+  /**
+   * Ref to the current active snippet name, owned by App.tsx.
+   * A ref (not state) so the dispatcher callback never goes stale
+   * without needing to be recreated on every name change.
+   */
+  activeSnippetNameRef: React.RefObject<string | null>;
 }
 
 export interface UseReplCommandsReturn {
@@ -203,6 +212,8 @@ export function useReplCommands({
   runProgram,
   addMsg,
   handleShare,
+  onActiveSnippetChange,
+  activeSnippetNameRef,
 }: UseReplCommandsOptions): UseReplCommandsReturn {
   const [snippets, setSnippets] = useState<SnippetMap>(loadSnippets);
 
@@ -229,9 +240,10 @@ export function useReplCommands({
       const isUpdate = name in current;
       const next = { ...current, [name]: { code: sourceRef.current, savedAt: Date.now() } };
       updateSnippets(next);
+      onActiveSnippetChange(name);
       addMsg(isUpdate ? `updated "${name}"` : `saved as "${name}"`, 'ok');
     },
-    [sourceRef, updateSnippets, addMsg],
+    [sourceRef, updateSnippets, onActiveSnippetChange, addMsg],
   );
 
   // ── /load [name] ──────────────────────────────────────────────────
@@ -263,9 +275,10 @@ export function useReplCommands({
       const snippet = current[match];
       setSource(snippet.code);
       await runProgram(snippet.code, match);
+      onActiveSnippetChange(match);
       addMsg(`loaded "${match}"`, 'ok');
     },
-    [setSource, runProgram, addMsg],
+    [setSource, runProgram, onActiveSnippetChange, addMsg],
   );
 
   // ── /remove <name> ────────────────────────────────────────────────
@@ -284,9 +297,22 @@ export function useReplCommands({
       const next = { ...current };
       delete next[match];
       updateSnippets(next);
+      // If the removed snippet was the active context, clear it.
+      onActiveSnippetChange(null);
       addMsg(`removed "${match}"`, 'ok');
     },
-    [updateSnippets, addMsg],
+    [updateSnippets, onActiveSnippetChange, addMsg],
+  );
+
+  // ── /autosave ─────────────────────────────────────────────────────
+  const doAutosave = useCallback(
+    (name: string) => {
+      const current = loadSnippets();
+      const next = { ...current, [name]: { code: sourceRef.current, savedAt: Date.now() } };
+      updateSnippets(next);
+      addMsg(`autosaved to "${name}"`, 'ok');
+    },
+    [sourceRef, updateSnippets, addMsg],
   );
 
   // ── Main dispatcher ───────────────────────────────────────────────
@@ -310,11 +336,23 @@ export function useReplCommands({
         case '/remove':
           doRemove(arg);
           break;
+        case '/autosave': {
+          const active = activeSnippetNameRef.current;
+          if (!active) {
+            addMsg('no active snippet — use /save <name> or /load <name> first', 'err');
+          } else {
+            doAutosave(active);
+          }
+          break;
+        }
         default:
-          addMsg(`unknown command "${verb}" — try /save, /load, /remove, /share, /ai`, 'err');
+          addMsg(
+            `unknown command "${verb}" — try /save, /load, /autosave, /remove, /share, /ai`,
+            'err',
+          );
       }
     },
-    [doShare, doSave, doLoad, doRemove, addMsg],
+    [doShare, doSave, doLoad, doRemove, doAutosave, activeSnippetNameRef, addMsg],
   );
 
   const savedSnippetNames = Object.keys(snippets).sort();

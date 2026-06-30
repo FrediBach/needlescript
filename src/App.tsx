@@ -5,6 +5,7 @@ import {
   useRef,
   useMemo,
   useEffect,
+  useLayoutEffect,
   lazy,
   Suspense,
 } from 'react';
@@ -154,6 +155,18 @@ export default function App() {
   const [errorMarkers, setErrorMarkers] = useState<Array<{ message: string; line: number }>>([]);
   // Last compile error message — used by the AI fix command.
   const lastErrorRef = useRef<string | null>(null);
+  // Active snippet name for /autosave: set by /save or /load, cleared when
+  // external content (example, share link) is loaded.  Lives here in App.tsx
+  // rather than inside useReplCommands so it can be passed to useShare without
+  // a circular hook dependency.
+  const [activeSnippetName, setActiveSnippetName] = useState<string | null>(null);
+  const activeSnippetNameRef = useRef<string | null>(null);
+  // Keep the ref in sync after each render so the useReplCommands dispatcher
+  // always reads the current name without needing it in its dependency array.
+  useLayoutEffect(() => {
+    activeSnippetNameRef.current = activeSnippetName;
+  });
+  const clearActiveSnippet = useCallback(() => setActiveSnippetName(null), []);
   // Location of the warning currently hovered in the console — drives the
   // preview marker and playback-bar part highlight. null = nothing hovered.
   const [hoverWarn, setHoverWarn] = useState<WarningLocation | null>(null);
@@ -282,6 +295,7 @@ export default function App() {
     addMsg,
     fallbackSrc: EXAMPLES[firstKey],
     fallbackName: 'bloom',
+    onLoad: clearActiveSnippet,
   });
 
   const {
@@ -305,6 +319,8 @@ export default function App() {
     runProgram,
     addMsg,
     handleShare,
+    onActiveSnippetChange: setActiveSnippetName,
+    activeSnippetNameRef,
   });
 
   // Hoop-fit warning computed reactively so it updates when the hoop changes
@@ -349,8 +365,9 @@ export default function App() {
       const name = key.split(' ')[0];
       setSource(src);
       runProgram(src, name);
+      clearActiveSnippet();
     },
-    [runProgram],
+    [runProgram, clearActiveSnippet],
   );
 
   // `@`-referenceable reporters defined in the current editor program, for the
@@ -521,6 +538,7 @@ export default function App() {
           aiIsGenerating={aiIsGenerating}
           onReplCommand={handleReplCommand}
           savedSnippetNames={savedSnippetNames}
+          activeSnippetName={activeSnippetName}
           style={!isMobile ? { width: leftWidth, flexShrink: 0 } : undefined}
         />
         {!isMobile && (

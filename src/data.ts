@@ -250,7 +250,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'warpedlines3',
       'functional',
       'ornaline',
-      'snake'
+      'snake',
     ],
   },
 ];

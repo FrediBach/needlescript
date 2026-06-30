@@ -11,6 +11,9 @@ interface UseShareOptions {
   fallbackSrc: string;
   /** Design name to use when falling back (a stable constant). */
   fallbackName: string;
+  /** Called whenever external content is loaded (share link success or fallback).
+   *  Used to clear any active snippet context. */
+  onLoad?: () => void;
 }
 
 /**
@@ -25,6 +28,7 @@ export function useShare({
   addMsg,
   fallbackSrc,
   fallbackName,
+  onLoad,
 }: UseShareOptions) {
   const shareLoadedRef = useRef(false);
 
@@ -40,12 +44,14 @@ export function useShare({
       .then((data: { source: string }) => {
         setSource(data.source);
         runProgram(data.source, 'shared');
+        onLoad?.();
       })
       .catch((err) => {
         addMsg(`could not load share: ${err instanceof Error ? err.message : err}`, 'err');
         runProgram(fallbackSrc, fallbackName);
+        onLoad?.();
       });
-  }, [addMsg, setSource, runProgram, fallbackSrc, fallbackName]);
+  }, [addMsg, setSource, runProgram, fallbackSrc, fallbackName, onLoad]);
 
   const handleShare = useCallback(async (): Promise<void> => {
     const res = await fetch('/api/share', {
