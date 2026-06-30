@@ -128,6 +128,44 @@ When at least one `@preset` line exists, a **preset dropdown** appears below the
 
 ---
 
+## AI generation
+
+The REPL also works as an AI interface. Type `/ai` commands to generate, improve, or fix designs using any model available on [OpenRouter](https://openrouter.ai). An API key is required (free tier available at openrouter.ai/settings/keys).
+
+### Setup
+
+```
+/ai apikey sk-or-v1-…     set and persist your OpenRouter API key
+/ai model claude sonnet   choose a model (fuzzy match — "gpt-4o", "gemini flash", "llama" all work)
+/ai reset                 remove the stored key and model selection
+/ai help                  show all commands
+```
+
+The API key and selected model are stored in `localStorage` and persist across reloads. Keys never leave the browser — they're sent directly to `api.openrouter.ai`.
+
+### Commands
+
+| Command                     | What it does                                                            |
+| --------------------------- | ----------------------------------------------------------------------- |
+| `/ai create <description>`  | Generate a new design from scratch — replaces the editor                |
+| `/ai improve <instruction>` | Modify the current code to match the instruction                        |
+| `/ai fix <instruction>`     | Fix the current code, including the last compile error                  |
+| `/ai explain <question>`    | Answer a question about the current code; prints to the console         |
+| `/ai <anything>`            | If there's existing code, acts as _improve_; otherwise acts as _create_ |
+
+### Model autocomplete
+
+When you type `/ai model ` the REPL shows a filtered list of all models available on your OpenRouter account. Use `↑`/`↓` to navigate, `Tab` to complete, `Enter` to confirm.
+
+### How generation works
+
+1. The AI receives a condensed NeedleScript language reference as its system prompt — all commands, limits, and embroidery best-practices.
+2. For _improve_ and _fix_, the current source is included in the request.
+3. For _fix_, the last compile error is included automatically so the model knows what went wrong.
+4. The generated code is compiled silently. If it fails, the AI is asked once more with the error. The result is then placed in the editor and run.
+
+---
+
 # Language guide
 
 NeedleScript has two dialects that **mix freely in the same program** and compile to exactly the same stitches:

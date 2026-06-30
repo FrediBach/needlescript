@@ -34,6 +34,7 @@ This tutorial walks you from the absolute basics up to seeded noise fields, Voro
 22. [Safety limits](#22-safety-limits)
 23. [Exporting and reusing your work](#23-exporting-and-reusing-your-work)
 24. [A capstone project](#24-a-capstone-project)
+25. [AI generation assistant](#25-ai-generation-assistant)
 
 ---
 
@@ -1247,3 +1248,103 @@ Change `seed 11` to any other number and you get a completely different — but 
 - Use the REPL below the console to nudge a running design one command at a time.
 
 Happy stitching.
+
+---
+
+## 25. AI generation assistant
+
+The REPL doubles as an AI interface. Any line starting with `/ai` is intercepted and dispatched to a language model of your choice via [OpenRouter](https://openrouter.ai), rather than being appended to the editor. The model receives the full NeedleScript language reference as its system prompt, along with your current code and any compile errors, and its output lands directly in the editor and runs.
+
+### First-time setup
+
+An API key from [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) is required. Free-tier credits are available. The key is stored in your browser's `localStorage` and sent directly from your browser to OpenRouter — it never passes through any server.
+
+```text
+/ai apikey sk-or-v1-…
+```
+
+Pick a model. Typing `/ai model ` shows a live-filtered list of all models on your account; use `↑`/`↓` to navigate and `Tab` to complete:
+
+```text
+/ai model claude sonnet 4.5
+/ai model gemini flash
+/ai model gpt-4o
+```
+
+Any model available on OpenRouter works. The chosen model and key persist across reloads.
+
+To remove both:
+
+```text
+/ai reset
+```
+
+### Generating designs
+
+**`/ai create <description>`** — generates a fresh design, replacing whatever is in the editor:
+
+```text
+/ai create a geometric ornament with a circular satin border and a tatami fill
+/ai create a noise-field stipple that avoids the centre of the hoop
+/ai create concentric hexagons with alternating fill angles
+```
+
+The generated code is compiled silently. If it fails, the AI is asked to fix the error automatically (one retry). The final result — passing or not — is placed in the editor and run so you can see it and its warnings immediately.
+
+**`/ai improve <instruction>`** — rewrites the current code according to your instruction:
+
+```text
+/ai improve make the fills denser and add a satin border
+/ai improve replace the square with a 12-pointed star
+/ai improve add randomised petal sizes using seed 7
+```
+
+The current source is included in the prompt, so the model sees exactly what you see.
+
+**`/ai fix <instruction>`** — like `improve`, but the most recent compile error is automatically included in the prompt:
+
+```text
+/ai fix                             (no instruction: just fix whatever broke)
+/ai fix the satin column is too wide
+/ai fix make it less dense so the warning goes away
+```
+
+Use this whenever a run produces a red error in the console.
+
+**`/ai explain <question>`** — answers a question about the current code and prints the response to the console without changing the editor:
+
+```text
+/ai explain what does line 8 do?
+/ai explain why is the density warning appearing?
+/ai explain how does the fill angle interact with the satin border?
+```
+
+**Default (no subcommand)** — if the input starts with `/ai` and isn't one of the above keywords, it's treated as a description. With code in the editor it behaves like `improve`; with an empty editor it behaves like `create`:
+
+```text
+/ai add a soft humanize effect to everything
+/ai make it more complex
+```
+
+### Prompting tips
+
+The model knows the full NeedleScript language, the embroidery physics, and the safety limits — you don't need to explain them. Short, concrete descriptions work best:
+
+- **Be specific about shape.** "A circle" → "concentric circles, radii 10 to 40 mm, step 5".
+- **Mention the stitch type.** "A star" is vague; "a six-pointed star with satin spokes and a tatami centre" is actionable.
+- **Name numerical targets.** "Make it less dense" is helpful; "reduce fillspacing from 0.35 to 0.55" is better.
+- **Reference existing structure.** With code in the editor, `improve` already sees it — say "add a second colour for the outer ring" without re-explaining what the outer ring is.
+
+If the first result isn't right, iterate: `/ai improve add more variation` or `/ai fix the jumps are too long`. Each command starts fresh with the current source, not a conversation history, so each attempt is independent.
+
+### The workflow loop
+
+The natural rhythm for new designs:
+
+1. `/ai create a …` — get a baseline
+2. Inspect the canvas and console; tweak values with the Parameters panel or the normal REPL
+3. `/ai improve <what you want to change>` — push it further
+4. If an error appears: `/ai fix` or `/ai fix <short description>`
+5. Repeat until the design fits the hoop and the density heatmap is calm
+
+The playback scrubber and source-line highlight still work on AI-generated code — step through it stitch by stitch to see exactly what each line produces.
