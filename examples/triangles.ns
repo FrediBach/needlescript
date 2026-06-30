@@ -1,0 +1,38 @@
+seed 42
+
+fabric "woven
+
+let numTriangles = 40
+let startSize = 6
+let growFactor = 1.1
+let rotationStep = 13
+
+def drawTriangle(cx, cy, size, angle) [
+  let x0 = cx + size * sin(angle)
+  let y0 = cy - size * cos(angle)
+  let x1 = cx + size * sin(angle + 120)
+  let y1 = cy - size * cos(angle + 120)
+  let x2 = cx + size * sin(angle + 240)
+  let y2 = cy - size * cos(angle + 240)
+  moveto x0 y0
+  down
+  setxy x1 y1
+  setxy x2 y2
+  setxy x0 y0
+  up
+  trim
+]
+
+let colorList = [1, 2, 3, 4, 5, 6]
+
+for i = 0 to numTriangles - 1 [
+  let size = startSize * pow(growFactor, i)
+  let angle = rotationStep * i
+  let c = colorList[i % len(colorList)]
+  color c
+  let stitch = 1.5 + i * 0.1
+  stitchlen stitch
+  if size <= 44 [
+    drawTriangle(0, 0, size, angle)
+  ]
+]
