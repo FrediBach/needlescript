@@ -176,6 +176,27 @@ export function useAI({
     addMsg('AI settings cleared.', 'ok');
   }, [addMsg]);
 
+  // ── Command: credits ───────────────────────────────────────────
+  const showCredits = useCallback(async () => {
+    const client = getClient();
+    if (!client) {
+      addMsg('set your OpenRouter API key first: /ai apikey sk-or-…', 'err');
+      return;
+    }
+    try {
+      const res = await client.credits.getCredits();
+      const { totalCredits, totalUsage } = res.data;
+      const remaining = totalCredits - totalUsage;
+      addMsg(
+        `credits: $${remaining.toFixed(4)} remaining` +
+          `  (purchased $${totalCredits.toFixed(4)} · used $${totalUsage.toFixed(4)})`,
+        'ok',
+      );
+    } catch (err) {
+      addMsg(`credits error: ${err instanceof Error ? err.message : String(err)}`, 'err');
+    }
+  }, [getClient, addMsg]);
+
   // ── Command: explain ───────────────────────────────────────────
   const explainCode = useCallback(
     async (question: string) => {
@@ -305,6 +326,9 @@ export function useAI({
         case 'reset':
           resetSettings();
           break;
+        case 'credits':
+          await showCredits();
+          break;
         case 'explain':
           await explainCode(args || 'explain this code');
           break;
@@ -323,7 +347,7 @@ export function useAI({
           break;
       }
     },
-    [showHelp, setApiKey, selectModel, resetSettings, explainCode, generateCode],
+    [showHelp, setApiKey, selectModel, resetSettings, showCredits, explainCode, generateCode],
   );
 
   return {
