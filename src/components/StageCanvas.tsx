@@ -511,8 +511,8 @@ function draw(
     const rw = Math.max(2 * MIN_HALF, b.maxX - b.minX + 2 * pad) * scale;
     const rh = Math.max(2 * MIN_HALF, b.maxY - b.minY + 2 * pad) * scale;
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 200, 0, 0.10)';
-    ctx.strokeStyle = 'rgba(255, 200, 0, 0.55)';
+    ctx.fillStyle = 'rgba(203, 161, 109, 0.05)';
+    ctx.strokeStyle = 'rgba(203, 161, 109, 0.8)';
     ctx.lineWidth = 1.5 * dpr;
     ctx.setLineDash([4 * dpr, 3 * dpr]);
     ctx.fillRect(rx, ry, rw, rh);
