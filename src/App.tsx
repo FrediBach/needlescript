@@ -36,6 +36,15 @@ export interface LineSegment {
   start: number; // 0-based index into pts[] where this line's stitches begin
 }
 
+/** Bounding box + stitch count for all stitch-type events on a single source line. */
+export interface LineStitchBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  count: number;
+}
+
 export interface DebugMark {
   x: number;
   y: number;
@@ -418,6 +427,32 @@ export default function App() {
     return segs;
   }, [design.pts]);
 
+  // Per-line bounding box of sewing stitches. Used by the editor hover tooltip
+  // and the canvas line-highlight overlay. Jumps are excluded — they can cross
+  // large distances and would inflate the rectangle misleadingly.
+  const lineStitchMap = useMemo((): Map<number, LineStitchBounds> => {
+    const map = new Map<number, LineStitchBounds>();
+    for (const p of design.pts) {
+      if (p.t !== 'stitch' || p.line === undefined) continue;
+      const b = map.get(p.line);
+      if (!b) {
+        map.set(p.line, { minX: p.x, maxX: p.x, minY: p.y, maxY: p.y, count: 1 });
+      } else {
+        if (p.x < b.minX) b.minX = p.x;
+        if (p.x > b.maxX) b.maxX = p.x;
+        if (p.y < b.minY) b.minY = p.y;
+        if (p.y > b.maxY) b.maxY = p.y;
+        b.count++;
+      }
+    }
+    return map;
+  }, [design.pts]);
+
+  // Source line currently hovered in the editor (drives canvas bounding-box overlay).
+  const [hoveredEditorLine, setHoveredEditorLine] = useState<number | null>(null);
+  const hoveredLineBounds =
+    hoveredEditorLine !== null ? (lineStitchMap.get(hoveredEditorLine) ?? null) : null;
+
   return (
     <div
       className={styles.app}
@@ -447,6 +482,8 @@ export default function App() {
           activeLine={activeLine}
           onWarnHover={setHoverWarn}
           errorMarkers={errorMarkers}
+          lineStitchMap={lineStitchMap}
+          onHoverLine={setHoveredEditorLine}
           style={!isMobile ? { width: leftWidth, flexShrink: 0 } : undefined}
         />
         {!isMobile && (
@@ -460,6 +497,7 @@ export default function App() {
           activeLine={activeLine}
           lineSegments={lineSegments}
           warningLoc={hoverWarn}
+          hoveredLineBounds={hoveredLineBounds}
           showDensity={showDensity}
           onToggleDensity={() => setShowDensity((v) => !v)}
           hideJumps={hideJumps}

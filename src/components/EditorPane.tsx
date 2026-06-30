@@ -1,8 +1,9 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import type { OnMount, BeforeMount } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
+import type { editor, IDisposable } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
+import type { LineStitchBounds } from '../App.tsx';
 import type { WarningLocation } from '../lib/engine.ts';
 import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
@@ -23,6 +24,12 @@ interface Props {
   /** Compiler error markers to display as squiggles in the editor.
    *  Pass an empty array (or omit) to clear any existing markers. */
   errorMarkers?: ReadonlyArray<{ message: string; line: number }>;
+  /** Per-line stitch bounds from the current compile. When provided, hovering a
+   *  line that produced stitches shows a tooltip with count and mm bounds. */
+  lineStitchMap?: Map<number, LineStitchBounds>;
+  /** Called when the hovered source line changes (content or gutter). Drives the
+   *  canvas bounding-box overlay. Called with null on mouse-leave. */
+  onHoverLine?: (line: number | null) => void;
   style?: React.CSSProperties;
 }
 
@@ -46,6 +53,8 @@ export default function EditorPane({
   activeLine,
   onWarnHover,
   errorMarkers,
+  lineStitchMap,
+  onHoverLine,
   style,
 }: Props) {
   const [replValue, setReplValue] = useState('');
@@ -80,6 +89,20 @@ export default function EditorPane({
   // stale closure value.
   const sourceRef = useRef(source);
   sourceRef.current = source;
+
+  // Stable refs for the hover-provider and mouse-listener callbacks so they
+  // always read the latest props without re-registering Monaco listeners.
+  const lineStitchMapRef = useRef(lineStitchMap);
+  const onHoverLineRef = useRef(onHoverLine);
+  useLayoutEffect(() => {
+    lineStitchMapRef.current = lineStitchMap;
+    onHoverLineRef.current = onHoverLine;
+  });
+
+  // Disposables created in handleMount — cleaned up on unmount.
+  const hoverProviderRef = useRef<IDisposable | null>(null);
+  const mouseMoveRef = useRef<IDisposable | null>(null);
+  const mouseLeaveRef = useRef<IDisposable | null>(null);
 
   // ── Parameters panel throttle ───────────────────────────────────────
   // Leading + trailing throttle at 250 ms: fire immediately on first change,
@@ -147,6 +170,53 @@ export default function EditorPane({
     ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       onRunRef.current(sourceRef.current);
     });
+
+    // ── Stitch-bounds hover tooltip ───────────────────────────────────────
+    // A second hover provider (merged with the built-in docs provider) that
+    // shows the stitch count and mm bounding box for lines that produce stitches.
+    hoverProviderRef.current = monaco.languages.registerHoverProvider('needlescript', {
+      provideHover(_model, position) {
+        const ln = position.lineNumber;
+        const b = lineStitchMapRef.current?.get(ln);
+        if (!b) return null;
+        return {
+          range: new monaco.Range(ln, 1, ln, 1),
+          contents: [
+            { value: `**${b.count} stitch${b.count === 1 ? '' : 'es'}**` },
+            {
+              value: `x: ${b.minX.toFixed(1)} – ${b.maxX.toFixed(1)} mm\n\ny: ${b.minY.toFixed(1)} – ${b.maxY.toFixed(1)} mm`,
+            },
+          ],
+        };
+      },
+    });
+
+    // ── Canvas overlay trigger ────────────────────────────────────────────
+    // Fire onHoverLine whenever the cursor enters a line (content text or the
+    // line-number gutter). The hover provider above handles the tooltip;
+    // onHoverLine drives the semi-transparent rect drawn on the canvas.
+    const GUTTER = monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS; // 3
+    const CONTENT = monaco.editor.MouseTargetType.CONTENT_TEXT; // 6
+    mouseMoveRef.current = ed.onMouseMove((e) => {
+      const t = e.target;
+      if (t.type === GUTTER || t.type === CONTENT) {
+        onHoverLineRef.current?.(t.position?.lineNumber ?? null);
+      } else {
+        onHoverLineRef.current?.(null);
+      }
+    });
+    mouseLeaveRef.current = ed.onMouseLeave(() => {
+      onHoverLineRef.current?.(null);
+    });
+  }, []);
+
+  // Dispose Monaco listeners when the editor pane unmounts.
+  useEffect(() => {
+    return () => {
+      hoverProviderRef.current?.dispose();
+      mouseMoveRef.current?.dispose();
+      mouseLeaveRef.current?.dispose();
+    };
   }, []);
 
   // ── Playback active-line decoration ────────────────────────────────

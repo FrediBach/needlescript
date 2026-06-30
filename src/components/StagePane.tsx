@@ -1,4 +1,4 @@
-import type { DesignState, LineSegment } from '../App.tsx';
+import type { DesignState, LineSegment, LineStitchBounds } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import type { WarningLocation } from '../lib/engine.ts';
 import StageCanvas from './StageCanvas.tsx';
@@ -15,6 +15,7 @@ interface Props {
   activeLine: number | null;
   lineSegments: LineSegment[];
   warningLoc: WarningLocation | null;
+  hoveredLineBounds: LineStitchBounds | null;
   showDensity: boolean;
   onToggleDensity: () => void;
   hideJumps: boolean;
@@ -78,6 +79,7 @@ export default function StagePane({
   activeLine,
   lineSegments,
   warningLoc,
+  hoveredLineBounds,
   showDensity,
   onToggleDensity,
   hideJumps,
@@ -93,6 +95,7 @@ export default function StagePane({
           showDensity={showDensity}
           hideJumps={hideJumps}
           warningLoc={warningLoc}
+          hoveredLineBounds={hoveredLineBounds}
         />
         <StatsChips design={design} />
         <div className="absolute top-[10px] right-[10px] flex items-center gap-[10px]">

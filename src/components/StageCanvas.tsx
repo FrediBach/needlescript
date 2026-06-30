@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DesignState } from '../App.tsx';
+import type { DesignState, LineStitchBounds } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import type { WarningLocation } from '../lib/engine.ts';
 import { THREADS } from '../data.ts';
@@ -32,6 +32,9 @@ interface Props {
   showDensity: boolean;
   hideJumps: boolean;
   warningLoc: WarningLocation | null;
+  /** Bounding box of the source line currently hovered in the editor.
+   *  When set, a semi-transparent rect is drawn over the affected area. */
+  hoveredLineBounds?: LineStitchBounds | null;
   /** SVG-import staging overlays drawn above the stitches (optional). */
   overlays?: CanvasOverlay[];
   /** Click-to-pick handler in mm space, for canvas → row linking (optional). */
@@ -76,6 +79,7 @@ export default function StageCanvas({
   showDensity,
   hideJumps,
   warningLoc,
+  hoveredLineBounds,
   overlays,
   onPick,
 }: Props) {
@@ -105,9 +109,20 @@ export default function StageCanvas({
       hideJumps,
       viewport,
       warningLoc,
+      hoveredLineBounds ?? null,
       overlays,
     );
-  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport, warningLoc, overlays]);
+  }, [
+    design,
+    hoop,
+    scrubPos,
+    showDensity,
+    hideJumps,
+    viewport,
+    warningLoc,
+    hoveredLineBounds,
+    overlays,
+  ]);
 
   // ── redraw on container resize ───────────────────────────────────────────
   useEffect(() => {
@@ -130,12 +145,23 @@ export default function StageCanvas({
         hideJumps,
         viewport,
         warningLoc,
+        hoveredLineBounds ?? null,
         overlays,
       );
     });
     ro.observe(canvas.parentElement!);
     return () => ro.disconnect();
-  }, [design, hoop, scrubPos, showDensity, hideJumps, viewport, warningLoc, overlays]);
+  }, [
+    design,
+    hoop,
+    scrubPos,
+    showDensity,
+    hideJumps,
+    viewport,
+    warningLoc,
+    hoveredLineBounds,
+    overlays,
+  ]);
 
   // ── pointer handlers ─────────────────────────────────────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -325,6 +351,7 @@ function draw(
   hideJumps: boolean,
   viewport: Viewport | null,
   warningLoc: WarningLocation | null,
+  hoveredLineBounds: LineStitchBounds | null,
   overlays: CanvasOverlay[] = [],
 ): RenderTransform {
   const ctx = canvas.getContext('2d');
@@ -469,6 +496,28 @@ function draw(
       ctx.fillStyle = canvasDebugPinStroke;
       ctx.fillText(String(i + 1), mx, my + 0.5 * dpr);
     });
+  }
+
+  // Hovered-line bounding box — semi-transparent rect around the stitches
+  // produced by the source line currently under the cursor in the editor.
+  // Drawn above the stitches/pins but below warning markers so both remain
+  // legible when a hotspot line is also hovered.
+  if (hoveredLineBounds) {
+    const b = hoveredLineBounds;
+    const pad = 1.5; // mm padding on every side
+    const MIN_HALF = 1.0; // mm — keep single-point lines visible as a small rect
+    const rx = X(b.minX - pad);
+    const ry = Y(b.maxY + pad); // y-up flip: top of rect is maxY in mm space
+    const rw = Math.max(2 * MIN_HALF, b.maxX - b.minX + 2 * pad) * scale;
+    const rh = Math.max(2 * MIN_HALF, b.maxY - b.minY + 2 * pad) * scale;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 200, 0, 0.10)';
+    ctx.strokeStyle = 'rgba(255, 200, 0, 0.55)';
+    ctx.lineWidth = 1.5 * dpr;
+    ctx.setLineDash([4 * dpr, 3 * dpr]);
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.restore();
   }
 
   // Warning location marker — shown while a locatable warning is hovered in

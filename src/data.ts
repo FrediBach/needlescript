@@ -223,7 +223,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'ampmod2',
       'sinewaves',
       'quantized',
-      'runner'
+      'runner',
     ],
   },
   {
@@ -244,7 +244,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'warpedlines2',
       'warpedlines3',
       'functional',
-      'ornaline'
+      'ornaline',
     ],
   },
 ];
