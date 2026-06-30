@@ -398,7 +398,14 @@ describe('underlay in exports and stats', () => {
   // density / stacking advisories firing on them is correct, expected feedback
   // — not a defect — so they are exempt from the "sews clean" gate. The gate
   // still guards every other bundled example, including any added later.
-  const DENSE_BY_DESIGN = new Set(['snowflake', 'fill', 'flower', 'spirolateral', 'turtle', 'functional']);
+  const DENSE_BY_DESIGN = new Set([
+    'snowflake',
+    'fill',
+    'flower',
+    'spirolateral',
+    'turtle',
+    'functional',
+  ]);
 
   it.each(Object.keys(EXAMPLES))('"%s" sews without density or stacking warnings', (key) => {
     const out = run(EXAMPLES[key]);

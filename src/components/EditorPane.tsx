@@ -1,10 +1,11 @@
-import { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { editor, IDisposable } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
 import type { LineStitchBounds } from '../App.tsx';
 import type { WarningLocation } from '../lib/engine.ts';
+import type { AIModelInfo } from '../hooks/useAI.ts';
 import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
 import { updateParameter } from '../lib/parse-parameters.ts';
@@ -30,6 +31,16 @@ interface Props {
   /** Called when the hovered source line changes (content or gutter). Drives the
    *  canvas bounding-box overlay. Called with null on mouse-leave. */
   onHoverLine?: (line: number | null) => void;
+  /** Called when an /ai <command> is entered in the REPL. */
+  onAiCommand?: (input: string) => Promise<void>;
+  /** Model list from the AI hook — used for /ai model <…> autocomplete. */
+  aiModels?: AIModelInfo[];
+  /** Currently selected AI model ID. */
+  aiSelectedModel?: string;
+  /** Whether an AI API key is stored. */
+  aiHasApiKey?: boolean;
+  /** Whether the AI hook is currently generating. */
+  aiIsGenerating?: boolean;
   style?: React.CSSProperties;
 }
 
@@ -44,6 +55,13 @@ const EDITOR_LINE_HEIGHT = editorLineHeight; // 20 px
 // :global block.
 const ACTIVE_LINE_CLASS = 'ns-playback-line';
 
+// Prefix that triggers AI command mode in the REPL.
+const AI_TRIGGER = '/ai';
+// Prefix that triggers model autocomplete.
+const MODEL_TRIGGER = '/ai model ';
+// Maximum suggestions shown at once.
+const MAX_SUGGESTIONS = 8;
+
 export default function EditorPane({
   source,
   onSourceChange,
@@ -55,11 +73,19 @@ export default function EditorPane({
   errorMarkers,
   lineStitchMap,
   onHoverLine,
+  onAiCommand,
+  aiModels,
+  aiSelectedModel,
+  aiHasApiKey,
+  aiIsGenerating,
   style,
 }: Props) {
   const [replValue, setReplValue] = useState('');
   const replHistoryRef = useRef<string[]>([]);
   const replIdxRef = useRef(-1);
+
+  // ── Suggestion state for /ai model autocomplete ─────────────────
+  const [suggestionIdx, setSuggestionIdx] = useState(-1);
 
   // ── Console panel height (vertical split) ──────────────────────────
   const CONSOLE_DEFAULT = 96;
@@ -303,47 +329,135 @@ export default function EditorPane({
     );
   }, [errorMarkers, monaco]);
 
+  // ── AI model autocomplete suggestions ──────────────────────────────────
+  // Computed from the current REPL value. Only shown when typing "/ai model ".
+  const aiSuggestions = useMemo((): AIModelInfo[] => {
+    if (!aiModels?.length || !replValue.startsWith(MODEL_TRIGGER)) return [];
+    const query = replValue.slice(MODEL_TRIGGER.length).toLowerCase();
+    if (!query) return aiModels.slice(0, MAX_SUGGESTIONS);
+    return aiModels
+      .filter((m) => m.id.toLowerCase().includes(query) || m.name.toLowerCase().includes(query))
+      .slice(0, MAX_SUGGESTIONS);
+  }, [replValue, aiModels]);
+
+  // Clamp the suggestion index to the current list length to avoid stale highlights.
+  const effectiveSuggestionIdx = Math.min(suggestionIdx, aiSuggestions.length - 1);
+
   // ── REPL ─────────────────────────────────────────────────────────────
   const handleReplKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        const line = replValue.trim();
-        if (!line) return;
-        replHistoryRef.current.push(line);
-        replIdxRef.current = replHistoryRef.current.length;
-        const next = source + (source && !source.endsWith('\n') ? '\n' : '') + line;
-        onSourceChange(next);
-        setReplValue('');
-        // Scroll Monaco to the last line so the newly-appended command is visible
-        requestAnimationFrame(() => {
-          const ed = editorRef.current;
-          if (ed) {
-            const model = ed.getModel();
-            if (model) ed.revealLine(model.getLineCount());
-          }
-        });
-        // Pass next explicitly — setSource(next) is async and may not be committed
-        // to React state by the time handleRun fires, so we pass the value directly.
-        onRun(next);
-      } else if (e.key === 'ArrowUp') {
-        if (replIdxRef.current > 0) {
+      const showingSuggestions = aiSuggestions.length > 0;
+      const isAiMode = replValue.startsWith(AI_TRIGGER);
+
+      // ── Escape: close suggestion panel ──────────────────────────────
+      if (e.key === 'Escape' && showingSuggestions) {
+        e.preventDefault();
+        setSuggestionIdx(-1);
+        return;
+      }
+
+      // ── Tab: apply highlighted suggestion ───────────────────────────
+      if (e.key === 'Tab' && showingSuggestions) {
+        e.preventDefault();
+        const target =
+          effectiveSuggestionIdx >= 0 ? aiSuggestions[effectiveSuggestionIdx] : aiSuggestions[0];
+        if (target) setReplValue(`${MODEL_TRIGGER}${target.id}`);
+        setSuggestionIdx(-1);
+        return;
+      }
+
+      // ── Arrow up/down: navigate suggestions OR history ───────────────
+      if (e.key === 'ArrowUp') {
+        if (showingSuggestions) {
+          e.preventDefault();
+          setSuggestionIdx((i) => Math.max(0, Math.min(i, aiSuggestions.length - 1) - 1));
+          return;
+        }
+        if (!isAiMode && replIdxRef.current > 0) {
           replIdxRef.current--;
           setReplValue(replHistoryRef.current[replIdxRef.current]);
           e.preventDefault();
         }
-      } else if (e.key === 'ArrowDown') {
-        if (replIdxRef.current < replHistoryRef.current.length - 1) {
-          replIdxRef.current++;
-          setReplValue(replHistoryRef.current[replIdxRef.current]);
-        } else {
-          replIdxRef.current = replHistoryRef.current.length;
-          setReplValue('');
+        return;
+      }
+
+      if (e.key === 'ArrowDown') {
+        if (showingSuggestions) {
+          e.preventDefault();
+          setSuggestionIdx((i) => Math.min(aiSuggestions.length - 1, i + 1));
+          return;
         }
-        e.preventDefault();
+        if (!isAiMode) {
+          if (replIdxRef.current < replHistoryRef.current.length - 1) {
+            replIdxRef.current++;
+            setReplValue(replHistoryRef.current[replIdxRef.current]);
+          } else {
+            replIdxRef.current = replHistoryRef.current.length;
+            setReplValue('');
+          }
+          e.preventDefault();
+        }
+        return;
+      }
+
+      // ── Enter: apply suggestion, dispatch AI command, or normal REPL ─
+      if (e.key === 'Enter') {
+        // If a suggestion is highlighted, apply it and don't submit yet.
+        if (showingSuggestions && effectiveSuggestionIdx >= 0) {
+          e.preventDefault();
+          setReplValue(`${MODEL_TRIGGER}${aiSuggestions[effectiveSuggestionIdx].id}`);
+          setSuggestionIdx(-1);
+          return;
+        }
+
+        const line = replValue.trim();
+        if (!line) return;
+
+        replHistoryRef.current.push(line);
+        replIdxRef.current = replHistoryRef.current.length;
+        setSuggestionIdx(-1);
+
+        if (line === AI_TRIGGER || line.startsWith(AI_TRIGGER + ' ')) {
+          // ── AI command — intercept and dispatch ──────────────────────
+          const cmd =
+            line.length > AI_TRIGGER.length ? line.slice(AI_TRIGGER.length + 1).trim() : '';
+          setReplValue('');
+          void onAiCommand?.(cmd);
+        } else {
+          // ── Normal REPL — append to source and run ───────────────────
+          const next = source + (source && !source.endsWith('\n') ? '\n' : '') + line;
+          onSourceChange(next);
+          setReplValue('');
+          // Scroll Monaco to the last line so the newly-appended command is visible
+          requestAnimationFrame(() => {
+            const ed = editorRef.current;
+            if (ed) {
+              const model = ed.getModel();
+              if (model) ed.revealLine(model.getLineCount());
+            }
+          });
+          // Pass next explicitly — setSource(next) is async and may not be committed
+          // to React state by the time handleRun fires, so we pass the value directly.
+          onRun(next);
+        }
       }
     },
-    [replValue, source, onSourceChange, onRun],
+    [replValue, source, onSourceChange, onRun, onAiCommand, aiSuggestions, effectiveSuggestionIdx],
   );
+
+  // ── Dynamic placeholder ────────────────────────────────────────────────
+  const replPlaceholder = useMemo(() => {
+    if (replValue.startsWith(MODEL_TRIGGER)) {
+      return 'type a model name to filter — ↑↓ to navigate · Tab to complete';
+    }
+    if (replValue.startsWith(AI_TRIGGER)) {
+      return '/ai create … · /ai improve … · /ai fix … · /ai explain … · /ai help';
+    }
+    if (aiHasApiKey) {
+      return "type a command and press Enter — it's appended to the pattern (↑ history) · /ai help";
+    }
+    return "type a command and press Enter — it's appended to the pattern (↑ history) · /ai apikey …";
+  }, [replValue, aiHasApiKey]);
 
   // ─────────────────────────────────────────────────────────────────────
   return (
@@ -433,17 +547,58 @@ export default function EditorPane({
       </div>
 
       <div className={styles.replRow}>
-        <span className={styles.prompt}>›</span>
+        {/* Model autocomplete suggestion panel */}
+        {aiSuggestions.length > 0 && (
+          <div className={styles.suggestBox} role="listbox" aria-label="Model suggestions">
+            {aiSuggestions.map((m, i) => (
+              <div
+                key={m.id}
+                role="option"
+                aria-selected={i === effectiveSuggestionIdx}
+                className={`${styles.suggestItem} ${i === effectiveSuggestionIdx ? styles.suggestItemActive : ''}`}
+                onMouseDown={(e) => {
+                  // Use mousedown to avoid blur on the input
+                  e.preventDefault();
+                  setReplValue(`${MODEL_TRIGGER}${m.id}`);
+                  setSuggestionIdx(-1);
+                }}
+              >
+                <span className={styles.suggestItemId}>{m.id}</span>
+                <span className={styles.suggestItemName}>{m.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* AI generating indicator */}
+        {aiIsGenerating && <span className={styles.aiSpinner} aria-label="AI generating" />}
+
+        <span className={styles.prompt}>{aiIsGenerating ? '⟳' : '›'}</span>
         <Input
           type="text"
           value={replValue}
           onChange={(e) => setReplValue(e.target.value)}
           onKeyDown={handleReplKeyDown}
+          disabled={aiIsGenerating}
           autoComplete="off"
-          placeholder="type a command and press Enter — it's appended to the pattern (↑ history)"
+          placeholder={replPlaceholder}
           aria-label="REPL input"
-          className="flex-1 h-auto py-[7px] px-[10px] text-ui font-mono bg-secondary border-border text-foreground placeholder:text-faint focus-visible:ring-ring/50"
+          aria-owns={aiSuggestions.length > 0 ? 'ai-suggest-box' : undefined}
+          aria-autocomplete={aiSuggestions.length > 0 ? 'list' : undefined}
+          aria-activedescendant={
+            effectiveSuggestionIdx >= 0 ? `ai-suggest-${effectiveSuggestionIdx}` : undefined
+          }
+          className={`flex-1 h-auto py-[7px] px-[10px] text-ui font-mono bg-secondary border-border text-foreground placeholder:text-faint focus-visible:ring-ring/50 ${
+            aiIsGenerating ? 'opacity-50 cursor-not-allowed' : ''
+          } ${replValue.startsWith(AI_TRIGGER) ? styles.aiReplInput : ''}`}
         />
+
+        {/* Selected model badge */}
+        {aiSelectedModel && aiHasApiKey && !aiIsGenerating && (
+          <span className={styles.modelBadge} title={`AI model: ${aiSelectedModel}`}>
+            {aiSelectedModel.split('/').pop()?.split('-').slice(0, 3).join('-') ?? aiSelectedModel}
+          </span>
+        )}
       </div>
 
       {isDragging && <div className={styles.dropOverlay}>drop SVG to convert</div>}

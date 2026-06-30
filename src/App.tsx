@@ -20,6 +20,7 @@ import type { ExportFormat } from './components/Header.tsx';
 import { usePanelSplit } from './hooks/usePanelSplit.ts';
 import { useSvgImport } from './hooks/useSvgImport.ts';
 import { useShare } from './hooks/useShare.ts';
+import { useAI } from './hooks/useAI.ts';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
 import EditorPane from './components/EditorPane.tsx';
@@ -150,6 +151,8 @@ export default function App() {
   // Compiler error markers fed into the editor as red squiggles.
   // Set after an explicit run that fails; cleared when a run succeeds.
   const [errorMarkers, setErrorMarkers] = useState<Array<{ message: string; line: number }>>([]);
+  // Last compile error message — used by the AI fix command.
+  const lastErrorRef = useRef<string | null>(null);
   // Location of the warning currently hovered in the console — drives the
   // preview marker and playback-bar part highlight. null = nothing hovered.
   const [hoverWarn, setHoverWarn] = useState<WarningLocation | null>(null);
@@ -193,6 +196,8 @@ export default function App() {
       if (!response.ok) {
         addMsg(response.message, 'err');
         dispatch({ type: 'run/error' });
+        // Track the error for the AI fix command.
+        lastErrorRef.current = response.message;
         // Surface compiler error as a squiggle on the reported line (if available).
         if (response.slLine !== undefined) {
           // Strip the "  (line N)" suffix appended by NeedlescriptError since the
@@ -247,6 +252,7 @@ export default function App() {
         ok: true,
       };
       setErrorMarkers([]);
+      lastErrorRef.current = null;
       dispatch({ type: 'run/success', design: newDesign, scrubPos: pts.length });
     },
     [addMsg, compile],
@@ -275,6 +281,21 @@ export default function App() {
     addMsg,
     fallbackSrc: EXAMPLES[firstKey],
     fallbackName: 'bloom',
+  });
+
+  const {
+    handleAiCommand,
+    aiModels,
+    selectedModel: aiSelectedModel,
+    hasApiKey: aiHasApiKey,
+    isGenerating: aiIsGenerating,
+  } = useAI({
+    sourceRef,
+    compile,
+    setSource,
+    runProgram,
+    addMsg,
+    getLastError: () => lastErrorRef.current,
   });
 
   // Hoop-fit warning computed reactively so it updates when the hoop changes
@@ -484,6 +505,11 @@ export default function App() {
           errorMarkers={errorMarkers}
           lineStitchMap={lineStitchMap}
           onHoverLine={setHoveredEditorLine}
+          onAiCommand={handleAiCommand}
+          aiModels={aiModels}
+          aiSelectedModel={aiSelectedModel}
+          aiHasApiKey={aiHasApiKey}
+          aiIsGenerating={aiIsGenerating}
           style={!isMobile ? { width: leftWidth, flexShrink: 0 } : undefined}
         />
         {!isMobile && (
