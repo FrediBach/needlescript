@@ -77,6 +77,8 @@ export default function EditorPane({
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   // Holds the decoration collection for the playback active-line highlight.
   const decoCollRef = useRef<editor.IEditorDecorationsCollection | null>(null);
+  // Holds the decoration collection for brightened line numbers on stitch lines.
+  const stitchLineDecoCollRef = useRef<editor.IEditorDecorationsCollection | null>(null);
   // Ref for the console panel — used to auto-scroll to the latest message.
   const consoleRef = useRef<HTMLDivElement>(null);
 
@@ -163,6 +165,7 @@ export default function EditorPane({
   const handleMount = useCallback<OnMount>((ed, monaco) => {
     editorRef.current = ed;
     decoCollRef.current = ed.createDecorationsCollection();
+    stitchLineDecoCollRef.current = ed.createDecorationsCollection();
 
     // Cmd/Ctrl + Enter → run the program (mirrors the original textarea shortcut).
     // Pass sourceRef.current explicitly so the latest source is used even if
@@ -243,6 +246,27 @@ export default function EditorPane({
       coll.clear();
     }
   }, [activeLine, monaco]);
+
+  // ── Stitch-line number highlights ──────────────────────────────────────
+  // Apply a gold tint to every line number that produced at least one stitch.
+  // Cleared and rebuilt whenever a new compile completes (lineStitchMap changes).
+  useEffect(() => {
+    const coll = stitchLineDecoCollRef.current;
+    if (!coll || !monaco) return;
+    if (!lineStitchMap || lineStitchMap.size === 0) {
+      coll.clear();
+      return;
+    }
+    coll.set(
+      Array.from(lineStitchMap.keys()).map((line) => ({
+        range: new monaco.Range(line, 1, line, 1),
+        options: {
+          lineNumberClassName: 'ns-stitch-line-num',
+          description: 'stitch-line-num',
+        },
+      })),
+    );
+  }, [lineStitchMap, monaco]);
 
   // Auto-scroll the console to the bottom whenever a new message arrives.
   useEffect(() => {

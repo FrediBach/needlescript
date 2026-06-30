@@ -46,6 +46,14 @@
   border-left: 2px solid var(--gold) !important;
 }
 
+/* ── Stitch-line number highlight ────────────────────────────────────
+   Applied via lineNumberClassName on every line that produced at least
+   one stitch in the current compile.  Gold tint echoes the playback
+   highlight, making the connection to stitch output visually clear.    */
+:global(.ns-stitch-line-num) {
+  color: rgba(203, 161, 109, 0.7) !important;
+}
+
 /* Loading skeleton shown while Monaco initialises */
 .editorLoading {
   flex: 1;
