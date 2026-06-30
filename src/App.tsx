@@ -21,6 +21,7 @@ import { usePanelSplit } from './hooks/usePanelSplit.ts';
 import { useSvgImport } from './hooks/useSvgImport.ts';
 import { useShare } from './hooks/useShare.ts';
 import { useAI } from './hooks/useAI.ts';
+import { useReplCommands } from './hooks/useReplCommands.ts';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
 import EditorPane from './components/EditorPane.tsx';
@@ -298,6 +299,14 @@ export default function App() {
     getLastError: () => lastErrorRef.current,
   });
 
+  const { handleReplCommand, savedSnippetNames } = useReplCommands({
+    sourceRef,
+    setSource,
+    runProgram,
+    addMsg,
+    handleShare,
+  });
+
   // Hoop-fit warning computed reactively so it updates when the hoop changes
   // without requring a re-run.
   const displayDesign = useMemo((): DesignState => {
@@ -510,6 +519,8 @@ export default function App() {
           aiSelectedModel={aiSelectedModel}
           aiHasApiKey={aiHasApiKey}
           aiIsGenerating={aiIsGenerating}
+          onReplCommand={handleReplCommand}
+          savedSnippetNames={savedSnippetNames}
           style={!isMobile ? { width: leftWidth, flexShrink: 0 } : undefined}
         />
         {!isMobile && (

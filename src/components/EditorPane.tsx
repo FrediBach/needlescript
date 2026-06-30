@@ -41,6 +41,10 @@ interface Props {
   aiHasApiKey?: boolean;
   /** Whether the AI hook is currently generating. */
   aiIsGenerating?: boolean;
+  /** Called when a non-/ai slash command is entered (/share, /save, /load, /remove). */
+  onReplCommand?: (line: string) => Promise<void>;
+  /** Sorted list of saved snippet names — drives /load and /remove autocomplete. */
+  savedSnippetNames?: string[];
   style?: React.CSSProperties;
 }
 
@@ -59,6 +63,9 @@ const ACTIVE_LINE_CLASS = 'ns-playback-line';
 const AI_TRIGGER = '/ai';
 // Prefix that triggers model autocomplete.
 const MODEL_TRIGGER = '/ai model ';
+// Prefixes that trigger snippet name autocomplete.
+const LOAD_TRIGGER = '/load ';
+const REMOVE_TRIGGER = '/remove ';
 // Maximum suggestions shown at once.
 const MAX_SUGGESTIONS = 8;
 
@@ -78,6 +85,8 @@ export default function EditorPane({
   aiSelectedModel,
   aiHasApiKey,
   aiIsGenerating,
+  onReplCommand,
+  savedSnippetNames,
   style,
 }: Props) {
   const [replValue, setReplValue] = useState('');
@@ -329,25 +338,71 @@ export default function EditorPane({
     );
   }, [errorMarkers, monaco]);
 
-  // ── AI model autocomplete suggestions ──────────────────────────────────
-  // Computed from the current REPL value. Only shown when typing "/ai model ".
-  const aiSuggestions = useMemo((): AIModelInfo[] => {
-    if (!aiModels?.length || !replValue.startsWith(MODEL_TRIGGER)) return [];
-    const query = replValue.slice(MODEL_TRIGGER.length).toLowerCase();
-    if (!query) return aiModels.slice(0, MAX_SUGGESTIONS);
-    return aiModels
-      .filter((m) => m.id.toLowerCase().includes(query) || m.name.toLowerCase().includes(query))
-      .slice(0, MAX_SUGGESTIONS);
-  }, [replValue, aiModels]);
+  // ── Unified suggestion system ─────────────────────────────────────────
+  // A single suggestion panel serves multiple triggers:
+  //   /ai model  → AI model names (label = model id, description = display name)
+  //   /load      → saved snippet names
+  //   /remove    → saved snippet names
+  interface ReplSuggestion {
+    label: string;
+    description: string;
+    /** The full replacement text to write into the input when applied. */
+    completion: string;
+  }
+
+  const replSuggestions = useMemo((): ReplSuggestion[] => {
+    // /ai model  → filter models
+    if (replValue.startsWith(MODEL_TRIGGER) && aiModels?.length) {
+      const query = replValue.slice(MODEL_TRIGGER.length).toLowerCase();
+      const hits = query
+        ? aiModels.filter(
+            (m) => m.id.toLowerCase().includes(query) || m.name.toLowerCase().includes(query),
+          )
+        : aiModels;
+      return hits.slice(0, MAX_SUGGESTIONS).map((m) => ({
+        label: m.id,
+        description: m.name,
+        completion: `${MODEL_TRIGGER}${m.id}`,
+      }));
+    }
+
+    // /load  → filter snippet names
+    if (replValue.startsWith(LOAD_TRIGGER) && savedSnippetNames?.length) {
+      const query = replValue.slice(LOAD_TRIGGER.length).toLowerCase();
+      const hits = query
+        ? savedSnippetNames.filter((n) => n.toLowerCase().includes(query))
+        : savedSnippetNames;
+      return hits.slice(0, MAX_SUGGESTIONS).map((n) => ({
+        label: n,
+        description: '',
+        completion: `${LOAD_TRIGGER}${n}`,
+      }));
+    }
+
+    // /remove  → filter snippet names
+    if (replValue.startsWith(REMOVE_TRIGGER) && savedSnippetNames?.length) {
+      const query = replValue.slice(REMOVE_TRIGGER.length).toLowerCase();
+      const hits = query
+        ? savedSnippetNames.filter((n) => n.toLowerCase().includes(query))
+        : savedSnippetNames;
+      return hits.slice(0, MAX_SUGGESTIONS).map((n) => ({
+        label: n,
+        description: '',
+        completion: `${REMOVE_TRIGGER}${n}`,
+      }));
+    }
+
+    return [];
+  }, [replValue, aiModels, savedSnippetNames]);
 
   // Clamp the suggestion index to the current list length to avoid stale highlights.
-  const effectiveSuggestionIdx = Math.min(suggestionIdx, aiSuggestions.length - 1);
+  const effectiveSuggestionIdx = Math.min(suggestionIdx, replSuggestions.length - 1);
 
   // ── REPL ─────────────────────────────────────────────────────────────
   const handleReplKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      const showingSuggestions = aiSuggestions.length > 0;
-      const isAiMode = replValue.startsWith(AI_TRIGGER);
+      const showingSuggestions = replSuggestions.length > 0;
+      const isSlashMode = replValue.startsWith('/');
 
       // ── Escape: close suggestion panel ──────────────────────────────
       if (e.key === 'Escape' && showingSuggestions) {
@@ -360,8 +415,10 @@ export default function EditorPane({
       if (e.key === 'Tab' && showingSuggestions) {
         e.preventDefault();
         const target =
-          effectiveSuggestionIdx >= 0 ? aiSuggestions[effectiveSuggestionIdx] : aiSuggestions[0];
-        if (target) setReplValue(`${MODEL_TRIGGER}${target.id}`);
+          effectiveSuggestionIdx >= 0
+            ? replSuggestions[effectiveSuggestionIdx]
+            : replSuggestions[0];
+        if (target) setReplValue(target.completion);
         setSuggestionIdx(-1);
         return;
       }
@@ -370,10 +427,10 @@ export default function EditorPane({
       if (e.key === 'ArrowUp') {
         if (showingSuggestions) {
           e.preventDefault();
-          setSuggestionIdx((i) => Math.max(0, Math.min(i, aiSuggestions.length - 1) - 1));
+          setSuggestionIdx((i) => Math.max(0, Math.min(i, replSuggestions.length - 1) - 1));
           return;
         }
-        if (!isAiMode && replIdxRef.current > 0) {
+        if (!isSlashMode && replIdxRef.current > 0) {
           replIdxRef.current--;
           setReplValue(replHistoryRef.current[replIdxRef.current]);
           e.preventDefault();
@@ -384,10 +441,10 @@ export default function EditorPane({
       if (e.key === 'ArrowDown') {
         if (showingSuggestions) {
           e.preventDefault();
-          setSuggestionIdx((i) => Math.min(aiSuggestions.length - 1, i + 1));
+          setSuggestionIdx((i) => Math.min(replSuggestions.length - 1, i + 1));
           return;
         }
-        if (!isAiMode) {
+        if (!isSlashMode) {
           if (replIdxRef.current < replHistoryRef.current.length - 1) {
             replIdxRef.current++;
             setReplValue(replHistoryRef.current[replIdxRef.current]);
@@ -400,12 +457,12 @@ export default function EditorPane({
         return;
       }
 
-      // ── Enter: apply suggestion, dispatch AI command, or normal REPL ─
+      // ── Enter: apply suggestion, dispatch command, or normal REPL ─────
       if (e.key === 'Enter') {
         // If a suggestion is highlighted, apply it and don't submit yet.
         if (showingSuggestions && effectiveSuggestionIdx >= 0) {
           e.preventDefault();
-          setReplValue(`${MODEL_TRIGGER}${aiSuggestions[effectiveSuggestionIdx].id}`);
+          setReplValue(replSuggestions[effectiveSuggestionIdx].completion);
           setSuggestionIdx(-1);
           return;
         }
@@ -418,11 +475,15 @@ export default function EditorPane({
         setSuggestionIdx(-1);
 
         if (line === AI_TRIGGER || line.startsWith(AI_TRIGGER + ' ')) {
-          // ── AI command — intercept and dispatch ──────────────────────
+          // ── /ai command ──────────────────────────────────────────────
           const cmd =
             line.length > AI_TRIGGER.length ? line.slice(AI_TRIGGER.length + 1).trim() : '';
           setReplValue('');
           void onAiCommand?.(cmd);
+        } else if (line.startsWith('/')) {
+          // ── other slash command (/share, /save, /load, /remove) ──────
+          setReplValue('');
+          void onReplCommand?.(line);
         } else {
           // ── Normal REPL — append to source and run ───────────────────
           const next = source + (source && !source.endsWith('\n') ? '\n' : '') + line;
@@ -442,7 +503,16 @@ export default function EditorPane({
         }
       }
     },
-    [replValue, source, onSourceChange, onRun, onAiCommand, aiSuggestions, effectiveSuggestionIdx],
+    [
+      replValue,
+      source,
+      onSourceChange,
+      onRun,
+      onAiCommand,
+      onReplCommand,
+      replSuggestions,
+      effectiveSuggestionIdx,
+    ],
   );
 
   // ── Dynamic placeholder ────────────────────────────────────────────────
@@ -450,13 +520,19 @@ export default function EditorPane({
     if (replValue.startsWith(MODEL_TRIGGER)) {
       return 'type a model name to filter — ↑↓ to navigate · Tab to complete';
     }
+    if (replValue.startsWith(LOAD_TRIGGER) || replValue.startsWith(REMOVE_TRIGGER)) {
+      return 'type a snippet name to filter — ↑↓ to navigate · Tab to complete';
+    }
     if (replValue.startsWith(AI_TRIGGER)) {
       return '/ai create … · /ai improve … · /ai fix … · /ai explain … · /ai help';
     }
-    if (aiHasApiKey) {
-      return "type a command and press Enter — it's appended to the pattern (↑ history) · /ai help";
+    if (replValue.startsWith('/')) {
+      return '/share · /save [name] · /load [name] · /remove <name> · /ai help';
     }
-    return "type a command and press Enter — it's appended to the pattern (↑ history) · /ai apikey …";
+    if (aiHasApiKey) {
+      return 'type a command or /ai · press Enter to append and run (↑ history)';
+    }
+    return 'type a command · press Enter to append and run (↑ history) · /ai apikey …';
   }, [replValue, aiHasApiKey]);
 
   // ─────────────────────────────────────────────────────────────────────
@@ -547,24 +623,24 @@ export default function EditorPane({
       </div>
 
       <div className={styles.replRow}>
-        {/* Model autocomplete suggestion panel */}
-        {aiSuggestions.length > 0 && (
-          <div className={styles.suggestBox} role="listbox" aria-label="Model suggestions">
-            {aiSuggestions.map((m, i) => (
+        {/* Autocomplete suggestion panel — serves /ai model, /load, /remove */}
+        {replSuggestions.length > 0 && (
+          <div className={styles.suggestBox} role="listbox" aria-label="Suggestions">
+            {replSuggestions.map((s, i) => (
               <div
-                key={m.id}
+                key={s.label}
                 role="option"
                 aria-selected={i === effectiveSuggestionIdx}
                 className={`${styles.suggestItem} ${i === effectiveSuggestionIdx ? styles.suggestItemActive : ''}`}
                 onMouseDown={(e) => {
                   // Use mousedown to avoid blur on the input
                   e.preventDefault();
-                  setReplValue(`${MODEL_TRIGGER}${m.id}`);
+                  setReplValue(s.completion);
                   setSuggestionIdx(-1);
                 }}
               >
-                <span className={styles.suggestItemId}>{m.id}</span>
-                <span className={styles.suggestItemName}>{m.name}</span>
+                <span className={styles.suggestItemId}>{s.label}</span>
+                {s.description && <span className={styles.suggestItemName}>{s.description}</span>}
               </div>
             ))}
           </div>
@@ -583,14 +659,14 @@ export default function EditorPane({
           autoComplete="off"
           placeholder={replPlaceholder}
           aria-label="REPL input"
-          aria-owns={aiSuggestions.length > 0 ? 'ai-suggest-box' : undefined}
-          aria-autocomplete={aiSuggestions.length > 0 ? 'list' : undefined}
+          aria-owns={replSuggestions.length > 0 ? 'repl-suggest-box' : undefined}
+          aria-autocomplete={replSuggestions.length > 0 ? 'list' : undefined}
           aria-activedescendant={
-            effectiveSuggestionIdx >= 0 ? `ai-suggest-${effectiveSuggestionIdx}` : undefined
+            effectiveSuggestionIdx >= 0 ? `repl-suggest-${effectiveSuggestionIdx}` : undefined
           }
           className={`flex-1 h-auto py-[7px] px-[10px] text-ui font-mono bg-secondary border-border text-foreground placeholder:text-faint focus-visible:ring-ring/50 ${
             aiIsGenerating ? 'opacity-50 cursor-not-allowed' : ''
-          } ${replValue.startsWith(AI_TRIGGER) ? styles.aiReplInput : ''}`}
+          } ${replValue.startsWith('/') ? styles.aiReplInput : ''}`}
         />
 
         {/* Selected model badge */}
