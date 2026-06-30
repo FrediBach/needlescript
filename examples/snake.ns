@@ -1,0 +1,151 @@
+// This creates a random snake which stops when it would move into
+// itself or the hoop. Play with the seed to see different results.
+
+seed 90
+
+let cellSize = 1.5
+let gridR = 44.0
+let maxSteps = 5000
+
+let cols = floor(gridR * 2 / cellSize) + 1
+let rows = floor(gridR * 2 / cellSize) + 1
+
+let originX = 0 - floor(cols / 2) * cellSize
+let originY = 0 - floor(rows / 2) * cellSize
+
+let visited = filled(cols * rows, 0)
+
+def cellIndex(cx, cy) [
+  return cy * cols + cx
+]
+
+def worldX(cx) [
+  return originX + cx * cellSize
+]
+
+def worldY(cy) [
+  return originY + cy * cellSize
+]
+
+def inHoop(cx, cy) [
+  let wx = worldX(cx)
+  let wy = worldY(cy)
+  let d = sqrt(wx * wx + wy * wy)
+  return d < 42.0
+]
+
+def markVisited(cx, cy) [
+  let idx = cellIndex(cx, cy)
+  visited[idx] = 1
+]
+
+def isVisited(cx, cy) [
+  let idx = cellIndex(cx, cy)
+  return visited[idx]
+]
+
+def inBounds(cx, cy) [
+  return cx >= 0 and cx < cols and cy >= 0 and cy < rows
+]
+
+def cellFree(cx, cy) [
+  if not inBounds(cx, cy) [ return 0 ]
+  if not inHoop(cx, cy) [ return 0 ]
+  if isVisited(cx, cy) [ return 0 ]
+  return 1
+]
+
+let dxArr = [0, 1, 0, -1]
+let dyArr = [1, 0, -1, 0]
+
+// How many free neighbors does (cx, cy) have? (its onward degree)
+def freeDegree(cx, cy) [
+  let n = 0
+  for d = 0 to 3 [
+    if cellFree(cx + dxArr[d], cy + dyArr[d]) [
+      n = n + 1
+    ]
+  ]
+  return n
+]
+
+// Buffers for candidate directions and their onward degrees
+let candDir = [0, 0, 0, 0]
+let candDeg = [0, 0, 0, 0]
+
+// Warnsdorff: pick the free neighbor with the fewest onward moves.
+// Ties broken randomly so the seed still varies the path.
+def pickBestNeighbor(cx, cy) [
+  let count = 0
+  for d = 0 to 3 [
+    let nx = cx + dxArr[d]
+    let ny = cy + dyArr[d]
+    if cellFree(nx, ny) [
+      candDir[count] = d
+      // degree AFTER we would have stepped here: this cell becomes
+      // visited, so don't count the cell we came from. Approximate
+      // with current free degree minus 1 for the entry, floored at 0.
+      let deg = freeDegree(nx, ny) - 1
+      if deg < 0 [ deg = 0 ]
+      candDeg[count] = deg
+      count = count + 1
+    ]
+  ]
+  if count = 0 [ return -1 ]
+
+  // Find the minimum onward degree among candidates.
+  let best = 99
+  for i = 0 to count - 1 [
+    if candDeg[i] < best [ best = candDeg[i] ]
+  ]
+
+  // Collect all candidates tied at the minimum, pick one at random.
+  let tied = [0, 0, 0, 0]
+  let tcount = 0
+  for i = 0 to count - 1 [
+    if candDeg[i] = best [
+      tied[tcount] = candDir[i]
+      tcount = tcount + 1
+    ]
+  ]
+  let pick = floor(random(tcount))
+  if pick >= tcount [ pick = tcount - 1 ]
+  return tied[pick]
+]
+
+let startCX = floor(cols / 2)
+let startCY = floor(rows / 2)
+
+let curCX = startCX
+let curCY = startCY
+
+markVisited(curCX, curCY)
+
+fabric "woven
+stitchlen 2.5
+satin 0
+color 1
+
+setxy worldX(curCX) worldY(curCY)
+down
+
+let steps = 0
+let stuck = 0
+
+while stuck = 0 [
+  let dir = pickBestNeighbor(curCX, curCY)
+  if dir = -1 [
+    stuck = 1
+  ] else [
+    let nx = curCX + dxArr[dir]
+    let ny = curCY + dyArr[dir]
+    markVisited(nx, ny)
+    curCX = nx
+    curCY = ny
+    setxy worldX(curCX) worldY(curCY)
+  ]
+  steps = steps + 1
+  if steps >= maxSteps [ stuck = 1 ]
+]
+
+trim

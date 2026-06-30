@@ -65,6 +65,7 @@ import functionalRaw from '../examples/functional.ns?raw';
 import ornalineRaw from '../examples/ornaline.ns?raw';
 import runnerRaw from '../examples/runner.ns?raw';
 import trianglesRaw from '../examples/triangles.ns?raw';
+import snakeRaw from '../examples/snake.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -166,6 +167,7 @@ export const EXAMPLES: Record<string, string> = {
   ornaline: ornalineRaw,
   runner: runnerRaw,
   triangles: trianglesRaw,
+  snake: snakeRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -248,6 +250,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'warpedlines3',
       'functional',
       'ornaline',
+      'snake'
     ],
   },
 ];
