@@ -265,7 +265,7 @@ describe('reporter contract errors', () => {
 
   it('@name must reference a real procedure', () => {
     expect(() => run('fill dir @nope\nbeginfill arc 360 10 endfill')).toThrow(
-      /no procedure named "nope"/,
+      /no procedure or function named "nope"/,
     );
   });
 

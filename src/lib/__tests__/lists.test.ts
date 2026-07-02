@@ -474,3 +474,206 @@ describe('lists never reach the stitch pipeline', () => {
     expect(r.warnings).toEqual(run(recordReplay).warnings);
   });
 });
+
+// ── steps() — inclusive numeric sequence ─────────────────────────────────────
+describe('steps()', () => {
+  it('basic integer steps with default step=1', () => {
+    expect(printed('print steps(0, 5)')).toEqual(['[0, 1, 2, 3, 4, 5]']);
+  });
+
+  it('custom step', () => {
+    const p = printed('print len(steps(0, 6, 0.2))');
+    expect(p).toEqual(['31']); // 0, 0.2, 0.4, …, 5.8, 6.0
+  });
+
+  it('first and last element are exact', () => {
+    const p = printed('let s = steps(0, 6, 0.2) print first(s) print last(s)');
+    expect(p).toEqual(['0', '6']);
+  });
+
+  it('single element when start == end', () => {
+    expect(printed('print steps(3, 3)')).toEqual(['[3]']);
+  });
+
+  it('negative step', () => {
+    expect(printed('print steps(10, 0, -2)')).toEqual(['[10, 8, 6, 4, 2, 0]']);
+  });
+
+  it('direction mismatch yields empty list', () => {
+    expect(printed('print steps(5, 0)')).toEqual(['[]']);
+    expect(printed('print steps(0, 5, -1)')).toEqual(['[]']);
+  });
+
+  it('step = 0 throws', () => {
+    expect(() => run('let x = steps(0, 5, 0)')).toThrow(/step can't be 0/);
+  });
+
+  it('floating-point edge: steps(0, 1, 0.1) yields 11 elements', () => {
+    expect(printed('print len(steps(0, 1, 0.1))')).toEqual(['11']);
+  });
+
+  it('steps composes with other list functions', () => {
+    expect(printed('print sum(steps(0, 4))')).toEqual(['10']); // 0+1+2+3+4
+  });
+});
+
+// ── @builtin references ─────────────────────────────────────────────────────
+describe('@builtin references', () => {
+  it('@sin resolves as a FuncRef', () => {
+    // just verify it parses and produces a value (FuncRef prints as @sin)
+    expect(printed('print @sin')).toEqual(['@sin']);
+  });
+
+  it('@vadd resolves as a FuncRef', () => {
+    expect(printed('print @vadd')).toEqual(['@vadd']);
+  });
+
+  it('@vlen resolves as a FuncRef', () => {
+    expect(printed('print @vlen')).toEqual(['@vlen']);
+  });
+
+  it('@fd (command) is rejected at parse time', () => {
+    expect(() => run('print @fd')).toThrow(/doesn't return a value/);
+  });
+
+  it('@sewpath (gen command) is rejected at parse time', () => {
+    expect(() => run('print @sewpath')).toThrow(/doesn't return a value/);
+  });
+
+  it('@append (list command) is rejected at parse time', () => {
+    expect(() => run('print @append')).toThrow(/doesn't return a value/);
+  });
+
+  it('user proc shadows builtin for @ref', () => {
+    // vlen is a library-tier builtin that can be shadowed
+    expect(printed('def vlen(x) [ return x * 10 ] print map([3], @vlen)')).toEqual(['[30]']);
+  });
+});
+
+// ── map() ────────────────────────────────────────────────────────────────────
+describe('map()', () => {
+  it('applies a user-defined function to every element', () => {
+    expect(printed('def double(x) [ return x * 2 ] print map([1, 2, 3], @double)')).toEqual([
+      '[2, 4, 6]',
+    ]);
+  });
+
+  it('works with @abs builtin', () => {
+    expect(printed('print map([-3, -1, 2], @abs)')).toEqual(['[3, 1, 2]']);
+  });
+
+  it('works with @vlen on points', () => {
+    const p = printed('print map([[3, 4], [0, 1]], @vlen)');
+    expect(p).toEqual(['[5, 1]']);
+  });
+
+  it('empty list returns empty list', () => {
+    expect(printed('def id(x) [ return x ] print map([], @id)')).toEqual(['[]']);
+  });
+
+  it('preserves order', () => {
+    expect(printed('def inc(x) [ return x + 1 ] print map([10, 20, 30], @inc)')).toEqual([
+      '[11, 21, 31]',
+    ]);
+  });
+
+  it('rejects non-FuncRef callback', () => {
+    expect(() => run('let x = map([1, 2], 5)')).toThrow(/@procedure reference/);
+  });
+
+  it('rejects non-list first argument', () => {
+    expect(() => run('def f(x) [ return x ] let x = map(42, @f)')).toThrow(/expected a list/);
+  });
+
+  it('errors when callback may not return a value (static check)', () => {
+    expect(() => run('def noop(x) [ print x ] let x = map([1], @noop)')).toThrow(
+      /may finish without returning a value/,
+    );
+  });
+
+  it('works with steps and builtin ref for a complete pipeline', () => {
+    expect(printed('print map(steps(0, 3), @floor)')).toEqual(['[0, 1, 2, 3]']);
+  });
+});
+
+// ── filter() ─────────────────────────────────────────────────────────────────
+describe('filter()', () => {
+  it('keeps elements that pass a predicate', () => {
+    expect(printed('def big(x) [ return x > 2 ] print filter([1, 2, 3, 4, 5], @big)')).toEqual([
+      '[3, 4, 5]',
+    ]);
+  });
+
+  it('all pass → same elements', () => {
+    expect(printed('def yes(x) [ return 1 ] print filter([1, 2, 3], @yes)')).toEqual(['[1, 2, 3]']);
+  });
+
+  it('none pass → empty', () => {
+    expect(printed('def no(x) [ return 0 ] print filter([1, 2, 3], @no)')).toEqual(['[]']);
+  });
+
+  it('empty input → empty output', () => {
+    expect(printed('def yes(x) [ return 1 ] print filter([], @yes)')).toEqual(['[]']);
+  });
+
+  it('rejects non-FuncRef callback', () => {
+    expect(() => run('let x = filter([1, 2], [3, 4])')).toThrow(/@procedure reference/);
+  });
+});
+
+// ── reduce() ─────────────────────────────────────────────────────────────────
+describe('reduce()', () => {
+  it('sums numbers with a user-defined add', () => {
+    expect(printed('def add(a, b) [ return a + b ] print reduce([1, 2, 3, 4], @add, 0)')).toEqual([
+      '10',
+    ]);
+  });
+
+  it('works with @vadd on points', () => {
+    expect(printed('print reduce([[1, 2], [3, 4], [5, 6]], @vadd, [0, 0])')).toEqual(['[9, 12]']);
+  });
+
+  it('empty list returns initial value', () => {
+    expect(printed('def add(a, b) [ return a + b ] print reduce([], @add, 42)')).toEqual(['42']);
+  });
+
+  it('single element applies fn once', () => {
+    expect(printed('def add(a, b) [ return a + b ] print reduce([10], @add, 5)')).toEqual(['15']);
+  });
+
+  it('rejects non-FuncRef callback', () => {
+    expect(() => run('let x = reduce([1, 2], 99, 0)')).toThrow(/@procedure reference/);
+  });
+
+  it('works with builtin @max', () => {
+    expect(printed('print reduce([3, 7, 2, 9, 1], @max, 0)')).toEqual(['9']);
+  });
+});
+
+// ── Integration: map + filter + reduce + steps ───────────────────────────────
+describe('HOF integration', () => {
+  it('map + filter pipeline', () => {
+    expect(
+      printed(
+        'def double(x) [ return x * 2 ] def big(x) [ return x > 4 ] print filter(map([1, 2, 3], @double), @big)',
+      ),
+    ).toEqual(['[6]']);
+  });
+
+  it('steps + map + reduce pipeline', () => {
+    expect(
+      printed(
+        'def sq(x) [ return x * x ] def add(a, b) [ return a + b ] print reduce(map(steps(1, 3), @sq), @add, 0)',
+      ),
+    ).toEqual(['14']); // 1+4+9
+  });
+
+  it('map with @vfromheading to build a ring of points', () => {
+    // Verify we can map a builtin with 2 params if we wrap it
+    expect(
+      printed(
+        'def petal(t) [ return vfromheading(t * 60, 10) ] let ring = map(steps(0, 5), @petal) print len(ring)',
+      ),
+    ).toEqual(['6']);
+  });
+});

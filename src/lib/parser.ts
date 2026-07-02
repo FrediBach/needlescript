@@ -1129,32 +1129,40 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       next();
       return { k: 'var', name: tok.v as string, line: tok.line };
     }
-    // "@name" — a procedure reference, fed to warp / warppath. Resolved against
-    // the pre-scan: it must name a procedure the program defines (not a builtin
-    // or a variable), or the error says exactly that.
+    // "@name" — a procedure or function reference. User procs are resolved
+    // from the pre-scan; built-in *functions* (value-returning) are also
+    // accepted so that map/filter/reduce can use @vadd, @sin, etc.
+    // Statement-only builtins (fd, sewpath, append…) are rejected because
+    // they don't return a value.
     if (tok.t === 'pref') {
       next();
       const name = tok.v as string;
-      if (procArity[name] === undefined) {
-        const kind = builtinKind(name);
-        if (
-          kind ||
-          LIST_FUNCS[name] !== undefined ||
-          GEN_FUNCS[name] !== undefined ||
-          QUERY_FUNCS[name] !== undefined ||
-          LIST_CMDS[name] !== undefined ||
-          GEN_CMDS[name] !== undefined
-        )
-          throw new NeedlescriptError(
-            `@${name} must reference a procedure you defined with def/to, not a ${kind ?? 'built-in'}`,
-            tok.line,
-          );
+      // 1. User-defined procedure — always accepted (shadows builtins)
+      if (procArity[name] !== undefined) {
+        return { k: 'procref', name, line: tok.line };
+      }
+      // 2. Value-returning builtins — accepted as references
+      if (
+        FUNC_ARITY[name] !== undefined ||
+        ZERO_FUNCS.has(name) ||
+        LIST_FUNCS[name] !== undefined ||
+        GEN_FUNCS[name] !== undefined ||
+        QUERY_FUNCS[name] !== undefined
+      ) {
+        return { k: 'procref', name, line: tok.line };
+      }
+      // 3. Statement-only builtins — explicit rejection with helpful message
+      const kind = builtinKind(name);
+      if (kind || LIST_CMDS[name] !== undefined || GEN_CMDS[name] !== undefined)
         throw new NeedlescriptError(
-          `@${name} — no procedure named "${name}"${didYouMean(name, Object.keys(procArity))}`,
+          `@${name} can't be used as a reference — "${name}" is a ${kind ?? 'command'} that doesn't return a value`,
           tok.line,
         );
-      }
-      return { k: 'procref', name, line: tok.line };
+      // 4. Unknown name
+      throw new NeedlescriptError(
+        `@${name} — no procedure or function named "${name}"${didYouMean(name, [...Object.keys(procArity), ...Object.keys(FUNC_ARITY), ...Object.keys(LIST_FUNCS), ...Object.keys(GEN_FUNCS)])}`,
+        tok.line,
+      );
     }
     if (tok.t === ',')
       throw new NeedlescriptError(

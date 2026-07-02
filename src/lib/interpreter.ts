@@ -4,7 +4,7 @@ import type { ASTNode, ExprNode, RunResult, RunOptions, WarningLocation } from '
 import { NeedlescriptError } from './errors.ts';
 import { makeRNG, makeNoise, fork, gauss } from './prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
-import { FABRICS, GEN_FUNCS, QUERY_FUNCS } from './commands.ts';
+import { FABRICS, FUNC_ARITY, ZERO_FUNCS, LIST_FUNCS, GEN_FUNCS, QUERY_FUNCS } from './commands.ts';
 import { Machine, LIMITS } from './machine.ts';
 import { tokenize } from './tokenizer.ts';
 import { parse } from './parser.ts';
@@ -175,13 +175,23 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     return v;
   }
 
+  /** The value must be a @procedure reference. */
+  function funcRef(v: Val, what: string, line?: number): FuncRef {
+    if (!isFuncRef(v))
+      throw new NeedlescriptError(
+        `"${what}" expected a @procedure reference, got ${isList(v) ? 'a list' : 'a number'}`,
+        line,
+      );
+    return v;
+  }
+
   /** Check that nesting an element one level deeper stays within the cap. */
   function checkDepth(v: Val, line?: number) {
     if (isList(v) && valDepth(v) + 1 > LIMITS.maxListDepth)
       throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`, line);
   }
 
-  function listFunc(name: string, args: Val[], line: number | undefined): Val {
+  function listFunc(name: string, args: Val[], line: number | undefined, depth = 0): Val {
     switch (name) {
       case 'range': {
         const a = args.length === 1 ? 0 : num(args[0], 'range', line);
@@ -334,6 +344,59 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         cells -= 1;
         tick(line);
         return removed;
+      }
+
+      // ---------- steps: inclusive numeric sequence ----------
+      case 'steps': {
+        const start = num(args[0], 'steps', line);
+        const end = num(args[1], 'steps', line);
+        const step = args.length === 3 ? num(args[2], 'steps', line) : 1;
+        if (step === 0) throw new NeedlescriptError("steps: step can't be 0", line);
+        // Direction mismatch → empty list (consistent with range)
+        if ((end - start) * step < 0) return allocList([], line);
+        // Inclusive end with floating-point tolerance
+        const count = Math.floor(Math.abs((end - start) / step) + 1e-9) + 1;
+        if (count > LIMITS.maxListLen)
+          throw new NeedlescriptError(
+            `List too long (${count.toLocaleString('en-US')} elements, limit ${LIMITS.maxListLen.toLocaleString('en-US')})`,
+            line,
+          );
+        const out: Val[] = [];
+        for (let k = 0; k < count; k++) out.push(start + k * step);
+        return allocList(out, line);
+      }
+
+      // ---------- Higher-order list functions ----------
+      case 'map': {
+        const xs = list(args[0], 'map', line);
+        const ref = funcRef(args[1], 'map', line);
+        const out: Val[] = [];
+        for (const item of xs.items) {
+          tick(line);
+          out.push(callRef(ref, [item], depth + 1, line));
+        }
+        return allocList(out, line);
+      }
+      case 'filter': {
+        const xs = list(args[0], 'filter', line);
+        const ref = funcRef(args[1], 'filter', line);
+        const out: Val[] = [];
+        for (const item of xs.items) {
+          tick(line);
+          const result = callRef(ref, [item], depth + 1, line);
+          if (truthy(result, `filter callback @${ref.name}`, line)) out.push(item);
+        }
+        return allocList(out, line);
+      }
+      case 'reduce': {
+        const xs = list(args[0], 'reduce', line);
+        const ref = funcRef(args[1], 'reduce', line);
+        let acc = args[2]; // initial value (required)
+        for (const item of xs.items) {
+          tick(line);
+          acc = callRef(ref, [acc, item], depth + 1, line);
+        }
+        return acc;
       }
     }
     throw new NeedlescriptError(`Unknown function ${name}`, line);
@@ -765,7 +828,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         if (GEN_FUNCS[node.name] !== undefined)
           return genFunc(node.name, args, node.line, node.word);
         if (QUERY_FUNCS[node.name] !== undefined) return queryFunc(node.name, args, node.line);
-        return listFunc(node.name, args, node.line);
+        return listFunc(node.name, args, node.line, depth);
       }
       case 'bin': {
         // and / or short-circuit so guards like  :i > 0 and 10 / :i > 2  are safe
@@ -833,69 +896,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         throw new NeedlescriptError('Unknown operator');
       }
       case 'func': {
-        if (node.name === 'not')
-          return truthy(evalExpr(node.args[0], env, repcount, depth), 'not', node.line) === 0
-            ? 1
-            : 0;
-        // Every legacy function is scalar — a list operand is a type error
-        // naming the function (RFC-2 §2).
-        const args = node.args.map((a) =>
-          num(evalExpr(a, env, repcount, depth), node.name, node.line),
-        );
-        switch (node.name) {
-          case 'random':
-            return rng() * args[0];
-          case 'sin':
-            return Math.sin((args[0] * Math.PI) / 180);
-          case 'cos':
-            return Math.cos((args[0] * Math.PI) / 180);
-          case 'sqrt':
-            if (args[0] < 0) throw new NeedlescriptError('sqrt of a negative number', node.line);
-            return Math.sqrt(args[0]);
-          case 'abs':
-            return Math.abs(args[0]);
-          case 'round':
-            return Math.round(args[0]);
-          case 'floor':
-            return Math.floor(args[0]);
-          case 'ceil':
-            return Math.ceil(args[0]);
-          case 'min':
-            return Math.min(args[0], args[1]);
-          case 'max':
-            return Math.max(args[0], args[1]);
-          case 'pow': {
-            const v = Math.pow(args[0], args[1]);
-            if (!isFinite(v))
-              throw new NeedlescriptError(
-                `pow ${formatNum(args[0])} ${formatNum(args[1])} is not a finite number`,
-                node.line,
-              );
-            return v;
-          }
-          case 'mod':
-            return ((args[0] % args[1]) + args[1]) % args[1];
-          // heading-convention angle of the vector (x, y): 0 = up/north, clockwise
-          case 'atan':
-            return ((Math.atan2(args[0], args[1]) * 180) / Math.PI + 360) % 360;
-          case 'noise':
-            return noise(args[0]);
-          case 'noise2':
-            return noise(args[0], args[1]);
-          case 'distance':
-            return Math.hypot(args[0] - m.x, args[1] - m.y);
-          case 'towards':
-            return ((Math.atan2(args[0] - m.x, args[1] - m.y) * 180) / Math.PI + 360) % 360;
-          case 'repcount':
-            return repcount;
-          case 'xcor':
-            return m.x;
-          case 'ycor':
-            return m.y;
-          case 'heading':
-            return m.heading;
-        }
-        throw new NeedlescriptError(`Unknown function ${node.name}`, node.line);
+        // repcount is special: it reads from the current eval context
+        if (node.name === 'repcount') return repcount;
+        // Evaluate args, then delegate to the shared scalarBuiltin dispatcher
+        const vals = node.args.map((a) => evalExpr(a, env, repcount, depth));
+        return scalarBuiltin(node.name, vals, node.line);
       }
       case 'callexpr': {
         const v = callProc(node.name, node.args, env, repcount, depth, node.line);
@@ -970,6 +975,103 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       throw e;
     }
     return undefined;
+  }
+
+  // ---------- Built-in function reference dispatch ----------
+  //
+  // When map/filter/reduce receive a @ref, callRef dispatches it:
+  //   1. user proc (shadows builtins)  → callProcVals
+  //   2. scalar builtin (sin, cos …)   → scalarBuiltin
+  //   3. list/gen/query builtin        → listFunc / genFunc / queryFunc
+  //
+  // The scalar built-in switch is extracted so evalExpr case 'func' and
+  // callRef can share it without duplication.
+
+  /**
+   * Evaluate a scalar built-in function (`FUNC_ARITY` / `ZERO_FUNCS` tier)
+   * on already-evaluated argument values. Used by both `evalExpr` and `callRef`.
+   */
+  function scalarBuiltin(name: string, argVals: Val[], line?: number): Val {
+    if (name === 'not') return truthy(argVals[0], 'not', line) === 0 ? 1 : 0;
+    const args = argVals.map((a) => num(a, name, line));
+    switch (name) {
+      case 'random':
+        return rng() * args[0];
+      case 'sin':
+        return Math.sin((args[0] * Math.PI) / 180);
+      case 'cos':
+        return Math.cos((args[0] * Math.PI) / 180);
+      case 'sqrt':
+        if (args[0] < 0) throw new NeedlescriptError('sqrt of a negative number', line);
+        return Math.sqrt(args[0]);
+      case 'abs':
+        return Math.abs(args[0]);
+      case 'round':
+        return Math.round(args[0]);
+      case 'floor':
+        return Math.floor(args[0]);
+      case 'ceil':
+        return Math.ceil(args[0]);
+      case 'min':
+        return Math.min(args[0], args[1]);
+      case 'max':
+        return Math.max(args[0], args[1]);
+      case 'pow': {
+        const v = Math.pow(args[0], args[1]);
+        if (!isFinite(v))
+          throw new NeedlescriptError(
+            `pow ${formatNum(args[0])} ${formatNum(args[1])} is not a finite number`,
+            line,
+          );
+        return v;
+      }
+      case 'mod':
+        return ((args[0] % args[1]) + args[1]) % args[1];
+      case 'atan':
+        return ((Math.atan2(args[0], args[1]) * 180) / Math.PI + 360) % 360;
+      case 'noise':
+        return noise(args[0]);
+      case 'noise2':
+        return noise(args[0], args[1]);
+      case 'distance':
+        return Math.hypot(args[0] - m.x, args[1] - m.y);
+      case 'towards':
+        return ((Math.atan2(args[0] - m.x, args[1] - m.y) * 180) / Math.PI + 360) % 360;
+      // Zero-arg reporters
+      case 'xcor':
+        return m.x;
+      case 'ycor':
+        return m.y;
+      case 'heading':
+        return m.heading;
+    }
+    throw new NeedlescriptError(`Unknown function ${name}`, line);
+  }
+
+  /**
+   * Invoke a function reference (user proc or built-in) with the given
+   * argument values. Used by map, filter, reduce, and any future HOFs.
+   */
+  function callRef(ref: FuncRef, argVals: Val[], depth: number, line?: number): Val {
+    // 1. User-defined proc takes priority (can shadow builtins)
+    if (procs[ref.name]) {
+      const result = callProcVals(ref.name, argVals, depth, line);
+      if (result === undefined)
+        throw new NeedlescriptError(
+          `"${ref.name}" must return a value when used as a callback`,
+          line,
+        );
+      return result;
+    }
+    // 2. Scalar builtins (FUNC_ARITY + ZERO_FUNCS)
+    if (FUNC_ARITY[ref.name] !== undefined || ZERO_FUNCS.has(ref.name))
+      return scalarBuiltin(ref.name, argVals, line);
+    // 3. List / Gen / Query builtins
+    if (LIST_FUNCS[ref.name] !== undefined) return listFunc(ref.name, argVals, line);
+    if (GEN_FUNCS[ref.name] !== undefined) return genFunc(ref.name, argVals, line);
+    if (QUERY_FUNCS[ref.name] !== undefined) return queryFunc(ref.name, argVals, line);
+
+    throw new NeedlescriptError(`Unknown function "${ref.name}" in @${ref.name} reference`, line);
   }
 
   /**

@@ -274,10 +274,10 @@ describe('after-split effects skip satin columns', () => {
 // ── 8: @name procedure references — the contract and its errors ──────────────
 describe('@name procedure references', () => {
   it('an unknown name is a parse error naming the missing procedure', () => {
-    expect(() => run('warp @nope [ fd 5 ]')).toThrow(/no procedure named "nope"/);
+    expect(() => run('warp @nope [ fd 5 ]')).toThrow(/no procedure or function named "nope"/);
   });
-  it('a built-in cannot be referenced', () => {
-    expect(() => run('warp @fd [ fd 5 ]')).toThrow(/must reference a procedure you defined/);
+  it('a built-in command cannot be referenced', () => {
+    expect(() => run('warp @fd [ fd 5 ]')).toThrow(/can't be used as a reference/);
   });
   it('a reporter that never outputs a value is an error', () => {
     // RFC DX item 6: parse-time reporter-path check promotes this to a compile error.

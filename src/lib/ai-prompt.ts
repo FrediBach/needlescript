@@ -111,6 +111,11 @@ concat(a,b) slice(xs,a) slice(xs,a,b) reverse(xs) sort(xs) copy(xs)
 first(xs) last(xs) indexof(xs,v) contains(xs,v)
 sum(xs) mean(xs) minof(xs) maxof(xs)
 pos() setpos(p)      — needle position as [x,y]
+steps(a,b) steps(a,b,step) — inclusive numeric sequence (default step=1)
+map(xs, @fn)         — apply fn to each element, return new list
+filter(xs, @fn)      — keep elements where fn returns truthy
+reduce(xs, @fn, init) — fold with fn(acc, item) from init
+// @name can reference user procs or built-in functions: @vadd @sin @abs etc.
 
 ## Generative math — vectors (call-syntax only)
 vadd(a,b) vsub(a,b) vscale(a,s) vlerp(a,b,t) vdot(a,b) vlen(a) vdist(a,b)

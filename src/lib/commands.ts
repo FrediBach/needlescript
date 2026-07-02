@@ -187,6 +187,11 @@ export const LIST_FUNCS: Record<string, { min: number; max: number }> = {
   shuffle: { min: 1, max: 1 },
   pos: { min: 0, max: 0 },
   removeat: { min: 2, max: 2 },
+  // Higher-order list functions
+  steps: { min: 2, max: 3 }, // steps(start, end) or steps(start, end, step)
+  map: { min: 2, max: 2 }, // map(list, @fn)
+  filter: { min: 2, max: 2 }, // filter(list, @fn)
+  reduce: { min: 3, max: 3 }, // reduce(list, @fn, initial)
 };
 
 /** List commands usable as statements (mutators + setpos). */

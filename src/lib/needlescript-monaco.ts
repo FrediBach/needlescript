@@ -1265,6 +1265,59 @@ const NS_ITEMS: NSItem[] = [
     params: [['point']],
   },
 
+  // ── Higher-order list functions ──────────────────────────────────────────
+  {
+    label: 'steps',
+    kindName: 'function',
+    detail: 'inclusive numeric sequence',
+    documentation:
+      'Generate a list of evenly spaced numbers from `start` to `end` (inclusive).\n\n' +
+      '`steps(0, 6)` → `[0, 1, 2, 3, 4, 5, 6]`\n\n' +
+      '`steps(0, 6, 0.2)` → `[0, 0.2, 0.4, …, 5.8, 6]`\n\n' +
+      'Unlike `range`, the end value is included when it falls exactly on a step boundary.',
+    insertText: 'steps(${1:start}, ${2:end}, ${3:step})',
+    isSnippet: true,
+    params: [
+      ['start', 'end'],
+      ['start', 'end', 'step'],
+    ],
+  },
+  {
+    label: 'map',
+    kindName: 'function',
+    detail: 'apply function to every element',
+    documentation:
+      'Return a new list by applying `@fn` to each element of `list`.\n\n' +
+      '```\ndef double(x) [ return x * 2 ]\nprint map([1, 2, 3], @double)  // [2, 4, 6]\n```\n\n' +
+      'The callback can be a user-defined procedure (`@myProc`) or a built-in function (`@vlen`, `@abs`, …).',
+    insertText: 'map(${1:list}, @${2:fn})',
+    isSnippet: true,
+    params: [['list', '@fn']],
+  },
+  {
+    label: 'filter',
+    kindName: 'function',
+    detail: 'keep elements that pass a test',
+    documentation:
+      'Return a new list keeping only elements for which `@fn` returns a truthy value.\n\n' +
+      '```\ndef big(x) [ return x > 2 ]\nprint filter([1, 2, 3, 4], @big)  // [3, 4]\n```',
+    insertText: 'filter(${1:list}, @${2:fn})',
+    isSnippet: true,
+    params: [['list', '@fn']],
+  },
+  {
+    label: 'reduce',
+    kindName: 'function',
+    detail: 'fold list into a single value',
+    documentation:
+      'Fold `list` with `@fn(accumulator, element)` starting from `init`.\n\n' +
+      '```\ndef add(a, b) [ return a + b ]\nprint reduce([1, 2, 3], @add, 0)  // 6\n```\n\n' +
+      'Works with built-in functions too: `reduce(points, @vadd, [0, 0])`.',
+    insertText: 'reduce(${1:list}, @${2:fn}, ${3:init})',
+    isSnippet: true,
+    params: [['list', '@fn', 'init']],
+  },
+
   // ── Generative math — scalars & noise ────────────────────────────────────
   {
     label: 'lerp',
@@ -2161,6 +2214,11 @@ export function registerNeedlescript(monaco: Monaco): void {
       'prepend',
       'insertat',
       'setpos',
+      // higher-order list functions
+      'steps',
+      'map',
+      'filter',
+      'reduce',
       // generative math
       'snoise2',
       'snoise3',
