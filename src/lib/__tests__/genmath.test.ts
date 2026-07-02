@@ -159,6 +159,125 @@ describe('vector functions (§4.3)', () => {
   });
 });
 
+// ── §4.3b segments ───────────────────────────────────────────────────────────
+describe('segments: segisect, segdist, nearestonpath (§4.3b)', () => {
+  // ── segisect ───────────────────────────────────────────────────────────────
+  it('segisect: simple X crossing', () => {
+    expect(first('print segisect([0, 0], [10, 10], [10, 0], [0, 10])')).toBe('[5, 5]');
+  });
+
+  it('segisect: shared endpoint touch counts as intersection', () => {
+    expect(first('print segisect([0, 0], [5, 5], [5, 5], [10, 0])')).toBe('[5, 5]');
+  });
+
+  it('segisect: parallel non-overlapping → []', () => {
+    expect(first('print segisect([0, 0], [10, 0], [0, 1], [10, 1])')).toBe('[]');
+  });
+
+  it('segisect: collinear overlapping → midpoint of overlap', () => {
+    // overlap is [5,0]..[10,0], midpoint = [7.5, 0]
+    expect(first('print segisect([0, 0], [10, 0], [5, 0], [15, 0])')).toBe('[7.5, 0]');
+  });
+
+  it('segisect: collinear non-overlapping → []', () => {
+    expect(first('print segisect([0, 0], [3, 0], [5, 0], [10, 0])')).toBe('[]');
+  });
+
+  it("segisect: lines cross but segments don't → []", () => {
+    expect(first('print segisect([0, 0], [1, 1], [0, 10], [1, 11])')).toBe('[]');
+  });
+
+  it('segisect: identical segments → midpoint', () => {
+    expect(first('print segisect([0, 0], [10, 0], [0, 0], [10, 0])')).toBe('[5, 0]');
+  });
+
+  it('segisect: degenerate point-on-segment', () => {
+    expect(first('print segisect([5, 5], [5, 5], [0, 0], [10, 10])')).toBe('[5, 5]');
+  });
+
+  it('segisect: degenerate both points, coincident', () => {
+    expect(first('print segisect([3, 4], [3, 4], [3, 4], [3, 4])')).toBe('[3, 4]');
+  });
+
+  it('segisect: degenerate both points, distinct → []', () => {
+    expect(first('print segisect([0, 0], [0, 0], [1, 1], [1, 1])')).toBe('[]');
+  });
+
+  it('segisect: type errors', () => {
+    expect(() => run('print segisect(5, [1, 1], [2, 2], [3, 3])')).toThrow(/segisect/);
+  });
+
+  // ── segdist ────────────────────────────────────────────────────────────────
+  it('segdist: perpendicular foot on segment', () => {
+    expect(first('print segdist([5, 5], [0, 0], [10, 0])')).toBe('5');
+  });
+
+  it('segdist: foot past endpoint a → distance to a', () => {
+    expect(first('print segdist([-5, 0], [0, 0], [10, 0])')).toBe('5');
+  });
+
+  it('segdist: foot past endpoint b → distance to b', () => {
+    expect(first('print segdist([15, 0], [0, 0], [10, 0])')).toBe('5');
+  });
+
+  it('segdist: zero-length segment ≡ vdist', () => {
+    expect(first('print segdist([3, 4], [0, 0], [0, 0])')).toBe('5');
+  });
+
+  it('segdist: point on segment → 0', () => {
+    expect(first('print segdist([5, 0], [0, 0], [10, 0])')).toBe('0');
+  });
+
+  it('segdist: type errors', () => {
+    expect(() => run('print segdist(5, [0, 0], [10, 0])')).toThrow(/segdist/);
+  });
+
+  // ── nearestonpath ──────────────────────────────────────────────────────────
+  it('nearestonpath: closest on a middle segment', () => {
+    expect(first('print nearestonpath([5, 5], [[0, 0], [10, 0], [10, 10]])')).toBe('[5, 0]');
+  });
+
+  it('nearestonpath: closest along a later segment', () => {
+    expect(first('print nearestonpath([11, 5], [[0, 0], [10, 0], [10, 10]])')).toBe('[10, 5]');
+  });
+
+  it('nearestonpath: single-point path', () => {
+    expect(first('print nearestonpath([3, 4], [[0, 0]])')).toBe('[0, 0]');
+  });
+
+  it('nearestonpath: two-point path agrees with segdist', () => {
+    // closest point on segment [0,0]→[10,0] to [5,5] is [5,0]
+    expect(first('print nearestonpath([5, 5], [[0, 0], [10, 0]])')).toBe('[5, 0]');
+    // distance should match
+    const r = run(
+      'let p = nearestonpath([5, 5], [[0, 0], [10, 0]])\n' +
+        'print vdist([5, 5], p) = segdist([5, 5], [0, 0], [10, 0])',
+    );
+    expect(r.printed[0]).toBe('1');
+  });
+
+  it('nearestonpath: empty path → error', () => {
+    expect(() => run('print nearestonpath([0, 0], [])')).toThrow(/nearestonpath/);
+  });
+
+  it('nearestonpath: open path — no implicit closing segment', () => {
+    // L-shaped path with opening from [10,10] back to [0,0].
+    // Point [5, 5] is closest to the first segment at [5, 0] (dist 5),
+    // NOT to a hypothetical closing segment [10,10]→[0,0] which would
+    // be closer at ~[5, 5] itself.
+    const r = run('let path = [[0, 0], [10, 0], [10, 10]]\n' + 'print nearestonpath([5, 5], path)');
+    expect(r.printed[0]).toBe('[5, 0]');
+  });
+
+  it('nearestonpath: call-syntax required', () => {
+    expect(() => run('let p = [[0, 0], [1, 1]]\nnearestonpath [0, 0] p')).toThrow(/call syntax/);
+  });
+
+  it('nearestonpath: type errors', () => {
+    expect(() => run('print nearestonpath(5, [[0, 0], [1, 1]])')).toThrow(/nearestonpath/);
+  });
+});
+
 // ── §4.4 paths & curves ──────────────────────────────────────────────────────
 describe('paths & curves (§4.4)', () => {
   it('pathlen sums the polyline', () => {

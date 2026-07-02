@@ -119,6 +119,99 @@ export const vfromheading = (deg: number, len: number): Pt => [
   len * Math.cos(deg * DEG),
 ];
 
+// ---------- §4.3b Segments ----------
+
+/** Closest point on segment a→b to point p (clamped projection). */
+function closestPtOnSeg(p: Pt, a: Pt, b: Pt): Pt {
+  const dx = b[0] - a[0],
+    dy = b[1] - a[1];
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return a; // degenerate: a === b
+  const t = clamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq, 0, 1);
+  return [a[0] + t * dx, a[1] + t * dy];
+}
+
+/**
+ * Intersection point of segment a0→a1 and b0→b1, or null if they don't cross.
+ * Segment test, not infinite-line — both t and u must lie in 0..1.
+ * Collinear overlapping segments return the midpoint of the overlap.
+ */
+export function segisect(a0: Pt, a1: Pt, b0: Pt, b1: Pt): Pt | null {
+  const d1x = a1[0] - a0[0],
+    d1y = a1[1] - a0[1];
+  const d2x = b1[0] - b0[0],
+    d2y = b1[1] - b0[1];
+  const det = d1x * d2y - d1y * d2x;
+  const EPS = 1e-9;
+
+  if (Math.abs(det) > EPS) {
+    // Non-parallel: solve for t, u
+    const dx = b0[0] - a0[0],
+      dy = b0[1] - a0[1];
+    const t = (dx * d2y - dy * d2x) / det;
+    const u = (dx * d1y - dy * d1x) / det;
+    if (t >= -EPS && t <= 1 + EPS && u >= -EPS && u <= 1 + EPS) {
+      const tc = clamp(t, 0, 1);
+      return [a0[0] + tc * d1x, a0[1] + tc * d1y];
+    }
+    return null;
+  }
+
+  // Parallel — check if collinear
+  const ex = b0[0] - a0[0],
+    ey = b0[1] - a0[1];
+  const cross = ex * d1y - ey * d1x;
+  if (Math.abs(cross) > EPS) return null; // parallel but not collinear
+
+  // Collinear — project onto the axis with the larger span
+  const axis = Math.abs(d1x) >= Math.abs(d1y) ? 0 : 1;
+  const lenSq = axis === 0 ? d1x * d1x : d1y * d1y;
+  if (lenSq === 0) {
+    // Segment a is a point — check if it lies on b
+    const bLenSq = d2x * d2x + d2y * d2y;
+    if (bLenSq === 0) {
+      // Both degenerate to the same point?
+      return Math.abs(a0[0] - b0[0]) <= EPS && Math.abs(a0[1] - b0[1]) <= EPS ? a0 : null;
+    }
+    const ub = ((a0[0] - b0[0]) * d2x + (a0[1] - b0[1]) * d2y) / bLenSq;
+    return ub >= -EPS && ub <= 1 + EPS ? [a0[0], a0[1]] : null;
+  }
+
+  // Project b0 and b1 onto segment a's parameter space
+  const tb0 = (b0[axis] - a0[axis]) / (a1[axis] - a0[axis]);
+  const tb1 = (b1[axis] - a0[axis]) / (a1[axis] - a0[axis]);
+  const tlo = Math.min(tb0, tb1),
+    thi = Math.max(tb0, tb1);
+  const oStart = Math.max(tlo, 0),
+    oEnd = Math.min(thi, 1);
+  if (oStart > oEnd + EPS) return null; // no overlap
+  const tMid = clamp((oStart + oEnd) / 2, 0, 1);
+  return [a0[0] + tMid * d1x, a0[1] + tMid * d1y];
+}
+
+/** Shortest distance from point p to segment a→b. */
+export const segdist = (p: Pt, a: Pt, b: Pt): number => vdist(p, closestPtOnSeg(p, a, b));
+
+/**
+ * Closest point to p lying anywhere on path (vertices or along segments).
+ * Treats path as open (no implicit closing segment). O(len(path)) per call.
+ */
+export function nearestOnPath(p: Pt, path: Pt[], line?: number): Pt {
+  if (path.length === 0) throw new NeedlescriptError('nearestonpath: path must not be empty', line);
+  if (path.length === 1) return [path[0][0], path[0][1]];
+  let best = closestPtOnSeg(p, path[0], path[1]);
+  let bestD = vdist(p, best);
+  for (let i = 1; i < path.length - 1; i++) {
+    const c = closestPtOnSeg(p, path[i], path[i + 1]);
+    const d = vdist(p, c);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  return best;
+}
+
 // ---------- §4.4 Paths & curves ----------
 
 export function pathlen(path: Pt[]): number {

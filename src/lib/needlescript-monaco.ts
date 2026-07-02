@@ -1444,6 +1444,38 @@ const NS_ITEMS: NSItem[] = [
     params: [['degrees', 'length']],
   },
 
+  // ── Generative math — segments ──────────────────────────────────────────
+  {
+    label: 'segisect',
+    kindName: 'function',
+    detail: 'segment-segment intersection point (or [])',
+    documentation:
+      "Intersection point [x, y] of segment a0\u2192a1 and segment b0\u2192b1, or [] if they don't cross.\nSegment test, not infinite-line \u2014 endpoints must actually meet. Collinear overlapping segments return the midpoint of the overlap.",
+    insertText: 'segisect(${1:a0}, ${2:a1}, ${3:b0}, ${4:b1})',
+    isSnippet: true,
+    params: [['a0', 'a1', 'b0', 'b1']],
+  },
+  {
+    label: 'segdist',
+    kindName: 'function',
+    detail: 'distance from point to segment',
+    documentation:
+      'Shortest distance from point p to the segment a\u2192b. If the perpendicular foot falls outside the segment, returns the distance to the nearer endpoint. A zero-length segment behaves like vdist(p, a).',
+    insertText: 'segdist(${1:p}, ${2:a}, ${3:b})',
+    isSnippet: true,
+    params: [['p', 'a', 'b']],
+  },
+  {
+    label: 'nearestonpath',
+    kindName: 'function',
+    detail: 'closest point on a path to a point',
+    documentation:
+      'The closest point to p lying anywhere on path (vertices or along segments). Returns [x, y]. The path is treated as open (no implicit closing segment). O(len(path)) per call.',
+    insertText: 'nearestonpath(${1:p}, ${2:path})',
+    isSnippet: true,
+    params: [['p', 'path']],
+  },
+
   // ── Generative math — paths & curves ────────────────────────────────────
   {
     label: 'pathlen',
@@ -2149,6 +2181,9 @@ export function registerNeedlescript(monaco: Monaco): void {
       'vrot',
       'vheading',
       'vfromheading',
+      'segisect',
+      'segdist',
+      'nearestonpath',
       'pathlen',
       'resample',
       'chaikin',

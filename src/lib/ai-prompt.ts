@@ -117,6 +117,11 @@ vadd(a,b) vsub(a,b) vscale(a,s) vlerp(a,b,t) vdot(a,b) vlen(a) vdist(a,b)
 vnorm(a) vrot(a,deg) vheading(a) vfromheading(deg,len)
 // NOTE: no operator broadcasting — use vadd/vsub, not [1,2]+[3,4]
 
+## Segments (call-syntax only)
+segisect(a0,a1,b0,b1)       — intersection point [x,y] of two segments, or []
+segdist(p,a,b)               — shortest distance from point to segment
+nearestonpath(p,path)        — closest point on an open polyline to p; O(len(path))
+
 ## Paths and curves (call-syntax only)
 resample(path, mm)           — evenly-spaced path (bridges math and stitch space)
 chaikin(path, n)             — corner-cutting smoothing (1–6 passes)

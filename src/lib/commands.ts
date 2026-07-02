@@ -228,6 +228,10 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   vrot: { min: 2, max: 2 },
   vheading: { min: 1, max: 1 },
   vfromheading: { min: 2, max: 2 },
+  // §4.3b segments
+  segisect: { min: 4, max: 4 },
+  segdist: { min: 3, max: 3 },
+  nearestonpath: { min: 2, max: 2 },
   // §4.4 paths & curves
   pathlen: { min: 1, max: 1 },
   resample: { min: 2, max: 2 },

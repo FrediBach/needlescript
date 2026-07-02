@@ -435,6 +435,20 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       case 'vfromheading':
         return point(gm.vfromheading(sc(0), sc(1)));
 
+      // ----- §4.3b segments -----
+      case 'segisect': {
+        const r = gm.segisect(pointArg(0), pointArg(1), pointArg(2), pointArg(3));
+        return r ? point(r) : allocList([], line);
+      }
+      case 'segdist':
+        return gm.segdist(pointArg(0), pointArg(1), pointArg(2));
+      case 'nearestonpath': {
+        const p = pointArg(0);
+        const pts = gm.toPath(args[1], name, line, 1);
+        tickN(pts.length, line);
+        return point(gm.nearestOnPath(p, pts, line));
+      }
+
       // ----- §4.4 paths & curves -----
       case 'pathlen': {
         const p = pathArg(0);
