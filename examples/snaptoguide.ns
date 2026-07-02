@@ -17,6 +17,7 @@ let stitch    = 2.2   // [1:0.1:4]
 
 seed 12
 stitchlen stitch
+moveto -40 0
 
 // a smooth sine-wave guide rail
 let guide = []
