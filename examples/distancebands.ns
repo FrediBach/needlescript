@@ -1,0 +1,56 @@
+// ============================================================
+//  DISTANCE BANDS — STADIUM CONTOURS AROUND A SEGMENT
+//
+//  segdist measures the distance from any point to a line
+//  segment (not the infinite line — the rounded caps at the
+//  endpoints come for free).  This example sweep-fills
+//  concentric distance bands around a single segment,
+//  producing the characteristic stadium / discorectangle
+//  shape of a segment's equidistant contours.
+// ============================================================
+
+// --- geometry ---
+let a       = [-20, 0]   // segment start
+let b       = [20, 0]    // segment end
+let bands   = 5          // [2:10] number of bands
+let bandW   = 4          // [2:0.5:8] band width, mm
+// --- quality ---
+let sweep   = 1.6        // [0.8:0.2:3] horizontal sample spacing, mm
+let stitch  = 1.8        // [1:0.1:4]
+
+stitchlen stitch
+
+// draw the central segment
+down  setpos(a)  setpos(b)  up  trim
+
+// for each band, sweep a grid and stitch horizontal runs
+// where segdist falls inside the band's range
+color 2
+for band = 1 to bands [
+  let dLo = (band - 1) * bandW
+  let dHi = band * bandW
+  let y = -40
+  while y <= 40 [
+    let runStart = 0
+    let inRun = 0
+    let x = -42
+    while x <= 42 [
+      let d = segdist([x, y], a, b)
+      let hit = d >= dLo and d < dHi
+      if hit and !inRun [
+        inRun = 1
+        runStart = x
+      ]
+      if !hit and inRun [
+        inRun = 0
+        up  setxy runStart y  down  setxy x y
+      ]
+      x += sweep
+    ]
+    if inRun [
+      up  setxy runStart y  down  setxy 42 y
+    ]
+    y += bandW
+  ]
+  trim
+]

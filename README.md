@@ -565,6 +565,37 @@ One angle rule: **everything heading-like uses turtle degrees** (0 = north, cloc
 
 There is **no operator broadcasting**: `[1, 2] + [3, 4]` stays a loud error, now with hints (`use vadd(a, b) for element-wise, concat(a, b) to join`). The reason is audience-specific: in Python that expression is _concatenation_, and silently giving it NumPy semantics is the kind of bug that sews before it's noticed.
 
+### Segments
+
+Point-to-point distance is covered by `vdist`; point-in-region by `inpath`. These three fill the remaining gap: **point-to-segment** and **segment-to-segment** queries.
+
+| Function                   | Returns                                                                                                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `segisect(a0, a1, b0, b1)` | the intersection point `[x, y]` of segment `a0→a1` and `b0→b1`, or `[]` if they don't cross. Segment test, not infinite-line — the rails must actually meet. Collinear overlapping segments return the midpoint of the overlap |
+| `segdist(p, a, b)`         | shortest distance from point `p` to segment `a→b` — if the perpendicular foot falls outside the segment, you get the distance to the nearer endpoint. A zero-length segment behaves like `vdist(p, a)`                         |
+| `nearestonpath(p, path)`   | the closest point to `p` lying anywhere on `path` (vertices _or_ along its segments), as a single `[x, y]`. The path is open (no implicit closing segment). O(len(path)) per call                                              |
+
+`segisect` returns `[]` (not an error) when segments don't meet — mirroring `nearestsewn`'s "empty list means none" convention. `nearestonpath` always returns a point for a non-empty path; an empty `path` is a loud error.
+
+```text
+// mark every crossing in a grid of segments
+let hlines = []
+let vlines = []
+for i = -4 to 4 [
+  append(hlines, [[-40, i * 9], [40, i * 9]])
+  append(vlines, [[i * 9, -40], [i * 9, 40]])
+]
+for h in hlines [
+  for v in vlines [
+    let hit = segisect(h[0], h[1], v[0], v[1])
+    if len(hit) > 0 [
+      up  moveto hit[0] hit[1]  down
+      circle 0.6
+    ]
+  ]
+]
+```
+
 ### Paths & curves
 
 | Function                                            | Returns                                                                                                                                                                 |

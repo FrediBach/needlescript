@@ -727,6 +727,32 @@ One angle rule governs everything here: **headings use turtle degrees** (0 = nor
 
 > **There is no operator broadcasting.** `[1, 2] + [3, 4]` is a loud error (with a hint to use `vadd` for element-wise, or `concat` to join). This is deliberate and audience-specific: in Python that expression means _concatenation_, and silently giving it vector semantics would be a bug that sews before anyone notices.
 
+### Segments
+
+You already know how to measure point-to-point distance (`vdist`) and test whether a point is inside a region (`inpath`). Three more functions fill the remaining gap: measuring a point against a **segment**, finding where two **segments** cross, and finding the nearest point on a **path**.
+
+| Function                   | Returns                                                                                                                                                                                       |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `segisect(a0, a1, b0, b1)` | the intersection point `[x, y]` of segment `a0→a1` and `b0→b1`, or `[]` if they don't cross. This is a **segment** test, not an infinite-line test — the rails must actually touch each other |
+| `segdist(p, a, b)`         | shortest distance from point `p` to segment `a→b`. If the perpendicular foot falls outside the segment, you get the distance to the nearer endpoint                                           |
+| `nearestonpath(p, path)`   | the closest point to `p` lying anywhere on `path` (vertices _or_ along its segments), as `[x, y]`. The path is open — no implicit closing segment. O(len(path)) per call                      |
+
+`segisect` returns `[]` (not an error) when segments don't meet — because _not intersecting_ is a perfectly ordinary outcome for two arbitrary segments, not a malformed input. `nearestonpath` always returns a point for a non-empty path; an empty path is a loud error (a program bug, not a normal "no result").
+
+Here's a practical use: snapping a free point onto the nearest spot on a guide path, then stitching a line from the point to that snap target:
+
+```text
+let guide = [[-30, -20], [0, 30], [30, -20]]   // a V-shaped guide
+let p = [20, 10]                                 // some free point
+
+let snap = nearestonpath(p, guide)               // closest point on the guide
+let d = segdist(p, guide[0], guide[1])           // distance to first segment
+
+up  setpos(p)  down  setpos(snap)                // stitch from point to snap
+```
+
+The first call finds where on the polyline `p` is closest; the second measures the gap to a specific segment. They compose naturally with the rest of the vector vocabulary — `segdist` returns a number you can feed to `clamp`, comparisons, or `coverat`-style thresholds.
+
 ---
 
 ## 14. Paths and curves

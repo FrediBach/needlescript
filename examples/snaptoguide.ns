@@ -1,0 +1,42 @@
+// ============================================================
+//  SNAP TO GUIDE — NEAREST POINT ON A PATH
+//
+//  A smooth sine-wave guide rail runs across the hoop.
+//  Scattered points each send a connector line to their
+//  closest spot on the guide, found by nearestonpath.
+//  The result looks like iron filings snapping to a magnet:
+//  every connector is perpendicular where it meets the curve.
+// ============================================================
+
+// --- layout ---
+let amplitude = 15    // [5:30] sine wave height, mm
+let freq      = 18    // [8:36] degrees per guide point
+let mindist   = 13    // [6:20] scatter minimum distance, mm
+// --- quality ---
+let stitch    = 2.2   // [1:0.1:4]
+
+seed 12
+stitchlen stitch
+
+// a smooth sine-wave guide rail
+let guide = []
+for i = 0 to 40 [
+  let x = -40 + i * 2
+  let y = amplitude * sin(i * freq)
+  append(guide, [x, y])
+]
+down  sewpath(resample(guide, stitch))  up  trim
+
+// scatter points around the design
+let pts = scatter(mindist)
+
+// for each point, draw a connector to its nearest spot on
+// the guide — skip points that are already close
+color 3
+for p in pts [
+  let snap = nearestonpath(p, guide)
+  if vdist(p, snap) > 2 [
+    up  setpos(p)  down  setpos(snap)
+  ]
+]
+trim

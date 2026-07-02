@@ -66,6 +66,9 @@ import ornalineRaw from '../examples/ornaline.ns?raw';
 import runnerRaw from '../examples/runner.ns?raw';
 import trianglesRaw from '../examples/triangles.ns?raw';
 import snakeRaw from '../examples/snake.ns?raw';
+import crossingsRaw from '../examples/crossings.ns?raw';
+import distancebandsRaw from '../examples/distancebands.ns?raw';
+import snaptoguideRaw from '../examples/snaptoguide.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -168,6 +171,9 @@ export const EXAMPLES: Record<string, string> = {
   runner: runnerRaw,
   triangles: trianglesRaw,
   snake: snakeRaw,
+  crossings: crossingsRaw,
+  'distance bands': distancebandsRaw,
+  'snap to guide': snaptoguideRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -229,6 +235,9 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'sinewaves',
       'quantized',
       'runner',
+      'crossings',
+      'distance bands',
+      'snap to guide',
     ],
   },
   {
