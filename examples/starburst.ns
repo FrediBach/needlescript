@@ -71,6 +71,7 @@ trim
 color 3
 // close the loop by appending the first point
 let closed = concat(outer, [first(outer)])
+moveto first(outer)[0] first(outer)[1]
 sewpath(catmull(closed, 2))
 trim
 
@@ -85,8 +86,3 @@ for p in tips [
 ]
 satin 0
 trim
-
-// ── draw: centre dot ─────────────────────────────────────────────────
-color 2
-up  setxy(centre[0], centre[1])  down
-circle 2
