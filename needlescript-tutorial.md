@@ -636,7 +636,6 @@ All list functions are **call-syntax only** — `len(xs)`, never `len xs`. The f
 
 | Function                                           | Returns / effect                                                                        |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `range(n)` · `range(a, b)` · `range(a, b, s)`      | `[0…n-1]` / `[a…b-1]` / stepped — 0-based, end-exclusive                                |
 | `filled(n, v)`                                     | a list of _n_ deep copies of _v_                                                        |
 | `len(xs)` · `islist(v)`                            | element count · `1`/`0`                                                                 |
 | `first(xs)` · `last(xs)`                           | `xs[0]` · `xs[-1]`                                                                      |
@@ -653,6 +652,61 @@ All list functions are **call-syntax only** — `len(xs)`, never `len xs`. The f
 | `pos()` · `setpos(p)`                              | the needle's position as `[x, y]` · move there (`setpos` makes record/replay symmetric) |
 
 > **`push`/`pop` are taken** — they save and restore the _turtle state_ (section 4), not lists. To grow a list, use `append(xs, v)`.
+
+### Sequences: range and steps
+
+Two ways to generate numeric sequences:
+
+| Function                                      | Returns                                                           |
+| --------------------------------------------- | ----------------------------------------------------------------- |
+| `range(n)` · `range(a, b)` · `range(a, b, s)` | `[0…n-1]` / `[a…b-1]` / stepped — **end-exclusive** (like Python) |
+| `steps(a, b)` · `steps(a, b, s)`              | `[a, a+s, …, b]` — **end-inclusive**, default step 1              |
+
+Use `range` for integer loops (it matches Python's `range()`). Use `steps` for continuous sweeps where the endpoint must be reachable — angles, parametric coordinates, grid positions:
+
+```text
+print range(5)                 // [0, 1, 2, 3, 4]   — 5 is excluded
+print steps(0, 5)              // [0, 1, 2, 3, 4, 5] — 5 is included
+print steps(0, 1, 0.25)        // [0, 0.25, 0.5, 0.75, 1]
+```
+
+### Higher-order functions: map, filter, reduce
+
+Sometimes you want to transform an entire list without writing a loop. Three functions take a `@reference` to a procedure or built-in and apply it across a list:
+
+| Function                | Returns                                                                    |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `map(xs, @fn)`          | new list of `fn(element)` for every element                                |
+| `filter(xs, @fn)`       | new list keeping only elements where `fn(element)` is truthy               |
+| `reduce(xs, @fn, init)` | fold: `fn(fn(fn(init, xs[0]), xs[1]), xs[2])` — a single accumulated value |
+
+The `@name` syntax creates a reference to any callable that returns a value. It works for user-defined procedures (`@myFunc`) and for built-in functions (`@abs`, `@sin`, `@vadd`, `@vlen`, etc.). Statement-only commands like `@fd` or `@sewpath` are rejected because they don't return a value.
+
+```text
+// user procs as callbacks
+def double(x) [ return x * 2 ]
+def big(x)    [ return x > 4 ]
+def add(a, b) [ return a + b ]
+
+print map([1, 2, 3], @double)       // [2, 4, 6]
+print filter([1, 2, 3, 4, 5], @big) // [5]
+print reduce([1, 2, 3, 4], @add, 0) // 10
+
+// built-in refs work too
+print map([-3, -1, 2], @abs)        // [3, 1, 2]
+print reduce([[1, 2], [3, 4]], @vadd, [0, 0])  // [4, 6]
+```
+
+Combine `steps` with `map` for expressive geometry pipelines:
+
+```text
+// sweep 24 angles → spoke endpoints → smooth curve
+def petal(t) [
+  return vfromheading(t * 60, 20 + sin(t * 180) * 8)
+]
+let ring = map(steps(0, 6, 0.25), @petal)
+sewpath(catmull(ring, 2))
+```
 
 Here's a list-driven palette cycle:
 

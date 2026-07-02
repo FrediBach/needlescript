@@ -1,0 +1,92 @@
+// =====================================================================
+//  STARBURST — higher-order functions meet generative embroidery
+// =====================================================================
+//  A radial design built entirely with map, filter, reduce and steps.
+//
+//  1. steps() sweeps angles around a full circle.
+//  2. map() with @vfromheading turns each angle into a spoke endpoint.
+//  3. A second map() warps the spokes outward with a sine-driven bloom.
+//  4. filter() keeps only the wider spokes for a satin accent ring.
+//  5. reduce() with @vadd computes the centroid of the filtered points.
+//
+//  The result: a layered starburst where every coordinate is derived
+//  from functional transforms — no manual loop bookkeeping anywhere.
+// =====================================================================
+
+// @param seed    [1, 999, 1]  "random seed"
+// @param spokes  [8, 36, 1]   "number of spokes"
+// @param radius  [10, 40, 1]  "base radius"
+// @param bloom   [2, 15, 1]   "petal bloom amount"
+
+seed 42
+fabric "woven
+stitchlen 1.8
+
+let nspokes = 18
+let rad = 28
+let bloomamt = 8
+
+// ── helpers ──────────────────────────────────────────────────────────
+
+def spoke(angle) [
+  return vfromheading(angle, rad + sin(angle * 3) * bloomamt)
+]
+
+def issunward(p) [
+  return vlen(p) > rad - 2
+]
+
+def nudge(p) [
+  return vscale(p, 1.12)
+]
+
+// ── build geometry with map / filter / reduce ────────────────────────
+
+// a full sweep of angles: 0, 20, 40, … 340
+let angles = steps(0, 360 - 360 / nspokes, 360 / nspokes)
+
+// turn each angle into a point on the bloom curve
+let ring = map(angles, @spoke)
+
+// push every point outward a little for the accent layer
+let outer = map(ring, @nudge)
+
+// keep only the points that sit outside the base radius
+let tips = filter(ring, @issunward)
+
+// sum all tip points, then scale by 1/len to find the centroid
+let tipsum = reduce(tips, @vadd, [0, 0])
+let centre = vscale(tipsum, 1 / max(len(tips), 1))
+
+// ── draw: inner running-stitch star ─────────────────────────────────
+color 1
+for p in ring [
+  up  setxy(centre[0], centre[1])  down
+  let [px, py] = p
+  setxy(px, py)
+]
+trim
+
+// ── draw: outer accent ring as a smooth closed curve ─────────────────
+color 3
+// close the loop by appending the first point
+let closed = concat(outer, [first(outer)])
+sewpath(catmull(closed, 2))
+trim
+
+// ── draw: satin-stitched petal tips ──────────────────────────────────
+color 0
+satin 2.5
+density 0.5
+for p in tips [
+  let inner = vscale(p, 0.7)
+  up  setxy(inner[0], inner[1])  down
+  setxy(p[0], p[1])
+]
+satin 0
+trim
+
+// ── draw: centre dot ─────────────────────────────────────────────────
+color 2
+up  setxy(centre[0], centre[1])  down
+circle 2

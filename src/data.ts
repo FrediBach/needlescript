@@ -69,6 +69,7 @@ import snakeRaw from '../examples/snake.ns?raw';
 import crossingsRaw from '../examples/crossings.ns?raw';
 import distancebandsRaw from '../examples/distancebands.ns?raw';
 import snaptoguideRaw from '../examples/snaptoguide.ns?raw';
+import starburstRaw from '../examples/starburst.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -174,6 +175,7 @@ export const EXAMPLES: Record<string, string> = {
   crossings: crossingsRaw,
   'distance bands': distancebandsRaw,
   'snap to guide': snaptoguideRaw,
+  starburst: starburstRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -238,6 +240,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'crossings',
       'distance bands',
       'snap to guide',
+      'starburst',
     ],
   },
   {

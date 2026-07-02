@@ -443,7 +443,6 @@ All list functions are **call-syntax only**: `len(xs)`, never `len xs` (this is 
 
 | Function                                           | Returns / effect                                                                                                                                                              |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `range(n)` · `range(a, b)` · `range(a, b, s)`      | new list `[0…n-1]` / `[a…b-1]` / stepped — 0-based, end-exclusive, like Python                                                                                                |
 | `filled(n, v)`                                     | new list of _n_ deep copies of _v_                                                                                                                                            |
 | `len(xs)` · `islist(v)`                            | element count · `1`/`0`                                                                                                                                                       |
 | `first(xs)` · `last(xs)`                           | `xs[0]` · `xs[-1]` (the Logo heritage names)                                                                                                                                  |
@@ -462,6 +461,46 @@ All list functions are **call-syntax only**: `len(xs)`, never `len xs` (this is 
 | `setpos(p)`                                        | command: like `setxy p[0] p[1]` — makes record/replay symmetric: `append(path, pos())` … `setpos(p)`                                                                          |
 
 > **`push`/`pop` are taken.** They save and restore the _turtle state_ (see Movement) and keep that meaning. To grow a list, use `append(xs, v)` — the `push` arity error will remind you.
+
+### Sequences
+
+| Function                                      | Returns                                                                                                  |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `range(n)` · `range(a, b)` · `range(a, b, s)` | `[0…n-1]` / `[a…b-1]` / stepped — 0-based, **end-exclusive**                                             |
+| `steps(a, b)` · `steps(a, b, s)`              | `[a, a+s, a+2s, …, b]` — **end-inclusive**, default step 1. `steps(0, 6, 0.2)` → 31 elements ending at 6 |
+
+`range` is your go-to for integer index loops and zero-based sequences. `steps` is for continuous sweeps where you want exact endpoints — angles, time parameters, grid coordinates.
+
+### Higher-order functions — map, filter, reduce
+
+Three functions that take a `@reference` to a procedure (or built-in) and apply it across a list:
+
+| Function                | Returns                                                 |
+| ----------------------- | ------------------------------------------------------- |
+| `map(xs, @fn)`          | new list of `fn(element)` for each element              |
+| `filter(xs, @fn)`       | new list keeping elements where `fn(element)` is truthy |
+| `reduce(xs, @fn, init)` | single value: `fn(fn(fn(init, xs[0]), xs[1]), …)`       |
+
+The `@name` syntax creates a reference to a user-defined procedure or a built-in function. Any name that returns a value works: `@abs`, `@vlen`, `@vadd`, `@sin`, etc. Statement-only commands like `@fd` are rejected.
+
+```text
+def double(x) [ return x * 2 ]
+def big(x)    [ return x > 4 ]
+def add(a, b) [ return a + b ]
+
+print map([1, 2, 3], @double)          // [2, 4, 6]
+print filter([1, 2, 3, 4, 5], @big)    // [5]
+print reduce([1, 2, 3, 4], @add, 0)    // 10
+
+// Built-in refs compose naturally:
+print map([-3, -1, 2], @abs)           // [3, 1, 2]
+print reduce([[1, 2], [3, 4]], @vadd, [0, 0])   // [4, 6]
+
+// A pipeline: angle sweep → points → smooth curve
+def petal(t) [ return vfromheading(t * 60, 20 + sin(t * 180) * 8) ]
+let ring = map(steps(0, 6, 0.25), @petal)
+sewpath(catmull(ring, 2))
+```
 
 `print` formats lists as `[1, 2, 3]` (nested as `[[0, 1], [2, 3]]`, capped at 64 elements with `… +n more`). List builtin names are resolved only at call position, so classic programs that use names like `:len` for parameters keep working, and a `def` of the same name shadows the builtin.
 
