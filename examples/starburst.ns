@@ -72,10 +72,10 @@ trim
 
 // ── draw: satin-stitched petal tips ──────────────────────────────────
 color 0
-satin 2.5
+satin 2
 density 0.5
 for p in tips [
-  let inner = vscale(p, 0.7)
+  let inner = vscale(p, 0.75)
   up  setxy(inner[0], inner[1])  down
   setxy(p[0], p[1])
 ]

@@ -471,15 +471,16 @@ All list functions are **call-syntax only**: `len(xs)`, never `len xs` (this is 
 
 `range` is your go-to for integer index loops and zero-based sequences. `steps` is for continuous sweeps where you want exact endpoints — angles, time parameters, grid coordinates.
 
-### Higher-order functions — map, filter, reduce
+### Higher-order functions — map, filter, reduce, compose
 
-Three functions that take a `@reference` to a procedure (or built-in) and apply it across a list:
+Functions that take a `@reference` to a procedure (or built-in) and apply it across a list:
 
-| Function                | Returns                                                 |
-| ----------------------- | ------------------------------------------------------- |
-| `map(xs, @fn)`          | new list of `fn(element)` for each element              |
-| `filter(xs, @fn)`       | new list keeping elements where `fn(element)` is truthy |
-| `reduce(xs, @fn, init)` | single value: `fn(fn(fn(init, xs[0]), xs[1]), …)`       |
+| Function                | Returns                                                                  |
+| ----------------------- | ------------------------------------------------------------------------ |
+| `map(xs, @fn)`          | new list of `fn(element)` for each element                               |
+| `filter(xs, @fn)`       | new list keeping elements where `fn(element)` is truthy                  |
+| `reduce(xs, @fn, init)` | single value: `fn(fn(fn(init, xs[0]), xs[1]), …)`                        |
+| `compose(@f, @g, …)`    | a new reference that pipes left-to-right: `compose(@f, @g)(x) = g(f(x))` |
 
 The `@name` syntax creates a reference to a user-defined procedure or a built-in function. Any name that returns a value works: `@abs`, `@vlen`, `@vadd`, `@sin`, etc. Statement-only commands like `@fd` are rejected.
 
@@ -495,6 +496,10 @@ print reduce([1, 2, 3, 4], @add, 0)    // 10
 // Built-in refs compose naturally:
 print map([-3, -1, 2], @abs)           // [3, 1, 2]
 print reduce([[1, 2], [3, 4]], @vadd, [0, 0])   // [4, 6]
+
+// compose builds a multi-step pipeline:
+let cleanup = compose(@abs, @round)
+print map([-3.7, 4.2], cleanup)        // [4, 4]
 
 // A pipeline: angle sweep → points → smooth curve
 def petal(t) [ return vfromheading(t * 60, 20 + sin(t * 180) * 8) ]

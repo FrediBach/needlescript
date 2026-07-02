@@ -677,3 +677,74 @@ describe('HOF integration', () => {
     ).toEqual(['6']);
   });
 });
+
+// ── compose() ────────────────────────────────────────────────────────────────
+describe('compose()', () => {
+  it('basic 2-step pipeline', () => {
+    expect(
+      printed(
+        'def double(x) [ return x * 2 ] def inc(x) [ return x + 1 ] print map([1, 2, 3], compose(@double, @inc))',
+      ),
+    ).toEqual(['[3, 5, 7]']);
+  });
+
+  it('3-step chain', () => {
+    expect(
+      printed(
+        'def a(x) [ return x + 1 ] def b(x) [ return x * 2 ] def c(x) [ return x - 1 ] print map([5], compose(@a, @b, @c))',
+      ),
+    ).toEqual(['[11]']); // (5+1)*2-1 = 11
+  });
+
+  it('with builtin refs only', () => {
+    expect(printed('print map([-3.7, 4.2], compose(@abs, @round))')).toEqual(['[4, 4]']);
+  });
+
+  it('mixed user + builtin', () => {
+    expect(
+      printed('def double(x) [ return x * 2 ] print map([1.7], compose(@double, @round))'),
+    ).toEqual(['[3]']); // 1.7*2=3.4 → round(3.4)=3
+  });
+
+  it('stored in a variable and reused', () => {
+    expect(
+      printed(
+        'def inc(x) [ return x + 1 ] let pipeline = compose(@inc, @inc) print map([1, 10], pipeline)',
+      ),
+    ).toEqual(['[3, 12]']);
+  });
+
+  it('works with filter (last step returns truthy/falsy)', () => {
+    expect(
+      printed(
+        'def double(x) [ return x * 2 ] def big(x) [ return x > 4 ] print filter([1, 2, 3], compose(@double, @big))',
+      ),
+    ).toEqual(['[3]']); // only 3*2=6 > 4
+  });
+
+  it('nested compose', () => {
+    expect(
+      printed(
+        'def inc(x) [ return x + 1 ] def double(x) [ return x * 2 ] let inner = compose(@inc, @double) let outer = compose(inner, @inc) print map([1], outer)',
+      ),
+    ).toEqual(['[5]']); // inc(1)=2, double(2)=4, inc(4)=5
+  });
+
+  it('rejects non-FuncRef argument', () => {
+    expect(() => run('let x = compose(@abs, 5)')).toThrow(/@procedure reference/);
+  });
+
+  it('parse error with fewer than 2 args', () => {
+    expect(() => run('let x = compose(@abs)')).toThrow();
+  });
+
+  it('print shows compose(...) format', () => {
+    expect(printed('print compose(@abs, @round)')).toEqual(['compose(@abs, @round)']);
+  });
+
+  it('compose + steps + map integration', () => {
+    expect(
+      printed('def double(x) [ return x * 2 ] print map(steps(1, 3), compose(@double, @abs))'),
+    ).toEqual(['[2, 4, 6]']);
+  });
+});

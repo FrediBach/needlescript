@@ -670,15 +670,16 @@ print steps(0, 5)              // [0, 1, 2, 3, 4, 5] — 5 is included
 print steps(0, 1, 0.25)        // [0, 0.25, 0.5, 0.75, 1]
 ```
 
-### Higher-order functions: map, filter, reduce
+### Higher-order functions: map, filter, reduce, compose
 
-Sometimes you want to transform an entire list without writing a loop. Three functions take a `@reference` to a procedure or built-in and apply it across a list:
+Sometimes you want to transform an entire list without writing a loop. These functions take a `@reference` to a procedure or built-in and apply it across a list:
 
 | Function                | Returns                                                                    |
 | ----------------------- | -------------------------------------------------------------------------- |
 | `map(xs, @fn)`          | new list of `fn(element)` for every element                                |
 | `filter(xs, @fn)`       | new list keeping only elements where `fn(element)` is truthy               |
 | `reduce(xs, @fn, init)` | fold: `fn(fn(fn(init, xs[0]), xs[1]), xs[2])` — a single accumulated value |
+| `compose(@f, @g, …)`    | a new reference that pipes left-to-right: `compose(@f, @g)(x) = g(f(x))`   |
 
 The `@name` syntax creates a reference to any callable that returns a value. It works for user-defined procedures (`@myFunc`) and for built-in functions (`@abs`, `@sin`, `@vadd`, `@vlen`, etc.). Statement-only commands like `@fd` or `@sewpath` are rejected because they don't return a value.
 
@@ -695,6 +696,23 @@ print reduce([1, 2, 3, 4], @add, 0) // 10
 // built-in refs work too
 print map([-3, -1, 2], @abs)        // [3, 1, 2]
 print reduce([[1, 2], [3, 4]], @vadd, [0, 0])  // [4, 6]
+```
+
+`compose` builds a multi-step pipeline from two or more `@references`. The steps apply left-to-right, and the result is a single reference you can store in a variable or pass straight to `map`/`filter`:
+
+```text
+// chain two buildins into one callable
+let cleanup = compose(@abs, @round)
+print map([-3.7, 4.2], cleanup)     // [4, 4]
+
+// mix user procs and builtins
+def double(x) [ return x * 2 ]
+print map([1.7, 2.3], compose(@double, @round))  // [3, 5]
+
+// nested composes also work
+let inner = compose(@abs, @round)
+let outer = compose(inner, @double)
+print map([-1.6], outer)            // [4]  — abs(-1.6)=1.6, round→2, double→4
 ```
 
 Combine `steps` with `map` for expressive geometry pipelines:

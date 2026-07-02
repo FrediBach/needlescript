@@ -1317,6 +1317,19 @@ const NS_ITEMS: NSItem[] = [
     isSnippet: true,
     params: [['list', '@fn', 'init']],
   },
+  {
+    label: 'compose',
+    kindName: 'function',
+    detail: 'compose functions into a pipeline',
+    documentation:
+      'Create a left-to-right pipeline from two or more `@references`.\n\n' +
+      '`compose(@f, @g, @h)` returns a reference where `step(x) = h(g(f(x)))`.\n\n' +
+      '```\ndef double(x) [ return x * 2 ]\nlet step = compose(@double, @round)\nprint map([1.7, 2.3], step)  // [3, 5]\n```\n\n' +
+      'Works with user procs, built-in refs, and nested composes.',
+    insertText: 'compose(@${1:fn1}, @${2:fn2})',
+    isSnippet: true,
+    params: [['@fn1', '@fn2', '...']],
+  },
 
   // ── Generative math — scalars & noise ────────────────────────────────────
   {
@@ -2219,6 +2232,7 @@ export function registerNeedlescript(monaco: Monaco): void {
       'map',
       'filter',
       'reduce',
+      'compose',
       // generative math
       'snoise2',
       'snoise3',

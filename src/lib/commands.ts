@@ -192,6 +192,7 @@ export const LIST_FUNCS: Record<string, { min: number; max: number }> = {
   map: { min: 2, max: 2 }, // map(list, @fn)
   filter: { min: 2, max: 2 }, // filter(list, @fn)
   reduce: { min: 3, max: 3 }, // reduce(list, @fn, initial)
+  compose: { min: 2, max: 16 }, // compose(@fn1, @fn2, …) — left-to-right pipeline
 };
 
 /** List commands usable as statements (mutators + setpos). */

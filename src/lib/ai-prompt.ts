@@ -115,6 +115,7 @@ steps(a,b) steps(a,b,step) — inclusive numeric sequence (default step=1)
 map(xs, @fn)         — apply fn to each element, return new list
 filter(xs, @fn)      — keep elements where fn returns truthy
 reduce(xs, @fn, init) — fold with fn(acc, item) from init
+compose(@fn1, @fn2, …) — left-to-right pipeline; compose(@f, @g)(x) = g(f(x))
 // @name can reference user procs or built-in functions: @vadd @sin @abs etc.
 
 ## Generative math — vectors (call-syntax only)

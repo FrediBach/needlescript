@@ -38,8 +38,22 @@ export class FuncRef {
   }
 }
 
+/**
+ * A left-to-right pipeline of function references, created by `compose(@f, @g, …)`.
+ * Extends FuncRef so it passes `isFuncRef` checks and can be used anywhere a
+ * single @ref is accepted (map, filter, reduce, warp, …).
+ */
+export class ComposedRef extends FuncRef {
+  steps: FuncRef[];
+  constructor(steps: FuncRef[]) {
+    super('<composed>');
+    this.steps = steps;
+  }
+}
+
 export const isList = (v: Val): v is NsList => v instanceof NsList;
 export const isFuncRef = (v: Val): v is FuncRef => v instanceof FuncRef;
+export const isComposedRef = (v: Val): v is ComposedRef => v instanceof ComposedRef;
 
 /** Format a number the way print always has. */
 export function formatNum(v: number): string {
@@ -52,6 +66,7 @@ const PRINT_CAP = 64;
 
 /** Format any runtime value; lists as [1, 2, 3], capped at 64 elements. */
 export function formatVal(v: Val, depth = 0): string {
+  if (v instanceof ComposedRef) return `compose(${v.steps.map((s) => formatVal(s)).join(', ')})`;
   if (isFuncRef(v)) return '@' + v.name;
   if (!isList(v)) return formatNum(v);
   if (depth >= LIMITS.maxListDepth)
@@ -63,6 +78,7 @@ export function formatVal(v: Val, depth = 0): string {
 
 /** Describe a value for error messages: "a list (length 3)" / "a number". */
 export function describeVal(v: Val): string {
+  if (v instanceof ComposedRef) return 'a composed reference';
   if (isFuncRef(v)) return `a procedure reference (@${v.name})`;
   return isList(v) ? `a list (length ${v.items.length})` : 'a number';
 }
@@ -101,6 +117,12 @@ export function valDepth(v: Val, depth = 0): number {
 export function deepEqual(a: Val, b: Val, depth = 0): boolean {
   if (depth >= LIMITS.maxListDepth)
     throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`);
+  // ComposedRef: equal if same steps in the same order
+  if (a instanceof ComposedRef || b instanceof ComposedRef) {
+    if (!(a instanceof ComposedRef) || !(b instanceof ComposedRef)) return false;
+    if (a.steps.length !== b.steps.length) return false;
+    return a.steps.every((s, i) => deepEqual(s, b.steps[i], depth + 1));
+  }
   if (isFuncRef(a) || isFuncRef(b)) return isFuncRef(a) && isFuncRef(b) && a.name === b.name;
   const al = isList(a),
     bl = isList(b);

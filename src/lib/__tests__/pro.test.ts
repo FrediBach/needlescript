@@ -405,6 +405,7 @@ describe('underlay in exports and stats', () => {
     'spirolateral',
     'turtle',
     'functional',
+    'starburst',
   ]);
 
   it.each(Object.keys(EXAMPLES))('"%s" sews without density or stacking warnings', (key) => {

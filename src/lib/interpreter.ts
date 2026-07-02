@@ -13,6 +13,7 @@ import { didYouMean } from './suggestions.ts';
 import {
   NsList,
   FuncRef,
+  ComposedRef,
   isList,
   isFuncRef,
   num,
@@ -397,6 +398,13 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           acc = callRef(ref, [acc, item], depth + 1, line);
         }
         return acc;
+      }
+      case 'compose': {
+        const refs: FuncRef[] = [];
+        for (let i = 0; i < args.length; i++) {
+          refs.push(funcRef(args[i], `compose argument ${i + 1}`, line));
+        }
+        return new ComposedRef(refs);
       }
     }
     throw new NeedlescriptError(`Unknown function ${name}`, line);
@@ -1053,6 +1061,15 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
    * argument values. Used by map, filter, reduce, and any future HOFs.
    */
   function callRef(ref: FuncRef, argVals: Val[], depth: number, line?: number): Val {
+    // 0. Composed reference — pipe through each step left-to-right
+    if (ref instanceof ComposedRef) {
+      let result = callRef(ref.steps[0], argVals, depth, line);
+      for (let i = 1; i < ref.steps.length; i++) {
+        tick(line);
+        result = callRef(ref.steps[i], [result], depth, line);
+      }
+      return result;
+    }
     // 1. User-defined proc takes priority (can shadow builtins)
     if (procs[ref.name]) {
       const result = callProcVals(ref.name, argVals, depth, line);
