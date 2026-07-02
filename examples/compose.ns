@@ -1,0 +1,106 @@
+// =====================================================================
+//  COMPOSE — transform pipelines for layered embroidery
+// =====================================================================
+//  Every ring starts from the same angle sweep. Each one passes through
+//  a different compose() pipeline that wires small, reusable transforms
+//  into a distinct personality — no per-ring loop code, just
+//
+//      map(angles, pipeline)
+//
+//  Scroll back and forth between the pipeline definitions and the sew
+//  section to see how four lines of compose() drive four completely
+//  different shapes from the same 90-angle input.
+// =====================================================================
+
+// @param seed    [1, 999, 1]   "random seed"
+// @param density [3, 8, 1]     "angle step (lower = denser)"
+
+seed 7
+fabric "woven
+stitchlen 1.8
+
+// ── atomic transforms ───────────────────────────────────────────────
+// Each takes one value and returns one value — ready for compose.
+
+def polar(a)   [ return vfromheading(a, 1) ]        // angle → unit point
+
+def small(p)   [ return vscale(p, 11) ]             // scale to inner ring
+def mid(p)     [ return vscale(p, 20) ]             // scale to middle ring
+def wide(p)    [ return vscale(p, 30) ]             // scale to outer ring
+
+def twist(p)   [ return vrot(p, 10) ]               // gentle rotation
+
+def ripple(p)  [                                     // six-fold sine wave
+  let a = vheading(p)
+  return vfromheading(a, vlen(p) + sin(a * 6) * 2)
+]
+
+def star(p)    [                                     // five-pointed star lobes
+  let a = vheading(p)
+  let lobe = (1 + cos(a * 5)) / 2
+  return vfromheading(a, vlen(p) * (1 + lobe * 0.3))
+]
+
+def squash(p)  [ return [p[0], p[1] * 0.6] ]        // vertical flatten
+
+// ── composed pipelines ──────────────────────────────────────────────
+// Wire transforms left-to-right.  Same start (polar), different shape.
+
+let circ  = compose(@polar, @small)                    // plain circle
+let waves   = compose(@polar, @mid, @ripple)             // six-fold ripple
+let pointed = compose(@polar, @mid, @star, @twist)       // rotated star
+let oval    = compose(@polar, @wide, @squash, @ripple)   // squashed + waved
+
+// ── generate geometry ───────────────────────────────────────────────
+
+let angles = steps(0, 356, 4)              // 90 angles around the sweep
+
+let pts1 = map(angles, circ)
+let pts2 = map(angles, waves)
+let pts3 = map(angles, pointed)
+let pts4 = map(angles, oval)
+
+// Use filter to pick the star tips (points pushed far from centre)
+def isTip(p) [ return vlen(p) > 23 ]
+let tips = filter(pts3, @isTip)
+
+// Use reduce to find the centroid of the tips
+let tipSum = reduce(tips, @vadd, [0, 0])
+let centre = vscale(tipSum, 1 / max(len(tips), 1))
+
+// ── helper: close a ring and sew as a smooth curve ──────────────────
+
+def sewring(pts) [
+  sewpath(catmull(concat(pts, [first(pts)]), 1.5))
+]
+
+// ── sew ─────────────────────────────────────────────────────────────
+
+// inner circle
+color 3
+sewring(pts1)
+trim
+
+// ripple ring
+color 1
+sewring(pts2)
+trim
+
+// star ring
+color 2
+sewring(pts3)
+trim
+
+// oval ring
+color 4
+sewring(pts4)
+trim
+
+// star-tip accents: radial spokes from centre to each tip
+color 0
+for p in tips [
+  let inner = vscale(p, 0.85)
+  up  setxy(inner[0], inner[1])  down
+  setxy(p[0], p[1])
+]
+trim
