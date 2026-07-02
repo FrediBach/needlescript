@@ -1,42 +1,40 @@
 // ============================================================
-//  CROSSINGS — SEGMENT INTERSECTIONS ON A STARBURST
+//  CROSSINGS — SEGMENT INTERSECTIONS ON RANDOM CHORDS
 //
-//  Rays fan out from the centre; wherever two rays cross,
+//  Random chords span a circle; wherever two chords cross,
 //  a small circle marks the intersection.  segisect finds
 //  every crossing — the segment test means only real
-//  crossings inside both rays are marked, not their
+//  crossings inside both chords are marked, not their
 //  infinite extensions.
 // ============================================================
 
 // --- layout ---
-let rays    = 12    // [4:24] number of rays
-let rlen    = 38    // [15:45] ray length, mm
+let nChords = 14    // [4:24] number of chords
+let radius  = 38    // [15:45] circle radius, mm
 let stitch  = 1.8   // [1:0.1:4]
 // --- markers ---
-let dotR    = 1.2   // [0.4:0.2:3] crossing-circle radius, mm
+let dotR    = 1.0   // [0.4:0.2:3] crossing-circle radius, mm
 
+seed 5
 stitchlen stitch
 
-// build the ray segments as endpoint pairs
+// build random chords: two random points on the circle
 let segs = []
-for i = 0 to rays - 1 [
-  let ang = i * 360 / rays
-  let dx = sin(ang)
-  let dy = cos(ang)
-  // each ray starts a little off-centre so crossings
-  // aren't all at [0, 0]
-  let a = [dx * 4, dy * 4]
-  let b = [dx * rlen, dy * rlen]
-  append(segs, [a, b])
+for i = 0 to nChords - 1 [
+  let a1 = random(360)
+  let a2 = random(360)
+  let p1 = [radius * sin(a1), radius * cos(a1)]
+  let p2 = [radius * sin(a2), radius * cos(a2)]
+  append(segs, [p1, p2])
 ]
 
-// draw the rays
+// draw the chords
 for s in segs [
   up  setpos(s[0])  down  setpos(s[1])
 ]
 trim
 
-// mark every crossing between different rays
+// mark every crossing between different chords
 color 2
 for i = 0 to len(segs) - 2 [
   for j = i + 1 to len(segs) - 1 [
