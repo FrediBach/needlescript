@@ -13,11 +13,6 @@
 //  from functional transforms — no manual loop bookkeeping anywhere.
 // =====================================================================
 
-// @param seed    [1, 999, 1]  "random seed"
-// @param spokes  [8, 36, 1]   "number of spokes"
-// @param radius  [10, 40, 1]  "base radius"
-// @param bloom   [2, 15, 1]   "petal bloom amount"
-
 seed 42
 fabric "woven
 stitchlen 1.8
