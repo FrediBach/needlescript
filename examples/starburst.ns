@@ -22,9 +22,9 @@ seed 42
 fabric "woven
 stitchlen 1.8
 
-let nspokes = 18
+let nspokes = 19 // [8:1:36]
 let rad = 28
-let bloomamt = 8
+let bloomamt = 7 // [2:1:15]
 
 // ── helpers ──────────────────────────────────────────────────────────
 
