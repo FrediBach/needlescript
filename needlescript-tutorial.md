@@ -1656,8 +1656,6 @@ These are where the worlds touch, in both directions:
 
 Neither world — control flow and structure: `repeat`, `while`, `for` (all spellings), `if`/`else`, `break`, `continue`, `def`/`to`…`end`, `return`/`output`/`op`/`exit`, `let`, `make`, `local`, assignment and the operators, `true`/`false`. Plus debugging: `print`, `printloc`, `assert` (console-only), and `mark` — a slight oddball: it reads the needle position and pins the *preview*, but is never exported or counted, so I'd tint it debug rather than sewing.
 
-Two editor notes. First, `satin` and `fill` are sewing-world words whose `@fn` arguments summon user reporters that must stay drawless — highlighting the reporter's body as data-world would visually reinforce that contract. Second, inside `trace [ … ]` all sewing words are sandboxed (machine commands are inert with a note), so if you ever want to get fancy, dimming sewing-world highlights inside a trace block would make the sandbox rule visible at a glance.
-
 ---
 
 ## 28. AI generation assistant
