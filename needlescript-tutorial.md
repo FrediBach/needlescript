@@ -1396,7 +1396,152 @@ You can also bring artwork _in_: **Import SVG** (a button, or drag and drop) con
 
 ---
 
-## 25. A capstone project
+## 25. Sewing gotchas: where artefacts come from
+
+NeedleScript's promise is that what you preview is what the machine sews. The flip side of that honesty is that when something strange appears on the stage — a phantom wedge, an unfilled sliver, a gap in an outline, a loose thread across the hoop — it is almost never a rendering bug. It is geometry you asked for without noticing.
+
+Nearly every such surprise comes from one underlying tension: the language has **two worlds**. The data world of lists, paths, and regions is pure and stateless — a region doesn't care where it is, closes itself implicitly, and can be transformed, clipped, and resampled without consequence. The thread world is a physical cursor dragging real thread through real fabric — it is always *somewhere*, it is always *trailing something*, and every millimetre it moves either sews, jumps, or becomes part of a boundary. Artefacts are born at the seam between the two. This section walks through the five confusions that cause them, and the habits that prevent each one.
+
+### 25.1 The needle is always somewhere
+
+Data has no position; the needle always does. Every sewing command starts *from wherever the last one ended* — and that includes `sewpath`, which is exactly `for p in path [ setpos(p) ]`. The very first `setpos` sews a segment from the needle's current position to `path[0]`. If the needle happens to be parked across the hoop, that segment is a stray straight stitch right through your design.
+
+Two things make this easy to forget. First, `trace` restores the turtle on exit — so after a run of trace blocks the needle is *still wherever it was before them*, usually nowhere near the geometry you just built. Second, the stray edge is invisible in your source: no line of code says "sew from here to there"; the connection is implied by state.
+
+In the open (pen down, no fill), the symptom is just an unwanted line. Inside a fill it is sneakier — the stray edge becomes part of the boundary ring, and parity does the rest. A case study:
+
+```text
+let disc = trace [ arc 360 28 ]                     // rim passes through (0, 0)
+let bite = trace [ up setxy 44 0 down arc 360 14 ]  // pokes through the rim
+
+moveto 20 10       // imagine earlier work parked the needle here
+
+for piece in clippaths(disc, bite, "difference) [
+  beginfill sewpath(resample(piece, 1)) endfill
+  trim
+]
+```
+
+The difference is a clean pac-man shape, yet the fill shows a skinny triangular *cutout*, a few degrees wide, radiating from `(20, 10)` to the rim. Here's why. The ring `endfill` receives is not the piece — it is `(20, 10)`, *then* the piece, then the implicit closure back to `(20, 10)`. The two chords from the needle's parking spot out to the piece's first vertex and back from its last enclose a long thin triangle, and by the even-odd rule (next-but-one section) the parity inside that sliver flips: unfilled. The apex sits wherever the needle happened to be; the base sits wherever Clipper happened to start the ring. Pure coincidence, dressed up as a bug.
+
+The habit that prevents this — and it should become reflexive — is **park before you sew**: jump onto the data before opening the fill.
+
+```text
+for piece in clippaths(disc, bite, "difference) [
+  let ring = resample(piece, 1)
+  up setpos(ring[0]) down            // park the needle ON the data first
+  beginfill sewpath(ring) endfill
+  trim
+]
+```
+
+A cousin of the same confusion: `home` returns to the origin, and if the pen is down it **sews a line straight back**. Reposition with `moveto` or `gohome`, which jump.
+
+### 25.2 Regions close themselves; thread doesn't
+
+A region is "a closed path — the closing segment is implicit." Implicit is the operative word: the last point of the list is *not* the first point, and nothing in the data ever traverses the gap between them. The data world doesn't need to; `inpath`, `clippaths`, and `endfill` all treat the closure as given.
+
+The thread world traverses only what you sew. `resample(ring, 2)` treats the path as open (first and last points preserved), and `sewpath` walks exactly the points it is given — so sewing a region *outline* leaves the final closing segment unsewn: a gap of up to one original segment where the loop should meet itself. If the outline is a border you'll see it; if it's under a satin column you'll feel it as a mismatched joint.
+
+Closing is one extra stitch:
+
+```text
+let ring = resample(cell, 2)
+up setpos(ring[0]) down
+sewpath(ring)
+setpos(ring[0])          // sew the implicit closing segment yourself
+```
+
+Fills, by contrast, close every ring for you — the boundary is data for the fill generator, not thread — which is exactly why the stray leading edge in §25.1 got silently welded into a closed ring.
+
+### 25.3 A fill is parity, not paint
+
+`endfill` does not flood-fill from a point the way a paint bucket does. It counts **boundary crossings**: a location is filled when a ray from it crosses the accumulated rings an odd number of times. Three consequences follow, and each is a classic artefact when it surprises you — or a technique when it doesn't.
+
+**Holes are just inner rings.** A pen-up move inside a fill (`moveto`, or `up … down`) starts a new ring, and a ring inside a ring flips parity — the donut from §6. This is the *intended* use of parity.
+
+**Overlap is xor, not union.** Two rings in one fill that overlap don't merge; the lens where they overlap has crossing count two — empty:
+
+```text
+beginfill
+  circle 16
+  moveto 20 0
+  circle 16          // overlaps the first ring
+endfill              // the lens where they overlap comes out EMPTY
+```
+
+If you wanted one merged blob, do the boolean in the data world first, then fill the result:
+
+```text
+let a = trace [ circle 16 ]
+let b = trace [ up setxy 20 0 down circle 16 ]
+
+for piece in clippaths(a, b, "union) [
+  let ring = resample(piece, 1.5)
+  up setpos(ring[0]) down
+  beginfill sewpath(ring) endfill
+  trim
+]
+```
+
+The rule of thumb: **booleans belong before the fill, parity belongs inside it.** Overlapping rings inside one fill is a request for xor; if that's not what you meant, `clippaths` is.
+
+**Rings that describe one shape belong in one fill.** `offsetpath` and `clippaths` hand you lists of rings, and sometimes several of those rings together describe a single shape — an outer boundary and the hole inside it. Fill each ring in its own `beginfill` and the "hole" gets dutifully painted solid, right on top of everything else (a density hotspot into the bargain). Give all of them to *one* fill and parity carves the shape correctly. A 2 mm border band, for instance, is an outer ring plus its inset as a hole:
+
+```text
+beginfill
+  let outer = resample(shape, 1.5)
+  let [ox, oy] = outer[0]
+  moveto ox oy                        // pen-safe: starts a ring
+  sewpath(outer)
+  for inner in offsetpath(shape, -2) [
+    let r = resample(inner, 1.5)
+    let [ix, iy] = r[0]
+    moveto ix iy                      // each inset starts a new ring
+    sewpath(r)
+  ]
+endfill
+```
+
+Note `moveto` doing double duty here: because it jumps, it both parks the needle (§25.1) *and* starts a fresh ring — the one command that respects both worlds at once.
+
+Finally, parity explains why boundary self-touching misbehaves: a spur (a path that doubles back on itself) or two nearly-coincident edges is a zero-width slit — mathematically nothing, but the moment `humanize` or a coarse resample nudges the two sides apart, the slit opens into a visible unfilled crack. Keep boundaries simple; let `clippaths` produce them if the shape is compound.
+
+### 25.4 Thread exists between shapes, too
+
+In the data world, two shapes are simply two list entries. On fabric, moving between them strings a physical connector thread across the hoop — the dashed lines in the preview are not decoration, they are thread that will dangle, snag, and shadow through light fabric.
+
+The tools: `trim` cuts at the current point, `autotrim` (on by default at 7 mm) cuts before long travels automatically, and `lock` (on by default) ties thread ends so cut runs can't unravel. What they can't do is *plan* for you. Travel order is a design input: a loop that sews motifs in scattered order produces a web of jumps and a forest of trims (each trim stops the machine); the same motifs sewn in a swept order — sorted by position, or walked cell-by-cell — produce a handful. When you generate placements, spend a line sorting them.
+
+One sandbox interaction is worth engraving: **machine commands inside `trace` are discarded.** The sandbox exists to capture geometry, so a `trim` or `color` inside a trace block mutates sandboxed state and is thrown away (with a one-time console note). Trims live in the sewing code, never in the region constructor — if your connectors aren't being cut, check whether the `trim` accidentally rode along into a trace.
+
+### 25.5 Stitches are physical
+
+The last family of gotchas has nothing to do with topology — the geometry is right, but the *thread* can't follow it.
+
+**Too short.** Anything under 0.4 mm is too short to sew safely and gets merged into its neighbours, with a warning. You rarely write `fd 0.2` on purpose; you get there by accident — `resample(ring, 0.3)`, a `snaptogrid` cell that pushes adjacent penetrations onto the same node, a `humanize` on already-dense stitching. If the console reports merged tiny stitches, look for the line that made spacing collapse, not the stitches themselves.
+
+**Too much.** Coverage is measured in layers, and past roughly 2.5–3.5 the patch stops behaving like fabric. Parity mistakes from §25.3 (a hole filled solid, then filled again) show up here first — the density heatmap is your parity debugger as much as your physics one. Some constructions legitimately run hot (a satin border over a fill edge is ~4 layers); the right move is raising `maxdensity` *knowingly*, not silencing warnings you don't understand.
+
+**Out of order.** A satin column is buffered while you draw it and sewn — underlay first — when it *ends* (pen up, mode change, colour change, trim, or end of program). If a colour change or a coverage query (`coverat`) seems to ignore the column you "just sewed", it hasn't flushed yet: end it (`satin 0`) and the world catches up. Relatedly, `humanize` and `snaptogrid` deliberately skip satin columns — jittering a precise rail wrecks it — so don't chase a "why isn't my satin jittered" ghost.
+
+### A pre-flight checklist
+
+Before blaming the engine, walk this list — it catches the great majority of visual artefacts:
+
+1. **Park before you sew.** `up setpos(ring[0]) down` (or `moveto`) before every `sewpath`, and *especially* before every `beginfill`.
+2. **Close your outlines.** A region's closing segment is implicit in data; add the final `setpos(ring[0])` when sewing a loop.
+3. **Booleans before the fill, parity inside it.** Overlapping rings in one fill is xor; use `clippaths(a, b, "union)` when you mean union.
+4. **One shape, one fill.** Rings that jointly describe a shape (boundary + holes, border bands) go in a single `beginfill`, separated by `moveto`.
+5. **Trims outside `trace`.** The sandbox discards machine commands; cut thread where you sew, not where you capture.
+6. **Sort your travel.** Scattered sewing order means jumps and trims; a swept order means clean fabric and a faster machine.
+7. **Read the console, then the heatmap.** Tiny-stitch merges point at collapsed spacing; density hotspots point at double-filled parity mistakes.
+
+None of these are workarounds — they are the two worlds' border crossings, made explicit. Data closes itself and lives nowhere; thread is always somewhere and never closes on its own. Write with that asymmetry in mind and the preview stays boring, which in embroidery is exactly what you want.
+
+---
+
+## 26. A capstone project
 
 Let's combine what you've learned into one piece that exercises the whole pipeline: a generative seeded "meadow" of stems that grow along a noise field, each topped with a small satin leaf, all sitting on stable fabric.
 
@@ -1454,7 +1599,7 @@ Happy stitching.
 
 ---
 
-## 26. AI generation assistant
+## 27. AI generation assistant
 
 The REPL doubles as an AI interface. Any line starting with `/ai` is intercepted and dispatched to a language model of your choice via [OpenRouter](https://openrouter.ai), rather than being appended to the editor. The model receives the full NeedleScript language reference as its system prompt, along with your current code and any compile errors, and its output lands directly in the editor and runs.
 
