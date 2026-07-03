@@ -28,13 +28,14 @@ This tutorial walks you from the absolute basics up to seeded noise fields, Voro
 16. [Geometry: offsets and booleans](#16-geometry-offsets-and-booleans)
 17. [Transforms: stamping motifs](#17-transforms-stamping-motifs)
 18. [Effects: warp, humanize, snaptogrid](#18-effects-warp-humanize-snaptogrid)
-19. [Professional embroidery and fabric physics](#19-professional-embroidery-and-fabric-physics)
-20. [Programmable satin, fills, and closed-loop generation](#20-programmable-satin-fills-and-closed-loop-generation)
-21. [Debugging](#21-debugging)
-22. [Safety limits](#22-safety-limits)
-23. [Exporting and reusing your work](#23-exporting-and-reusing-your-work)
-24. [A capstone project](#24-a-capstone-project)
-25. [AI generation assistant](#25-ai-generation-assistant)
+19. [Trace: capturing paths as data](#19-trace-capturing-paths-as-data)
+20. [Professional embroidery and fabric physics](#20-professional-embroidery-and-fabric-physics)
+21. [Programmable satin, fills, and closed-loop generation](#21-programmable-satin-fills-and-closed-loop-generation)
+22. [Debugging](#22-debugging)
+23. [Safety limits](#23-safety-limits)
+24. [Exporting and reusing your work](#24-exporting-and-reusing-your-work)
+25. [A capstone project](#25-a-capstone-project)
+26. [AI generation assistant](#26-ai-generation-assistant)
 
 ---
 
@@ -52,7 +53,7 @@ A few facts to anchor everything else:
 
 Comments start with `//`, `#`, or `;` and run to the end of the line. A lone `/` is still division — only _two adjacent_ slashes start a comment.
 
-One frame before the commands, especially if your background is software rather than the sewing room. An embroidery machine doesn't _draw_ — it punches a needle through fabric at a sequence of points, and what you see is **thread pulled taut between them**. Everything you write here ultimately becomes a list of needle penetrations, and the craft comes down to three things: where the thread goes, how densely it piles up, and how it's secured so it can't unravel. The vocabulary in the next few sections — running stitch, satin, fills — is just different ways of turning your turtle path into those penetrations. You won't need any of the professional commands ([§19](#19-professional-embroidery-and-fabric-physics)) to start: `fd`, `rt`, and `repeat` already sew.
+One frame before the commands, especially if your background is software rather than the sewing room. An embroidery machine doesn't _draw_ — it punches a needle through fabric at a sequence of points, and what you see is **thread pulled taut between them**. Everything you write here ultimately becomes a list of needle penetrations, and the craft comes down to three things: where the thread goes, how densely it piles up, and how it's secured so it can't unravel. The vocabulary in the next few sections — running stitch, satin, fills — is just different ways of turning your turtle path into those penetrations. You won't need any of the professional commands ([§20](#20-professional-embroidery-and-fabric-physics)) to start: `fd`, `rt`, and `repeat` already sew.
 
 ---
 
@@ -235,7 +236,7 @@ arc 90 12          // satin follows the arc — a curved column
 satin 0            // back to running stitch
 ```
 
-The penetration spacing along a satin column is set by `density` (0.25–5 mm, default 0.4 — smaller is denser). Columns wider than about 8 mm tend to snag, and you'll get a warning. For columns the built-in zigzag can't make — tapers, woven cross-hatches, asymmetric rails — you can hand `satin` a procedure that draws the column itself (`satin @fn`); that's covered in §20.
+The penetration spacing along a satin column is set by `density` (0.25–5 mm, default 0.4 — smaller is denser). Columns wider than about 8 mm tend to snag, and you'll get a warning. For columns the built-in zigzag can't make — tapers, woven cross-hatches, asymmetric rails — you can hand `satin` a procedure that draws the column itself (`satin @fn`); that's covered in §21.
 
 **Bean stitch** sews each stitch multiple times for a bold, hand-drawn line:
 
@@ -307,7 +308,7 @@ endfill
 
 The fill covers the area between the two circles, leaving the centre empty.
 
-For fills whose rows _follow a curve_ — contour lines, a flow field, a grain that bends with the shape — you can hand `fill` a procedure that drives the row direction (and another for the texture), exactly the way `satin @fn` drives a column. That's `fill @fn`, covered in §20.
+For fills whose rows _follow a curve_ — contour lines, a flow field, a grain that bends with the shape — you can hand `fill` a procedure that drives the row direction (and another for the texture), exactly the way `satin @fn` drives a column. That's `fill @fn`, covered in §21.
 
 ---
 
@@ -1007,7 +1008,7 @@ warp @push_out [
 ]
 ```
 
-The `@name` syntax is new: it's a reference to a reporter, the one new kind of value effects add. You feed it to `warp` (or to `warppath`), to `satin` for a programmable column, or to `fill` for a directional/textured fill (both §20); using it anywhere else is a loud error, and so is a reporter that takes the wrong number of arguments or forgets to `return`. A fisheye, a twist, a ripple, a domain-warp are all just reporters — this is your shader.
+The `@name` syntax is new: it's a reference to a reporter, the one new kind of value effects add. You feed it to `warp` (or to `warppath`), to `satin` for a programmable column, or to `fill` for a directional/textured fill (both §21); using it anywhere else is a loud error, and so is a reporter that takes the wrong number of arguments or forgets to `return`. A fisheye, a twist, a ripple, a domain-warp are all just reporters — this is your shader.
 
 `warp` hands control to your code, which can push points off the hoop or stretch segments into long loose stitches — so the hoop, density and long-stitch checks all run on the **warped** result, surfacing trouble as warnings rather than a ruined garment. `warp` itself draws no randomness; it's seeded only if your reporter calls `random`/`snoise2`.
 
@@ -1042,7 +1043,111 @@ let pixels = snappath(scatter(8), 2)                 // Poisson dots on a 2 mm g
 
 ---
 
-## 19. Professional embroidery and fabric physics
+## 19. Trace: capturing paths as data
+
+So far, data flows _into_ drawing — `sewpath(region)` walks a point list with the full pen/mode/transform machinery — but drawing never flows back _out_ into data. If you want a hexagon as a region for `offsetpath`, `clippaths`, or `scatter`, you have to build it point by point: `vfromheading`, trigonometry, `append`. And yet the turtle already knows how to draw one: `repeat 6 [ fd 30 rt 60 ]`. `trace` bridges the gap.
+
+### The basic idea
+
+`trace [ … ]` runs its block in a **sandbox** — full language semantics, but the stitch machine is disconnected. Nothing is sewn, the turtle is restored on exit, and the block's pen-down trajectory is returned as a list of `[x, y]` points:
+
+```text
+let hex = trace [ repeat 6 [ fd 30 rt 60 ] ]
+sewpath(resample(hex, 2))      // sew it — now it's a region, resample for clean stitching
+```
+
+One line turns any turtle program into a region constructor. Arcs, procedures, transforms, `warp`, recursion — everything works inside a trace:
+
+```text
+def circleat(cx, cy, r) [
+  return trace [ up setxy cx cy - r down arc 360 r ]
+]
+
+let disc = circleat(0, 0, 28)
+for p in scatter(3.5, disc) [    // Poisson dots confined to the disc
+  up setpos(p) down arc 360 0.6 trim
+]
+```
+
+### `trace` vs `tracerings`
+
+`trace` expects **exactly one** pen-down run and returns it as a path. If the block lifts the pen and creates a second run, it's an error — _"use `tracerings` to capture all of them."_ Zero runs returns `[]` with a warning.
+
+`tracerings` returns a **list of paths**, one per run, in drawing order. This is the multi-ring shape: an outer boundary plus inner holes, like a donut or a badge knockout:
+
+```text
+let donut = tracerings [
+  arc 360 25                 // outer ring
+  up setxy 8 0 down
+  arc 360 12                 // inner ring (hole)
+]
+
+for ring in donut [
+  sewpath(resample(ring, 2))
+  trim
+]
+```
+
+### Expression position only
+
+Both words are **block expressions** — valid in initializers, arguments, and conditions. Using them as a bare statement is a parse error because the result would be discarded:
+
+```text
+let ring = trace [ arc 360 20 ]              // OK: initializer
+sewpath(trace [ repeat 4 [ fd 10 rt 90 ] ])  // OK: argument
+if inpath(p, trace [ arc 360 20 ]) [ … ]     // OK: condition operand
+trace [ fd 10 ]                              // ERROR: produces a value — assign it, pass it, or remove it
+```
+
+`trace` binds like a primary — tighter than any operator — so `trace [ … ][0]` indexes the result and `len(trace [ … ])` needs no extra parentheses.
+
+### The sandbox in detail
+
+The sandbox captures the complete turtle and stitch state at block entry and restores it on exit. Three things escape:
+
+1. **The returned path(s).**
+2. **The block's random-stream consumption** — `random`, `gauss`, `pick`, `scatter` calls hit the main stream normally. `trace` itself draws nothing.
+3. **Ordinary program effects** — variables mutate for real, `print` prints, `assert` asserts.
+
+Consequences:
+
+- **Nothing sews.** No stitches, jumps, trims, or colour changes enter the design.
+- **The turtle doesn't move.** `pos()` and `heading` are unchanged after a trace.
+- **The pen starts down** inside the block, regardless of the ambient pen state.
+- Machine/thread commands (`color`, `trim`, `lock`, `satin`, `stitchlen`, …) execute into sandboxed state and are discarded, with a one-time console note per kind.
+- `beginfill`/`endfill` inside trace is a hard error — capture the boundary, then fill it afterward.
+- `seed` inside trace is a hard error — the RNG escapes the sandbox, and reseeding mid-sandbox would be spooky action.
+- `return`/`exit` cannot cross the block boundary — the trace must produce its value.
+
+### What is captured
+
+The recorder captures the **pre-split** turtle spine — the same pipeline stage `warp` reads, before stitch-length splitting. `fd 30` contributes two vertices 30 mm apart, not twelve 2.5 mm stitches. `stitchlen` has no effect on a captured path. If you need controlled spacing, call `resample(path, mm)` on the result.
+
+`warp` _does_ apply to captured points (it deforms the pre-split path). `humanize` and `snaptogrid` do _not_ (they're post-split effects) — a note points you at `humanizepath`/`snappath` instead.
+
+### Coordinate frame
+
+Captured points live in the **trace-entry frame**. Transforms opened _inside_ the block apply; anything enclosing the trace does not:
+
+```text
+translate 20 0 [
+  let a = trace [ fd 10 ]              // [[0,0],[0,10]] — the translate is NOT baked in
+  let b = trace [ rotate 90 [ fd 10 ] ]  // [[0,0],[10,0]] — the inner rotate IS applied
+  sewpath(a)                            // sews at x=20 — the translate applies at emission
+]
+```
+
+This gives the **round-trip identity**: `sewpath(trace [ B ])` produces the same stitches as running `B` directly, because both go through the enclosing frame at emission time and trace adds zero random draws.
+
+### Nesting
+
+A trace inside a trace is allowed — the inner trace is a pure expression, invisible to the outer recorder. Each sandbox saves and restores independently.
+
+`trace` and `tracerings` are **core** words — they can't be redefined. (See the bundled **trace-regions** and **trace-motifs** examples.)
+
+---
+
+## 20. Professional embroidery and fabric physics
 
 Geometry that looks right on screen doesn't automatically _sew_ right. Thread tension pulls fabric inward, stitches sink into the material, tight curves crowd the needle, and layered stitching becomes a stiff, puckered patch. The following commands compensate for the physics. They are **opt-in** — without them, your program sews exactly as written.
 
@@ -1095,9 +1200,9 @@ Travels of 7 mm or more (configurable 3–30; `autotrim 0` off) automatically ge
 
 ---
 
-## 20. Programmable satin, fills, and closed-loop generation
+## 21. Programmable satin, fills, and closed-loop generation
 
-The professional layer in §19 _shapes_ the built-in stitches. The three features here go further: they let you replace the stitch generators themselves with your own reporters, and even read the fabric back as you sew. This is the most advanced corner of NeedleScript — and it reuses machinery you already know: the `@name` procedure references from [§18](#18-effects-warp-humanize-snaptogrid), and the coverage grid from [§19](#19-professional-embroidery-and-fabric-physics).
+The professional layer in §20 _shapes_ the built-in stitches. The three features here go further: they let you replace the stitch generators themselves with your own reporters, and even read the fabric back as you sew. This is the most advanced corner of NeedleScript — and it reuses machinery you already know: the `@name` procedure references from [§18](#18-effects-warp-humanize-snaptogrid), and the coverage grid from [§20](#20-professional-embroidery-and-fabric-physics).
 
 ### Programmable satin — `satin @fn`
 
@@ -1228,7 +1333,7 @@ def adaptive(p) [
 
 ---
 
-## 21. Debugging
+## 22. Debugging
 
 Generative designs surprise you. These tools tell you what actually happened.
 
@@ -1262,7 +1367,7 @@ repeat 50 [
 
 ---
 
-## 22. Safety limits
+## 23. Safety limits
 
 NeedleScript guards both your browser and your machine. Hit one of these and you'll get a clear error rather than a hang or a damaged garment:
 
@@ -1283,7 +1388,7 @@ NeedleScript guards both your browser and your machine. Hit one of these and you
 
 ---
 
-## 23. Exporting and reusing your work
+## 24. Exporting and reusing your work
 
 When a design is ready, **Download .DST** produces a standard Tajima file: 3-byte ternary delta records, moves longer than 12.1 mm split automatically, colour changes as stop records, trims as triple jumps, and a correct 512-byte header. Load it onto any machine, or into commercial software for a final check.
 
@@ -1291,7 +1396,7 @@ You can also bring artwork _in_: **Import SVG** (a button, or drag and drop) con
 
 ---
 
-## 24. A capstone project
+## 25. A capstone project
 
 Let's combine what you've learned into one piece that exercises the whole pipeline: a generative seeded "meadow" of stems that grow along a noise field, each topped with a small satin leaf, all sitting on stable fabric.
 
@@ -1349,7 +1454,7 @@ Happy stitching.
 
 ---
 
-## 25. AI generation assistant
+## 26. AI generation assistant
 
 The REPL doubles as an AI interface. Any line starting with `/ai` is intercepted and dispatched to a language model of your choice via [OpenRouter](https://openrouter.ai), rather than being appended to the editor. The model receives the full NeedleScript language reference as its system prompt, along with your current code and any compile errors, and its output lands directly in the editor and runs.
 

@@ -1,0 +1,78 @@
+// ============================================================
+//  TRACE-MOTIFS — CAPTURE, TRANSFORM, STAMP
+//  `trace` captures a motif at the origin; then xrotate, xlate
+//  and sewpath stamp copies as data without moving the turtle.
+//  `tracerings` captures multi-ring shapes (boundaries + holes)
+//  for fills and boolean geometry.
+// ============================================================
+
+// --- layout ---
+let petals   = 8     // [3:16] leaves in the rosette
+let leaf_len = 14    // [6:0.5:25] leaf arc length, mm
+let leaf_arc = 5     // [2:0.5:12] arc step per turn, degrees
+let ring_r   = 18    // [12:0.5:34] radius for the outer satin ring
+
+// --- quality ---
+let stitch   = 2.0   // [1:0.1:4] stitch length, mm
+
+stitchlen stitch
+
+// ── 1. define a leaf with a procedure ─────────────────────
+// The drawing vocabulary (arcs, turns, pen up/down) works
+// inside trace, including user procedures.
+
+def leafshape() [
+  repeat 2 [
+    repeat 18 [ fd leaf_len / 18 rt leaf_arc ]
+    rt 90 - leaf_arc * 18
+  ]
+]
+
+// ── 2. capture the motif at the origin, stamp rotated copies ──
+// trace captures the leaf as pure data; xrotate spins copies;
+// sewpath sews each one through the enclosing transform stack.
+
+let leaf = trace [ leafshape() ]
+
+color 2
+repeat petals [
+  let angle = (repcount - 1) * (360 / petals)
+  sewpath(resample(xrotate(leaf, angle), stitch))
+  trim
+]
+
+// ── 3. tracerings: a donut boundary for a warped satin ring ──
+// tracerings captures two pen-down runs (outer + inner circle)
+// as separate rings — the natural shape for fills and outlines.
+
+let donut = tracerings [
+  up setxy 0 0 - ring_r down arc 360 ring_r
+  up setxy 0 0 - ring_r + 3.5 down arc 360 ring_r - 3.5
+]
+
+color 1
+for ring in donut [
+  sewpath(resample(ring, stitch))
+]
+trim
+
+// ── 4. capture + warp: an organic boundary ────────────────
+// warp applies INSIDE trace, deforming the captured path.
+// The result is a warped circle usable as a scatter region.
+
+def ripple(p) [
+  let a = snoise2(p[0] / 9, p[1] / 9) * 2.5
+  return vadd(p, vfromheading(vheading(p), a))
+]
+
+let blob = trace [ warp @ripple [ up setxy 0 -12 down arc 360 12 ] ]
+
+color 3
+for p in scatter(3, blob) [
+  up setpos(p) down
+  fd 0.3 bk 0.6 fd 0.3
+  rt 90
+  fd 0.3 bk 0.6 fd 0.3
+  lt 90
+  trim
+]

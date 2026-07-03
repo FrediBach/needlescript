@@ -866,6 +866,99 @@ for p in pts [ up setpos(p) down arc 360 0.6 trim ]
 
 (See the bundled **warp**, **humanize** and **snaptogrid** examples.)
 
+## Trace — capturing paths as data
+
+NeedleScript's two worlds are asymmetric: data flows _into_ drawing — `sewpath(region)` walks any point list with the full pen/mode/transform machinery — but drawing never flows back _out_ into data. There is no way to get a region from `repeat 6 [ fd 30 rt 60 ]`, from `arc 360 28`, or from any procedure written in the imperative vocabulary. Every shape you want to feed to `clippaths`, `offsetpath`, `inpath`, `scatter`, or `voronoi` must be _constructed_ point-by-point out of `vfromheading` and `append`.
+
+`trace` closes the loop:
+
+```text
+let disc = trace [ arc 360 28 ]
+let bite = trace [ up setxy 18 0 down arc 360 14 ]
+
+for piece in clippaths(disc, bite, "difference) [
+  beginfill sewpath(resample(piece, 2)) endfill
+  trim
+]
+```
+
+One reporter, and the entire drawing vocabulary — arcs, procedures, transforms, `warp`, recursion — becomes a region constructor.
+
+| Word               | Returns                       | Notes                                   |
+| ------------------ | ----------------------------- | --------------------------------------- |
+| `trace [ … ]`      | one **path** (list of points) | the single pen-down run the block draws |
+| `tracerings [ … ]` | a **list of paths**           | one per pen-down run, in drawing order  |
+
+Both are **block expressions** — a header word followed by a bracket block, valid in _expression position_:
+
+```text
+let ring = trace [ arc 360 20 ]                 // initializer
+sewpath(trace [ repeat 6 [ fd 30 rt 60 ] ])     // argument
+if inpath(p, trace [ arc 360 20 ]) [ … ]        // condition operand
+```
+
+`trace` binds like a primary — tighter than any operator — so `trace [ … ][0]` indexes the result, and `len(trace [ … ])` needs no extra parentheses. Statement position is a **parse error**: `trace [ fd 10 ]` alone on a line discards a value, which is almost always a bug.
+
+### The sandbox rule
+
+At block entry the interpreter snapshots the complete turtle and stitch state. At block exit everything is restored. Three things escape the sandbox: the returned path(s), the block's own random-stream consumption, and ordinary program effects (variable mutation, `print`, `assert`).
+
+- **Nothing sews.** No stitches, jumps, trims, or colour changes enter the design. Machine/thread commands execute, mutate sandboxed state, and are thrown away — each kind gives a one-time console note.
+- **The turtle doesn't move.** After `let r = trace [ fd 100 rt 45 ]`, `pos()` and `heading` report exactly what they did before.
+- **The pen starts down.** Regardless of the ambient pen state, the block begins pen-down — inheriting a stray `up` would be a silent empty capture.
+- **Errors propagate.** A runtime error inside the block aborts normally; the sandbox is unwound cleanly.
+
+### What is captured
+
+The recorder captures the **emitted path polyline before stitch-length splitting** — the same pipeline stage `warp` reads.
+
+- `fd 30` contributes one segment: two vertices, 30 mm apart (not twelve 2.5 mm stitches). `stitchlen` has no effect on a captured path.
+- `arc` contributes its internal polyline at the engine's arc resolution. Programs that need controlled vertex spacing call `resample(ring, mm)` on the result.
+- Stitch _modes_ (satin, bean, estitch) don't change the capture — the captured path is the **spine**, the turtle's pen-down trajectory.
+- A **run** is a maximal pen-down movement sequence. Pen-up, `pop`, and pen-up repositioning (`home`/`setxy`) split runs.
+- If a run's final vertex coincides with its first (within 1e-6 mm), the duplicate is dropped — region closure is implicit.
+
+### `trace` vs `tracerings`
+
+`trace` expects **exactly one run**: zero runs returns `[]` with a warning; two or more runs is an error naming the split — _"use `tracerings` to capture all of them."_ Leading pen-up travel is fine: `trace [ up setxy 18 0 down arc 360 14 ]` repositions, then captures one run.
+
+`tracerings` returns a **list of runs** (possibly empty), in drawing order — the shape of `beginfill`'s world. A pen-up move starting a new ring is exactly how fills accumulate boundaries.
+
+### Coordinate frame
+
+Captured points are expressed **relative to the frame current at trace entry**. Transforms and warps opened _inside_ the block apply to the captured points; anything enclosing the trace does not:
+
+```text
+translate 20 0 [
+  let a = trace [ fd 10 ]              // [[0,0],[0,10]] — enclosing translate NOT applied
+  let b = trace [ rotate 90 [ fd 10 ] ]  // [[0,0],[10,0]] — inner rotate IS applied
+  sewpath(a)                            // sews at x=20 — the translate applies at emission
+]
+```
+
+This yields the round-trip identity: inside any enclosing frame, `sewpath(trace [ B ])` produces the same stitches as running `B` directly (given `B` is a single pen-down run using movement only).
+
+### Randomness — no fork
+
+`trace` and `tracerings` draw nothing from the seeded stream themselves. The block's own `random`/`gauss`/`pick`/`scatter` calls hit the main stream exactly as outside a trace. Wrapping existing code in `trace [ … ]` changes nothing downstream.
+
+### Interactions
+
+| Feature inside a trace block                  | Behaviour                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------- |
+| Movement, `push`/`pop`, procedures, recursion | normal                                                              |
+| Transforms (`translate`, `rotate`, …)         | apply to captured points                                            |
+| `warp @fn`                                    | applies — it deforms the pre-split path                             |
+| `humanize`, `snaptogrid`                      | inert + one-time note — use `humanizepath`/`snappath` on the result |
+| `beginfill` / `endfill`                       | **error** — capture the boundary and fill afterward                 |
+| `seed`                                        | **error** — reseed outside trace                                    |
+| `return`/`exit` crossing the block boundary   | **error** — the trace must produce its value                        |
+| Machine commands (`color`, `trim`, `lock`, …) | inert + one-time note                                               |
+| Stitch-history queries (`coverat`, …)         | see the fabric as of trace entry                                    |
+| Nested `trace`/`tracerings`                   | allowed — the inner trace is invisible to the outer recorder        |
+
+(See the bundled **trace-regions** and **trace-motifs** examples.)
+
 ## Professional embroidery & fabric physics
 
 Geometry alone doesn't survive the sewing machine: thread tension pulls fabric inward, stitches sink into the material, tight curves crowd the needle, and layered stitching turns into a bulletproof patch. These commands compensate for the physics. They are **opt-in** — without them, programs sew exactly as written.

@@ -1,0 +1,56 @@
+// ============================================================
+//  TRACE-REGIONS — TURTLE PATHS AS GEOMETRY DATA
+//  `trace [ … ]` dry-runs a block and returns the pen-down path
+//  as a list of [x, y] points. Nothing is sewn; the turtle is
+//  restored. The result plugs straight into clippaths, offsetpath,
+//  scatter, inpath — the entire drawing vocabulary becomes a
+//  region constructor.
+// ============================================================
+
+// --- shape ---
+let outer_r  = 20    // [12:0.5:35] outer disc radius, mm
+let bite_r   = 12    // [6:0.5:22] bite disc radius, mm
+let bite_x   = 14    // [0:0.5:30] bite disc centre X offset, mm
+let inset    = 1.2   // [0.4:0.2:3] inset for the outline, mm
+let dot_r    = 0.5   // [0.3:0.1:1.2] scatter dot radius, mm
+
+// --- quality ---
+let spacing  = 3.2   // [2:0.2:6] Poisson disc spacing, mm
+let stitch   = 2.2   // [1:0.1:4] stitch length, mm
+
+stitchlen stitch
+
+// ── 1. capture two circles as data ────────────────────────
+// No hand-rolled vfromheading loops — the turtle draws circles
+// natively, and trace returns them as point lists.
+
+let disc = trace [ arc 360 outer_r ]
+let bite = trace [ up setxy bite_x 0 down arc 360 bite_r ]
+
+// ── 2. boolean subtract to make a pac-man ─────────────────
+
+let pieces = clippaths(disc, bite, "difference)
+
+// ── 3. stitch the inset outlines ──────────────────────────
+
+color 1
+for piece in pieces [
+  for ring in offsetpath(piece, -inset) [
+    sewpath(resample(ring, stitch))
+    up setpos(ring[0]) down          // close cleanly
+  ]
+  trim
+]
+
+// ── 4. fill with scattered dots ───────────────────────────
+// scatter confines its Poisson points to the region, and trace
+// made the region — no manual point-in-polygon math needed.
+
+color 2
+for piece in pieces [
+  for p in scatter(spacing, piece) [
+    up setpos(p) down
+    arc 360 dot_r
+    trim
+  ]
+]

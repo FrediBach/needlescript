@@ -71,6 +71,8 @@ import distancebandsRaw from '../examples/distancebands.ns?raw';
 import snaptoguideRaw from '../examples/snaptoguide.ns?raw';
 import starburstRaw from '../examples/starburst.ns?raw';
 import composeRaw from '../examples/compose.ns?raw';
+import traceRegionsRaw from '../examples/trace-regions.ns?raw';
+import traceMotifsRaw from '../examples/trace-motifs.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -178,6 +180,8 @@ export const EXAMPLES: Record<string, string> = {
   'snap to guide': snaptoguideRaw,
   starburst: starburstRaw,
   compose: composeRaw,
+  'trace regions': traceRegionsRaw,
+  'trace motifs': traceMotifsRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -211,6 +215,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'custom satin',
       'pixelated',
       'triangles',
+      'trace regions',
     ],
   },
   {
@@ -244,6 +249,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'snap to guide',
       'starburst',
       'compose',
+      'trace motifs',
     ],
   },
   {
