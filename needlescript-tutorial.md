@@ -1643,7 +1643,7 @@ Pure values in, values out — nothing here ever moves the needle:
 
 **Stream config:** `seed` — a statement, but it configures the data world's RNG and touches no stitch state.
 
-### Bridges (worth their own color)
+### Bridges
 
 These are where the worlds touch, in both directions:
 
