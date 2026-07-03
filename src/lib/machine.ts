@@ -96,7 +96,7 @@ interface MachineSnapshot {
   _warnedSatinEffect: boolean;
   // Trace recording state (for nesting)
   traceRecording: boolean;
-  traceRuns: [number, number][][][];
+  traceRuns: [number, number][][];
   traceCurRun: [number, number][] | null;
   traceVertexCount: number;
 }
