@@ -2112,7 +2112,14 @@ export function registerNeedlescript(monaco: Monaco): void {
       'false',
       'and',
       'or',
-      // Transform block commands (CTM stack) — headers like repeat/if.
+      // Trace block expressions — bridge: sewing runs sandboxed, a path comes out.
+      'trace',
+      'tracerings',
+    ],
+
+    // ── Sewing-world transform & effect block commands (gold, italic) ─
+    sewingKwCmds: [
+      // Transform block commands (CTM stack) — mutate the stitch transform.
       'translate',
       'rotate',
       'rotateabout',
@@ -2121,16 +2128,13 @@ export function registerNeedlescript(monaco: Monaco): void {
       'mirror',
       'skew',
       'transform',
-      // Effect block commands (same stack, nonlinear / stochastic / after-split).
+      // Effect block commands — warp/perturb the emitted stitch geometry.
       'warp',
       'humanize',
       'snaptogrid',
-      // Trace block expressions (capture turtle paths as data).
-      'trace',
-      'tracerings',
     ],
 
-    // ── Turtle movement commands + pen + state reporters (teal) ─────
+    // ── Turtle movement & pen commands — sewing world (teal, italic) ─
     movementCmds: [
       'fd',
       'forward',
@@ -2163,14 +2167,17 @@ export function registerNeedlescript(monaco: Monaco): void {
       'cs',
       'clearscreen',
       'clear',
-      // zero-argument reporters that describe the turtle's current state
+    ],
+
+    // ── Turtle & loop state reporters — bridge: read-only (teal) ────
+    sensorCmds: [
       'xcor',
       'ycor',
       'heading',
       'repcount',
     ],
 
-    // ── Stitch / thread / professional / debug commands (amber) ─────
+    // ── Stitch / thread / professional commands — sewing world (amber, italic) ─
     stitchCmds: [
       'stitchlen',
       'stitchlength',
@@ -2192,14 +2199,18 @@ export function registerNeedlescript(monaco: Monaco): void {
       'color',
       'stop',
       'trim',
-      'seed',
+      'fabric',
+      'underlay',
+      'fillunderlay',
+    ],
+
+    // ── Debug / neutral / data-world auxiliaries (amber) ────────────
+    debugCmds: [
+      'seed', // data-world RNG config
       'print',
       'printloc',
       'mark',
       'assert',
-      'fabric',
-      'underlay',
-      'fillunderlay',
     ],
 
     // ── Core built-in math functions (lavender) ─────────────────────
@@ -2343,9 +2354,12 @@ export function registerNeedlescript(monaco: Monaco): void {
           /[a-z_][a-z0-9_]*/,
           {
             cases: {
+              '@sewingKwCmds': 'ns-sewing-kw',
               '@keywords': 'ns-keyword',
               '@movementCmds': 'ns-movement',
+              '@sensorCmds': 'ns-sensor',
               '@stitchCmds': 'ns-stitch',
+              '@debugCmds': 'ns-debug',
               '@mathFuncs': 'ns-math',
               '@libFuncs': 'ns-lib',
               '@default': 'ns-identifier',
@@ -2384,9 +2398,15 @@ export function registerNeedlescript(monaco: Monaco): void {
       // Control flow & definition keywords — brand gold, bold
       { token: 'ns-keyword', foreground: m(synKeyword), fontStyle: 'bold' },
       // Turtle movement + reporters — sky teal
-      { token: 'ns-movement', foreground: m(synMovement) },
-      // Stitch / thread / fabric commands — warm amber
-      { token: 'ns-stitch', foreground: m(synStitch) },
+      { token: 'ns-movement', foreground: m(synMovement), fontStyle: 'italic' },
+      // Turtle state reporters (bridges: read-only) — same teal, not italic
+      { token: 'ns-sensor', foreground: m(synMovement) },
+      // Stitch / thread / fabric commands — warm amber, italic
+      { token: 'ns-stitch', foreground: m(synStitch), fontStyle: 'italic' },
+      // Debug / neutral / data-world auxiliaries — same amber, not italic
+      { token: 'ns-debug', foreground: m(synStitch) },
+      // Sewing-world transform & effect block commands — gold, bold + italic
+      { token: 'ns-sewing-kw', foreground: m(synKeyword), fontStyle: 'bold italic' },
       // Core math functions — soft lavender
       { token: 'ns-math', foreground: m(synMath) },
       // Library functions (list + generative) — mint green
