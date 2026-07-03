@@ -34,8 +34,10 @@ This tutorial walks you from the absolute basics up to seeded noise fields, Voro
 22. [Debugging](#22-debugging)
 23. [Safety limits](#23-safety-limits)
 24. [Exporting and reusing your work](#24-exporting-and-reusing-your-work)
-25. [A capstone project](#25-a-capstone-project)
-26. [AI generation assistant](#26-ai-generation-assistant)
+25. [Sewing gotchas](#25-sewing-gotchas)
+26. [A capstone project](#26-a-capstone-project)
+27. [Two worlds](#27-two-worlds)
+28. [AI generation assistant](#28-ai-generation-assistant)
 
 ---
 
@@ -1599,7 +1601,66 @@ Happy stitching.
 
 ---
 
-## 27. AI generation assistant
+## 27. Two Worlds
+
+Sewing or data world? Does a command emit stitches or only data values?
+
+### Sewing world
+
+Everything that emits stitches or mutates turtle/machine/stitch state:
+
+**Movement:** `fd`/`forward`, `bk`/`back`/`backward`, `rt`/`right`, `lt`/`left`, `arc`, `circle`, `up`/`penup`/`pu`, `down`/`pendown`/`pd`, `setxy`, `setx`, `sety`, `seth`/`setheading`, `home`, `moveto`/`jump`, `gohome`, `push`, `pop`, `cs`/`clearscreen`/`clear` (a no-op, but sewing-flavored)
+
+**Thread & stitch quality:** `stitchlen`/`stitchlength`, `satin` (both numeric and `satin @fn`), `density`, `bean`, `estitch`, `color`, `stop`, `trim`, `lock`, `autotrim`
+
+**Fills:** `beginfill`, `endfill`, `fillangle`, `fillspacing`, `filllen`, `fill dir @f` / `fill shape @s`
+
+**Transforms (block commands):** `translate`, `rotate`, `rotateabout`, `scale`, `scalexy`, `mirror`, `skew`, `transform`
+
+**Effects (block commands):** `warp`, `humanize`, `snaptogrid`
+
+**Professional / fabric physics:** `fabric`, `pullcomp`, `underlay`, `fillunderlay`, `shortstitch`, `maxdensity`
+
+### Data world
+
+Pure values in, values out — nothing here ever moves the needle:
+
+**Scalar math:** `random`, `gauss`, `noise`, `noise2`, `snoise2`, `snoise3`, `fbm2`, `sin`, `cos`, `sqrt`, `abs`, `round`, `floor`, `ceil`, `min`, `max`, `pow`, `mod`, `lerp`, `remap`, `clamp`, `smoothstep`
+
+**Lists:** `filled`, `len`, `islist`, `first`, `last`, `append`, `prepend`, `insertat`, `removeat`, `concat`, `slice`, `reverse`, `sort`, `copy`, `indexof`, `contains`, `sum`, `mean`, `minof`, `maxof`, `pick`, `shuffle`, `range`, `steps`
+
+**Higher-order:** `map`, `filter`, `reduce`, `compose`, and `@name` references themselves
+
+**Vectors & segments:** `vadd`, `vsub`, `vscale`, `vlerp`, `vdot`, `vlen`, `vdist`, `vnorm`, `vrot`, `vheading`, `vfromheading`, `segisect`, `segdist`, `nearestonpath`
+
+**Paths & curves:** `pathlen`, `resample`, `chaikin`, `catmull`, `bezier`, `centroid`, `bbox`, `xlate`, `xrotate`, `xscale`, `xmirror`
+
+**Generators & geometry:** `scatter`, `voronoi`, `triangulate`, `hull`, `relax`, `offsetpath`, `clippaths`, `inpath`
+
+**Effect-path twins:** `warppath`, `humanizepath`, `snappath`
+
+**Tuple helpers:** `satinpair`, `satinasym`, `satinrake`, `tatamirow` (they only *build* the lists that satin/fill reporters return — pure)
+
+**Stream config:** `seed` — a statement, but it configures the data world's RNG and touches no stitch state.
+
+### Bridges (worth their own color)
+
+These are where the worlds touch, in both directions:
+
+- **Data → stitches:** `sewpath(path)` (walks a list with full pen/mode/transform machinery) and `setpos(p)` (its single-point sibling). These are the *only* commands that consume a list and sew.
+- **Stitches → data:** `trace [ … ]` and `tracerings [ … ]` — sewing vocabulary runs sandboxed, nothing sews, a path comes out.
+- **Turtle sensors (read-only):** `xcor`, `ycor`, `heading`, `pos()`, `distance`, `towards`, `repcount` — expressions that *read* sewing-world state but never change it.
+- **Fabric sensors (read-only):** `coverat`, `countat`, `nearestsewn`, `sewnwithin`, `stitchedpoints` — pure reads of committed penetrations; the closed-loop feedback channel.
+
+### Neutral scaffolding
+
+Neither world — control flow and structure: `repeat`, `while`, `for` (all spellings), `if`/`else`, `break`, `continue`, `def`/`to`…`end`, `return`/`output`/`op`/`exit`, `let`, `make`, `local`, assignment and the operators, `true`/`false`. Plus debugging: `print`, `printloc`, `assert` (console-only), and `mark` — a slight oddball: it reads the needle position and pins the *preview*, but is never exported or counted, so I'd tint it debug rather than sewing.
+
+Two editor notes. First, `satin` and `fill` are sewing-world words whose `@fn` arguments summon user reporters that must stay drawless — highlighting the reporter's body as data-world would visually reinforce that contract. Second, inside `trace [ … ]` all sewing words are sandboxed (machine commands are inert with a note), so if you ever want to get fancy, dimming sewing-world highlights inside a trace block would make the sandbox rule visible at a glance.
+
+---
+
+## 28. AI generation assistant
 
 The REPL doubles as an AI interface. Any line starting with `/ai` is intercepted and dispatched to a language model of your choice via [OpenRouter](https://openrouter.ai), rather than being appended to the editor. The model receives the full NeedleScript language reference as its system prompt, along with your current code and any compile errors, and its output lands directly in the editor and runs.
 
