@@ -22,10 +22,13 @@ interface RefEntry {
   desc: string;
 }
 
+type RefWorld = 'sewing' | 'data' | 'bridge';
+
 interface RefSection {
   title: string;
   note?: string;
   entries: RefEntry[];
+  world?: RefWorld;
 }
 
 const SECTIONS: RefSection[] = [
@@ -50,6 +53,7 @@ const SECTIONS: RefSection[] = [
   {
     title: 'Movement',
     note: 'Heading 0 = up/north, clockwise. rt 90 faces east.',
+    world: 'sewing',
     entries: [
       {
         cmd: 'fd n · bk n',
@@ -186,6 +190,7 @@ const SECTIONS: RefSection[] = [
   },
   {
     title: 'Math functions',
+    world: 'data',
     entries: [
       { cmd: 'random n', desc: 'seeded random number in 0…n — reproducible, driven by seed' },
       {
@@ -223,6 +228,7 @@ const SECTIONS: RefSection[] = [
   {
     title: 'Lists',
     note: 'A second value type alongside numbers: ordered, nestable lists. Reference semantics — assignment shares the list; mutate through any alias and every alias sees it. Use copy(xs) for an independent deep copy. All list functions are call-syntax only: len(xs), never len xs.',
+    world: 'data',
     entries: [
       {
         cmd: '[1, 2, 3] · []',
@@ -280,6 +286,7 @@ const SECTIONS: RefSection[] = [
   },
   {
     title: 'Thread & stitch quality',
+    world: 'sewing',
     entries: [
       {
         cmd: 'stitchlen mm',
@@ -323,6 +330,7 @@ const SECTIONS: RefSection[] = [
   {
     title: 'Fills',
     note: 'Moves between beginfill and endfill trace a boundary rather than sewing. Inner rings (started with a pen-up move) become holes by the even-odd rule.',
+    world: 'sewing',
     entries: [
       {
         cmd: 'beginfill … endfill',
@@ -347,6 +355,7 @@ const SECTIONS: RefSection[] = [
   {
     title: 'Generative math — scalars & noise',
     note: 'All generative-math functions are call-syntax only. Conventions: a point is [x, y], a path is a list of points, a region is a closed path (closing segment implicit).',
+    world: 'data',
     entries: [
       { cmd: 'lerp(a, b, t)', desc: 'a + (b−a)·t, t unclamped' },
       { cmd: 'remap(v, inlo, inhi, outlo, outhi)', desc: 'linear remap, unclamped' },
@@ -366,6 +375,7 @@ const SECTIONS: RefSection[] = [
   {
     title: 'Generative math — vectors',
     note: 'Everything heading-like uses turtle degrees (0 = north, clockwise positive) — matching seth, atan, towards. No operator broadcasting: [1,2] + [3,4] is an error; use vadd.',
+    world: 'data',
     entries: [
       { cmd: 'vadd(a, b) · vsub(a, b)', desc: 'new point: element-wise addition / subtraction' },
       { cmd: 'vscale(a, s) · vlerp(a, b, t)', desc: 'new point: scale / lerp' },
@@ -387,6 +397,7 @@ const SECTIONS: RefSection[] = [
   },
   {
     title: 'Generative math — paths & curves',
+    world: 'data',
     entries: [
       { cmd: 'pathlen(path)', desc: 'total polyline length in mm' },
       {
@@ -412,6 +423,7 @@ const SECTIONS: RefSection[] = [
   {
     title: 'Generative math — generators & geometry',
     note: 'Outputs compose: scatter → voronoi → offsetpath → resample → sewpath. All generators are seeded: same seed, same output.',
+    world: 'data',
     entries: [
       {
         cmd: 'scatter(mindist) · scatter(mindist, region)',
@@ -447,6 +459,7 @@ const SECTIONS: RefSection[] = [
   {
     title: 'Transforms',
     note: "Block-scoped transform stack (a CTM, like OpenSCAD): a transform takes its args then a [ … ] block, maps everything the block draws, and restores the previous frame. Core built-ins — can't be redefined. The turtle stays in untransformed local space (xcor/ycor/pos() report pre-transform); only emitted stitches are mapped, and stitch length / satin width / pullcomp are evaluated in hoop space after the transform, so previews stay physical.",
+    world: 'sewing',
     entries: [
       { cmd: 'translate dx dy [ … ]', desc: 'shift the block by (dx, dy) mm' },
       {
@@ -480,6 +493,7 @@ const SECTIONS: RefSection[] = [
   {
     title: 'Effects',
     note: "Transforms with an arbitrary per-point function instead of an affine matrix. Same block-scoped stack; nest freely with transforms. @name is a procedure reference — the one new value kind effects introduce — consumed by warp/warppath and satin. warp maps path vertices before stitch-split; humanize/snaptogrid perturb final penetrations after split and deliberately skip satin columns. All Core — can't be redefined.",
+    world: 'sewing',
     entries: [
       {
         cmd: 'warp @fn [ … ]',
@@ -506,6 +520,7 @@ const SECTIONS: RefSection[] = [
   {
     title: 'Fabric & professional quality',
     note: 'Without these commands, programs sew exactly as written. Fabric presets are the quickest route — explicit commands afterwards override the preset.',
+    world: 'sewing',
     entries: [
       { cmd: 'fabric "woven', desc: 'baseline preset: pull comp 0.2 mm, density limit 3.5 layers' },
       {
@@ -553,6 +568,7 @@ const SECTIONS: RefSection[] = [
   {
     title: 'Stitch history',
     note: "Read the coverage grid back mid-program so a design can respond to what's already sewn — adaptive density, stippling toward a target, avoidance, growth. Pure reporters (glued-call only, shadowable): they draw nothing from the RNG and emit nothing, so branching on them stays deterministic. They see committed penetrations in sewing order (a buffered satin column isn't visible until it flushes; tie-off locks excluded, so numbers match the heatmap). Query points are local-frame, mapped through the current transform; returned points are hoop-space.",
+    world: 'bridge',
     entries: [
       {
         cmd: 'coverat(p) · coverat(p, r)',
@@ -1559,8 +1575,19 @@ export default function ReferenceDialog({ open, onClose }: Props) {
                   <div className={styles.empty}>no matches for &ldquo;{query}&rdquo;</div>
                 ) : (
                   filtered.map((section) => (
-                    <section key={section.title} className={styles.section}>
-                      <h3 className={styles.sectionTitle}>{section.title}</h3>
+                    <section
+                      key={section.title}
+                      className={styles.section}
+                      data-world={section.world}
+                    >
+                      <div className={styles.sectionHeader}>
+                        <h3 className={styles.sectionTitle}>{section.title}</h3>
+                        {section.world && (
+                          <span className={styles.worldBadge}>
+                            {section.world.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
                       {section.note && <p className={styles.sectionNote}>{section.note}</p>}
                       <div className={styles.entries}>
                         {section.entries.map((e, i) => (

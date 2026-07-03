@@ -14,13 +14,52 @@
   border-top: 1px dashed var(--border);
 }
 
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+
 .sectionTitle {
   font-size: var(--fs-label);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-faint);
   font-weight: 500;
-  margin: 6px 0 4px;
+  margin: 0;
+}
+
+/* World classification badge */
+.worldBadge {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+[data-world='sewing'] .worldBadge {
+  color: #c87c3c;
+  background: rgba(200, 124, 60, 0.13);
+}
+
+[data-world='data'] .worldBadge {
+  color: #9888cc;
+  background: rgba(152, 136, 204, 0.13);
+}
+
+[data-world='bridge'] .worldBadge {
+  color: #62c4d4;
+  background: rgba(98, 196, 212, 0.13);
+}
+
+/* Mirror the editor: sewing-world commands are italic */
+[data-world='sewing'] .cmd {
+  font-style: italic;
 }
 
 .sectionNote {
