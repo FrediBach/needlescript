@@ -549,6 +549,8 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       next();
       const nxt = peek();
       const isValueWord = (w: string) =>
+        w === 'trace' ||
+        w === 'tracerings' ||
         FUNC_ARITY[w] !== undefined ||
         ZERO_FUNCS.has(w) ||
         LIST_FUNCS[w] !== undefined ||
@@ -653,6 +655,15 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         }
       }
       return { k: 'if', cond, body, elseBody, line: tok.line };
+    }
+
+    // Trace block expressions (RFC-trace): trace/tracerings are expression-only;
+    // using them as a bare statement is an error — the value would be discarded.
+    if (name === 'trace' || name === 'tracerings') {
+      throw new NeedlescriptError(
+        `${name} produces a value — assign it, pass it, or remove it`,
+        tok.line,
+      );
     }
 
     // Transform block commands (CTM stack):  translate dx dy [ … ].
@@ -1184,6 +1195,16 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     }
     if (tok.t === 'word') {
       const w = tok.v as string;
+
+      // Trace block expressions (RFC-trace): trace [ … ] / tracerings [ … ].
+      // Header word then a bracket block, valid in expression position only.
+      // Binds like a primary — tighter than any operator — so trace [ … ][0]
+      // indexes the result, and len(trace [ … ]) needs no extra parentheses.
+      if (w === 'trace' || w === 'tracerings') {
+        next();
+        const body = parseBracketBlock();
+        return parsePostfix({ k: 'trace', multi: w === 'tracerings', body, line: tok.line }, true);
+      }
 
       // Call syntax: name(args) — only when ( is glued to the name; with a
       // space between,  f (10)  keeps its Logo meaning (grouped expression).

@@ -91,6 +91,18 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   let cells = 0;
   const printed: string[] = [];
 
+  // Trace sandbox state (RFC-trace §4)
+  let insideTrace = 0;
+  const traceNoted = new Set<string>();
+
+  /** Emit a one-time note (warning) inside a trace block. */
+  function traceNote(kind: string, msg: string) {
+    if (insideTrace > 0 && !traceNoted.has(kind)) {
+      traceNoted.add(kind);
+      m.warnings.push(msg);
+    }
+  }
+
   function tick(line?: number) {
     if (++ops > LIMITS.maxOps) throw new NeedlescriptError(overlongMsg(), line);
   }
@@ -921,6 +933,61 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'procref':
         return new FuncRef(node.name);
+
+      case 'trace': {
+        // ── Trace sandbox (RFC-trace §4) ──────────────────────────────────
+        // Snapshot the machine, enter recording mode with a clean coordinate
+        // frame, execute the block, restore everything except warnings/RNG/
+        // variables, and return the captured path(s).
+        const snap = m.snapshotForTrace();
+        m.setupTraceSandbox();
+        insideTrace++;
+        let runs: [number, number][][];
+        try {
+          execBlock(node.body, env, repcount, depth, node.line);
+        } catch (e) {
+          if (e instanceof ReturnSignal)
+            throw new NeedlescriptError(
+              'cannot leave the procedure from inside trace — the trace must produce its value',
+              node.line,
+            );
+          if (e instanceof LoopSignal)
+            throw new NeedlescriptError(
+              `"${e.kind}" cannot cross a trace boundary`,
+              e.line ?? node.line,
+            );
+          throw e; // real errors propagate (§4.1)
+        } finally {
+          runs = m.endTrace();
+          m.restoreFromTrace(snap);
+          insideTrace--;
+        }
+
+        if (node.multi) {
+          // tracerings: return a list of paths (§4.3), possibly empty
+          if (runs.length === 0)
+            m.warnings.push('trace captured nothing — no pen-down movement in the block');
+          const paths: Val[] = runs.map((run) =>
+            allocList(
+              run.map(([x, y]) => allocList([x, y], node.line)),
+              node.line,
+            ),
+          );
+          return allocList(paths, node.line);
+        }
+        // trace: exactly one run expected (§4.3)
+        if (runs.length === 0) {
+          m.warnings.push('trace captured nothing — no pen-down movement in the block');
+          return allocList([], node.line);
+        }
+        if (runs.length > 1)
+          throw new NeedlescriptError(
+            `trace captured ${runs.length} separate runs — use tracerings to capture all of them`,
+            node.line,
+          );
+        const pts: Val[] = runs[0].map(([x, y]) => allocList([x, y], node.line));
+        return allocList(pts, node.line);
+      }
     }
   }
 
@@ -1522,6 +1589,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const a = st.args.map((x) => num(evalExpr(x, env, repcount, depth), st.name, st.line));
         let fn: (x: number, y: number) => [number, number];
         if (st.name === 'humanize') {
+          traceNote(
+            'humanize',
+            'note: humanize inside trace has no effect on the captured path — use humanizepath(...) on the result',
+          );
           const amount = clampHumanize(a[0]);
           // One main-stream draw seeds the coherent field (fork convention §7):
           // dropping a humanize block shifts downstream randomness by exactly
@@ -1530,6 +1601,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           fn = humanizeMap(amount, childSeed, snoise2);
         } else {
           // snaptogrid — pure, drawless, fixed hoop-space lattice
+          traceNote(
+            'snaptogrid',
+            'note: snaptogrid inside trace has no effect on the captured path — use snappath(...) on the result',
+          );
           fn = snapMapFromSpec(a, (msg) => new NeedlescriptError(`snaptogrid ${msg}`, st.line));
         }
         m.pushPen(fn);
@@ -1689,6 +1764,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         // numeric form; it begins buffering a column and flushes on the usual
         // triggers. The reporter is queried once per stitch pair at flush time.
         if (st.name === 'satin' && isFuncRef(vals[0])) {
+          traceNote('satin', 'note: satin inside trace has no effect on the captured path');
           const ref = vals[0];
           // Validate the contract eagerly so a malformed reporter is caught at
           // the engage site, even before the column has any geometry.
@@ -1781,6 +1857,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             m.popState();
             return;
           case 'stitchlen': {
+            traceNote(
+              'stitchlen',
+              'note: stitchlen inside trace has no effect on the captured path',
+            );
             const v = a[0];
             if (v < LIMITS.minStitch || v > LIMITS.maxStitch)
               m.warnings.push(
@@ -1790,6 +1870,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'satin': {
+            traceNote('satin', 'note: satin inside trace has no effect on the captured path');
             m.flushSatin();
             m.satinReporter = null; // numeric form returns to the built-in generator
             const v = Math.max(0, a[0]);
@@ -1802,6 +1883,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'estitch': {
+            traceNote('estitch', 'note: estitch inside trace has no effect on the captured path');
             m.flushSatin();
             m.satinReporter = null; // leaving satin mode disengages the reporter
             const v = Math.max(0, a[0]);
@@ -1812,6 +1894,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'bean': {
+            traceNote('bean', 'note: bean inside trace has no effect on the captured path');
             let n = Math.round(a[0]);
             if (n <= 1) {
               m.beanRepeats = 1;
@@ -1829,6 +1912,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'lock': {
+            traceNote('lock', 'note: lock inside trace has no effect on the captured path');
             if (a[0] <= 0) {
               m.lockLen = 0;
               return;
@@ -1839,15 +1923,33 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'beginfill':
+            if (insideTrace > 0)
+              throw new NeedlescriptError(
+                'a fill cannot run inside trace — capture the boundary and fill it afterward',
+                st.line,
+              );
             m.beginFill();
             return;
           case 'endfill':
+            if (insideTrace > 0)
+              throw new NeedlescriptError(
+                'a fill cannot run inside trace — capture the boundary and fill it afterward',
+                st.line,
+              );
             m.endFill();
             return;
           case 'fillangle':
+            traceNote(
+              'fillangle',
+              'note: fillangle inside trace has no effect on the captured path',
+            );
             m.fillAngle = a[0];
             return;
           case 'fillspacing': {
+            traceNote(
+              'fillspacing',
+              'note: fillspacing inside trace has no effect on the captured path',
+            );
             const v = Math.min(Math.max(a[0], 0.25), 5);
             if (v !== a[0])
               m.warnings.push(`fillspacing ${a[0]} clamped to ${v} mm (safe range 0.25–5)`);
@@ -1855,6 +1957,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'filllen': {
+            traceNote('filllen', 'note: filllen inside trace has no effect on the captured path');
             if (a[0] <= 0) {
               m.fillLen = null;
               return;
@@ -1865,10 +1968,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'density':
+            traceNote('density', 'note: density inside trace has no effect on the captured path');
             m.flushSatin();
             m.satinSpacing = Math.min(Math.max(a[0], 0.25), 5);
             return;
           case 'pullcomp': {
+            traceNote('pullcomp', 'note: pullcomp inside trace has no effect on the captured path');
             const v = Math.min(Math.max(a[0], 0), 1.5);
             if (v !== a[0])
               m.warnings.push(`pullcomp ${a[0]} clamped to ${v} mm (safe range 0–1.5)`);
@@ -1876,9 +1981,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'shortstitch':
+            traceNote(
+              'shortstitch',
+              'note: shortstitch inside trace has no effect on the captured path',
+            );
             m.shortStitch = a[0] !== 0;
             return;
           case 'autotrim': {
+            traceNote('autotrim', 'note: autotrim inside trace has no effect on the captured path');
             if (a[0] <= 0) {
               m.autoTrim = 0;
               return;
@@ -1890,6 +2000,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'maxdensity': {
+            traceNote(
+              'maxdensity',
+              'note: maxdensity inside trace has no effect on the captured path',
+            );
             if (a[0] <= 0) {
               m.maxDensity = 0;
               return;
@@ -1898,12 +2012,18 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'underlay':
+            traceNote('underlay', 'note: underlay inside trace has no effect on the captured path');
             m.underlayMode = st.word as typeof m.underlayMode;
             return;
           case 'fillunderlay':
+            traceNote(
+              'fillunderlay',
+              'note: fillunderlay inside trace has no effect on the captured path',
+            );
             m.fillUnderlayMode = st.word as typeof m.fillUnderlayMode;
             return;
           case 'fabric': {
+            traceNote('fabric', 'note: fabric inside trace has no effect on the captured path');
             const f = FABRICS[st.word as string];
             m.pullComp = f.pull;
             m.underlayMode = 'auto';
@@ -1915,15 +2035,23 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'color':
+            traceNote('color', 'note: color inside trace has no effect on the captured path');
             m.colorChange(a[0]);
             return;
           case 'stop':
+            traceNote('stop', 'note: stop inside trace has no effect on the captured path');
             m.colorChange(m.colorIdx + 1);
             return;
           case 'trim':
+            traceNote('trim', 'note: trim inside trace has no effect on the captured path');
             m.trimThread();
             return;
           case 'seed': {
+            if (insideTrace > 0)
+              throw new NeedlescriptError(
+                'reseed outside trace — the random stream escapes the sandbox',
+                st.line,
+              );
             const s = Math.floor(a[0]);
             rng = makeRNG(s);
             noise = makeNoise(s);
@@ -1932,6 +2060,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'mark':
+            traceNote(
+              'mark',
+              'note: mark inside trace has no effect — pins mark sewn positions; nothing is sewn',
+            );
             m.markHere();
             return;
         }

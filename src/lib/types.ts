@@ -107,7 +107,8 @@ export type ExprNode =
   | { k: 'index'; obj: ExprNode; idx: ExprNode; line: number }
   | { k: 'callval'; obj: ExprNode; args: ExprNode[]; line: number }
   | { k: 'callexpr'; name: string; args: ExprNode[]; line: number }
-  | { k: 'procref'; name: string; line: number };
+  | { k: 'procref'; name: string; line: number }
+  | { k: 'trace'; multi: boolean; body: ASTNode[]; line: number };
 
 // ---------- Density analysis types ----------
 

@@ -346,6 +346,9 @@ export const RESERVED = new Set<string>([
   // `dir`/`shape` are only positional keywords after `fill`, so they are NOT
   // reserved globally — existing variables named dir/shape keep working.
   'fill',
+  // Trace (RFC-trace): block expressions that capture turtle paths as data.
+  'trace',
+  'tracerings',
   ...Object.keys(ALIASES),
   ...Object.keys(BUILTIN_ARITY),
   ...Object.keys(TRANSFORM_ARITY),

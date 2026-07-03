@@ -603,6 +603,28 @@ const NS_ITEMS: NSItem[] = [
     params: [['cell']],
   },
 
+  // ── Trace block expressions (capture turtle paths as data) ───────────────
+  {
+    label: 'trace',
+    kindName: 'keyword',
+    detail: 'capture a single pen-down path as data',
+    documentation:
+      'Run a block in a sandbox — full language semantics, but the stitch machine is disconnected. Nothing is sewn, and on exit the turtle and all stitch state are restored. Returns the single pen-down path (a list of `[x, y]` points) at move-command resolution, unaffected by `stitchlen`. Errors if the block draws more than one pen-down run (use `tracerings` for that).\n\n```\nlet ring = trace [ repeat 6 [ fd 30 rt 60 ] ]\nsewpath(resample(ring, 2))\n```\n\n```\nlet disc = trace [ arc 360 28 ]\nfor p in scatter(3, disc) [\n  up setpos(p) down arc 360 0.5 trim\n]\n```',
+    insertText: 'trace [\n\t$0\n]',
+    isSnippet: true,
+    params: [],
+  },
+  {
+    label: 'tracerings',
+    kindName: 'keyword',
+    detail: 'capture multiple pen-down paths as data',
+    documentation:
+      'Like `trace`, but captures every pen-down run as a separate path. Returns a list of paths (list of lists of `[x, y]` points), in drawing order. Each pen-up/pen-down boundary starts a new ring.\n\n```\nlet donut = tracerings [\n  arc 360 25\n  up setxy 8 0 down\n  arc 360 12\n]\nfor ring in donut [ sewpath(resample(ring, 2)) trim ]\n```',
+    insertText: 'tracerings [\n\t$0\n]',
+    isSnippet: true,
+    params: [],
+  },
+
   // ── Thread & stitch commands ─────────────────────────────────────────────
   {
     label: 'stitchlen',
@@ -2103,6 +2125,9 @@ export function registerNeedlescript(monaco: Monaco): void {
       'warp',
       'humanize',
       'snaptogrid',
+      // Trace block expressions (capture turtle paths as data).
+      'trace',
+      'tracerings',
     ],
 
     // ── Turtle movement commands + pen + state reporters (teal) ─────

@@ -14,6 +14,7 @@ export const LIMITS = {
   sewableRadius: 47, // the sewable field inside the 100 mm hoop, in mm
   maxScatterPoints: 20000,
   maxDelaunayPoints: 10000, // voronoi / triangulate / hull / relax input
+  maxTraceVertices: 50000, // trace/tracerings vertex cap (matches MAX_CLIP_VERTICES)
 };
 
 // ---------- Stitch machine ----------
@@ -34,6 +35,71 @@ import { DensityGrid } from './postprocess.ts';
  */
 type OutLayer =
   { kind: 'aff'; m: Mat } | { kind: 'warp'; fn: (x: number, y: number) => [number, number] };
+
+/** Snapshot of all sandboxed machine state for trace (RFC-trace §4.1). */
+interface MachineSnapshot {
+  x: number;
+  y: number;
+  heading: number;
+  penDown: boolean;
+  stitchLen: number;
+  mode: 'run' | 'satin' | 'estitch';
+  satinWidth: number;
+  satinSpacing: number;
+  satinSide: number;
+  eWidth: number;
+  beanRepeats: number;
+  fillAngle: number;
+  fillSpacing: number;
+  fillLen: number | null;
+  lockLen: number;
+  pullComp: number;
+  underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
+  fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge';
+  doubleUnderlay: boolean;
+  shortStitch: boolean;
+  autoTrim: number;
+  maxDensity: number;
+  colorIdx: number;
+  eventsLen: number;
+  lastEmit: { x: number; y: number } | null;
+  started: boolean;
+  satinPath: { x: number; y: number }[] | null;
+  satinReporter:
+    | ((t: number, s: number, i: number, u: number) => [number, number, number, number, number])
+    | null;
+  satinDensityNoted: boolean;
+  satinCTM: Mat;
+  satinLayers: OutLayer[];
+  satinHasWarp: boolean;
+  recording: boolean;
+  rings: [number, number][][];
+  curRing: [number, number][] | null;
+  fillArmed: boolean;
+  fillDirReporter: ((px: number, py: number) => number) | null;
+  fillShapeReporter:
+    ((px: number, py: number, row: number, v: number) => [number, number, number]) | null;
+  fillCTM: Mat;
+  fillLayers: OutLayer[];
+  fillHasWarp: boolean;
+  localRings: [number, number][][];
+  curLocalRing: [number, number][] | null;
+  ctm: Mat;
+  outLayers: OutLayer[];
+  hasWarp: boolean;
+  outSnapLen: number;
+  penLayers: ((x: number, y: number) => [number, number])[];
+  stateStack: { x: number; y: number; heading: number; penDown: boolean }[];
+  tinyDropped: number;
+  tinyDroppedSpotsLen: number;
+  noEmit: boolean;
+  _warnedSatinEffect: boolean;
+  // Trace recording state (for nesting)
+  traceRecording: boolean;
+  traceRuns: [number, number][][][];
+  traceCurRun: [number, number][] | null;
+  traceVertexCount: number;
+}
 
 export class Machine {
   x = 0;
@@ -108,6 +174,14 @@ export class Machine {
   // never fed, so tie-offs don't read as crowding.
   density = new DensityGrid(1);
   usedQuery = false; // a history query ran — used to make limit errors loop-aware
+  // Trace recording state (RFC-trace §4): captures the pre-split turtle path
+  // as data. When traceRecording is true, travel() records the spine instead
+  // of emitting stitches, and _push() is a no-op (noEmit).
+  traceRecording = false;
+  traceRuns: [number, number][][] = [];
+  traceCurRun: [number, number][] | null = null;
+  traceVertexCount = 0;
+  noEmit = false;
 
   // The pre-split output map: transforms (CTM) and `warp` effects share one
   // block-scoped stack, applied to emitted geometry *before* stitch-length
@@ -162,6 +236,183 @@ export class Machine {
   }
   popPen() {
     this.penLayers.pop();
+  }
+
+  // ── Trace sandbox (RFC-trace §4.1) ──────────────────────────────────────
+  //
+  // snapshotForTrace() captures every piece of machine state that the sandbox
+  // must restore on exit.  setupTraceSandbox() then puts the machine into
+  // recording mode with a clean coordinate frame.  restoreFromTrace() winds
+  // everything back.  warnings are deliberately NOT snapshotted — one-time
+  // notes and user-generated warnings escape the sandbox (§4.1).
+
+  /** Opaque snapshot of all sandboxed machine state. */
+  snapshotForTrace(): MachineSnapshot {
+    return {
+      // Turtle
+      x: this.x,
+      y: this.y,
+      heading: this.heading,
+      penDown: this.penDown,
+      // Stitch configuration
+      stitchLen: this.stitchLen,
+      mode: this.mode,
+      satinWidth: this.satinWidth,
+      satinSpacing: this.satinSpacing,
+      satinSide: this.satinSide,
+      eWidth: this.eWidth,
+      beanRepeats: this.beanRepeats,
+      fillAngle: this.fillAngle,
+      fillSpacing: this.fillSpacing,
+      fillLen: this.fillLen,
+      lockLen: this.lockLen,
+      pullComp: this.pullComp,
+      underlayMode: this.underlayMode,
+      fillUnderlayMode: this.fillUnderlayMode,
+      doubleUnderlay: this.doubleUnderlay,
+      shortStitch: this.shortStitch,
+      autoTrim: this.autoTrim,
+      maxDensity: this.maxDensity,
+      colorIdx: this.colorIdx,
+      // Emission
+      eventsLen: this.events.length,
+      lastEmit: this.lastEmit ? { x: this.lastEmit.x, y: this.lastEmit.y } : null,
+      started: this.started,
+      // Satin buffer
+      satinPath: this.satinPath ? this.satinPath.slice() : null,
+      satinReporter: this.satinReporter,
+      satinDensityNoted: this.satinDensityNoted,
+      satinCTM: this.satinCTM,
+      satinLayers: this.satinLayers.slice(),
+      satinHasWarp: this.satinHasWarp,
+      // Fill recording
+      recording: this.recording,
+      rings: this.rings.slice(),
+      curRing: this.curRing ? this.curRing.slice() : null,
+      fillArmed: this.fillArmed,
+      fillDirReporter: this.fillDirReporter,
+      fillShapeReporter: this.fillShapeReporter,
+      fillCTM: this.fillCTM,
+      fillLayers: this.fillLayers.slice(),
+      fillHasWarp: this.fillHasWarp,
+      localRings: this.localRings.slice(),
+      curLocalRing: this.curLocalRing ? this.curLocalRing.slice() : null,
+      // Transform/effect stacks
+      ctm: this.ctm,
+      outLayers: this.outLayers.slice(),
+      hasWarp: this.hasWarp,
+      outSnapLen: this.outSnap.length,
+      penLayers: this.penLayers.slice(),
+      // Other
+      stateStack: this.stateStack.slice(),
+      tinyDropped: this.tinyDropped,
+      tinyDroppedSpotsLen: this.tinyDroppedSpots.length,
+      noEmit: this.noEmit,
+      _warnedSatinEffect: this._warnedSatinEffect,
+      // Trace recording (for nesting)
+      traceRecording: this.traceRecording,
+      traceRuns: this.traceRuns.map((r) => r.slice()),
+      traceCurRun: this.traceCurRun ? this.traceCurRun.slice() : null,
+      traceVertexCount: this.traceVertexCount,
+    };
+  }
+
+  /** Enter trace recording mode with a clean coordinate frame. */
+  setupTraceSandbox() {
+    // Reset coordinate frame to identity — captured points are relative to
+    // the trace-entry frame (§4.4). Inner transforms rebuild from here.
+    this.ctm = IDENTITY;
+    this.outLayers = [];
+    this.hasWarp = false;
+    this.outSnap.length = 0;
+    // Clear pen effects — humanize/snap are post-split, inherently inert on
+    // the pre-split capture. Clearing avoids any side-channel.
+    this.penLayers = [];
+    // Pen starts down regardless of ambient state (§4.2)
+    this.penDown = true;
+    // Suppress all stitch emission
+    this.noEmit = true;
+    // Initialize trace recorder
+    this.traceRecording = true;
+    this.traceRuns = [];
+    this.traceCurRun = null;
+    this.traceVertexCount = 0;
+  }
+
+  /** Finalize trace recording: close the last run, return captured runs. */
+  endTrace(): [number, number][][] {
+    this._closeTraceRun();
+    this.traceRecording = false;
+    return this.traceRuns;
+  }
+
+  /** Restore all sandboxed state from a prior snapshot. */
+  restoreFromTrace(snap: MachineSnapshot) {
+    // Turtle
+    this.x = snap.x;
+    this.y = snap.y;
+    this.heading = snap.heading;
+    this.penDown = snap.penDown;
+    // Stitch configuration
+    this.stitchLen = snap.stitchLen;
+    this.mode = snap.mode;
+    this.satinWidth = snap.satinWidth;
+    this.satinSpacing = snap.satinSpacing;
+    this.satinSide = snap.satinSide;
+    this.eWidth = snap.eWidth;
+    this.beanRepeats = snap.beanRepeats;
+    this.fillAngle = snap.fillAngle;
+    this.fillSpacing = snap.fillSpacing;
+    this.fillLen = snap.fillLen;
+    this.lockLen = snap.lockLen;
+    this.pullComp = snap.pullComp;
+    this.underlayMode = snap.underlayMode;
+    this.fillUnderlayMode = snap.fillUnderlayMode;
+    this.doubleUnderlay = snap.doubleUnderlay;
+    this.shortStitch = snap.shortStitch;
+    this.autoTrim = snap.autoTrim;
+    this.maxDensity = snap.maxDensity;
+    this.colorIdx = snap.colorIdx;
+    // Emission — truncate events back; density was never fed (noEmit)
+    this.events.length = snap.eventsLen;
+    this.lastEmit = snap.lastEmit ? { x: snap.lastEmit.x, y: snap.lastEmit.y } : null;
+    this.started = snap.started;
+    // Satin buffer
+    this.satinPath = snap.satinPath ? snap.satinPath.slice() : null;
+    this.satinReporter = snap.satinReporter;
+    this.satinDensityNoted = snap.satinDensityNoted;
+    this.satinCTM = snap.satinCTM;
+    this.satinLayers = snap.satinLayers.slice();
+    this.satinHasWarp = snap.satinHasWarp;
+    // Fill recording
+    this.recording = snap.recording;
+    this.rings = snap.rings.slice();
+    this.curRing = snap.curRing ? snap.curRing.slice() : null;
+    this.fillArmed = snap.fillArmed;
+    this.fillDirReporter = snap.fillDirReporter;
+    this.fillShapeReporter = snap.fillShapeReporter;
+    this.fillCTM = snap.fillCTM;
+    this.fillLayers = snap.fillLayers.slice();
+    this.fillHasWarp = snap.fillHasWarp;
+    this.localRings = snap.localRings.slice();
+    this.curLocalRing = snap.curLocalRing ? snap.curLocalRing.slice() : null;
+    // Transform/effect stacks
+    this.ctm = snap.ctm;
+    this.outLayers = snap.outLayers.slice();
+    this.hasWarp = snap.hasWarp;
+    this.outSnap.length = snap.outSnapLen;
+    this.penLayers = snap.penLayers.slice();
+    // Other
+    this.stateStack = snap.stateStack.slice();
+    this.tinyDropped = snap.tinyDropped;
+    this.tinyDroppedSpots.length = snap.tinyDroppedSpotsLen;
+    this.noEmit = snap.noEmit;
+    this._warnedSatinEffect = snap._warnedSatinEffect;
+    // Trace recording (for nesting): restore the outer trace's state
+    this.traceRecording = snap.traceRecording;
+    this.traceRuns = snap.traceRuns.map((r) => r.slice());
+    this.traceCurRun = snap.traceCurRun ? snap.traceCurRun.slice() : null;
+    this.traceVertexCount = snap.traceVertexCount;
   }
 
   /**
@@ -233,6 +484,7 @@ export class Machine {
   }
 
   _push(t: EventType, x: number, y: number, u = false) {
+    if (this.noEmit) return;
     if (this.events.length >= LIMITS.maxStitches)
       throw new NeedlescriptError(
         `Design exceeds ${LIMITS.maxStitches.toLocaleString('en-US')} stitches — stopped. Reduce repeats, raise stitchlen, or raise fillspacing.` +
@@ -325,6 +577,39 @@ export class Machine {
   travel(nx: number, ny: number) {
     const ox = this.x,
       oy = this.y;
+
+    // Trace recording (RFC-trace §4.2): capture the pre-split turtle spine.
+    // Intercepts before fill recording and all stitch-mode logic so the
+    // captured path is the raw movement polyline, not the stitched output.
+    if (this.traceRecording) {
+      if (this.penDown) {
+        const [px, py] = this.mapOut(nx, ny);
+        if (!this.traceCurRun) {
+          const [ox2, oy2] = this.mapOut(ox, oy);
+          this.traceCurRun = [[ox2, oy2]];
+          this.traceVertexCount++;
+          if (this.traceVertexCount > LIMITS.maxTraceVertices)
+            throw new NeedlescriptError(
+              `trace: too many vertices (over ${LIMITS.maxTraceVertices.toLocaleString('en-US')})`,
+            );
+        }
+        // Drop consecutive coincident vertices (zero-length moves)
+        const last = this.traceCurRun[this.traceCurRun.length - 1];
+        if (Math.hypot(px - last[0], py - last[1]) > 1e-6) {
+          this.traceCurRun.push([px, py]);
+          this.traceVertexCount++;
+          if (this.traceVertexCount > LIMITS.maxTraceVertices)
+            throw new NeedlescriptError(
+              `trace: too many vertices (over ${LIMITS.maxTraceVertices.toLocaleString('en-US')})`,
+            );
+        }
+      } else {
+        this._closeTraceRun();
+      }
+      this.x = nx;
+      this.y = ny;
+      return;
+    }
 
     if (this.recording) {
       // Fill boundaries are recorded in hoop space so the fill is generated
@@ -1016,6 +1301,24 @@ export class Machine {
     this.curRing = null;
     if (this.curLocalRing && this.curLocalRing.length >= 3) this.localRings.push(this.curLocalRing);
     this.curLocalRing = null;
+  }
+
+  /** Close the current trace run if it has geometric content (≥2 vertices). */
+  _closeTraceRun() {
+    if (this.traceCurRun && this.traceCurRun.length >= 2) {
+      // Closing-vertex dedupe (§4.2): if a run's final vertex coincides with
+      // its first within 1e-6 mm, the duplicate is dropped — region closure is
+      // implicit, and returning it doubled would break pathlen and resample.
+      const first = this.traceCurRun[0];
+      const last = this.traceCurRun[this.traceCurRun.length - 1];
+      if (Math.hypot(last[0] - first[0], last[1] - first[1]) < 1e-6) {
+        this.traceCurRun.pop();
+        this.traceVertexCount--;
+      }
+      // After dedupe, still need ≥2 for a valid path
+      if (this.traceCurRun.length >= 2) this.traceRuns.push(this.traceCurRun);
+    }
+    this.traceCurRun = null;
   }
 
   beginFill() {

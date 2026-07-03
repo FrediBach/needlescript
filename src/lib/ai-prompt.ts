@@ -164,6 +164,17 @@ warp @fn [ block ]           — bend the path (fn takes [x,y] → [x,y])
 humanize amount [ block ]    — coherent hand-stitch jitter (0–2 mm)
 snaptogrid cell [ block ]    — snap to cross-stitch grid (frame-constant)
 
+## Trace (block expressions — capture turtle paths as data)
+trace [ block ]              — run block in sandbox, return single pen-down path
+tracerings [ block ]         — run block in sandbox, return list of pen-down paths
+// Sandbox: nothing sewn, turtle/stitch state restored, pen starts down.
+// Captures the pre-split spine (stitchlen has no effect). Transforms and warps
+// inside the block apply; enclosing transforms do not.
+// trace errors if >1 run; tracerings returns all runs in drawing order.
+// beginfill/endfill and seed are forbidden inside trace.
+// Example: let hex = trace [ repeat 6 [ fd 30 rt 60 ] ]
+//          sewpath(resample(hex, 2))
+
 ## Fabric presets (professional settings)
 fabric "woven    — baseline (pull comp 0.2, underlay auto)
 fabric "knit     — stretch fabric (pull comp 0.5)
