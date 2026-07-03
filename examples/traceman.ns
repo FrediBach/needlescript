@@ -1,0 +1,20 @@
+// Use trace to cut out a smaller circle from a bigger one
+// and than let the "Pac Man" eat another circle.
+
+moveto -10 0
+let disc = trace [ translate -20 0 [ circle 30 ] ]
+let bite = trace [ translate -40 0 [ circle 20 ] ]
+
+color 3
+
+for piece in clippaths(disc, bite, "difference) [
+  let r = resample(piece, 1)
+  up setpos(r[0]) down
+  beginfill sewpath(r) endfill
+  trim
+]
+
+color 1
+
+moveto -40 0
+beginfill circle 10 endfill

@@ -73,6 +73,7 @@ import starburstRaw from '../examples/starburst.ns?raw';
 import composeRaw from '../examples/compose.ns?raw';
 import traceRegionsRaw from '../examples/trace-regions.ns?raw';
 import traceMotifsRaw from '../examples/trace-motifs.ns?raw';
+import tracemanRaw from '../examples/traceman.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -182,6 +183,7 @@ export const EXAMPLES: Record<string, string> = {
   compose: composeRaw,
   'trace regions': traceRegionsRaw,
   'trace motifs': traceMotifsRaw,
+  'traceman': tracemanRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -215,6 +217,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'custom satin',
       'pixelated',
       'triangles',
+      'traceman',
       'trace regions',
     ],
   },
