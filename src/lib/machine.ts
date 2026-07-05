@@ -10,6 +10,9 @@ export const LIMITS = {
   maxListLen: 100000,
   maxListCells: 1000000,
   maxListDepth: 16,
+  // Strings — same browser-protection philosophy as list limits.
+  maxStringLength: 10000, // characters in a single string
+  maxStringChars: 1000000, // monotonic allocation budget across all string ops
   // Generative math (RFC-3 §8)
   sewableRadius: 47, // the sewable field inside the 100 mm hoop, in mm
   maxScatterPoints: 20000,
@@ -568,10 +571,18 @@ export class Machine {
     this.heading = s.heading;
   }
 
-  markHere() {
+  markHere(label?: string) {
     this.flushSatin();
     const [hx, hy] = this.mapOut(this.x, this.y);
-    this._push('mark', hx, hy);
+    if (this.noEmit) return;
+    if (this.events.length >= LIMITS.maxStitches)
+      throw new NeedlescriptError(
+        `Design exceeds ${LIMITS.maxStitches.toLocaleString('en-US')} stitches — stopped.`,
+      );
+    const ev: StitchEvent = { t: 'mark', x: hx, y: hy, c: this.colorIdx, line: this.currentLine };
+    if (label !== undefined) ev.label = label;
+    this.events.push(ev);
+    this.density.feed('mark', hx, hy, this.currentLine);
   }
 
   travel(nx: number, ny: number) {

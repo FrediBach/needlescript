@@ -1,0 +1,181 @@
+// ===========================================================
+//  Single-stroke font — each glyph is ONE continuous line.
+//  Cell: cw mm wide, ch mm tall. Origin = bottom-left of cell.
+//  Globals ox, oy hold the current cell's bottom-left corner.
+//
+//  v2 — string-powered:
+//    · write('NEEDLE\nSCRIPT') sews any supported text
+//    · glyphs draw only; the writer advances the cursor,
+//      so ' ' is just an advance and '\n' starts a new line
+//    · unknown characters fail loudly, up front
+// ===========================================================
+
+let word = 'NEEDLE\nSCRIPT'    // [text]
+
+let ox = 0
+let oy = 0
+let cw = 4          // cell width
+let ch = 8          // cell height
+let gap = 3         // space between letters
+let leading = 4     // space between lines
+
+let glyphset = 'NEDLSCRIPT'    // every character we know how to sew
+
+// move (pen up) to a cell-relative point, then drop the pen
+def go(x, y) [
+  up setxy(ox + x, oy + y) down
+]
+
+// sew (pen down) to a cell-relative point
+def to_(x, y) [
+  setxy(ox + x, oy + y)
+]
+
+// advance the origin to the next cell
+def next() [
+  ox += cw + gap
+]
+
+// ---------- glyphs (draw only — no cursor movement) ----------
+
+def g_N() [
+  go(0, 0)
+  to_(0, ch)
+  to_(cw, 0)
+  to_(cw, ch)
+]
+
+def g_E() [
+  // start top-right, run the E in one stroke (middle bar is retraced)
+  go(cw, ch)
+  to_(0, ch)            // top
+  to_(0, 0)             // left spine
+  to_(cw, 0)            // bottom
+  go(0, ch / 2)         // jump to middle-left
+  to_(cw, ch / 2)       // middle bar
+]
+
+def g_D() [
+  go(0, 0)
+  to_(0, ch)            // left spine up
+  to_(cw * 0.55, ch)    // top curve start
+  to_(cw, ch * 0.62)
+  to_(cw, ch * 0.38)
+  to_(cw * 0.55, 0)
+  to_(0, 0)             // close bowl onto spine
+]
+
+def g_L() [
+  go(0, ch)
+  to_(0, 0)             // down the spine
+  to_(cw, 0)            // along the base
+]
+
+def g_S() [
+  go(cw, ch * 0.85)
+  to_(cw * 0.2, ch)     // top hook
+  to_(0, ch * 0.7)
+  to_(cw, ch * 0.3)     // diagonal sweep
+  to_(cw * 0.8, 0)
+  to_(0, ch * 0.15)     // bottom hook
+]
+
+def g_C() [
+  go(cw, ch * 0.8)
+  to_(cw * 0.5, ch)     // top
+  to_(0, ch * 0.6)
+  to_(0, ch * 0.4)
+  to_(cw * 0.5, 0)      // bottom
+  to_(cw, ch * 0.2)
+]
+
+def g_R() [
+  go(0, 0)
+  to_(0, ch)            // spine up
+  to_(cw * 0.6, ch)     // bowl top
+  to_(cw, ch * 0.72)
+  to_(cw * 0.6, ch / 2) // bowl close at mid-spine
+  to_(0, ch / 2)
+  to_(cw, 0)            // leg down to bottom-right
+]
+
+def g_I() [
+  go(cw / 2, 0)
+  to_(cw / 2, ch)       // single vertical stroke (minimal)
+]
+
+def g_P() [
+  go(0, 0)
+  to_(0, ch)            // spine up
+  to_(cw * 0.6, ch)     // bowl top
+  to_(cw, ch * 0.72)
+  to_(cw * 0.6, ch / 2) // bowl close at mid-spine
+  to_(0, ch / 2)
+]
+
+def g_T() [
+  go(0, ch)
+  to_(cw, ch)           // top bar
+  go(cw / 2, ch)        // jump to centre of bar
+  to_(cw / 2, 0)        // stem down
+]
+
+// ---------- the writer ----------
+
+// dispatch one character to its glyph
+def glyph(c) [
+  if c == 'N' [ g_N() ]
+  else if c == 'E' [ g_E() ]
+  else if c == 'D' [ g_D() ]
+  else if c == 'L' [ g_L() ]
+  else if c == 'S' [ g_S() ]
+  else if c == 'C' [ g_C() ]
+  else if c == 'R' [ g_R() ]
+  else if c == 'I' [ g_I() ]
+  else if c == 'P' [ g_P() ]
+  else if c == 'T' [ g_T() ]
+]
+
+// width of one line of text, in mm
+def linewidth(s) [
+  return len(s) * cw + (len(s) - 1) * gap
+]
+
+// sew one line, left to right, from the current ox/oy
+def writeline(s) [
+  for c in s [
+    if c != ' ' [ glyph(c) ]      // a space is just an advance
+    next()
+  ]
+]
+
+// sew a whole text, centred on the hoop; '\n' breaks lines
+def write(s) [
+  let msg = upper(s)              // the font is uppercase-only
+
+  for c in msg [                  // fail loudly BEFORE the first stitch
+    if c != ' ' and c != '\n' [
+      assert(contains(glyphset, c), concat('no glyph for ', c))
+    ]
+  ]
+
+  let lines = split(msg, '\n')
+  let totalh = len(lines) * ch + (len(lines) - 1) * leading
+  let row = 0
+  for ln in lines [
+    ox = -linewidth(ln) / 2                    // centre each line on its own
+    oy = totalh / 2 - ch - row * (ch + leading)
+    writeline(ln)
+    row += 1
+  ]
+]
+
+// ---------- the piece ----------
+
+fabric 'woven'
+stitchlen 2
+satin 0.5               // a clean glossy single-stroke ribbon
+color 4
+
+write(word)
+print('sewed: ', word, ' (', len(split(upper(word), '\n')), ' lines)')

@@ -1,8 +1,10 @@
-// ---------- List runtime (RFC-2) ----------
+// ---------- List runtime (RFC-2) + String runtime ----------
 //
-// Runtime values are `number | NsList`. NsList is a class so `instanceof`
-// is the type tag and identity is reference identity (Python model:
-// mutable, reference semantics, explicit deep copy()).
+// Runtime values are `number | string | NsList`. NsList is a class so
+// `instanceof` is the type tag and identity is reference identity (Python
+// model: mutable, reference semantics, explicit deep copy()).
+//
+// Strings are immutable value types: no aliasing, deepCopy is identity.
 //
 // Every deep operation here is capped at LIMITS.maxListDepth. Cycles can
 // be created through mutation (append a list into its own descendant);
@@ -12,7 +14,7 @@
 import { NeedlescriptError } from './errors.ts';
 import { LIMITS } from './machine.ts';
 
-export type Val = number | NsList | FuncRef;
+export type Val = number | string | NsList | FuncRef;
 
 export class NsList {
   items: Val[];
@@ -54,6 +56,7 @@ export class ComposedRef extends FuncRef {
 export const isList = (v: Val): v is NsList => v instanceof NsList;
 export const isFuncRef = (v: Val): v is FuncRef => v instanceof FuncRef;
 export const isComposedRef = (v: Val): v is ComposedRef => v instanceof ComposedRef;
+export const isString = (v: Val): v is string => typeof v === 'string';
 
 /** Format a number the way print always has. */
 export function formatNum(v: number): string {
@@ -62,24 +65,45 @@ export function formatNum(v: number): string {
     : v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
 }
 
+/** Encode a string for display inside a list: single-quoted with escapes. */
+function escapeStringForDisplay(s: string): string {
+  let out = "'";
+  for (const ch of s) {
+    if (ch === "'") out += "\\'";
+    else if (ch === '\\') out += '\\\\';
+    else if (ch === '\n') out += '\\n';
+    else if (ch === '\t') out += '\\t';
+    else out += ch;
+  }
+  return out + "'";
+}
+
 const PRINT_CAP = 64;
 
-/** Format any runtime value; lists as [1, 2, 3], capped at 64 elements. */
-export function formatVal(v: Val, depth = 0): string {
-  if (v instanceof ComposedRef) return `compose(${v.steps.map((s) => formatVal(s)).join(', ')})`;
+/**
+ * Format any runtime value for display.
+ * - Numbers: formatNum
+ * - Strings: raw when `insideList=false` (top-level print), quoted with escapes when inside a list
+ * - Lists: [1, 'a', …]  (capped at 64 elements)
+ */
+export function formatVal(v: Val, insideList = false, depth = 0): string {
+  if (v instanceof ComposedRef)
+    return `compose(${v.steps.map((s) => formatVal(s, true)).join(', ')})`;
   if (isFuncRef(v)) return '@' + v.name;
-  if (!isList(v)) return formatNum(v);
+  if (typeof v === 'string') return insideList ? escapeStringForDisplay(v) : v;
+  if (typeof v === 'number') return formatNum(v);
   if (depth >= LIMITS.maxListDepth)
     throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`);
-  const shown = v.items.slice(0, PRINT_CAP).map((x) => formatVal(x, depth + 1));
+  const shown = v.items.slice(0, PRINT_CAP).map((x) => formatVal(x, true, depth + 1));
   const more = v.items.length - PRINT_CAP;
   return `[${shown.join(', ')}${more > 0 ? `, … +${more} more` : ''}]`;
 }
 
-/** Describe a value for error messages: "a list (length 3)" / "a number". */
+/** Describe a value for error messages: "a list (length 3)" / "a number" / "a string". */
 export function describeVal(v: Val): string {
   if (v instanceof ComposedRef) return 'a composed reference';
   if (isFuncRef(v)) return `a procedure reference (@${v.name})`;
+  if (typeof v === 'string') return 'a string';
   return isList(v) ? `a list (length ${v.items.length})` : 'a number';
 }
 
@@ -97,7 +121,7 @@ export function num(v: Val, what: string, line?: number, side?: string): number 
   return v;
 }
 
-/** Depth of a value: numbers are 0, [] is 1, [[1]] is 2 … capped. */
+/** Depth of a value: numbers and strings are 0, [] is 1, [[1]] is 2 … capped. */
 export function valDepth(v: Val, depth = 0): number {
   if (!isList(v)) return 0;
   if (depth >= LIMITS.maxListDepth)
@@ -111,8 +135,8 @@ export function valDepth(v: Val, depth = 0): number {
 
 /**
  * Deep equality: element-count first, then per-number with the existing
- * 1e-9 tolerance. Mixed number/list is false (equality is a question,
- * not a type assertion).
+ * 1e-9 tolerance. Mixed types are unequal (equality is a question,
+ * not a type assertion). Strings compare by exact case-sensitive content.
  */
 export function deepEqual(a: Val, b: Val, depth = 0): boolean {
   if (depth >= LIMITS.maxListDepth)
@@ -124,6 +148,10 @@ export function deepEqual(a: Val, b: Val, depth = 0): boolean {
     return a.steps.every((s, i) => deepEqual(s, b.steps[i], depth + 1));
   }
   if (isFuncRef(a) || isFuncRef(b)) return isFuncRef(a) && isFuncRef(b) && a.name === b.name;
+  // Strings: exact, case-sensitive comparison. Cross-type always false.
+  if (typeof a === 'string' || typeof b === 'string') {
+    return typeof a === 'string' && typeof b === 'string' && a === b;
+  }
   const al = isList(a),
     bl = isList(b);
   if (al !== bl) return false;
@@ -140,9 +168,10 @@ export function deepEqual(a: Val, b: Val, depth = 0): boolean {
 /**
  * Deep copy. `onCell` is called once per copied cell so the interpreter
  * can charge the op budget and the live-cell counter.
+ * Strings are immutable value types — copy is identity, no cell charge.
  */
 export function deepCopy(v: Val, onCell: () => void, depth = 0): Val {
-  if (!isList(v)) return v;
+  if (!isList(v)) return v; // numbers, strings, FuncRefs copy by value
   if (depth >= LIMITS.maxListDepth)
     throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`);
   const out: Val[] = [];

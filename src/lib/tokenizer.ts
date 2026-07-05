@@ -44,10 +44,45 @@ export function tokenize(src: string): Token[] {
     if (c === '.' && src[i + 1] === '.') {
       throw new NeedlescriptError('".." is reserved for future syntax', line);
     }
-    // "'" was never valid; reserving it now (RFC-4 §4) means quoted strings
-    // can arrive in a future version without changing any program's meaning.
+    // String literals: single-quoted, must close on the same source line.
+    // Four escape sequences are recognised: \' \\ \n \t — all others are
+    // hard errors (loud over convenient, per the language design rule).
     if (c === "'") {
-      throw new NeedlescriptError('single-quote strings are reserved for a future version', line);
+      const startLine = line;
+      const startI = i;
+      i++; // consume opening quote
+      let str = '';
+      while (i < src.length && src[i] !== "'") {
+        if (src[i] === '\n') {
+          throw new NeedlescriptError(`Unterminated string starting at line ${startLine}`);
+        }
+        if (src[i] === '\\') {
+          i++;
+          if (i >= src.length || src[i] === '\n') {
+            throw new NeedlescriptError(`Unterminated string starting at line ${startLine}`);
+          }
+          const esc = src[i];
+          if (esc === "'") str += "'";
+          else if (esc === '\\') str += '\\';
+          else if (esc === 'n') str += '\n';
+          else if (esc === 't') str += '\t';
+          else
+            throw new NeedlescriptError(
+              `Unknown escape "\\${esc}" in string — valid escapes are \\' \\\\ \\n \\t`,
+              line,
+            );
+          i++;
+        } else {
+          str += src[i];
+          i++;
+        }
+      }
+      if (i >= src.length) {
+        throw new NeedlescriptError(`Unterminated string starting at line ${startLine}`);
+      }
+      i++; // consume closing quote
+      tokens.push({ t: 'string', v: str, line: startLine, start: startI, end: i });
+      continue;
     }
     if ('+-*/<>=!%'.includes(c)) {
       const spBefore = i === 0 || /[\s[(]/.test(src[i - 1]);

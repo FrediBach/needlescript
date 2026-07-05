@@ -288,7 +288,7 @@ describe('debugging commands', () => {
 
   it('assert passes silently and fails loudly with a line number', () => {
     expect(() => run('assert 1 fd 1')).not.toThrow();
-    expect(() => run('fd 1\nassert xcor > 5')).toThrow(/assert failed.*line 2/);
+    expect(() => run('fd 1\nassert xcor > 5')).toThrow(/assertion failed.*line 2/);
   });
 
   it('print accepts an optional label', () => {

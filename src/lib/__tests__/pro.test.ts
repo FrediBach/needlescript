@@ -93,8 +93,8 @@ describe('satin underlay', () => {
   });
 
   it('rejects unknown modes with suggestions', () => {
-    expect(() => run('underlay "centre satin 3 fd 5')).toThrow(/did you mean "center"/);
-    expect(() => run('underlay 3')).toThrow(/quoted word/);
+    expect(() => run('underlay "centre satin 3 fd 5')).toThrow(/did you mean "center"/i);
+    expect(() => run('underlay 3')).toThrow(/underlay expects a string mode/);
   });
 });
 
@@ -259,7 +259,7 @@ describe('fabric presets', () => {
   });
 
   it('unknown fabrics fail with choices', () => {
-    expect(() => run('fabric "silk')).toThrow(/choices: woven/);
+    expect(() => run('fabric "silk')).toThrow(/Unknown fabric 'silk'.*expected/);
   });
 });
 

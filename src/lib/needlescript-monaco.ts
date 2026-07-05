@@ -870,7 +870,7 @@ const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'drop debug pin on stage',
     documentation:
-      'Drop a numbered pin on the preview at the needle position. Never exported to the machine or counted in stats.',
+      "Drop a numbered pin on the preview at the needle position. Optional string label shown instead of the pin number.\n\n```\nmark         // numbered pin\nmark 'rose'  // labelled pin\n```\n\nNever exported to the machine or counted in stats.",
     insertText: 'mark',
   },
   {
@@ -1075,11 +1075,11 @@ const NS_ITEMS: NSItem[] = [
   {
     label: 'len',
     kindName: 'function',
-    detail: 'list element count',
-    documentation: 'Element count of a list.',
-    insertText: 'len(${1:list})',
+    detail: 'list or string length',
+    documentation: 'Element count of a list, or character count of a string.',
+    insertText: 'len(${1:xs})',
     isSnippet: true,
-    params: [['list']],
+    params: [['xs']],
   },
   {
     label: 'islist',
@@ -1351,6 +1351,103 @@ const NS_ITEMS: NSItem[] = [
     insertText: 'compose(@${1:fn1}, @${2:fn2})',
     isSnippet: true,
     params: [['@fn1', '@fn2', '...']],
+  },
+
+  // ── String functions ─────────────────────────────────────────────────────
+  {
+    label: 'str',
+    kindName: 'function',
+    detail: 'number → string',
+    documentation:
+      'Convert a number to its string representation (same as `print` shows). `str` of a string is identity.',
+    insertText: 'str(${1:n})',
+    isSnippet: true,
+    params: [['n']],
+  },
+  {
+    label: 'num',
+    kindName: 'function',
+    detail: 'string → number',
+    documentation:
+      'Parse a numeric string. Errors on non-numeric input unless a fallback is given.\n\n```\nnum("3.14")    // 3.14\nnum("bad", 0)  // 0\n```',
+    insertText: 'num(${1:s})',
+    isSnippet: true,
+    params: [['s'], ['s', 'fallback']],
+  },
+  {
+    label: 'isstring',
+    kindName: 'function',
+    detail: '1 if value is a string',
+    documentation: '1 if the value is a string, 0 otherwise. The sibling of `islist`.',
+    insertText: 'isstring(${1:value})',
+    isSnippet: true,
+    params: [['value']],
+  },
+  {
+    label: 'chars',
+    kindName: 'function',
+    detail: 'string → list of chars',
+    documentation:
+      'Split a string into a list of 1-character strings. Bridge to the whole list toolkit.',
+    insertText: 'chars(${1:s})',
+    isSnippet: true,
+    params: [['s']],
+  },
+  {
+    label: 'split',
+    kindName: 'function',
+    detail: 'split by separator',
+    documentation: 'Split `s` at every occurrence of `sep`. `sep` must be non-empty.',
+    insertText: "split(${1:s}, '${2:,}')",
+    isSnippet: true,
+    params: [['s', 'sep']],
+  },
+  {
+    label: 'joinstr',
+    kindName: 'function',
+    detail: 'join string list',
+    documentation:
+      'Concatenate a list of strings with `sep` between each. All elements must be strings.',
+    insertText: "joinstr(${1:xs}, '${2:,}')",
+    isSnippet: true,
+    params: [['xs', 'sep']],
+  },
+  {
+    label: 'upper',
+    kindName: 'function',
+    detail: 'ASCII uppercase',
+    documentation: 'Return a copy of `s` with ASCII letters uppercased (A–Z only).',
+    insertText: 'upper(${1:s})',
+    isSnippet: true,
+    params: [['s']],
+  },
+  {
+    label: 'lower',
+    kindName: 'function',
+    detail: 'ASCII lowercase',
+    documentation: 'Return a copy of `s` with ASCII letters lowercased (a–z only).',
+    insertText: 'lower(${1:s})',
+    isSnippet: true,
+    params: [['s']],
+  },
+  {
+    label: 'strip',
+    kindName: 'function',
+    detail: 'trim whitespace',
+    documentation:
+      'Return `s` with leading and trailing whitespace (space, tab, newline) removed.\n\n**Note:** `trim` cuts the thread — use `strip` for whitespace.',
+    insertText: 'strip(${1:s})',
+    isSnippet: true,
+    params: [['s']],
+  },
+  {
+    label: 'repeatstr',
+    kindName: 'function',
+    detail: 'repeat a string n times',
+    documentation: 'Return `s` repeated `n` times (n must be a non-negative integer).',
+    insertText: 'repeatstr(${1:s}, ${2:n})',
+    isSnippet: true,
+    params: [['s', 'n']],
   },
 
   // ── Generative math — scalars & noise ────────────────────────────────────
@@ -1705,10 +1802,10 @@ const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'boolean of two regions',
     documentation:
-      'Boolean operation on two regions. Backed by Clipper2 at μm precision. Returns a list of regions.\n\nOperations: `"union` `"intersect` `"difference` `"xor`',
-    insertText: 'clippaths(${1:a}, ${2:b}, "${3|union,intersect,difference,xor|}")',
+      "Boolean operation on two regions. Backed by Clipper2 at μm precision. Returns a list of regions.\n\nOperations: `'union'` `'intersect'` `'difference'` `'xor'`",
+    insertText: "clippaths(${1:a}, ${2:b}, '${3|union,intersect,difference,xor|}')",
     isSnippet: true,
-    params: [['a', 'b', '"op']],
+    params: [['a', 'b', "'op'"]],
   },
   {
     label: 'inpath',
@@ -2170,12 +2267,7 @@ export function registerNeedlescript(monaco: Monaco): void {
     ],
 
     // ── Turtle & loop state reporters — bridge: read-only (teal) ────
-    sensorCmds: [
-      'xcor',
-      'ycor',
-      'heading',
-      'repcount',
-    ],
+    sensorCmds: ['xcor', 'ycor', 'heading', 'repcount'],
 
     // ── Stitch / thread / professional commands — sewing world (amber, italic) ─
     stitchCmds: [
@@ -2327,6 +2419,17 @@ export function registerNeedlescript(monaco: Monaco): void {
       'nearestsewn',
       'sewnwithin',
       'stitchedpoints',
+      // string functions
+      'str',
+      'num',
+      'isstring',
+      'chars',
+      'split',
+      'joinstr',
+      'upper',
+      'lower',
+      'strip',
+      'repeatstr',
     ],
 
     tokenizer: {
@@ -2335,6 +2438,9 @@ export function registerNeedlescript(monaco: Monaco): void {
         [/\/\/.*$/, 'ns-comment'],
         [/#.*$/, 'ns-comment'],
         [/;.*$/, 'ns-comment'],
+
+        // Single-quoted string literals: 'text' with \' \\ \n \t escapes
+        [/'/, { token: 'ns-string', next: '@singleString' }],
 
         // Quoted-word (Logo "string" syntax): "woven "knit "label
         [/"[a-z_][a-z0-9_]*/, 'ns-string'],
@@ -2380,6 +2486,12 @@ export function registerNeedlescript(monaco: Monaco): void {
         // Whitespace
         [/\s+/, ''],
       ],
+      // Single-quoted string state — handles \' \\ \n \t escapes and terminates on '
+      singleString: [
+        [/[^'\\]+/, 'ns-string'],
+        [/\\./, 'ns-string-escape'],
+        [/'/, { token: 'ns-string', next: '@pop' }],
+      ],
     },
   } as languages.IMonarchLanguage);
 
@@ -2413,8 +2525,9 @@ export function registerNeedlescript(monaco: Monaco): void {
       { token: 'ns-lib', foreground: m(synLib) },
       // Numbers
       { token: 'ns-number', foreground: m(synNumber) },
-      // Quoted words / Logo "strings"
+      // Quoted words / Logo "strings" / single-quoted string literals
       { token: 'ns-string', foreground: m(synString) },
+      { token: 'ns-string-escape', foreground: m(synString), fontStyle: 'bold' },
       // Classic variable deref :var — steel blue, italic
       { token: 'ns-variable', foreground: m(synVariable), fontStyle: 'italic' },
       // Operators and punctuation — muted

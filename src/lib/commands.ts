@@ -61,8 +61,11 @@ export const BUILTIN_ARITY: Record<string, number> = {
   seed: 1,
   print: 1,
   printloc: 0,
-  mark: 0,
-  assert: 1,
+  // mark, assert handled specially in the parser (optional/variadic args)
+  // fabric, underlay, fillunderlay handled specially (string mode args)
+  fabric: 1,
+  underlay: 1,
+  fillunderlay: 1,
 };
 
 /**
@@ -301,6 +304,27 @@ export const QUERY_FUNCS: Record<string, { min: number; max: number }> = {
   stitchedpoints: { min: 0, max: 0 }, // snapshot: a deep copy of all penetrations
 };
 
+// ---------- String builtins ----------
+//
+// Same soft reservation as LIST_FUNCS: glued-call only, Library tier (user
+// procedures can shadow them with a one-time note). No new reserved words.
+// Determinism: all are pure / zero-draw like snaptogrid's scalar companions —
+// no rows added to the fork-convention table.
+
+/** String functions usable in expressions, with min/max argument counts. */
+export const STRING_FUNCS: Record<string, { min: number; max: number }> = {
+  str: { min: 1, max: 1 }, // str(v) → string rendering of a number; identity on string
+  num: { min: 1, max: 2 }, // num(s) or num(s, fallback)
+  isstring: { min: 1, max: 1 }, // 1/0 predicate
+  chars: { min: 1, max: 1 }, // string → list of 1-char strings
+  split: { min: 2, max: 2 }, // split(s, sep) → list of strings
+  joinstr: { min: 2, max: 2 }, // joinstr(xs, sep) → string
+  upper: { min: 1, max: 1 }, // ASCII uppercase
+  lower: { min: 1, max: 1 }, // ASCII lowercase
+  strip: { min: 1, max: 1 }, // trim leading/trailing whitespace
+  repeatstr: { min: 2, max: 2 }, // repeatstr(s, n)
+};
+
 /**
  * The Library tier (RFC-3 §3): built-in names a user definition may shadow,
  * with a one-time note instead of a hard error. Everything in RESERVED is
@@ -312,6 +336,7 @@ export const LIBRARY_FUNCS = new Set<string>([
   ...Object.keys(GEN_FUNCS),
   ...Object.keys(GEN_CMDS),
   ...Object.keys(QUERY_FUNCS),
+  ...Object.keys(STRING_FUNCS),
 ]);
 
 /** Words with special meaning that user procedures must not shadow. */
@@ -356,4 +381,7 @@ export const RESERVED = new Set<string>([
   ...Object.keys(QWORD_BUILTINS),
   ...Object.keys(FUNC_ARITY),
   ...ZERO_FUNCS,
+  // Special-cased commands (not in BUILTIN_ARITY but still Core):
+  'mark',
+  'assert',
 ]);

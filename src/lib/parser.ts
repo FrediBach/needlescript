@@ -19,9 +19,9 @@ import {
   LIST_CMDS,
   GEN_FUNCS,
   GEN_CMDS,
-  GEN_QWORD_ARG,
   QUERY_FUNCS,
   LIBRARY_FUNCS,
+  STRING_FUNCS,
 } from './commands.ts';
 import { didYouMean, didYouMeanKinded } from './suggestions.ts';
 import { prescan } from './prescan.ts';
@@ -272,75 +272,18 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
   }
 
   /**
-   * Parse a generative-math call (RFC-3 §4). Most are plain ranged-arity
-   * calls; the ones in GEN_QWORD_ARG take a quoted word in one slot
-   * (e.g.  clippaths(a, b, "union") ) — validated here, at parse time,
-   * because the runtime has no string values.
+   * Parse a generative-math call (RFC-3 §4). All calls use ranged-arity
+   * plain-expression arguments. The `clippaths` operation mode (formerly a
+   * quoted word) is now an ordinary string expression validated at runtime.
    */
   function parseGenCall(name: string, line: number): ExprNode {
     const a = GEN_FUNCS[name];
-    const q = GEN_QWORD_ARG[name];
-    if (!q) {
-      return {
-        k: 'listfunc',
-        name,
-        args: parseParenArgsRange(name, a.min, a.max, line),
-        line,
-      };
-    }
-    next(); // consume '('
-    const args: ExprNode[] = [];
-    let word: string | undefined;
-    let slot = 0;
-    for (;;) {
-      if (atEnd()) throw new NeedlescriptError(`Missing ) in ${name}(…)`, line);
-      if (slot === q.index) {
-        const wTok = peek();
-        if (!wTok || wTok.t !== 'qword')
-          throw new NeedlescriptError(
-            `${name} needs a quoted word here, e.g.  ${name}(a, b, "${q.allowed[0]}")`,
-            lineOf(wTok),
-          );
-        next();
-        word = wTok.v as string;
-        if (!q.allowed.includes(word))
-          throw new NeedlescriptError(
-            `${name} doesn't know "${word}"${didYouMean(word, q.allowed)} (choices: ${q.allowed.join(', ')})`,
-            wTok.line,
-          );
-      } else {
-        args.push(parseExpr());
-      }
-      slot++;
-      if (!atEnd() && peek().t === ',') {
-        next();
-        if (!atEnd() && peek().t === ')') {
-          next();
-          break;
-        } // trailing comma
-        continue;
-      }
-      if (!atEnd() && peek().t === ')') {
-        next();
-        break;
-      }
-      const bad = peek();
-      throw new NeedlescriptError(
-        `Expected , or ) in the arguments of ${name}(…), got "${bad ? (bad.v !== undefined ? bad.v : bad.t) : 'end of program'}"`,
-        bad ? bad.line : line,
-      );
-    }
-    if (slot < a.min || slot > a.max)
-      throw new NeedlescriptError(
-        `${name}(…) expects ${a.min === a.max ? `${a.min} arguments` : `${a.min} to ${a.max} arguments`}, got ${slot}`,
-        line,
-      );
-    if (word === undefined)
-      throw new NeedlescriptError(
-        `${name} needs a quoted word, e.g.  ${name}(a, b, "${q.allowed[0]}")`,
-        line,
-      );
-    return { k: 'listfunc', name, args, line, word };
+    return {
+      k: 'listfunc',
+      name,
+      args: parseParenArgsRange(name, a.min, a.max, line),
+      line,
+    };
   }
 
   function checkEffectArity(
@@ -792,6 +735,25 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     // Modern call syntax:  f(a, b) — only when the ( is glued to the name.
     if (gluedParenNext(tok)) {
       const canonical = ALIASES[name] || name;
+      // print(v1, v2, …) — variadic call form.
+      if (canonical === 'print') {
+        next();
+        const args = parseParenArgsRange('print', 1, 32, tok.line);
+        return { k: 'cmd', name: 'print', args, line: tok.line };
+      }
+      // assert(cond) or assert(cond, message) — call form.
+      if (canonical === 'assert') {
+        next();
+        const args = parseParenArgsRange('assert', 1, 2, tok.line);
+        return { k: 'cmd', name: 'assert', args, line: tok.line };
+      }
+      // trim(x) — fast-reject: trim takes no arguments.
+      if (canonical === 'trim') {
+        throw new NeedlescriptError(
+          `"trim" cuts the thread and takes no arguments — for whitespace, use strip(s)`,
+          tok.line,
+        );
+      }
       if (procArity[name] !== undefined) {
         next();
         const args = parseParenArgs(name, procArity[name], tok.line);
@@ -849,7 +811,8 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         ZERO_FUNCS.has(name) ||
         LIST_FUNCS[name] !== undefined ||
         GEN_FUNCS[name] !== undefined ||
-        QUERY_FUNCS[name] !== undefined
+        QUERY_FUNCS[name] !== undefined ||
+        STRING_FUNCS[name] !== undefined
       )
         throw new NeedlescriptError(
           `"${name}" returns a value — use it inside an expression`,
@@ -866,7 +829,8 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     const canonical = ALIASES[name] || name;
     if (canonical === 'print') {
       next();
-      // Optional label:  print "radius :r
+      // Classic forms:  print "label expr   or   print expr
+      // (call form print(…) is handled in the gluedParenNext block above)
       let label: string | undefined;
       if (!atEnd() && peek().t === 'qword') label = next().v as string;
       return { k: 'cmd', name: 'print', args: [parseExpr()], line: tok.line, label };
@@ -878,6 +842,28 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       let label: string | undefined;
       if (!atEnd() && peek().t === 'qword') label = next().v as string;
       return { k: 'cmd', name: 'printloc', args: [], line: tok.line, label };
+    }
+    // assert cond — classic 1-arg form (call form handled in gluedParenNext above).
+    if (canonical === 'assert') {
+      next();
+      return { k: 'cmd', name: 'assert', args: [parseExpr()], line: tok.line };
+    }
+    // mark — optional string label:  mark  or  mark 'text'  or  mark :var  etc.
+    if (canonical === 'mark') {
+      next();
+      const nxt = peek();
+      const hasLabel =
+        !!nxt &&
+        (nxt.t === 'string' ||
+          nxt.t === 'qword' ||
+          nxt.t === 'var' ||
+          nxt.t === 'num' ||
+          nxt.t === 'pref' ||
+          nxt.t === '(' ||
+          nxt.t === '[' ||
+          (nxt.t === 'word' && (isVariableName(nxt.v as string) || gluedParenNext(nxt))));
+      const args: ExprNode[] = hasLabel ? [parseExpr()] : [];
+      return { k: 'cmd', name: 'mark', args, line: tok.line };
     }
     // `fill` arms programmable fill for the next beginfill…endfill (§2). Four
     // surface forms:  fill @d  |  fill dir @d  |  fill shape @s  |
@@ -926,23 +912,6 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       }
       return { k: 'fillarm', dirRef, shapeRef, line: tok.line };
     }
-    if (QWORD_BUILTINS[canonical]) {
-      next();
-      const allowed = QWORD_BUILTINS[canonical];
-      const wTok = next();
-      if (!wTok || wTok.t !== 'qword')
-        throw new NeedlescriptError(
-          `${canonical} needs a quoted word, e.g.  ${canonical} "${allowed[0]}`,
-          tok.line,
-        );
-      const word = wTok.v as string;
-      if (!allowed.includes(word))
-        throw new NeedlescriptError(
-          `${canonical} doesn't know "${word}"${didYouMean(word, allowed)} (choices: ${allowed.join(', ')})`,
-          tok.line,
-        );
-      return { k: 'cmd', name: canonical, args: [], line: tok.line, word };
-    }
     if (BUILTIN_ARITY[canonical] !== undefined) {
       next();
       const args: ExprNode[] = [];
@@ -967,15 +936,19 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       throw new NeedlescriptError(`"${name}" is a variable — assign with  ${name} = …`, tok.line);
     }
 
-    // List/gen builtins are glued-call only (RFC-2 §4): no prefix form exists.
+    // List/gen/string builtins are glued-call only (RFC-2 §4): no prefix form exists.
     if (
       LIST_CMDS[name] !== undefined ||
       LIST_FUNCS[name] !== undefined ||
       GEN_CMDS[name] !== undefined ||
       GEN_FUNCS[name] !== undefined ||
-      QUERY_FUNCS[name] !== undefined
+      QUERY_FUNCS[name] !== undefined ||
+      STRING_FUNCS[name] !== undefined
     )
-      throw new NeedlescriptError(`list functions need call syntax:  ${name}(…)`, tok.line);
+      throw new NeedlescriptError(
+        `${STRING_FUNCS[name] !== undefined ? 'string' : 'list'} functions need call syntax:  ${name}(…)`,
+        tok.line,
+      );
 
     throw new NeedlescriptError(
       `Unknown command "${name}"${didYouMeanKinded(name, nameCandidates())}`,
@@ -1134,6 +1107,18 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       next();
       return { k: 'num', v: tok.v as number };
     }
+    // String literal: 'text' — a first-class string value.
+    if (tok.t === 'string') {
+      next();
+      return parsePostfix({ k: 'str', v: tok.v as string, line: tok.line }, true);
+    }
+    // Quoted word in expression position evaluates to a string value (lowercased).
+    // Binding positions (make "x, for "i, print "label) consume qwords before
+    // parsePrimary is reached and are unaffected.
+    if (tok.t === 'qword') {
+      next();
+      return parsePostfix({ k: 'str', v: tok.v as string, line: tok.line }, true);
+    }
     if (tok.t === 'var') {
       // Legacy :var tokens are excluded from index left-context — legacy
       // code predates indexing by definition.
@@ -1158,7 +1143,8 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         ZERO_FUNCS.has(name) ||
         LIST_FUNCS[name] !== undefined ||
         GEN_FUNCS[name] !== undefined ||
-        QUERY_FUNCS[name] !== undefined
+        QUERY_FUNCS[name] !== undefined ||
+        STRING_FUNCS[name] !== undefined
       ) {
         return { k: 'procref', name, line: tok.line };
       }
@@ -1171,7 +1157,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         );
       // 4. Unknown name
       throw new NeedlescriptError(
-        `@${name} — no procedure or function named "${name}"${didYouMean(name, [...Object.keys(procArity), ...Object.keys(FUNC_ARITY), ...Object.keys(LIST_FUNCS), ...Object.keys(GEN_FUNCS)])}`,
+        `@${name} — no procedure or function named "${name}"${didYouMean(name, [...Object.keys(procArity), ...Object.keys(FUNC_ARITY), ...Object.keys(LIST_FUNCS), ...Object.keys(GEN_FUNCS), ...Object.keys(STRING_FUNCS)])}`,
         tok.line,
       );
     }
@@ -1274,6 +1260,20 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
             true,
           );
         }
+        // String builtins (Library tier): call-only, soft reservation.
+        if (STRING_FUNCS[w] !== undefined) {
+          next();
+          const a = STRING_FUNCS[w];
+          return parsePostfix(
+            {
+              k: 'listfunc',
+              name: w,
+              args: parseParenArgsRange(w, a.min, a.max, tok.line),
+              line: tok.line,
+            },
+            true,
+          );
+        }
         if (isVariableName(w))
           throw new NeedlescriptError(`"${w}" is a variable, not a procedure`, tok.line);
         if (
@@ -1317,9 +1317,17 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
         for (let a = 0; a < procArity[w]; a++) args.push(parseExpr());
         return { k: 'callexpr', name: w, args, line: tok.line };
       }
-      // List/gen builtins are glued-call only (RFC-2 §4): no prefix form exists.
-      if (LIST_FUNCS[w] !== undefined || GEN_FUNCS[w] !== undefined || QUERY_FUNCS[w] !== undefined)
-        throw new NeedlescriptError(`list functions need call syntax:  ${w}(…)`, tok.line);
+      // List/gen/string builtins are glued-call only (RFC-2 §4): no prefix form exists.
+      if (
+        LIST_FUNCS[w] !== undefined ||
+        GEN_FUNCS[w] !== undefined ||
+        QUERY_FUNCS[w] !== undefined ||
+        STRING_FUNCS[w] !== undefined
+      )
+        throw new NeedlescriptError(
+          `${STRING_FUNCS[w] !== undefined ? 'string' : 'list'} functions need call syntax:  ${w}(…)`,
+          tok.line,
+        );
       throw new NeedlescriptError(
         `Unknown name "${w}"${didYouMeanKinded(w, nameCandidates())}`,
         tok.line,

@@ -4,7 +4,17 @@ import type { ASTNode, ExprNode, RunResult, RunOptions, WarningLocation } from '
 import { NeedlescriptError } from './errors.ts';
 import { makeRNG, makeNoise, fork, gauss } from './prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
-import { FABRICS, FUNC_ARITY, ZERO_FUNCS, LIST_FUNCS, GEN_FUNCS, QUERY_FUNCS } from './commands.ts';
+import {
+  FABRICS,
+  FUNC_ARITY,
+  ZERO_FUNCS,
+  LIST_FUNCS,
+  GEN_FUNCS,
+  QUERY_FUNCS,
+  STRING_FUNCS,
+  QWORD_BUILTINS,
+  GEN_QWORD_ARG,
+} from './commands.ts';
 import { Machine, LIMITS } from './machine.ts';
 import { tokenize } from './tokenizer.ts';
 import { parse } from './parser.ts';
@@ -16,6 +26,7 @@ import {
   ComposedRef,
   isList,
   isFuncRef,
+  isString,
   num,
   deepEqual,
   deepCopy,
@@ -89,6 +100,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
    *  out of reach stay counted — the counter is a tab-protecting ceiling,
    *  not a garbage collector. */
   let cells = 0;
+  /** Monotonic string character allocation counter. Same philosophy as cells. */
+  let stringChars = 0;
   const printed: string[] = [];
 
   // Trace sandbox state (RFC-trace §4)
@@ -134,6 +147,22 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     tickN(n, line);
   }
 
+  /** Allocate a new string, enforcing per-string and total-char budgets. */
+  function allocString(s: string, line?: number): string {
+    if (s.length > LIMITS.maxStringLength)
+      throw new NeedlescriptError(
+        `String is too long (${s.length.toLocaleString('en-US')} chars, limit ${LIMITS.maxStringLength.toLocaleString('en-US')})`,
+        line,
+      );
+    stringChars += s.length;
+    if (stringChars > LIMITS.maxStringChars)
+      throw new NeedlescriptError(
+        `String allocation budget exceeded (over ${LIMITS.maxStringChars.toLocaleString('en-US')} total chars) — stopped`,
+        line,
+      );
+    return s;
+  }
+
   /** Allocate a new list, enforcing the length limit and charging cells. */
   function allocList(items: Val[], line?: number): NsList {
     if (items.length > LIMITS.maxListLen)
@@ -145,11 +174,18 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     return new NsList(items);
   }
 
-  /** A condition must be a number; a list is a loud error (RFC-2 §2). */
+  /**
+   * A condition must be a number; lists and strings are loud errors.
+   */
   function truthy(v: Val, what: string, line?: number): number {
     if (isList(v))
       throw new NeedlescriptError(
         `"${what}" got ${describeVal(v)} — a list isn't true or false, use len(xs) > 0`,
+        line,
+      );
+    if (typeof v === 'string')
+      throw new NeedlescriptError(
+        `string in a condition — use len(s) > 0 or an explicit comparison like s == '...'`,
         line,
       );
     if (typeof v !== 'number')
@@ -161,7 +197,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   }
 
   /**
-   * Normalize an index into a list of length `len`: must be a number,
+   * Normalize an index into a sequence of length `len`: must be a number,
    * integral within 1e-9, negatives count from the end, out of range
    * (either direction) is an error.
    */
@@ -175,15 +211,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       );
     const i = r < 0 ? r + len : r;
     if (i < 0 || i >= len)
-      throw new NeedlescriptError(
-        `${what}: index ${r} is out of range (the list has ${len} element${len === 1 ? '' : 's'})`,
-        line,
-      );
+      throw new NeedlescriptError(`${what}: index ${r} is out of range (length ${len})`, line);
     return i;
   }
 
   /** The value must be a list. */
   function list(v: Val, what: string, line?: number): NsList {
+    if (typeof v === 'string')
+      throw new NeedlescriptError(`"${what}" expected a list, got a string`, line);
     if (!isList(v)) throw new NeedlescriptError(`"${what}" expected a list, got a number`, line);
     return v;
   }
@@ -192,7 +227,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   function funcRef(v: Val, what: string, line?: number): FuncRef {
     if (!isFuncRef(v))
       throw new NeedlescriptError(
-        `"${what}" expected a @procedure reference, got ${isList(v) ? 'a list' : 'a number'}`,
+        `"${what}" expected a @procedure reference, got ${describeVal(v)}`,
         line,
       );
     return v;
@@ -239,26 +274,56 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         return allocList(out, line);
       }
       case 'len':
+        if (typeof args[0] === 'string') return args[0].length;
         return list(args[0], 'len', line).items.length;
       case 'islist':
         return isList(args[0]) ? 1 : 0;
       case 'first': {
+        if (typeof args[0] === 'string') {
+          if (args[0].length === 0) throw new NeedlescriptError('first of an empty string', line);
+          return args[0][0];
+        }
         const xs = list(args[0], 'first', line);
         if (xs.items.length === 0) throw new NeedlescriptError('first of an empty list', line);
         return xs.items[0];
       }
       case 'last': {
+        if (typeof args[0] === 'string') {
+          if (args[0].length === 0) throw new NeedlescriptError('last of an empty string', line);
+          return args[0][args[0].length - 1];
+        }
         const xs = list(args[0], 'last', line);
         if (xs.items.length === 0) throw new NeedlescriptError('last of an empty list', line);
         return xs.items[xs.items.length - 1];
       }
       case 'concat': {
+        // String concat (both must be strings)
+        if (typeof args[0] === 'string' || typeof args[1] === 'string') {
+          if (typeof args[0] !== 'string' || typeof args[1] !== 'string')
+            throw new NeedlescriptError(
+              `concat: both arguments must be the same type — use str(n) to convert a number to a string`,
+              line,
+            );
+          return allocString(args[0] + args[1], line);
+        }
         const a = list(args[0], 'concat', line);
         const b = list(args[1], 'concat', line);
         // shallow: elements are shared references
         return allocList([...a.items, ...b.items], line);
       }
       case 'slice': {
+        if (typeof args[0] === 'string') {
+          const s = args[0];
+          const len = s.length;
+          const normStr = (v: Val | undefined, dflt: number) => {
+            if (v === undefined) return dflt;
+            const n = Math.trunc(num(v, 'slice', line));
+            return Math.min(len, Math.max(0, n < 0 ? n + len : n));
+          };
+          const a = normStr(args[1], 0);
+          const b = normStr(args[2], len);
+          return allocString(s.slice(a, b), line);
+        }
         const xs = list(args[0], 'slice', line);
         const len = xs.items.length;
         // Python window semantics: negatives from the end, then clamped —
@@ -273,6 +338,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         return allocList(xs.items.slice(a, b), line);
       }
       case 'reverse': {
+        if (typeof args[0] === 'string') {
+          return allocString([...args[0]].reverse().join(''), line);
+        }
         const xs = list(args[0], 'reverse', line);
         return allocList([...xs.items].reverse(), line);
       }
@@ -284,6 +352,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
               `sort can only sort numbers — element ${i} is a list`,
               line,
             );
+          if (typeof v === 'string')
+            throw new NeedlescriptError(
+              `sort can only sort numbers — element ${i} is a string`,
+              line,
+            );
         });
         return allocList(
           [...(xs.items as number[])].sort((a, b) => a - b),
@@ -291,8 +364,17 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         );
       }
       case 'copy':
+        if (typeof args[0] === 'string') return args[0]; // strings are immutable, copy is identity
         return deepCopy(args[0], () => charge(1, line));
       case 'indexof': {
+        if (typeof args[0] === 'string') {
+          if (typeof args[1] !== 'string')
+            throw new NeedlescriptError(
+              `indexof on a string needs a string to search for, got ${describeVal(args[1])}`,
+              line,
+            );
+          return args[0].indexOf(args[1]);
+        }
         const xs = list(args[0], 'indexof', line);
         for (let i = 0; i < xs.items.length; i++) {
           tick(line);
@@ -301,6 +383,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         return -1;
       }
       case 'contains': {
+        if (typeof args[0] === 'string') {
+          if (typeof args[1] !== 'string')
+            throw new NeedlescriptError(
+              `contains on a string needs a string to search for, got ${describeVal(args[1])}`,
+              line,
+            );
+          return args[0].includes(args[1]) ? 1 : 0;
+        }
         const xs = list(args[0], 'contains', line);
         for (const x of xs.items) {
           tick(line);
@@ -419,7 +509,123 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         return new ComposedRef(refs);
       }
     }
+    // ---------- String builtins ----------
+    if (STRING_FUNCS[name] !== undefined) return stringFunc(name, args, line);
     throw new NeedlescriptError(`Unknown function ${name}`, line);
+  }
+
+  // ---------- String builtins ----------
+
+  function stringFunc(name: string, args: Val[], line: number | undefined): Val {
+    switch (name) {
+      case 'str': {
+        const v = args[0];
+        if (typeof v === 'number') return formatNum(v);
+        if (typeof v === 'string') return v; // identity
+        throw new NeedlescriptError(
+          `str() expects a number or string, got ${describeVal(v)} — to format lists, use print`,
+          line,
+        );
+      }
+      case 'num': {
+        const sv = args[0];
+        // Identity on number (convenience: num(x) where x might already be a number)
+        if (typeof sv === 'number') return sv;
+        if (typeof sv !== 'string')
+          throw new NeedlescriptError(`num() expects a string, got ${describeVal(sv)}`, line);
+        const n = Number(sv);
+        if (isNaN(n)) {
+          if (args.length === 2) return args[1]; // fallback form
+          throw new NeedlescriptError(
+            `num('${sv}') is not a number — pass a fallback: num(s, 0)`,
+            line,
+          );
+        }
+        return n;
+      }
+      case 'isstring':
+        return typeof args[0] === 'string' ? 1 : 0;
+      case 'chars': {
+        const s = requireString(args[0], 'chars', line);
+        const items: Val[] = [...s]; // Unicode-aware character split
+        return allocList(items, line);
+      }
+      case 'split': {
+        const s = requireString(args[0], 'split', line);
+        const sep = requireString(args[1], 'split separator', line);
+        if (sep === '')
+          throw new NeedlescriptError(
+            `split: separator must not be empty — use chars(s) to split into individual characters`,
+            line,
+          );
+        const parts = s.split(sep);
+        const items: Val[] = parts.map((p) => allocString(p, line));
+        return allocList(items, line);
+      }
+      case 'joinstr': {
+        const xs = list(args[0], 'joinstr', line);
+        const sep = requireString(args[1], 'joinstr separator', line);
+        const parts: string[] = [];
+        for (let i = 0; i < xs.items.length; i++) {
+          const el = xs.items[i];
+          if (typeof el !== 'string')
+            throw new NeedlescriptError(
+              `joinstr: element ${i} is ${describeVal(el)} — use map(xs, @str) first`,
+              line,
+            );
+          parts.push(el);
+        }
+        return allocString(parts.join(sep), line);
+      }
+      case 'upper':
+        return allocString(asciiUpper(requireString(args[0], 'upper', line)), line);
+      case 'lower':
+        return allocString(asciiLower(requireString(args[0], 'lower', line)), line);
+      case 'strip':
+        return allocString(
+          requireString(args[0], 'strip', line).replace(/^[\s\t\n]+|[\s\t\n]+$/g, ''),
+          line,
+        );
+      case 'repeatstr': {
+        const s = requireString(args[0], 'repeatstr', line);
+        const nv = num(args[1], 'repeatstr', line);
+        const n = Math.round(nv);
+        if (Math.abs(nv - n) > 1e-9 || n < 0)
+          throw new NeedlescriptError(
+            `repeatstr: count must be a non-negative integer, got ${formatNum(nv)}`,
+            line,
+          );
+        return allocString(s.repeat(n), line);
+      }
+    }
+    throw new NeedlescriptError(`Unknown string function ${name}`, line);
+  }
+
+  /** Guard: v must be a string. */
+  function requireString(v: Val, what: string, line?: number): string {
+    if (typeof v !== 'string')
+      throw new NeedlescriptError(`"${what}" expected a string, got ${describeVal(v)}`, line);
+    return v;
+  }
+
+  /** ASCII-only uppercase (A-Z). */
+  function asciiUpper(s: string): string {
+    let out = '';
+    for (const ch of s) {
+      const code = ch.charCodeAt(0);
+      out += code >= 97 && code <= 122 ? String.fromCharCode(code - 32) : ch;
+    }
+    return out;
+  }
+
+  /** ASCII-only lowercase (a-z). */
+  function asciiLower(s: string): string {
+    let out = '';
+    for (const ch of s) {
+      const code = ch.charCodeAt(0);
+      out += code >= 65 && code <= 90 ? String.fromCharCode(code + 32) : ch;
+    }
+    return out;
   }
 
   // ---------- Generative math dispatcher (RFC-3) ----------
@@ -429,7 +635,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   // the way back. Draw accounting (§7): gauss = 2 direct draws; scatter and
   // shuffle draw exactly 1 and fork; voronoi/relax/… draw 0.
 
-  function genFunc(name: string, args: Val[], line: number | undefined, word?: string): Val {
+  function genFunc(name: string, args: Val[], line: number | undefined): Val {
     const sc = (i: number) => num(args[i], name, line);
     const pointArg = (i: number) => gm.toPoint(args[i], name, line);
     const pathArg = (i: number, min = 2) => gm.toPath(args[i], name, line, min);
@@ -619,8 +825,22 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       case 'clippaths': {
         const a = regionArg(0),
           b = regionArg(1);
+        // Third arg is now a string expression (not a parse-time qword).
+        const opVal = args[2];
+        if (typeof opVal !== 'string')
+          throw new NeedlescriptError(
+            `clippaths: operation must be a string, got ${describeVal(opVal)} — e.g. clippaths(a, b, 'difference')`,
+            line,
+          );
+        const op = opVal.toLowerCase();
+        const allowed = GEN_QWORD_ARG['clippaths'].allowed;
+        if (!allowed.includes(op))
+          throw new NeedlescriptError(
+            `clippaths doesn't know '${op}'${didYouMean(op, allowed)} — choices: ${allowed.join(', ')}`,
+            line,
+          );
         tickN((a.length + b.length) * 4, line);
-        return regions(clipRegions(a, b, word as string, line));
+        return regions(clipRegions(a, b, op, line));
       }
       case 'inpath':
         return gm.pointInRegion(pointArg(0), regionArg(1)) ? 1 : 0;
@@ -795,6 +1015,15 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     switch (node.k) {
       case 'num':
         return node.v;
+      case 'str':
+        // String literals: check per-string limit only (no allocation budget
+        // for literals — they come from source, not from computation).
+        if (node.v.length > LIMITS.maxStringLength)
+          throw new NeedlescriptError(
+            `String literal is too long (${node.v.length} chars, limit ${LIMITS.maxStringLength})`,
+            node.line,
+          );
+        return node.v;
       case 'var': {
         if (env && node.name in env) return env[node.name];
         if (node.name in globals) return globals[node.name];
@@ -826,9 +1055,18 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'index': {
         const obj = evalExpr(node.obj, env, repcount, depth);
+        if (typeof obj === 'string') {
+          const i = toIndex(
+            evalExpr(node.idx, env, repcount, depth),
+            obj.length,
+            'string indexing',
+            node.line,
+          );
+          return obj[i];
+        }
         if (!isList(obj))
           throw new NeedlescriptError(
-            `only lists can be indexed with [ ] — this is a number`,
+            `only lists and strings can be indexed with [ ] — this is a ${typeof obj === 'number' ? 'number' : describeVal(obj)}`,
             node.line,
           );
         const i = toIndex(
@@ -840,13 +1078,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         return obj.items[i];
       }
       case 'callval': {
-        evalExpr(node.obj, env, repcount, depth);
+        const callTarget = evalExpr(node.obj, env, repcount, depth);
+        if (typeof callTarget === 'string')
+          throw new NeedlescriptError("a string value can't be called like a procedure", node.line);
         throw new NeedlescriptError("a list value can't be called like a procedure", node.line);
       }
       case 'listfunc': {
         const args = node.args.map((a) => evalExpr(a, env, repcount, depth));
-        if (GEN_FUNCS[node.name] !== undefined)
-          return genFunc(node.name, args, node.line, node.word);
+        if (GEN_FUNCS[node.name] !== undefined) return genFunc(node.name, args, node.line);
         if (QUERY_FUNCS[node.name] !== undefined) return queryFunc(node.name, args, node.line);
         return listFunc(node.name, args, node.line, depth);
       }
@@ -864,13 +1103,29 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             : 0;
         const av = evalExpr(node.left, env, repcount, depth);
         const bv = evalExpr(node.right, env, repcount, depth);
-        // Equality on lists is deep; mixed number/list compares unequal
-        // (equality is a question, not a type assertion).
+        const lineHint =
+          (node.left as { line?: number }).line ?? (node.right as { line?: number }).line;
+        // Equality: deep equal handles all types (strings, lists, numbers).
+        // Cross-type always returns 0/1 without error — equality is a question.
         if (node.op === '=' || node.op === '!=') {
-          if (isList(av) || isList(bv)) {
+          if (isList(av) || isList(bv) || typeof av === 'string' || typeof bv === 'string') {
             const eq = deepEqual(av, bv);
             return node.op === '=' ? (eq ? 1 : 0) : eq ? 0 : 1;
           }
+        }
+        // String operator errors — loud with hints.
+        if (typeof av === 'string' || typeof bv === 'string') {
+          if (node.op === '+')
+            throw new NeedlescriptError(`"+" cannot join strings — use concat(a, b)`, lineHint);
+          if (node.op === '<' || node.op === '>' || node.op === '<=' || node.op === '>=')
+            throw new NeedlescriptError(
+              `strings have no ordering — "${node.op}" is not defined for strings`,
+              lineHint,
+            );
+          throw new NeedlescriptError(
+            `"${node.op}" on a string — no implicit conversion; use num(s) or str(n)`,
+            lineHint,
+          );
         }
         // Arithmetic on lists stays a loud error (RFC-3 §2) — with hints
         // pointing at the named vector functions. No broadcasting: in
@@ -883,10 +1138,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
               : node.op === '-'
                 ? ' — use vsub(a, b) for element-wise'
                 : ' — use vscale(a, s) to scale a point';
-          throw new NeedlescriptError(
-            `"${node.op}" on lists${hint}`,
-            (node.left as { line?: number }).line ?? (node.right as { line?: number }).line,
-          );
+          throw new NeedlescriptError(`"${node.op}" on lists${hint}`, lineHint);
         }
         const a = num(av, node.op, undefined, 'on the left');
         const b = num(bv, node.op, undefined, 'on the right');
@@ -1150,10 +1402,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     // 2. Scalar builtins (FUNC_ARITY + ZERO_FUNCS)
     if (FUNC_ARITY[ref.name] !== undefined || ZERO_FUNCS.has(ref.name))
       return scalarBuiltin(ref.name, argVals, line);
-    // 3. List / Gen / Query builtins
+    // 3. List / Gen / Query / String builtins
     if (LIST_FUNCS[ref.name] !== undefined) return listFunc(ref.name, argVals, line);
     if (GEN_FUNCS[ref.name] !== undefined) return genFunc(ref.name, argVals, line);
     if (QUERY_FUNCS[ref.name] !== undefined) return queryFunc(ref.name, argVals, line);
+    if (STRING_FUNCS[ref.name] !== undefined) return stringFunc(ref.name, argVals, line);
 
     throw new NeedlescriptError(`Unknown function "${ref.name}" in @${ref.name} reference`, line);
   }
@@ -1421,6 +1674,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             `Variable "${st.name}" was never assigned on this path`,
             st.line,
           );
+        // Strings are immutable — index assignment is always an error.
+        if (typeof target === 'string')
+          throw new NeedlescriptError(
+            `strings are immutable — build a new one with concat(a, b) or slice(s, a, b)`,
+            st.line,
+          );
         for (let k = 0; ; k++) {
           if (!isList(target))
             throw new NeedlescriptError(
@@ -1488,12 +1747,26 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         return;
       }
       case 'forin': {
-        // for x in xs — length captured at loop entry, elements read live
-        // (reference semantics, documented), loop variable doesn't leak.
+        // for x in xs — iterates list elements or string characters.
+        // Loop variable doesn't leak.
         const v = evalExpr(st.list, env, repcount, depth);
+        if (typeof v === 'string') {
+          // String iteration: each character is a 1-char string.
+          const scope = env ?? globals;
+          const had = st.varName in scope;
+          const prev = scope[st.varName];
+          for (const ch of v) {
+            tick(st.line);
+            scope[st.varName] = ch;
+            if (!runLoopBody(st.body, env, repcount, depth, contextLine)) break;
+          }
+          if (had) scope[st.varName] = prev;
+          else delete scope[st.varName];
+          return;
+        }
         if (!isList(v))
           throw new NeedlescriptError(
-            `for ${st.varName} in … expected a list, got a number`,
+            `for ${st.varName} in … expected a list or string, got ${describeVal(v)}`,
             st.line,
           );
         const n = v.items.length;
@@ -1676,6 +1949,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         switch (st.name) {
           case 'append':
           case 'prepend': {
+            if (typeof a[0] === 'string')
+              throw new NeedlescriptError(
+                `strings are immutable — "${st.name}" needs a list; use concat(a, b) to build longer strings`,
+                st.line,
+              );
             const xs = list(a[0], st.name, st.line);
             if (xs.items.length + 1 > LIMITS.maxListLen)
               throw new NeedlescriptError(
@@ -1689,6 +1967,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             return;
           }
           case 'insertat': {
+            if (typeof a[0] === 'string')
+              throw new NeedlescriptError(
+                `strings are immutable — "insertat" needs a list; use concat(a, b) to build longer strings`,
+                st.line,
+              );
             const xs = list(a[0], 'insertat', st.line);
             if (xs.items.length + 1 > LIMITS.maxListLen)
               throw new NeedlescriptError(
@@ -1743,20 +2026,40 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'cmd': {
         m.currentLine = contextLine ?? st.line;
+
+        // assert: evaluate condition first; message only on failure (lazy).
+        if (st.name === 'assert') {
+          const condVal = evalExpr(st.args[0], env, repcount, depth);
+          if (truthy(condVal, 'assert', st.line) === 0) {
+            let msg = 'assertion failed';
+            if (st.args.length === 2) {
+              const msgVal = evalExpr(st.args[1], env, repcount, depth);
+              const msgStr = typeof msgVal === 'string' ? msgVal : formatVal(msgVal);
+              msg = `assertion failed: ${msgStr}`;
+            }
+            throw new NeedlescriptError(msg, st.line);
+          }
+          return;
+        }
+
         const vals = st.args.map((x) => evalExpr(x, env, repcount, depth));
+
         if (st.name === 'print') {
-          printed.push((st.label ? st.label + ': ' : '') + formatVal(vals[0]));
+          // Multi-arg call form: print(v1, v2, …) — concatenate renderings.
+          // Classic form: print expr or print "label expr — single arg.
+          const renderVal = (v: Val) => (isString(v) ? v : formatVal(v));
+          if (st.args.length > 1) {
+            // Variadic call form — no label, just concatenate
+            printed.push(vals.map(renderVal).join(''));
+          } else {
+            printed.push((st.label ? st.label + ': ' : '') + renderVal(vals[0]));
+          }
           return;
         }
         if (st.name === 'printloc') {
           // DX: printloc — logs local-frame needle position, like pos() formatted.
           // Reports m.x / m.y (local turtle coordinates, same as pos()).
           printed.push((st.label ?? 'loc') + ': [' + formatNum(m.x) + ', ' + formatNum(m.y) + ']');
-          return;
-        }
-        if (st.name === 'assert') {
-          if (truthy(vals[0], 'assert', st.line) === 0)
-            throw new NeedlescriptError('assert failed — the condition is 0 (false)', st.line);
           return;
         }
         // `satin @fn` — engage programmable satin: a user shape reporter
@@ -1782,7 +2085,59 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           }
           return;
         }
-        // Every other command is scalar — a list argument is a type error
+        // String-argument mode commands — handled before the bulk num() conversion.
+        if (st.name === 'fabric' || st.name === 'underlay' || st.name === 'fillunderlay') {
+          traceNote(st.name, `note: ${st.name} inside trace has no effect on the captured path`);
+          const modeVal = vals[0];
+          if (typeof modeVal !== 'string')
+            throw new NeedlescriptError(
+              `${st.name} expects a string mode, got ${describeVal(modeVal)} — e.g. ${st.name} '${QWORD_BUILTINS[st.name][0]}'`,
+              st.line,
+            );
+          const mode = modeVal.toLowerCase();
+          const allowed = QWORD_BUILTINS[st.name];
+          if (!allowed.includes(mode))
+            throw new NeedlescriptError(
+              `Unknown ${st.name} '${mode}'${didYouMean(mode, allowed)} — expected ${allowed.map((w) => `'${w}'`).join(', ')}`,
+              st.line,
+            );
+          if (st.name === 'underlay') {
+            m.underlayMode = mode as typeof m.underlayMode;
+          } else if (st.name === 'fillunderlay') {
+            m.fillUnderlayMode = mode as typeof m.fillUnderlayMode;
+          } else {
+            // fabric
+            const f = FABRICS[mode];
+            m.pullComp = f.pull;
+            m.underlayMode = 'auto';
+            m.fillUnderlayMode = 'auto';
+            m.maxDensity = f.maxDensity;
+            m.doubleUnderlay = !!f.doubleUnderlay;
+            if (f.densityFloor && m.satinSpacing < f.densityFloor) m.satinSpacing = f.densityFloor;
+            if (f.note && !m.warnings.includes(f.note)) m.warnings.push(f.note);
+          }
+          return;
+        }
+        // mark — optional string label.
+        if (st.name === 'mark') {
+          traceNote(
+            'mark',
+            'note: mark inside trace has no effect — pins mark sewn positions; nothing is sewn',
+          );
+          if (st.args.length === 1) {
+            const labelVal = vals[0];
+            if (typeof labelVal !== 'string')
+              throw new NeedlescriptError(
+                `mark label must be a string, got ${describeVal(labelVal)}`,
+                st.line,
+              );
+            m.markHere(labelVal);
+          } else {
+            m.markHere();
+          }
+          return;
+        }
+        // Every other command is scalar — a string or list argument is a type error
         // naming the command (RFC-2 §2).
         const a = vals.map((v) => num(v, st.name, st.line));
         switch (st.name) {
@@ -2011,29 +2366,6 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             m.maxDensity = Math.min(Math.max(a[0], 1), 8);
             return;
           }
-          case 'underlay':
-            traceNote('underlay', 'note: underlay inside trace has no effect on the captured path');
-            m.underlayMode = st.word as typeof m.underlayMode;
-            return;
-          case 'fillunderlay':
-            traceNote(
-              'fillunderlay',
-              'note: fillunderlay inside trace has no effect on the captured path',
-            );
-            m.fillUnderlayMode = st.word as typeof m.fillUnderlayMode;
-            return;
-          case 'fabric': {
-            traceNote('fabric', 'note: fabric inside trace has no effect on the captured path');
-            const f = FABRICS[st.word as string];
-            m.pullComp = f.pull;
-            m.underlayMode = 'auto';
-            m.fillUnderlayMode = 'auto';
-            m.maxDensity = f.maxDensity;
-            m.doubleUnderlay = !!f.doubleUnderlay;
-            if (f.densityFloor && m.satinSpacing < f.densityFloor) m.satinSpacing = f.densityFloor;
-            if (f.note && !m.warnings.includes(f.note)) m.warnings.push(f.note);
-            return;
-          }
           case 'color':
             traceNote('color', 'note: color inside trace has no effect on the captured path');
             m.colorChange(a[0]);
@@ -2059,13 +2391,6 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             snoise3 = createNoise3D(makeRNG(s ^ 0x9e3779b9));
             return;
           }
-          case 'mark':
-            traceNote(
-              'mark',
-              'note: mark inside trace has no effect — pins mark sewn positions; nothing is sewn',
-            );
-            m.markHere();
-            return;
         }
         throw new NeedlescriptError(`Unhandled command ${st.name}`, st.line);
       }

@@ -230,12 +230,10 @@ describe('loop-control edge cases', () => {
   });
 });
 
-// ── single-quote reservation (RFC-4 §4, closing RFC-1 Q4) ───────────────────
+// ── single-quote strings are now valid ──────────────────────────────────────
 describe("the ' character", () => {
-  it('is reserved with a forward-looking error', () => {
-    expect(() => run("print 'hi'")).toThrow(
-      /single-quote strings are reserved for a future version/,
-    );
-    expect(() => run("fd 10 ' rt 90")).toThrow(/reserved for a future version/);
+  it('is now a string literal delimiter — old reservation is retired', () => {
+    expect(run("print 'hi'").printed).toEqual(['hi']);
+    expect(run("let s = 'hello' print s").printed).toEqual(['hello']);
   });
 });

@@ -45,7 +45,8 @@ import hilbert2Raw from '../examples/hilbert2.ns?raw';
 import lissajousRaw from '../examples/lissajous.ns?raw';
 import fishRaw from '../examples/fish.ns?raw';
 import turtleRaw from '../examples/turtle.ns?raw';
-import needlescriptRaw from '../examples/needlescript.ns?raw';
+import needlescript1Raw from '../examples/needlescript1.ns?raw';
+import needlescript2Raw from '../examples/needlescript2.ns?raw';
 import eclipseRaw from '../examples/eclipse.ns?raw';
 import transformsRaw from '../examples/transforms.ns?raw';
 import warpRaw from '../examples/warp.ns?raw';
@@ -155,7 +156,8 @@ export const EXAMPLES: Record<string, string> = {
   lissajous: lissajousRaw,
   fish: fishRaw,
   turtle: turtleRaw,
-  needlescript: needlescriptRaw,
+  needlescript1: needlescript1Raw,
+  needlescript2: needlescript2Raw,
   eclipse: eclipseRaw,
   transforms: transformsRaw,
   warp: warpRaw,
@@ -183,7 +185,7 @@ export const EXAMPLES: Record<string, string> = {
   compose: composeRaw,
   'trace regions': traceRegionsRaw,
   'trace motifs': traceMotifsRaw,
-  'traceman': tracemanRaw,
+  traceman: tracemanRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -266,7 +268,8 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'fill',
       'custom fill',
       'turtle',
-      'needlescript',
+      'needlescript1',
+      'needlescript2',
       'stipple',
       'extrude',
       'warpedlines1',

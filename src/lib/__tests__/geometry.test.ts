@@ -115,15 +115,15 @@ describe('clippaths (§4.6)', () => {
     expect(r.printed).toEqual(['1', '1']);
   });
 
-  it('a bad op word is a parse error with did-you-mean', () => {
+  it('a bad op word gives a runtime error with did-you-mean', () => {
     expect(() =>
       run('let u = clippaths([[0,0],[1,0],[1,1]], [[0,0],[1,0],[1,1]], "unoin")'),
-    ).toThrow(/clippaths doesn't know "unoin".*union.*choices: union, intersect, difference, xor/);
+    ).toThrow(/clippaths doesn't know 'unoin'.*union/);
   });
 
-  it('the op must be a quoted word, at parse time', () => {
+  it('the op accepts string expressions and errors on a non-string at runtime', () => {
     expect(() => run('let u = clippaths([[0,0],[1,0],[1,1]], [[0,0],[1,0],[1,1]], 3)')).toThrow(
-      /clippaths needs a quoted word here/,
+      /clippaths: operation must be a string/,
     );
     expect(() => run('let u = clippaths([[0,0],[1,0],[1,1]], [[0,0],[1,0],[1,1]])')).toThrow(
       /clippaths\(…\) expects 3 arguments, got 2/,

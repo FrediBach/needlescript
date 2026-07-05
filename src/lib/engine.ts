@@ -51,13 +51,14 @@ export {
   GEN_CMDS,
   GEN_QWORD_ARG,
   QUERY_FUNCS,
+  STRING_FUNCS,
   LIBRARY_FUNCS,
   RESERVED,
 } from './commands.ts';
 export { suggest } from './suggestions.ts';
 export { tokenize } from './tokenizer.ts';
 export { parse } from './parser.ts';
-export { NsList, isList } from './list.ts';
+export { NsList, isList, isString } from './list.ts';
 export type { Val } from './list.ts';
 export type { Pt } from './genmath.ts';
 export { LIMITS } from './machine.ts';

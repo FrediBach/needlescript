@@ -259,7 +259,7 @@ describe('legacy preservation', () => {
   it('single-arity prefix commands still absorb a full expression', () => {
     // assert is single-arity, so the comparison belongs to its argument
     expect(() => run('let tries = 0 assert tries < 99')).not.toThrow();
-    expect(() => run('assert 1 > 2')).toThrow(/assert failed/);
+    expect(() => run('assert 1 > 2')).toThrow(/assertion failed/);
   });
 
   it('every bundled example still parses and runs (test #18)', () => {

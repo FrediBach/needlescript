@@ -1583,9 +1583,7 @@ export default function ReferenceDialog({ open, onClose }: Props) {
                       <div className={styles.sectionHeader}>
                         <h3 className={styles.sectionTitle}>{section.title}</h3>
                         {section.world && (
-                          <span className={styles.worldBadge}>
-                            {section.world.toUpperCase()}
-                          </span>
+                          <span className={styles.worldBadge}>{section.world.toUpperCase()}</span>
                         )}
                       </div>
                       {section.note && <p className={styles.sectionNote}>{section.note}</p>}

@@ -389,7 +389,7 @@ describe('trace semantics', () => {
   });
 
   it('errors inside trace propagate normally', () => {
-    expect(() => run('let p = trace [ assert 0 ]')).toThrow(/assert failed/);
+    expect(() => run('let p = trace [ assert 0 ]')).toThrow(/assertion failed/);
   });
 
   it('break inside a loop within trace is fine', () => {

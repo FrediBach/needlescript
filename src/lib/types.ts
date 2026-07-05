@@ -1,7 +1,7 @@
 // ---------- Shared types ----------
 
 export type TokenType =
-  'num' | 'var' | 'qword' | 'word' | 'pref' | 'op' | '[' | ']' | '(' | ')' | ',';
+  'num' | 'string' | 'var' | 'qword' | 'word' | 'pref' | 'op' | '[' | ']' | '(' | ')' | ',';
 
 export interface Token {
   t: TokenType;
@@ -24,6 +24,7 @@ export interface StitchEvent {
   c: number; // color index
   line?: number; // source line that produced this event (debugging)
   u?: 1; // underlay stitch (drawn lighter in previews; identical in exports)
+  label?: string; // mark events only: optional preview label
 }
 
 /**
@@ -98,6 +99,7 @@ export type ASTNode =
 
 export type ExprNode =
   | { k: 'num'; v: number }
+  | { k: 'str'; v: string; line: number }
   | { k: 'var'; name: string; line: number; bare?: boolean }
   | { k: 'neg'; val: ExprNode; line: number }
   | { k: 'bin'; op: string; left: ExprNode; right: ExprNode }
