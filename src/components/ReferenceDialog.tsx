@@ -1439,7 +1439,13 @@ export default function ReferenceDialog({ open, onClose }: Props) {
   const [tab, setTab] = useState<TabId>('reference');
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const tutorialNodes = useMemo(() => parseMarkdown(tutorialMd), []);
+  // Guard: tutorialMd must be a raw string. If the Vite MDX plugin is
+  // mis-configured to process .md files, the import may return a module
+  // object instead of a string — this prevents a crash in that case.
+  const tutorialNodes = useMemo(
+    () => (typeof tutorialMd === 'string' ? parseMarkdown(tutorialMd) : []),
+    [],
+  );
 
   // Auto-focus search when dialog opens on a searchable tab, clear on close
   useEffect(() => {

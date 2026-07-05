@@ -28,14 +28,14 @@ The #1 trap is `step` (it is the for-loop keyword: `for i = 0 to 10 step 2`). In
 
 Built-in commands and functions can NOT be shadowed — defining a variable or procedure with a built-in's name is a parse error. Frequent collisions and safe alternatives:
 
-| Tempting name                                                                                         | Why it fails                  | Use instead                |
-| ----------------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------- |
-| `step`                                                                                                | for-loop keyword              | `stride`, `pace`, `inc`    |
-| `circle`                                                                                              | built-in command (`circle r`) | `ring`, `disc`, `blob`     |
-| `pos`                                                                                                 | built-in reporter             | `p`, `pt`, `here`          |
-| `color`                                                                                               | built-in command              | `hue`, `col`, `thread`     |
-| `heading`                                                                                             | built-in reporter             | `hdg`, `dir_deg`           |
-| `random`, `pick`, `sort`, `first`, `last`, `min`, `max`, `sum`, `range`, `trace`, `scale`, `distance`, `str`, `num`, `upper`, `lower`, `strip`, `chars`, `split` | built-ins | any other descriptive name |
+| Tempting name                                                                                                                                                    | Why it fails                  | Use instead                |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------- |
+| `step`                                                                                                                                                           | for-loop keyword              | `stride`, `pace`, `inc`    |
+| `circle`                                                                                                                                                         | built-in command (`circle r`) | `ring`, `disc`, `blob`     |
+| `pos`                                                                                                                                                            | built-in reporter             | `p`, `pt`, `here`          |
+| `color`                                                                                                                                                          | built-in command              | `hue`, `col`, `thread`     |
+| `heading`                                                                                                                                                        | built-in reporter             | `hdg`, `dir_deg`           |
+| `random`, `pick`, `sort`, `first`, `last`, `min`, `max`, `sum`, `range`, `trace`, `scale`, `distance`, `str`, `num`, `upper`, `lower`, `strip`, `chars`, `split` | built-ins                     | any other descriptive name |
 
 When in doubt, pick a name that is clearly yours: `petal_w`, `stride_mm`, `ring_r`. A variable and a procedure can never share a name either, and parameters can't reuse a procedure or built-in name.
 
@@ -69,61 +69,59 @@ def spiral_r(i) [
 
 ## Strings (third value type — immutable, never reach the stitch stream)
 
-let s = 'hello'          — single-quoted literals; contents are case-sensitive
-print s                  — prints: hello  (raw, no quotes)
-print concat(s, '!')     — hello!
+let s = 'hello' — single-quoted literals; contents are case-sensitive
+print s — prints: hello (raw, no quotes)
+print concat(s, '!') — hello!
 
-Escape sequences (only these four):  \'  \\  \n  \t
+Escape sequences (only these four): \' \\ \n \t
 Anything else after \ is a hard error.
 
 Classic quoted words ("knit "difference) in expression position evaluate to strings
 (lowercased). Both syntaxes always work and are equivalent:
-  fabric "knit  ≡  fabric 'knit'
-  clippaths(a, b, "difference)  ≡  clippaths(a, b, 'difference')
+fabric "knit ≡ fabric 'knit'
+clippaths(a, b, "difference) ≡ clippaths(a, b, 'difference')
 
 Strings are IMMUTABLE — no index assignment, append/prepend require lists.
 String in a condition is an error: if s [...] → use len(s) > 0
 
 ### Sequence overloads (these list functions also work on strings)
 
-len(s)             character count
-first(s)/last(s)   1-char strings
-slice(s, a, b)     substring (Python semantics, clamped)
-reverse(s)         reversed string
-concat(a, b)       joined string (BOTH must be strings — concat('x', 1) errors)
-contains(s, sub)   1/0 substring test
-indexof(s, sub)    first index or -1
-copy(s)            identity (immutable)
-s[i]               0-based, negatives from end, returns 1-char string
+len(s) character count
+first(s)/last(s) 1-char strings
+slice(s, a, b) substring (Python semantics, clamped)
+reverse(s) reversed string
+concat(a, b) joined string (BOTH must be strings — concat('x', 1) errors)
+contains(s, sub) 1/0 substring test
+indexof(s, sub) first index or -1
+copy(s) identity (immutable)
+s[i] 0-based, negatives from end, returns 1-char string
 
 ### New string functions (call-syntax only, Library tier)
 
-str(v)              number → string (same as print shows); identity on a string; error on list
-num(s)              parse number from string; error on non-numeric
-num(s, fallback)    tolerant form: returns fallback if s is not a number
-isstring(v)         1/0 predicate (sibling of islist)
-chars(s)            list of 1-char strings
-split(s, sep)       list of strings; sep must be non-empty (use chars for splitting to chars)
-joinstr(xs, sep)    join list of strings with sep; all elements must be strings
-upper(s)/lower(s)   ASCII case (A–Z/a–z only)
-strip(s)            remove leading/trailing whitespace — NOTE: trim cuts thread, strip strips whitespace
-repeatstr(s, n)     repeat s n times (n ≥ 0, integer)
+str(v) number → string (same as print shows); identity on a string; error on list
+num(s) parse number from string; error on non-numeric
+num(s, fallback) tolerant form: returns fallback if s is not a number
+isstring(v) 1/0 predicate (sibling of islist)
+chars(s) list of 1-char strings
+split(s, sep) list of strings; sep must be non-empty (use chars for splitting to chars)
+joinstr(xs, sep) join list of strings with sep; all elements must be strings
+upper(s)/lower(s) ASCII case (A–Z/a–z only)
+strip(s) remove leading/trailing whitespace — NOTE: trim cuts thread, strip strips whitespace
+repeatstr(s, n) repeat s n times (n ≥ 0, integer)
 
 // @str @upper @lower etc. work as @ references in map/filter/compose
 
 ### print, assert, mark extensions
 
-print('part: ', i, ' of ', total)         — variadic, concatenates renderings
-assert(len(result) > 0, 'clip failed')    — 2-arg form; message evaluated only on failure
-mark 'label'  or  mark lower(name)        — optional string label on the preview pin
+print('part: ', i, ' of ', total) — variadic, concatenates renderings
+assert(len(result) > 0, 'clip failed') — 2-arg form; message evaluated only on failure
+mark 'label' or mark lower(name) — optional string label on the preview pin
 
 ### Mode consumers now accept computed strings
 
 let ops = ['union', 'difference', 'xor']
-clippaths(a, b, pick(ops))               — the mode is just a string expression
-fabric lower('KNIT')                     — case-insensitive matching
-
-
+clippaths(a, b, pick(ops)) — the mode is just a string expression
+fabric lower('KNIT') — case-insensitive matching
 
 fd n — forward n mm (sews stitches)
 bk n — backward n mm
@@ -269,7 +267,7 @@ relax(points, n) — Lloyd's relaxation (n rounds), evens out spacing
 
 offsetpath(region, mm) — list of regions (positive=inflate, negative=shrink — may return empty list)
 clippaths(a, b, 'op') — boolean: 'union' 'intersect' 'difference' 'xor' → list of regions
-                       — also accepts "op quoted-word syntax: clippaths(a, b, "difference)
+— also accepts "op quoted-word syntax: clippaths(a, b, "difference)
 inpath(p, region) — 1/0 by even-odd rule
 
 ## Transforms (block-scoped, nest inside-out)
@@ -303,9 +301,9 @@ tracerings [ block ] — run block in sandbox, return list of pen-down paths
 ## Fabric presets (professional settings)
 
 // Both quoted-word and string literal syntax work:
-fabric 'woven'  (or fabric "woven) — baseline (pull comp 0.2, underlay auto)
-fabric 'knit'   (or fabric "knit) — stretch fabric (pull comp 0.5)
-fabric 'denim'  (or fabric "denim) — thick stable (pull comp 0.15)
+fabric 'woven' (or fabric "woven) — baseline (pull comp 0.2, underlay auto)
+fabric 'knit' (or fabric "knit) — stretch fabric (pull comp 0.5)
+fabric 'denim' (or fabric "denim) — thick stable (pull comp 0.15)
 // Can also use a variable or expression: let f = 'knit' fabric f
 
 ## Stitch history queries (call-syntax, read-only)

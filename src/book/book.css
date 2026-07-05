@@ -1,0 +1,251 @@
+/*
+ * src/book/book.css
+ *
+ * Design tokens for the /book section. Entirely separate from index.css.
+ * Applied by wrapping the book root with data-book-theme="light" or
+ * data-book-theme="dark" on the outer div.
+ *
+ * Palette: black on white (light) / white on black (dark).
+ * The only non-neutral color is the run-button red borrowed from the IDE.
+ */
+
+/* ── Light theme (default) ─────────────────────────────────────────────────── */
+[data-book-theme] {
+  --bk-bg: #ffffff;
+  --bk-bg-alt: #f7f7f7;
+  --bk-text: #111111;
+  --bk-text-muted: #555555;
+  --bk-text-faint: #999999;
+  --bk-border: #e0e0e0;
+  --bk-border-strong: #bbbbbb;
+
+  /* Code / editor surfaces */
+  --bk-code-bg: #f4f4f4;
+  --bk-code-text: #111111;
+
+  /* Interactive cell chrome */
+  --bk-cell-bg: #fafafa;
+  --bk-cell-border: #d0d0d0;
+  --bk-cell-canvas-bg: #ffffff;
+
+  /* Canvas (embroidery hoop area) */
+  --bk-canvas-fabric: #efe8d8; /* same warm linen as IDE */
+  --bk-canvas-fabric-dark: #e5dcc7;
+
+  /* Accents — kept minimal */
+  --bk-run: #c8472f; /* same red as IDE Run button */
+  --bk-run-hi: #d55036;
+  --bk-run-text: #ffffff;
+  --bk-locked: #6b8fa3; /* muted slate blue for RunLocked */
+  --bk-ok: #2d7a4a; /* green for checkmarks */
+  --bk-warn: #b45309; /* amber for pitfall callouts */
+
+  /* Sidebar */
+  --bk-sidebar-bg: #fafafa;
+  --bk-sidebar-border: #e0e0e0;
+  --bk-sidebar-active-bg: #111111;
+  --bk-sidebar-active-text: #ffffff;
+  --bk-sidebar-hover-bg: #eeeeee;
+
+  /* Quiz / checkpoint chips */
+  --bk-chip-bg: #f0f0f0;
+  --bk-chip-correct-bg: #dcf5e7;
+  --bk-chip-correct-text: #1a5c32;
+  --bk-chip-wrong-bg: #fde8e3;
+  --bk-chip-wrong-text: #7a1c0e;
+
+  /* Typography */
+  --bk-font-prose: 'IBM Plex Sans', system-ui, sans-serif;
+  --bk-font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  --bk-prose-max-width: 72ch;
+  --bk-prose-size: 17px;
+  --bk-prose-line-height: 1.75;
+  --bk-heading-line-height: 1.25;
+}
+
+/* ── Dark theme ─────────────────────────────────────────────────────────────── */
+[data-book-theme='dark'] {
+  --bk-bg: #000000;
+  --bk-bg-alt: #0d0d0d;
+  --bk-text: #f0f0f0;
+  --bk-text-muted: #aaaaaa;
+  --bk-text-faint: #666666;
+  --bk-border: #2a2a2a;
+  --bk-border-strong: #444444;
+
+  --bk-code-bg: #111111;
+  --bk-code-text: #f0f0f0;
+
+  --bk-cell-bg: #0a0a0a;
+  --bk-cell-border: #333333;
+  --bk-cell-canvas-bg: #000000;
+
+  --bk-canvas-fabric: #efe8d8;
+  --bk-canvas-fabric-dark: #e5dcc7;
+
+  --bk-run: #c8472f;
+  --bk-run-hi: #d55036;
+  --bk-run-text: #ffffff;
+  --bk-locked: #5a7f95;
+  --bk-ok: #4caf7a;
+  --bk-warn: #d97706;
+
+  --bk-sidebar-bg: #0a0a0a;
+  --bk-sidebar-border: #2a2a2a;
+  --bk-sidebar-active-bg: #f0f0f0;
+  --bk-sidebar-active-text: #000000;
+  --bk-sidebar-hover-bg: #1a1a1a;
+
+  --bk-chip-bg: #1a1a1a;
+  --bk-chip-correct-bg: #0d2b1a;
+  --bk-chip-correct-text: #5dd98a;
+  --bk-chip-wrong-bg: #2b0d0d;
+  --bk-chip-wrong-text: #f08a80;
+}
+
+/* ── Base styles scoped to the book ─────────────────────────────────────────── */
+.book-root {
+  background: var(--bk-bg);
+  color: var(--bk-text);
+  font-family: var(--bk-font-prose);
+  font-size: var(--bk-prose-size);
+  line-height: var(--bk-prose-line-height);
+  min-height: 100dvh;
+}
+
+/* Prose content column */
+.book-prose {
+  max-width: var(--bk-prose-max-width);
+  margin-inline: auto;
+}
+
+/* Headings */
+.book-prose h1,
+.book-prose h2,
+.book-prose h3,
+.book-prose h4 {
+  font-family: var(--bk-font-prose);
+  font-weight: 700;
+  line-height: var(--bk-heading-line-height);
+  color: var(--bk-text);
+  margin-top: 2.2em;
+  margin-bottom: 0.6em;
+}
+
+.book-prose h1 {
+  font-size: 2rem;
+  margin-top: 0;
+}
+
+.book-prose h2 {
+  font-size: 1.45rem;
+  border-bottom: 1px solid var(--bk-border);
+  padding-bottom: 0.3em;
+}
+
+.book-prose h3 {
+  font-size: 1.15rem;
+}
+
+.book-prose h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--bk-text-muted);
+}
+
+/* Paragraph, lists */
+.book-prose p {
+  margin-bottom: 1.2em;
+}
+
+.book-prose ul,
+.book-prose ol {
+  padding-left: 1.6em;
+  margin-bottom: 1.2em;
+}
+
+.book-prose li {
+  margin-bottom: 0.35em;
+}
+
+/* Inline code */
+.book-prose code {
+  font-family: var(--bk-font-mono);
+  font-size: 0.88em;
+  background: var(--bk-code-bg);
+  color: var(--bk-code-text);
+  border: 1px solid var(--bk-border);
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+}
+
+/* Fenced code blocks (non-interactive, for display only) */
+.book-prose pre {
+  background: var(--bk-code-bg);
+  border: 1px solid var(--bk-border);
+  border-radius: 6px;
+  padding: 1.1em 1.3em;
+  overflow-x: auto;
+  margin-bottom: 1.4em;
+}
+
+.book-prose pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.85em;
+}
+
+/* Blockquote */
+.book-prose blockquote {
+  border-left: 3px solid var(--bk-border-strong);
+  margin-left: 0;
+  padding-left: 1.2em;
+  color: var(--bk-text-muted);
+  font-style: italic;
+}
+
+/* Tables */
+.book-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.4em;
+  font-size: 0.92em;
+}
+
+.book-prose th {
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid var(--bk-border-strong);
+  padding: 0.5em 0.75em;
+}
+
+.book-prose td {
+  border-bottom: 1px solid var(--bk-border);
+  padding: 0.45em 0.75em;
+  vertical-align: top;
+}
+
+/* Horizontal rule */
+.book-prose hr {
+  border: none;
+  border-top: 1px solid var(--bk-border);
+  margin: 2.5em 0;
+}
+
+/* Strong / em */
+.book-prose strong {
+  font-weight: 700;
+  color: var(--bk-text);
+}
+
+/* Links */
+.book-prose a {
+  color: var(--bk-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.book-prose a:hover {
+  color: var(--bk-run);
+}

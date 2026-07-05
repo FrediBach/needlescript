@@ -1,0 +1,57 @@
+---
+title: 'Hello, hoop'
+part: 'Part 0 — Start Here'
+partNumber: 0
+order: 5
+subtitle: 'Your first six words of NeedleScript'
+---
+
+Here is your first NeedleScript program. Run it.
+
+<Run>{`repeat 6 [ fd 20 rt 60 ]`}</Run>
+
+Six words, one design, ready to export as a `.DST` file your machine will sew.
+
+## What each word means
+
+| Word       | What it does                                   |
+| ---------- | ---------------------------------------------- |
+| `repeat 6` | Do the block 6 times                           |
+| `[`        | Start the block                                |
+| `fd 20`    | Move **forward** 20 mm, sewing a line as we go |
+| `rt 60`    | Turn **right** 60 degrees                      |
+| `]`        | End the block                                  |
+
+After 6 repetitions, the turtle has turned a full 360° (6 × 60 = 360) and is back where it started — a regular hexagon.
+
+## Experiment
+
+Try changing the numbers:
+
+- `repeat 4 [ fd 20 rt 90 ]` — a square
+- `repeat 3 [ fd 20 rt 120 ]` — an equilateral triangle
+- `repeat 36 [ fd 5 rt 10 ]` — a near-circle
+- `repeat 5 [ fd 20 rt 144 ]` — a five-pointed star
+
+The rule is simple: `repeat n [ fd s rt (360/n) ]` draws a regular n-gon with side length `s`.
+
+## What the scrubber shows
+
+The scrubber version below lets you watch each stitch form. Notice how the hexagon is built one side at a time — each `fd` adds a segment, each `rt` changes the direction.
+
+<Scrub>{`repeat 6 [ fd 20 rt 60 ]`}</Scrub>
+
+Drag the slider slowly through the first 40 stitches. You'll see corner by corner.
+
+## Export
+
+When a design looks right in the preview, export it from the **Playground** (the full IDE at `/`). Navigate there, paste your code, click Run, then use the export buttons in the top bar.
+
+<Pitfall drill="D1" title="Blocks use [ ], never { }">
+`repeat 6 { fd 20 rt 60 }` is a parse error. NeedleScript has no curly braces. Every block — `repeat`, `if`, `while`, procedure bodies — uses square brackets `[ ]`.
+</Pitfall>
+
+<Checkpoint chapterId="ch-0-5">
+  Run the basic hexagon, then modify it to draw a square (`repeat 4 [ fd 20 rt 90 ]`). When you have
+  a square in the preview, you've written your second NeedleScript program. Mark complete.
+</Checkpoint>

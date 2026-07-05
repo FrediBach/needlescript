@@ -1,0 +1,40 @@
+---
+title: "What you'll make"
+part: 'Part 0 — Start Here'
+partNumber: 0
+order: 1
+subtitle: 'A gallery of the possible'
+---
+
+Before any syntax, a question: _what can you actually make with NeedleScript?_
+
+The answer is: designs that can't be drawn in traditional embroidery software — organic noise fields, recursive fractals, parametric geometry. And because everything runs on your device, what you preview is _exactly_ what your machine will sew.
+
+## Generative embroidery
+
+Traditional digitizing is drawing. You trace shapes, assign stitch types, tweak by hand. NeedleScript is programming. You describe rules — _how_ a design is built — and the machine resolves them into thread.
+
+This means:
+
+- The same six lines of code can produce twelve completely different pieces by changing a single number (the **seed**).
+- You can build things that would take hours to digitize manually — noise-guided flow fields, recursively branching trees, Voronoi-shattered fills — in minutes.
+- Every design is reproducible: same code + same seed = identical `.DST` file, every time.
+
+## A first taste
+
+Here is the simplest possible NeedleScript program. Run it, then try changing the `20` to `30` and running again.
+
+<Run>{`repeat 6 [ fd 20 rt 60 ]`}</Run>
+
+Six lines radiating in a hexagonal star — twelve words of code.
+
+## What the rest of the book adds
+
+By the end of Part 0 you will understand the preview, the scrubber, and how to export. By Part I you'll command the turtle freely. Parts II–IX go deeper: every stitch mode, the full language, generative math, geometric operations, and the physical craft of sewing out your designs.
+
+The whole book is interactive. Every code example runs right here. Every concept has a scrubber so you can watch stitches form one by one.
+
+<Checkpoint chapterId="ch-0-1">
+  Run the hexagon cell above. Change one number and run again. When you have a different shape in
+  the preview, you're ready.
+</Checkpoint>

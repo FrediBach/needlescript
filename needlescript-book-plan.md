@@ -2,7 +2,7 @@
 
 ## Chapter plan for a multi-page MDX notebook tutorial
 
-**Working title:** *NeedleScript: From First Stitch to Generative Fabric*
+**Working title:** _NeedleScript: From First Stitch to Generative Fabric_
 **Format:** Online-only interactive book. Every page is an MDX document mixing prose, runnable NeedleScript cells with live hoop previews, and purpose-built widgets. Target scope: **~55 chapters in 10 parts + 7 appendices, ≈ 550–650 book-pages equivalent**, designed to be read linearly but navigable by track.
 **Source baseline:** the existing 29-section `needlescript-tutorial.md`. Everything in it is preserved; the plan below splits, reorders, and extends it (a §-to-chapter mapping is in Appendix H of this plan).
 
@@ -14,23 +14,23 @@ Before the chapters, the component vocabulary the chapters refer to. Each MDX pa
 
 ## 1.1 Core MDX components
 
-| Component | What it does |
-|---|---|
-| `<Run>` | Editable code cell + live hoop preview (canvas). Cmd/Ctrl-Enter re-runs. "Reset" restores the authored code. Every page has at least one. |
-| `<RunLocked>` | Read-only cell with preview — for "look, don't touch yet" examples. One click forks it into an editable scratch cell. |
-| `<Scrub>` | A `<Run>` with the playback scrubber docked: stitch-by-stitch stepping with **source-line highlight**. The book's single most important teaching device — used everywhere a temporal/order concept appears (buffered satin, fill row order, trims, locks). |
-| `<Compare>` | Two or three previews side by side, driven by the same code with one variable swapped (e.g. `stitchlen 1 / 2.5 / 5`), with an A/B slider. |
-| `<Param>` | A `<Run>` with the Parameters panel exposed: annotated `// [min:max]` variables become sliders. Teaches the customizer *and* lets readers explore ranges without editing code. |
-| `<SeedGrid>` | Renders one program at 6–12 seeds as a thumbnail grid; click a thumbnail to load that seed into the cell. The core "determinism + variation" widget. |
-| `<Heatmap>` | Preview with the density heatmap toggled on and a layers legend. |
-| `<Field>` | Background visualization of a scalar/vector field (noise, direction field) *under* the stitch preview — the bridge between math and thread. |
-| `<Quiz>` | Predict-the-output / multiple-choice / "which line errors?" — instant feedback, no grading server needed. |
-| `<Bug>` | "Fix this program" cell: broken code + an automatic validator (see 1.2). The reader edits until the checkmark turns green. |
-| `<Challenge>` | Open-ended task with machine-checkable constraints ("sew a hexagon border under 900 stitches, ≤ 2 trims") validated against `run()` stats. Optional hints, revealed progressively. |
-| `<Pitfall>` | Styled callout for the recurring trap drills (see 1.4), each with its canonical error message screenshot and one-line fix. |
-| `<Ref>` | Hover/popover reference card for any command or function — generated from the engine's command tables (`FUNC_ARITY`, `BUILTIN_ARITY`, …) so the book can never drift from the implementation. |
-| `<Gallery>` | Grid of finished pieces (bundled examples + capstones), each opening as a `<Scrub>`. |
-| `<Checkpoint>` | End-of-chapter block: 3–5 quiz items + 1 challenge; completing it marks the chapter done in the progress sidebar (localStorage). |
+| Component      | What it does                                                                                                                                                                                                                                               |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<Run>`        | Editable code cell + live hoop preview (canvas). Cmd/Ctrl-Enter re-runs. "Reset" restores the authored code. Every page has at least one.                                                                                                                  |
+| `<RunLocked>`  | Read-only cell with preview — for "look, don't touch yet" examples. One click forks it into an editable scratch cell.                                                                                                                                      |
+| `<Scrub>`      | A `<Run>` with the playback scrubber docked: stitch-by-stitch stepping with **source-line highlight**. The book's single most important teaching device — used everywhere a temporal/order concept appears (buffered satin, fill row order, trims, locks). |
+| `<Compare>`    | Two or three previews side by side, driven by the same code with one variable swapped (e.g. `stitchlen 1 / 2.5 / 5`), with an A/B slider.                                                                                                                  |
+| `<Param>`      | A `<Run>` with the Parameters panel exposed: annotated `// [min:max]` variables become sliders. Teaches the customizer _and_ lets readers explore ranges without editing code.                                                                             |
+| `<SeedGrid>`   | Renders one program at 6–12 seeds as a thumbnail grid; click a thumbnail to load that seed into the cell. The core "determinism + variation" widget.                                                                                                       |
+| `<Heatmap>`    | Preview with the density heatmap toggled on and a layers legend.                                                                                                                                                                                           |
+| `<Field>`      | Background visualization of a scalar/vector field (noise, direction field) _under_ the stitch preview — the bridge between math and thread.                                                                                                                |
+| `<Quiz>`       | Predict-the-output / multiple-choice / "which line errors?" — instant feedback, no grading server needed.                                                                                                                                                  |
+| `<Bug>`        | "Fix this program" cell: broken code + an automatic validator (see 1.2). The reader edits until the checkmark turns green.                                                                                                                                 |
+| `<Challenge>`  | Open-ended task with machine-checkable constraints ("sew a hexagon border under 900 stitches, ≤ 2 trims") validated against `run()` stats. Optional hints, revealed progressively.                                                                         |
+| `<Pitfall>`    | Styled callout for the recurring trap drills (see 1.4), each with its canonical error message screenshot and one-line fix.                                                                                                                                 |
+| `<Ref>`        | Hover/popover reference card for any command or function — generated from the engine's command tables (`FUNC_ARITY`, `BUILTIN_ARITY`, …) so the book can never drift from the implementation.                                                              |
+| `<Gallery>`    | Grid of finished pieces (bundled examples + capstones), each opening as a `<Scrub>`.                                                                                                                                                                       |
+| `<Checkpoint>` | End-of-chapter block: 3–5 quiz items + 1 challenge; completing it marks the chapter done in the progress sidebar (localStorage).                                                                                                                           |
 
 ## 1.2 Validation engine (what makes challenges gradeable)
 
@@ -52,26 +52,26 @@ The engine is DOM-free and exposes `run()`, `designStats()`, warnings, and the d
 
 ## 1.4 The six Pitfall Drills (spaced repetition backbone)
 
-Six errors account for most beginner failure. Each gets a named drill introduced once, then deliberately *re-surfaced* as a `<Bug>` in two later chapters (spaced repetition), and indexed in Appendix E:
+Six errors account for most beginner failure. Each gets a named drill introduced once, then deliberately _re-surfaced_ as a `<Bug>` in two later chapters (spaced repetition), and indexed in Appendix E:
 
-| Drill | The trap |
-|---|---|
-| **D1 Brackets** | `{ }` never exists; every block is `[ ]`. |
-| **D2 Names** | reserved words & built-ins can't be names — above all `step` (→ `stride`), plus `circle`, `pos`, `color`, `heading`, `random`, string built-ins. |
-| **D3 Let-once** | one `let` per name per procedure; blocks are not scopes; never `let` a parameter. |
-| **D4 Negative literals** | `fd 10 -5` is two args; space rules; call parens as the escape hatch. |
-| **D5 Home & travel** | `home` sews with pen down; use `moveto 0 0`/`gohome`; trim after repositioning. |
-| **D6 Sandbox borders** | machine commands (esp. `trim`) inside `trace` are discarded; `beginfill`/`seed` forbidden in trace. |
+| Drill                    | The trap                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **D1 Brackets**          | `{ }` never exists; every block is `[ ]`.                                                                                                        |
+| **D2 Names**             | reserved words & built-ins can't be names — above all `step` (→ `stride`), plus `circle`, `pos`, `color`, `heading`, `random`, string built-ins. |
+| **D3 Let-once**          | one `let` per name per procedure; blocks are not scopes; never `let` a parameter.                                                                |
+| **D4 Negative literals** | `fd 10 -5` is two args; space rules; call parens as the escape hatch.                                                                            |
+| **D5 Home & travel**     | `home` sews with pen down; use `moveto 0 0`/`gohome`; trim after repositioning.                                                                  |
+| **D6 Sandbox borders**   | machine commands (esp. `trim`) inside `trace` are discarded; `beginfill`/`seed` forbidden in trace.                                              |
 
 ## 1.5 Learning-curve architecture
 
-- **Two on-ramps, one spine.** The book serves (a) programmers who've never threaded a needle and (b) makers/embroiderers who've never programmed. Part 0 routes them: programmers may skim Part III at "fast-track" density (each chapter opens with a *For programmers* summary box: "this is Logo-flavoured; here are the 5 deltas from what you expect"); makers may skim Part II's craft framing and slow down in Part III. Nobody skips Parts IV–VIII — that content exists nowhere else.
+- **Two on-ramps, one spine.** The book serves (a) programmers who've never threaded a needle and (b) makers/embroiderers who've never programmed. Part 0 routes them: programmers may skim Part III at "fast-track" density (each chapter opens with a _For programmers_ summary box: "this is Logo-flavoured; here are the 5 deltas from what you expect"); makers may skim Part II's craft framing and slow down in Part III. Nobody skips Parts IV–VIII — that content exists nowhere else.
 - **Payoff-first spiral.** A real, exportable design ships in Chapter 2. Concepts return at increasing depth: satin appears in Ch 6 (use it), Ch 35 (its physics), Ch 37 (reprogram it); fills in Ch 9 → Ch 32 (booleans) → Ch 38 (programmable) → Ch 39 (closed-loop).
 - **One new idea per `<Run>`.** Cells differ from the previous cell by a single visible change wherever possible.
-- **Interleaving.** Language chapters (Part III) each end with an *embroidery application* section so syntax never floats free of thread.
+- **Interleaving.** Language chapters (Part III) each end with an _embroidery application_ section so syntax never floats free of thread.
 - **Everything deterministic.** Seeded RNG means every screenshot, quiz answer, and challenge validation is exactly reproducible — lean on this constantly (`<SeedGrid>` everywhere).
 - **Part capstones.** Every part ends in a project chapter that uses only material covered so far — readers always have a "complete piece" feeling at part boundaries.
-- **Export early, export often.** `.DST` download is taught in Part 0 and re-prompted at each capstone: the book's promise is *physical* output.
+- **Export early, export often.** `.DST` download is taught in Part 0 and re-prompted at each capstone: the book's promise is _physical_ output.
 
 ---
 
@@ -83,15 +83,17 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Part 0 — Start Here (≈ 18 pages)
 
-*Goal: reader runs code in the first 60 seconds, understands what the book is, picks a track.*
+_Goal: reader runs code in the first 60 seconds, understands what the book is, picks a track._
 
 ### Ch 0.1 — What you'll make (4 p)
+
 - 0.1.1 A gallery of finished pieces (`<Gallery>` of bloom, meadow, shatter, patch, fern…), each scrubbable
 - 0.1.2 What "generative embroidery" means — designs that can't be drawn in traditional software (noise, recursion, seeds)
 - 0.1.3 The promise: what you preview is exactly what the machine sews (determinism, `.DST` export)
 - **Interactive:** the meadow example as a `<SeedGrid>` — "same program, twelve pieces."
 
 ### Ch 0.2 — How this book works (4 p)
+
 - 0.2.1 Running, editing, and resetting cells; keyboard shortcuts
 - 0.2.2 The preview: hoop, stitches, dashed jumps, penetration dots when zoomed
 - 0.2.3 The scrubber and source-line highlight ("which line made this stitch?")
@@ -99,12 +101,14 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Interactive:** a sandbox `<Run>` pre-loaded with a 5-line design and an invitation to break it.
 
 ### Ch 0.3 — Choose your on-ramp (3 p)
+
 - 0.3.1 Track quiz (5 questions) → recommended path
 - 0.3.2 **Programmer track:** what to skim, what not to (the "5 deltas" preview: brackets, let-once, no shadowing, negative literals, two dialects)
 - 0.3.3 **Maker track:** you already know the hard part (thread behaviour); the code is 20 words
 - 0.3.4 **Generative-artist track:** p5/Processing → NeedleScript translation table (draw loop vs. one-shot, mm vs px, seeded-only randomness)
 
 ### Ch 0.4 — Thread, needle, fabric: a five-minute physics primer (4 p)
+
 - 0.4.1 A machine doesn't draw — it punches penetrations; what you see is thread pulled taut between them
 - 0.4.2 The three quantities that matter: where thread goes, how densely it piles, how it's secured
 - 0.4.3 Why direction is visible (gloss) — the fact that makes embroidery unlike plotting
@@ -112,6 +116,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Interactive:** macro-photo pairs next to their preview renders; a `<Compare>` of the same square at 3 fill angles.
 
 ### Ch 0.5 — Hello, hoop (3 p)
+
 - 0.5.1 Your literal first program: `repeat 6 [ fd 20 rt 60 ]`
 - 0.5.2 Download it as `.DST` right now (yes, already)
 - 0.5.3 What the rest of the book adds to these 6 words
@@ -121,9 +126,10 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Part I — First Stitches: the Turtle (≈ 42 pages)
 
-*Goal: full command of movement, turning, repetition, and travel. Existing §§1–4, deepened.*
+_Goal: full command of movement, turning, repetition, and travel. Existing §§1–4, deepened._
 
 ### Ch 1 — The mental model (7 p)
+
 - 1.1 Millimetres and the 47 mm sewable disc; origin at centre; overflow warnings
 - 1.2 Heading: degrees **clockwise from north** — the Logo convention used by every later vector/noise function (drill it now)
 - 1.3 From path to penetrations: how `fd 20` becomes eight stitches (the splitter, default 2.5 mm)
@@ -133,13 +139,15 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** predict-the-endpoint quizzes (position + heading after a short program).
 
 ### Ch 2 — Moving and sewing (8 p)
+
 - 2.1 `fd` / `bk`; overlap is legal and sometimes useful
-- 2.2 Absolute moves: `setxy`, `setx`, `sety` — and that they *sew* from wherever you were
+- 2.2 Absolute moves: `setxy`, `setx`, `sety` — and that they _sew_ from wherever you were
 - 2.3 **Pitfall D4:** negative literals (`setxy -6 -21` vs `fd 10 - 5` vs the `fd 10 -5` error); call parens as the universal fix
 - 2.4 First real design: sew your initials from straight segments
 - **Interactive:** `<Bug>` cell for D4; an initials `<Challenge>` (≤ 300 stitches).
 
 ### Ch 3 — Turning and looping (10 p)
+
 - 3.1 `rt` / `lt`; the square by hand
 - 3.2 `repeat n [ … ]` — the single most important pattern: small move + small turn, repeated, becomes a shape
 - 3.3 `repcount` and spirals (1-based; grows-per-iteration idiom)
@@ -151,6 +159,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — a 5-pointed star with exact rotational symmetry (validated by re-running under `rotate 72` and diffing event streams).
 
 ### Ch 4 — Pen, jumps, and travel (10 p)
+
 - 4.1 `up`/`down` (`pu`/`pd`): jumps as dashed lines, not stitches
 - 4.2 `moveto x y` (alias `jump`): pen-state-preserving repositioning — the default travel verb
 - 4.3 `gohome` vs **`home` (Pitfall D5):** `home` sews with the pen down and resets heading; the safe idioms
@@ -161,6 +170,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** quiz on pen-state after mixed sequences.
 
 ### Ch 5 — Part I capstone: Constellation (7 p)
+
 - 5.1 Plan: scattered "stars" (tiny circles), connecting branch structures, trims between
 - 5.2 Build it in four passes, each a `<Run>` diff
 - 5.3 Export and (optionally) sew it — first sew-out sidebar (pointer to Ch 47 for the full physical workflow)
@@ -170,37 +180,42 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Part II — The Thread Vocabulary (≈ 55 pages)
 
-*Goal: every stitch mode, colour, securing, and fills — the embroidery-specific layer. Existing §§5–6, greatly expanded.*
+_Goal: every stitch mode, colour, securing, and fills — the embroidery-specific layer. Existing §§5–6, greatly expanded._
 
 ### Ch 6 — Running stitch and stitch length (6 p)
+
 - 6.1 `stitchlen` (0.4–12 mm, default 2.5); clamping behaviour
 - 6.2 How length changes character: delicate dashes vs long floats; curve fidelity vs snag risk
-- 6.3 Sub-0.4 mm merges: the tiny-stitch warning and where it *really* comes from (dense resampling, later)
+- 6.3 Sub-0.4 mm merges: the tiny-stitch warning and where it _really_ comes from (dense resampling, later)
 - **Interactive:** `<Compare>` of one curve at 1 / 2.5 / 5 mm; zoomed penetration view.
 
 ### Ch 7 — Satin (10 p)
+
 - 7.1 What a satin column is: your path becomes the **spine** of a zigzag column
 - 7.2 `satin w`; width limits and the 2–8 mm guidance; snag warnings above ~8
 - 7.3 `density`: penetration spacing along the column (0.25–5 mm)
 - 7.4 Curved columns: satin follows `arc` — the thing traditional software makes painful
-- 7.5 **Buffering:** a column sews when it *ends* (pen up, mode/colour change, trim, program end) — first encounter with sewing order vs code order (`<Scrub>` this!)
+- 7.5 **Buffering:** a column sews when it _ends_ (pen up, mode/colour change, trim, program end) — first encounter with sewing order vs code order (`<Scrub>` this!)
 - 7.6 Satin lettering & borders — a small practical study
 - **Interactive:** width/density `<Param>`; buffered-flush `<Scrub>`; foreshadow box: "in Ch 37 you'll replace this generator entirely."
 - **Checkpoint:** `<Challenge>` — a curved satin border around a circle, no warnings.
 
 ### Ch 8 — Bean, blanket, and line character (5 p)
+
 - 8.1 `bean n`: bold hand-drawn lines (forced odd, max 9)
-- 8.2 `estitch n`: blanket prongs, left of travel — so *direction of travel is a design decision*
+- 8.2 `estitch n`: blanket prongs, left of travel — so _direction of travel is a design decision_
 - 8.3 Choosing a line: a decision table (thin detail → running; emphasis → bean; edge → estitch/satin)
 - **Interactive:** four-way `<Compare>` of the same spiral in each mode.
 
 ### Ch 9 — Colour, stops, and locks (6 p)
+
 - 9.1 The thread palette; `color n` emits a machine stop; `stop` as "next colour"
 - 9.2 `lock`: automatic tie-in/tie-off at starts, ends, colour changes, trims, long jumps (0.3–1.5 mm; on by default)
 - 9.3 Colour economics: every change stops a physical machine — batch by colour, not by motif (first taste of travel planning, Ch 45)
 - **Interactive:** `<Scrub>` pausing at a colour stop; lock stitches under the zoom loupe.
 
 ### Ch 10 — Fills (12 p)
+
 - 10.1 The mental shift: between `beginfill`/`endfill` your moves trace a **boundary**, they don't sew
 - 10.2 `endfill` lays a tatami: rows of running stitch, brick-offset penetrations
 - 10.3 `fillangle`, `fillspacing` (0.25–5), `filllen` (and `filllen 0` = follow stitchlen)
@@ -211,12 +226,14 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Bug>` — a fill with an accidental double ring (solid where a hole was meant).
 
 ### Ch 11 — Light and direction (6 p)
-- 11.1 Thread gloss: stitch angle *is* a colour channel
+
+- 11.1 Thread gloss: stitch angle _is_ a colour channel
 - 11.2 Two-tone effects with one thread: adjacent regions at 0°/90°
 - 11.3 Design study: the same leaf shaded three ways by `fillangle` alone
 - **Interactive:** a simulated-sheen `<Compare>` (angle-dependent shading toggle in the preview).
 
 ### Ch 12 — Part II capstone: The Badge (10 p)
+
 - 12.1 Spec: filled disc, hole/knockout motif, satin ring border, two colours, clean trims
 - 12.2 Build passes: fill → knockout → border → colour order → stat review
 - 12.3 Reading the stats row like a digitizer (counts, extents, max stitch)
@@ -226,17 +243,19 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Part III — The Language (≈ 95 pages)
 
-*Goal: complete programming competence in NeedleScript. Existing §§7–10, 12, 13, 23 — restructured for the two audiences; every chapter ends with an embroidery application so syntax never floats free. Fast-track boxes open every chapter for programmers.*
+_Goal: complete programming competence in NeedleScript. Existing §§7–10, 12, 13, 23 — restructured for the two audiences; every chapter ends with an embroidery application so syntax never floats free. Fast-track boxes open every chapter for programmers._
 
 ### Ch 13 — Values and expressions (7 p)
+
 - 13.1 Numbers everywhere: mm, degrees, counts, truth (0 false, else true)
 - 13.2 Operators and precedence (`or < and < compare < +− < */% < unary`); `%` is floor mod
 - 13.3 Comparisons; `=` vs `==` (same); deep list equality preview
 - 13.4 **Pitfall D4 revisited** as expression parsing; parenthesize when in doubt
-- 13.5 *Embroidery application:* computed geometry — a polygon whose side count drives its turn angle
+- 13.5 _Embroidery application:_ computed geometry — a polygon whose side count drives its turn angle
 - **Checkpoint:** precedence prediction `<Quiz>`.
 
 ### Ch 14 — Variables and scope: the no-surprises chapter (10 p)
+
 - 14.1 `let` declares **once**; bare assignment (and `+=` family) thereafter
 - 14.2 One scope per procedure; **blocks are not scopes** — "this is not JavaScript" (the spiral-radius example, wrong → right)
 - 14.3 No shadowing, ever: not of outer names, not of built-ins, not of procedures
@@ -248,15 +267,17 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** "which line is the parse error?" quiz battery.
 
 ### Ch 15 — Control flow in depth (8 p)
+
 - 15.1 `repeat` + `repcount` (recap, formalized)
 - 15.2 `for i = a to b [step s]` — inclusive; **`step` is a keyword here and nowhere a name**
 - 15.3 `for elem in list` (loop var auto-local, don't `let` it)
 - 15.4 `while` and the 2 M-op guard; 200 k iteration cap
 - 15.5 `break`/`continue` are **lexical** — same-procedure loop bodies only; `exit`
-- 15.6 *Embroidery application:* a density-graded spiral (`for r = 4 to 40 step 3`)
+- 15.6 _Embroidery application:_ a density-graded spiral (`for r = 4 to 40 step 3`)
 - **Checkpoint:** `<Bug>` — a `break` smuggled into a helper called from a loop.
 
 ### Ch 16 — Procedures and reporters (10 p)
+
 - 16.1 `def name(p, q) [ … ]`; call as `name(args)` or `name args`; forward calls
 - 16.2 Commands vs **reporters**: `return expr` / `output expr`; reporters usable in expressions
 - 16.3 Every path must return: the **parse-time reporter check** (celebrate it — no unlucky-seed debugging)
@@ -266,6 +287,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — write `polygon(n, side)` and `star(points, r1, r2)` reporters/commands passing a test battery.
 
 ### Ch 17 — Two dialects and call syntax (7 p)
+
 - 17.1 Classic prefix Logo vs modern parenthesized calls — both always work
 - 17.2 The two classic parsing rules (multi-arg absorbs trailing operator; single-arg binds tight) and why they bite (`random 64 - 32` vs `distance 0 0 < 47`)
 - 17.3 House style: modern for anything nested; classic for terse turtle lines (`fd 10 rt 90`)
@@ -274,6 +296,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** translate 5 classic snippets to modern and back (`<Quiz>` with diff-check).
 
 ### Ch 18 — Lists (12 p)
+
 - 18.1 Literals, nesting, trailing commas; 0-based indexing, negatives; index assignment (+ compound ops)
 - 18.2 Destructuring: `let [x, y] = pos()`
 - 18.3 **Reference semantics** and `copy` (deep); the alias demo
@@ -282,28 +305,31 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - 18.6 The toolkit tour: mutators vs pure functions (append/insertat vs reverse/sort/slice/concat)
 - 18.7 `range` (end-exclusive) vs `steps` (end-inclusive) — when each
 - 18.8 Conventions: point = `[x,y]`, path = list of points, palette = list of thread numbers
-- 18.9 *Embroidery application:* palette cycling; a path recorded point-by-point and replayed with `setpos`
+- 18.9 _Embroidery application:_ palette cycling; a path recorded point-by-point and replayed with `setpos`
 - **Interactive:** reference-semantics visualizer; `<Quiz>` on the `[` rule.
 
 ### Ch 19 — Strings (8 p)
+
 - 19.1 Literals, the four escapes, unterminated/unknown-escape hard errors
-- 19.2 Immutability; the case-sensitivity island (words case-insensitive, string *contents* not)
+- 19.2 Immutability; the case-sensitivity island (words case-insensitive, string _contents_ not)
 - 19.3 Sequence overloads shared with lists (len/slice/reverse/…); `concat` needs both strings
 - 19.4 The function set: `str`/`num(+fallback)`/`chars`/`split`/`joinstr`/`upper`/`lower`/`strip`/`repeatstr` — and **`strip` ≠ `trim`** (trim cuts thread, forever)
 - 19.5 Why strings exist: computed print messages; **mode words as values** (`clippaths(a, b, pick(ops))`, `fabric f`)
 - 19.6 No truthiness, no `+`: `len(s) > 0`, `concat(a, b)`
-- 19.7 *Embroidery application:* a string-seeded design — `chars(name)` mapped to angles (initials → unique mandala)
+- 19.7 _Embroidery application:_ a string-seeded design — `chars(name)` mapped to angles (initials → unique mandala)
 - **Checkpoint:** `<Bug>` featuring `trim(s)` and `if s`.
 
 ### Ch 20 — Higher-order programming (8 p)
+
 - 20.1 `@name` references: user procs and value-returning built-ins; statement commands rejected
 - 20.2 `map` / `filter` / `reduce`; `compose` pipelines (left-to-right)
 - 20.3 The signature pipeline idiom: `steps` → `map(@shape)` → curve → `sewpath` (the petal-ring example, dissected)
 - 20.4 When a loop is clearer — honest guidance
-- 20.5 *Embroidery application:* refactor Ch 16's motif API into pipelines
+- 20.5 _Embroidery application:_ refactor Ch 16's motif API into pipelines
 - **Checkpoint:** rewrite three loops as pipelines (validated by identical event streams).
 
 ### Ch 21 — Debugging like a digitizer (10 p)
+
 - 21.1 `print` (all three forms), `printloc` (local-frame caveat under transforms)
 - 21.2 `mark` and labeled preview pins (never exported, never counted)
 - 21.3 `assert` + lazy message: geometric invariants as executable comments
@@ -314,6 +340,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Interactive:** three staged mysteries as `<Scrub>` cells with hidden solutions.
 
 ### Ch 22 — Part III capstone: The Parametric Mandala Kit (8 p)
+
 - 22.1 Spec: a library of 3–4 motif procedures + a composition program, fully slider-driven
 - 22.2 Annotate for the Parameters panel (`// [min:max]`), presets, lock & randomize
 - 22.3 Ship it: a `<Param>` the reader publishes to the book's community gallery (stretch feature)
@@ -323,18 +350,20 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Part IV — Randomness and Generative Math (≈ 72 pages)
 
-*Goal: the "generative" in generative embroidery — seeded randomness, noise, the scalar shaping toolkit, vectors, segments. Existing §§11, 14, deepened into five chapters. This is where the book stops resembling any embroidery manual.*
+_Goal: the "generative" in generative embroidery — seeded randomness, noise, the scalar shaping toolkit, vectors, segments. Existing §§11, 14, deepened into five chapters. This is where the book stops resembling any embroidery manual._
 
 ### Ch 23 — Seeded randomness and the determinism contract (10 p)
+
 - 23.1 The tension: art wants surprise, machines want reproducibility — `seed` resolves it (default 42)
 - 23.2 `random(n)`, `gauss(mu, sigma)`, `pick`, `shuffle` — distribution intuition with live histograms
-- 23.3 **The fork convention:** fixed-cost draws vs forking generators (`scatter`/`shuffle` cost exactly 1); *why your edits stay local* — insert a generator, downstream shifts by one draw, not thousands
+- 23.3 **The fork convention:** fixed-cost draws vs forking generators (`scatter`/`shuffle` cost exactly 1); _why your edits stay local_ — insert a generator, downstream shifts by one draw, not thousands
 - 23.4 Draw costs as API contract (pinned by the test suite)
 - 23.5 Seed as a design dimension: curating seeds, not fighting them
 - **Interactive:** `<SeedGrid>` as the chapter's spine; a fork-convention demo (toggle a `scatter` line on/off, watch a downstream `mark` move by exactly one draw's worth).
 - **Checkpoint:** `<Quiz>` on draw-cost accounting.
 
 ### Ch 24 — Noise fields (16 p)
+
 - 24.1 Why noise beats `random` for organic work: continuity — neighbours agree
 - 24.2 `snoise2(x, y)` in −1..1; **sampling scale** (divide coordinates by 10–20) as the one knob that matters
 - 24.3 `snoise3` and the variation axis (z = motif index × 50 — independent-but-coherent motifs)
@@ -346,6 +375,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — a flow-field piece where all walkers stay in-hoop and coherent (validator checks overflow + a smoothness statistic).
 
 ### Ch 25 — The shaping toolkit (10 p)
+
 - 25.1 `lerp`, `remap`, `clamp`, `smoothstep` — the four verbs of parameter design
 - 25.2 remap as the universal adapter: noise (−1..1) → any design range
 - 25.3 smoothstep for soft edges: fading density near the hoop rim
@@ -355,6 +385,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Bug>` — a design whose noise mapping exceeds physical ranges; fix with remap+clamp.
 
 ### Ch 26 — Vectors (12 p)
+
 - 26.1 Points as `[x, y]`; no operator broadcasting — `vadd`/`vsub`/`vscale`, always
 - 26.2 `vlen`, `vdist`, `vnorm`, `vlerp`, `vdot` — with geometric pictures, not formulas
 - 26.3 The heading bridge: `vfromheading(deg, len)` and `vheading(v)` — clockwise-from-north everywhere (recall Ch 1.2)
@@ -364,6 +395,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — a phyllotaxis (sunflower) spiral via `vfromheading`, validated by point-count and golden-angle spacing.
 
 ### Ch 27 — Segments and proximity (8 p)
+
 - 27.1 `segisect`: intersection or `[]` — branching on emptiness
 - 27.2 `segdist`: point-to-segment distance; corridor tests
 - 27.3 `nearestonpath` (O(n) — budget awareness): snapping, attraction, edge-following
@@ -372,8 +404,9 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — walkers that provably never cross (validator runs pairwise segisect on the event stream).
 
 ### Ch 28 — Part IV capstone: The Wander Study (6 p)
+
 - 28.1 Rebuild the bundled **wander/flow** examples from a blank cell, decision by decision
-- 28.2 Seed curation session: generate 24 seeds, pick 3, articulate *why* (an editorial eye is a skill)
+- 28.2 Seed curation session: generate 24 seeds, pick 3, articulate _why_ (an editorial eye is a skill)
 - 28.3 Sew-out notes: what flow fields look like in thread vs pixels
 - **Checkpoint:** personal variation submitted to gallery; determinism validator.
 
@@ -381,9 +414,10 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Part V — Paths, Curves, and the Data Bridge (≈ 68 pages)
 
-*Goal: fluency in the data world and its two-way border with sewing. Existing §§15, 18, 19, 20 — reordered so `trace` arrives right after paths (it makes everything else easier).*
+_Goal: fluency in the data world and its two-way border with sewing. Existing §§15, 18, 19, 20 — reordered so `trace` arrives right after paths (it makes everything else easier)._
 
 ### Ch 29 — Paths as data (8 p)
+
 - 29.1 A path is just a list of points — everything from Part III applies
 - 29.2 `pathlen`, `centroid`, `bbox` — measuring before sewing
 - 29.3 **`resample(path, mm)`:** the bridge between math space and stitch space; why generated paths need it
@@ -392,6 +426,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Quiz>` — which of five paths need resampling and why.
 
 ### Ch 30 — Trace: drawing becomes data (12 p)
+
 - 30.1 The gap: `sewpath` goes data→stitches, nothing went the other way; `trace [ … ]` closes the loop
 - 30.2 Sandbox semantics: nothing sews, turtle restored, pen starts down; what escapes (the path, RNG consumption, variables/prints)
 - 30.3 `trace` (exactly one run) vs `tracerings` (list of runs, drawing order) — donuts and knockouts as data
@@ -404,6 +439,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** write `ngon(cx, cy, r, n)` returning a region via trace; validator round-trips it.
 
 ### Ch 31 — Curves and smoothing (12 p)
+
 - 31.1 `chaikin(path, n)`: corner-cutting; passes 1–6 visualized
 - 31.2 `catmull(points, mm)`: through-points splines — control points you can scatter
 - 31.3 `bezier(p0, c0, c1, p1, mm)`: designed curves; handles intuition
@@ -414,6 +450,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — smooth a jagged 12-point ring three ways, pick and justify (guided reflection prompt).
 
 ### Ch 32 — Transforms (10 p)
+
 - 32.1 Block transforms: `translate`, `rotate`, `rotateabout`, `scale`, `scalexy`, `mirror`, `skew` — nesting applies inside-out
 - 32.2 Stamping: one motif procedure, placed n times (the wreath pattern)
 - 32.3 Symmetry systems: `mirror` axes, `rotateabout` for k-fold; combining for dihedral symmetry
@@ -423,9 +460,10 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — a 6-fold wreath from a single motif procedure, ≤ 1 motif definition (validated structurally).
 
 ### Ch 33 — Effects: warp, humanize, snaptogrid (14 p)
+
 - 33.1 Where effects sit in the pipeline (warp pre-split on the spine; humanize/snaptogrid post-split on penetrations) — and why that's the only ordering that works
 - 33.2 **`warp @fn` — your first shader:** reporter `[x,y] → [x,y]`; fisheye, twist, ripple, noise-push worked examples
-- 33.3 Safety story: hoop/density/long-stitch checks run on the *warped* result
+- 33.3 Safety story: hoop/density/long-stitch checks run on the _warped_ result
 - 33.4 **`humanize amount`:** coherent (not per-stitch) jitter; forks — costs one draw; same seed, same imperfections
 - 33.5 **`snaptogrid cell …`:** frame-invariance (the lattice belongs to the fabric); rectangular/offset/rotated arities; cross-stitch aesthetics; merge warnings on coarse grids
 - 33.6 Satin exemptions: humanize/snaptogrid skip satin columns (and warn once) — don't chase that ghost
@@ -434,6 +472,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** write a custom warp reporter passing a "stays in hoop" assertion battery.
 
 ### Ch 34 — Part V capstone: The Cross-Stitch Portrait (12 p)
+
 - 34.1 Pipeline: trace a silhouette → resample → snaptogrid → palette by region (`inpath` preview of Ch 36)
 - 34.2 Frame-invariance in anger: motifs stamped across the grid all register
 - 34.3 Humanize the border for a hand-finished look
@@ -443,9 +482,10 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Part VI — Computational Geometry (≈ 58 pages)
 
-*Goal: the generator/geometry toolkit and the design patterns it unlocks. Existing §§16–17, expanded with pattern chapters.*
+_Goal: the generator/geometry toolkit and the design patterns it unlocks. Existing §§16–17, expanded with pattern chapters._
 
 ### Ch 35 — Point generators (10 p)
+
 - 35.1 `scatter(mindist)` — Poisson-disc: even-but-organic; vs pure random (side-by-side)
 - 35.2 Region-bounded `scatter(mindist, region)` — regions from `trace` (Ch 30 pays off)
 - 35.3 `relax(points, n)` — Lloyd's relaxation; when even-ness matters (stippling, cell seeds)
@@ -455,6 +495,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — stippled gradient disc, darker toward one focus.
 
 ### Ch 36 — Tessellations: Voronoi, Delaunay, hull (12 p)
+
 - 36.1 `voronoi(points[, region])`: cells as regions; clipping to a traced boundary
 - 36.2 `triangulate(points)`: Delaunay triangles; when triangles beat cells
 - 36.3 `hull(points)`: convex boundary (CCW) — quick regions from clouds
@@ -465,6 +506,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — stained-glass piece: voronoi cells, each inset-outlined, palette from a 3-list.
 
 ### Ch 37 — Offsets and booleans (12 p)
+
 - 37.1 `offsetpath(region, mm)`: inflate/shrink; returns a **list** of regions; shrinking may return empty — always check
 - 37.2 Concentric insets: the `while len(rings) > 0` inset loop (topographic fills)
 - 37.3 `clippaths(a, b, op)`: union/intersect/difference/xor — each visualized on the same two shapes
@@ -475,12 +517,14 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Bug>` — a "union" done by overlapping fill rings (xor holes appear); fix with clippaths.
 
 ### Ch 38 — Part VI capstone: Shatter, rebuilt (10 p)
+
 - 38.1 The full generative-geometry pipeline from scratch: trace a boundary → scatter → relax → voronoi(clipped) → per-cell offset insets → fills with per-cell angles → ordered travel
 - 38.2 Compare with the bundled **shatter** example: read it as a peer, not an oracle
 - 38.3 Parameterize and seed-curate
 - **Checkpoint:** validator — every cell inside the boundary, no density warnings, ≤ N trims.
 
 ### Ch 39 — Interlude: performance and budgets (6 p)
+
 - 39.1 The op counter (2 M), stitch cap (60 k), list-cell and string budgets — what actually costs what
 - 39.2 `nearestonpath` and O(n) honesty; pre-computing vs re-computing in loops
 - 39.3 Reading the stats row as a profiler; a worked optimization (same design, ⅓ the stitches)
@@ -490,22 +534,25 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Part VII — Fabric Physics and the Professional Layer (≈ 72 pages)
 
-*Goal: from "renders right" to "sews right", then reprogram the stitch generators themselves. Existing §§21–22 — the book's expert tier, split into six chapters.*
+_Goal: from "renders right" to "sews right", then reprogram the stitch generators themselves. Existing §§21–22 — the book's expert tier, split into six chapters._
 
 ### Ch 40 — Why geometry isn't enough (8 p)
+
 - 40.1 Four physical realities: pull (tension shrinks along stitch axis), sink (stitches settle into fabric), crowding on curves, coverage limits
 - 40.2 **Coverage in layers:** mm of thread per mm²; 1 layer = clean satin/tatami; fabric stops being fabric past ~2.5–3.5
-- 40.3 Tour of the instruments: the 1 mm coverage grid, heatmap toggle (orange ~1.2, red ~3), hotspot warnings with coordinates *and source lines*
+- 40.3 Tour of the instruments: the 1 mm coverage grid, heatmap toggle (orange ~1.2, red ~3), hotspot warnings with coordinates _and source lines_
 - 40.4 The philosophy: everything here is **opt-in** — nothing rewrites your design behind your back
 - **Interactive:** `<Heatmap>` on a deliberately hot design; click a hotspot → offending line highlights.
 
 ### Ch 41 — Fabric presets (6 p)
+
 - 41.1 `fabric 'woven' | 'knit' | 'stretch' | 'denim'/'canvas' | 'fleece'` — the table, explained row by row
 - 41.2 What a preset sets (pullcomp, underlay, satin density floors, coverage limit); explicit commands override piecewise
 - 41.3 Choosing by garment: tee vs cap vs patch vs towel
 - **Checkpoint:** match designs to fabrics `<Quiz>` (with failure photos).
 
 ### Ch 42 — Pull compensation and underlay (12 p)
+
 - 42.1 `pullcomp mm` (0–1.5): widening satin, extending fill rows; why borders meet fills only with it
 - 42.2 Underlay = the difference between hobby and professional: anchors fabric, lifts top stitching
 - 42.3 `underlay` modes for satin: center / edge / zigzag / auto (picks by width) / off — each visualized under the loupe
@@ -515,6 +562,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — a satin-bordered fill where border and fill provably meet (bbox check).
 
 ### Ch 43 — Curves, density, and trims at machine level (10 p)
+
 - 43.1 `shortstitch`: alternate inner-edge stitches pulled to 60 % on tight curves; the "column wider than curve radius" impossibility warning
 - 43.2 `maxdensity n` and the coverage grid revisited: raising the limit **knowingly** (the patch example: satin-over-fill ≈ 4 layers is legitimate)
 - 43.3 Tie-off micro-stitches excluded from the grid (no false hotspots)
@@ -523,6 +571,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Interactive:** curvature stress-test `<Param>` (radius slider on a satin arc, watch shortstitch engage).
 
 ### Ch 44 — Programmable satin (14 p)
+
 - 44.1 The contract: reporter `(t, s, i, u) → [advance, leftw, rightw, leftlag, rightlag]`; advance must be positive (the termination guarantee)
 - 44.2 The four inputs: arc-length mm (`t`, scale-stable patterns), normalized `s` (tapers — possible because the column buffers), pair index `i`, local heading `u`
 - 44.3 The tuple helpers: `satinpair`, `satinasym`, `satinrake` — intent over slot-memorization; `satinpair(0.4, 2) ≡ satin 4`
@@ -530,9 +579,10 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - 44.5 Why it composes: the generator sits **upstream of the physics** — spine-local space, so transforms/warp/pullcomp/underlay/heatmap all still apply
 - 44.6 Guarantees: parse-time return-completeness, arity/shape errors with line numbers; no hidden randomness
 - **Interactive:** satin-shaper lab (edit the reporter, see the column and its penetration pattern side by side).
-- **Checkpoint:** `<Challenge>` — a leaf that tapers at both tips *and* rakes toward the tip (validator inspects rail geometry).
+- **Checkpoint:** `<Challenge>` — a leaf that tapers at both tips _and_ rakes toward the tip (validator inspects rail geometry).
 
 ### Ch 45 — Programmable fills (12 p)
+
 - 45.1 `fill dir @f` / `fill shape @s`: arming the next beginfill/endfill; the engine keeps rows evenly spaced, clips holes, runs physics
 - 45.2 Direction fields: rows that **curve to follow the work** — radial, orbital, noise-guided fills
 - 45.3 Stitch shapers and `tatamirow`: texture inside the fill (length/offset modulation)
@@ -542,13 +592,15 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — a leaf filled with veins following a midrib field.
 
 ### Ch 46 — Closed-loop generation (10 p)
-- 46.1 Reading the fabric back: `coverat(p[, r])`, `countat`, `nearestsewn(p)`, `sewnwithin(p, r)`, `stitchedpoints` — pure reads of *committed* penetrations
+
+- 46.1 Reading the fabric back: `coverat(p[, r])`, `countat`, `nearestsewn(p)`, `sewnwithin(p, r)`, `stitchedpoints` — pure reads of _committed_ penetrations
 - 46.2 The flush gotcha: a buffered satin column isn't committed until it ends — `satin 0` before you read
 - 46.3 Patterns: density-aware placement (add motifs only where `coverat < x`), avoid-what-exists walkers, grow-until-covered loops with a hard iteration ceiling
 - 46.4 Feedback stability: why closed loops need caps and hysteresis (a diverging example, then fixed)
 - **Checkpoint:** `<Challenge>` — self-limiting stipple: keeps adding dots until mean coverage crosses a target, provably terminates.
 
 ### Ch 47 — Part VII capstone: The Patch (— production-grade) (8 p)
+
 - 47.1 A merrowed-look badge: fill base, knockout, satin border over fill edge (raise maxdensity knowingly), correct underlay everywhere, fabric preset, colour-batched order
 - 47.2 The professional review pass: heatmap calm, stats sane, warnings zero-or-justified
 - **Checkpoint:** validator mirrors a commercial digitizing checklist.
@@ -557,24 +609,27 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Part VIII — Craft, Projects, and the Real Machine (≈ 55 pages)
 
-*Goal: judgment — the two-worlds model, gotchas, travel planning, and the physical workflow. Existing §§24–28.*
+_Goal: judgment — the two-worlds model, gotchas, travel planning, and the physical workflow. Existing §§24–28._
 
 ### Ch 48 — The two worlds (8 p)
+
 - 48.1 The taxonomy: sewing world (emits stitches / mutates machine state) vs data world (values in, values out) — the full command census
 - 48.2 The bridges: `sewpath`/`setpos` inward; `trace`/`tracerings` outward; read-only turtle & fabric sensors
 - 48.3 Neutral scaffolding: control flow belongs to neither
-- 48.4 The asymmetry worth engraving: *data closes itself and lives nowhere; thread is always somewhere and never closes on its own*
+- 48.4 The asymmetry worth engraving: _data closes itself and lives nowhere; thread is always somewhere and never closes on its own_
 - **Interactive:** sortable command-census table (generated from engine tables); "which world?" `<Quiz>`.
 
 ### Ch 49 — Sewing gotchas (10 p)
+
 - 49.1 Open vs closed: regions close implicitly in data; sewn loops need the final `setpos(first(ring))`
-- 49.2 Parking: before every `sewpath` and *especially* every `beginfill`
+- 49.2 Parking: before every `sewpath` and _especially_ every `beginfill`
 - 49.3 Parity vs booleans recap (the Ch 37 rule, now as a debugging lens: the heatmap is your parity debugger)
 - 49.4 Physical-stitch gotchas: too short (merge chains from resample/snap/humanize), too much (layers), out of order (buffered satin)
 - 49.5 **The pre-flight checklist** — rendered as an interactive linter panel the reader can run against any cell in the book
 - **Interactive:** the checklist widget; a `<Bug>` gauntlet of five classic artefacts.
 
 ### Ch 50 — Travel planning and design hygiene (8 p)
+
 - 50.1 Sewing order as a first-class design output: scattered order = jumps+trims+time; swept order = clean fabric
 - 50.2 Sorting strategies: nearest-neighbour tours over motif lists; row sweeps; colour batching (one stop per thread)
 - 50.3 Jump/trim budgets in `designStats`; autotrim interplay
@@ -582,6 +637,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Checkpoint:** `<Challenge>` — reorder a 30-motif scatter under a trim budget.
 
 ### Ch 51 — From preview to fabric (12 p)
+
 - 51.1 `.DST` export: what's in the file (ternary deltas, split long moves, stops, trim jumps, header); PES/EXP/SVG exports
 - 51.2 The physical stack: hoops & hooping tension, stabilizers by fabric, thread weights, needle sizes — a pragmatic primer (with the honest note: your machine's manual wins)
 - 51.3 First sew-out protocol: test fabric, watch the first colour, compare against the preview
@@ -590,6 +646,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - **Interactive:** annotated sew-out photo pairs (preview vs fabric) per failure mode.
 
 ### Ch 52 — Capstone studio (12 p) — graded projects, each a guided-then-open build
+
 - 52.1 **The Meadow** (flow fields + satin leaves + fabric preset) — the tutorial classic, now with full physics
 - 52.2 **The Sampler** (every stitch mode + snaptogrid band) — a reference object worth sewing and keeping
 - 52.3 **Stained Glass** (geometry pipeline + travel planning)
@@ -598,6 +655,7 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 - 52.6 Community gallery + "design notes" template (seed, fabric, stats, what you'd change)
 
 ### Ch 53 — Reading the masters (5 p)
+
 - 53.1 Guided readings of the bundled examples not yet dissected (bloom, echo, shell, tree…) — each as a `<Scrub>` with margin commentary
 - 53.2 Style notes: idiomatic mixed-dialect NeedleScript (meadow as reference)
 
@@ -605,33 +663,38 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Part IX — Tooling and Ecosystem (≈ 38 pages)
 
-*Goal: power use and going beyond the book. Existing §§25, 29 + README material.*
+_Goal: power use and going beyond the book. Existing §§25, 29 + README material._
 
 ### Ch 54 — Playground power use (8 p)
+
 - 54.1 The REPL: nudging a live design; history
 - 54.2 The Parameters panel / customizer in depth: `// [min:max]` annotations, toggles, locks, randomize-unlocked, named presets — no-code exploration for collaborators
 - 54.3 Editor ergonomics; examples dropdown; drag & drop
 - **Checkpoint:** annotate a given design for a "client" who will only touch sliders.
 
 ### Ch 55 — SVG import (6 p)
+
 - 55.1 What maps to what: fills → beginfill blocks (subpaths → holes), strokes → outlines, colours → nearest thread; supported elements/transforms
-- 55.2 The import is a *starting point*: cleaning generated code, re-parameterizing, adding physics
+- 55.2 The import is a _starting point_: cleaning generated code, re-parameterizing, adding physics
 - 55.3 Round-trip workflows with vector tools
 - **Checkpoint:** import a provided logo, take it to production quality.
 
 ### Ch 56 — The AI assistant (6 p)
+
 - 56.1 `/ai` setup (OpenRouter key, model picker) and the four verbs: create / improve / fix / explain
 - 56.2 Prompting that works: concrete shapes, stitch types, numerical targets (the tutorial's tips, expanded with before/after prompt pairs)
-- 56.3 Review discipline: AI output goes through *your* pre-flight checklist (Ch 49); the scrubber as code review
+- 56.3 Review discipline: AI output goes through _your_ pre-flight checklist (Ch 49); the scrubber as code review
 - 56.4 Where AI helps most (boilerplate, exploration) vs least (physics judgment, travel planning)
 
 ### Ch 57 — The engine as a library (8 p)
+
 - 57.1 `npm install needlescript`: `run` → events/warnings/density; `designStats`; `toDST`/`toPES`/`toEXP`/`toSVG`
 - 57.2 Building your own tools: batch seed rendering, a Twitter-bot, a plotter bridge, custom validators (how this book's `<Challenge>` grader works — eat your own dog food)
 - 57.3 The exported tables and `LIMITS`; tests as the behavioural spec
 - 57.4 Determinism guarantees at the library level (pinned deps, no `Math.random`)
 
 ### Ch 58 — Where to go from here (4 p)
+
 - 58.1 The community gallery; sharing programs (seed + source = the whole piece)
 - 58.2 Contributing examples and chapters; the book is a repo
 - 58.3 A reading list: turtle geometry, generative art, digitizing craft
@@ -651,37 +714,37 @@ Page counts are book-page equivalents (≈ 350 words or one interactive per "pag
 
 ## Appendix H — mapping from the existing tutorial
 
-| Existing § | New home |
-|---|---|
-| 1 Mental model | Ch 0.4, Ch 1 |
-| 2 First stitches | Ch 2 |
-| 3 Turning & looping | Ch 3 |
-| 4 Pen/jumps | Ch 4 |
-| 5 Stitch types | Ch 6–9 |
-| 6 Fills | Ch 10–11 |
-| 7 Variables & expressions | Ch 13–14 |
-| 8 Control flow | Ch 15 |
-| 9 Procedures | Ch 16 |
-| 10 Two dialects | Ch 17 |
-| 11 Randomness | Ch 23 |
-| 12 Lists | Ch 18, 20 |
-| 13 Strings | Ch 19 |
-| 14 Generative math | Ch 24–27 |
-| 15 Paths & curves | Ch 29, 31 |
-| 16 Generators | Ch 35–36 |
-| 17 Geometry | Ch 37 |
-| 18 Transforms | Ch 32 |
-| 19 Effects | Ch 33 |
-| 20 Trace | Ch 30 |
-| 21 Professional layer | Ch 40–43 |
-| 22 Programmable satin/fills/closed-loop | Ch 44–46 |
-| 23 Debugging | Ch 21 |
-| 24 Safety limits | Ch 39, App C |
-| 25 Export & reuse | Ch 51, 57 |
-| 26 Sewing gotchas | Ch 49 (+37.4, 30.7) |
-| 27 Capstone | Ch 52 |
-| 28 Two worlds | Ch 48 |
-| 29 AI assistant | Ch 56 |
+| Existing §                              | New home            |
+| --------------------------------------- | ------------------- |
+| 1 Mental model                          | Ch 0.4, Ch 1        |
+| 2 First stitches                        | Ch 2                |
+| 3 Turning & looping                     | Ch 3                |
+| 4 Pen/jumps                             | Ch 4                |
+| 5 Stitch types                          | Ch 6–9              |
+| 6 Fills                                 | Ch 10–11            |
+| 7 Variables & expressions               | Ch 13–14            |
+| 8 Control flow                          | Ch 15               |
+| 9 Procedures                            | Ch 16               |
+| 10 Two dialects                         | Ch 17               |
+| 11 Randomness                           | Ch 23               |
+| 12 Lists                                | Ch 18, 20           |
+| 13 Strings                              | Ch 19               |
+| 14 Generative math                      | Ch 24–27            |
+| 15 Paths & curves                       | Ch 29, 31           |
+| 16 Generators                           | Ch 35–36            |
+| 17 Geometry                             | Ch 37               |
+| 18 Transforms                           | Ch 32               |
+| 19 Effects                              | Ch 33               |
+| 20 Trace                                | Ch 30               |
+| 21 Professional layer                   | Ch 40–43            |
+| 22 Programmable satin/fills/closed-loop | Ch 44–46            |
+| 23 Debugging                            | Ch 21               |
+| 24 Safety limits                        | Ch 39, App C        |
+| 25 Export & reuse                       | Ch 51, 57           |
+| 26 Sewing gotchas                       | Ch 49 (+37.4, 30.7) |
+| 27 Capstone                             | Ch 52               |
+| 28 Two worlds                           | Ch 48               |
+| 29 AI assistant                         | Ch 56               |
 
 ---
 

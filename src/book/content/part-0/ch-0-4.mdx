@@ -1,0 +1,69 @@
+---
+title: 'Thread, needle, fabric'
+part: 'Part 0 — Start Here'
+partNumber: 0
+order: 4
+subtitle: 'A five-minute physics primer'
+---
+
+A machine embroidery needle doesn't draw. It **punches penetrations** through fabric and pulls thread taut between them. What you see in a preview is the thread pulled between those points — a series of tiny line segments, not a continuous stroke.
+
+Understanding this changes how you read designs and how you debug them.
+
+## What the machine actually does
+
+Each stitch is two holes: the needle goes down, locks with the bobbin thread, comes back up. The preview shows the path between consecutive holes. The dashes you see in jumps are _thread floating over the fabric_ — not sewn, just carried.
+
+Three things determine what you see on the fabric:
+
+1. **Where thread goes** — the path of the turtle
+2. **How densely it piles** — stitch length, fill spacing, number of layers
+3. **How it's secured** — lock stitches at start/end, trims, colour stops
+
+## Direction is visible
+
+Embroidery thread has gloss. Stitches angled toward a light source reflect more than those angled away. This means **stitch direction is a colour channel** — two adjacent fills at 0° and 90° look different even with the same thread.
+
+The book will return to this many times. For now, try this:
+
+<Run>
+{`// Two adjacent squares — same thread, different angle
+fillangle 0
+beginfill
+  setxy -12 -10
+  setxy  -2 -10
+  setxy  -2  10
+  setxy -12  10
+endfill
+
+moveto -2 0
+
+fillangle 90
+beginfill
+setxy 2 -10
+setxy 12 -10
+setxy 12 10
+setxy 2 10
+endfill`}
+
+</Run>
+
+The left square has horizontal rows, the right square has vertical rows — one thread colour, two apparent shades.
+
+## The vocabulary you'll meet
+
+| Term               | What it means                                                     |
+| ------------------ | ----------------------------------------------------------------- |
+| **Running stitch** | Thread follows the path directly, one line of stitches            |
+| **Satin**          | Zigzag column — thread crosses a spine back and forth             |
+| **Tatami / fill**  | Grid of rows densely covering a region                            |
+| **Underlay**       | Lightweight stitches sewn _before_ the top layer to anchor fabric |
+| **Trim**           | A machine cut between two areas of different thread               |
+| **Lock**           | Tie-in / tie-off stitches that secure thread ends                 |
+
+Each of these gets its own chapter. For now, just recognise the words.
+
+<Checkpoint chapterId="ch-0-4">
+  Run the two-squares example. Look closely at the preview — do you see a difference between the
+  left and right squares? That's the gloss angle at work. Mark complete when you've observed it.
+</Checkpoint>

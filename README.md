@@ -93,16 +93,16 @@ Annotate variable declarations with comment brackets to expose them as **live co
 
 ### Parameter controls
 
-| Annotation                           | Control                                                                       |
-| ------------------------------------ | ----------------------------------------------------------------------------- |
-| `let radius = 15  // [5:30]`         | **integer slider** — both bounds are whole numbers and the range spans > 1    |
-| `let smooth = 0.5  // [0:1]`         | **smooth slider** — at least one float bound, or range ≤ 1; 100 steps         |
-| `let n = 4  // [0.5:0.5:8]`          | **stepped slider** — `[min:step:max]`; any positive step including fractional |
-| `let wave = 1  // [switch]`          | **toggle** — `0` = off, `1` = on                                              |
-| `let mode = 0  // [switch:hypo,epi]` | **labelled toggle** — label pair shown on each side                           |
-| `let name = 'Anna'  // [text]`       | **free text input** — any string value                                        |
-| `let op = 'union'  // [text:union,difference,intersect]` | **dropdown** — string value limited to the listed choices |
-| `// --- Section ---`                 | **section divider** — groups controls with a horizontal rule and title        |
+| Annotation                                               | Control                                                                       |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `let radius = 15  // [5:30]`                             | **integer slider** — both bounds are whole numbers and the range spans > 1    |
+| `let smooth = 0.5  // [0:1]`                             | **smooth slider** — at least one float bound, or range ≤ 1; 100 steps         |
+| `let n = 4  // [0.5:0.5:8]`                              | **stepped slider** — `[min:step:max]`; any positive step including fractional |
+| `let wave = 1  // [switch]`                              | **toggle** — `0` = off, `1` = on                                              |
+| `let mode = 0  // [switch:hypo,epi]`                     | **labelled toggle** — label pair shown on each side                           |
+| `let name = 'Anna'  // [text]`                           | **free text input** — any string value                                        |
+| `let op = 'union'  // [text:union,difference,intersect]` | **dropdown** — string value limited to the listed choices                     |
+| `// --- Section ---`                                     | **section divider** — groups controls with a horizontal rule and title        |
 
 All three declaration styles work: `let name = value`, `make "name value`, and bare `name = value`.
 
@@ -421,12 +421,12 @@ clippaths(disc, bite, mode)        // computed mode argument
 
 Strings start and end with `'` on the same source line. Four escape sequences, no others:
 
-| Escape | Meaning |
-| ------ | ------- |
+| Escape | Meaning      |
+| ------ | ------------ |
 | `\'`   | single quote |
-| `\\`   | backslash |
-| `\n`   | newline |
-| `\t`   | tab |
+| `\\`   | backslash    |
+| `\n`   | newline      |
+| `\t`   | tab          |
 
 Any other backslash sequence is a hard error (`Unknown escape "\q"`). A string that reaches end-of-line without closing is a hard error (`Unterminated string`).
 
@@ -475,31 +475,31 @@ print s[0] = 'H'                    // ERROR: strings are immutable
 
 These existing list functions also accept strings:
 
-| Function | On a string |
-| --- | --- |
-| `len(s)` | character count |
-| `first(s)` · `last(s)` | `s[0]` · `s[-1]` as 1-char strings |
-| `slice(s, a)` · `slice(s, a, b)` | substring, Python semantics, bounds clamped |
-| `reverse(s)` | new reversed string |
-| `concat(a, b)` | new joined string (both must be strings; `concat('a', 1)` is an error) |
-| `contains(s, sub)` · `indexof(s, sub)` | substring test · first index or −1 |
-| `copy(s)` | identity (immutable — documented, harmless) |
+| Function                               | On a string                                                            |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| `len(s)`                               | character count                                                        |
+| `first(s)` · `last(s)`                 | `s[0]` · `s[-1]` as 1-char strings                                     |
+| `slice(s, a)` · `slice(s, a, b)`       | substring, Python semantics, bounds clamped                            |
+| `reverse(s)`                           | new reversed string                                                    |
+| `concat(a, b)`                         | new joined string (both must be strings; `concat('a', 1)` is an error) |
+| `contains(s, sub)` · `indexof(s, sub)` | substring test · first index or −1                                     |
+| `copy(s)`                              | identity (immutable — documented, harmless)                            |
 
 ### New string functions
 
 All call-syntax only, Library tier (shadowable with a note):
 
-| Function | Returns |
-| --- | --- |
-| `str(v)` | string rendering of a number — exactly what `print` shows. Identity on a string |
-| `num(s)` · `num(s, fallback)` | parse string as number; error (or return fallback) on non-numeric |
-| `isstring(v)` | `1`/`0` — the sibling of `islist(v)` |
-| `chars(s)` | list of 1-character strings — bridge to `map`, `filter`, `pick`, … |
-| `split(s, sep)` | list of strings; `sep` must be non-empty (use `chars` to split to individual characters) |
-| `joinstr(xs, sep)` | join a list of strings with separator; every element must be a string |
-| `upper(s)` · `lower(s)` | ASCII-cased copies (A–Z / a–z only) |
-| `strip(s)` | remove leading/trailing whitespace — **`trim` cuts the thread; use `strip` for whitespace** |
-| `repeatstr(s, n)` | `s` repeated `n` times (non-negative integer) |
+| Function                      | Returns                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------- |
+| `str(v)`                      | string rendering of a number — exactly what `print` shows. Identity on a string             |
+| `num(s)` · `num(s, fallback)` | parse string as number; error (or return fallback) on non-numeric                           |
+| `isstring(v)`                 | `1`/`0` — the sibling of `islist(v)`                                                        |
+| `chars(s)`                    | list of 1-character strings — bridge to `map`, `filter`, `pick`, …                          |
+| `split(s, sep)`               | list of strings; `sep` must be non-empty (use `chars` to split to individual characters)    |
+| `joinstr(xs, sep)`            | join a list of strings with separator; every element must be a string                       |
+| `upper(s)` · `lower(s)`       | ASCII-cased copies (A–Z / a–z only)                                                         |
+| `strip(s)`                    | remove leading/trailing whitespace — **`trim` cuts the thread; use `strip` for whitespace** |
+| `repeatstr(s, n)`             | `s` repeated `n` times (non-negative integer)                                               |
 
 `@str`, `@upper`, `@lower`, and all other string functions work as `@`-references with `map`, `filter`, `compose`:
 
@@ -807,7 +807,7 @@ Backed by Clipper2 on ×1000 integer coordinates (µm precision) — results are
 | Function                 | Returns                                                                                                                                                                                          |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `offsetpath(region, mm)` | list of regions — positive inflates, negative shrinks. Shrinking may split a shape into several or into **none** (an empty list, not an error — loops over it naturally do nothing). Round joins |
-| `clippaths(a, b, 'op')` | boolean of two regions; op ∈ `'union'` `'intersect'` `'difference'` `'xor'` (also accepts the classic `"op` quoted-word form); returns a list of regions |
+| `clippaths(a, b, 'op')`  | boolean of two regions; op ∈ `'union'` `'intersect'` `'difference'` `'xor'` (also accepts the classic `"op` quoted-word form); returns a list of regions                                         |
 | `inpath(p, region)`      | 1/0, even-odd rule (consistent with fills)                                                                                                                                                       |
 
 ### Library names may be shadowed
@@ -1104,13 +1104,13 @@ fabric 'knit'      // pull comp 0.5, auto underlay, lighter satin, density limit
 // also accepts the classic quoted-word form:  fabric "knit
 ```
 
-| Fabric               | Pull comp | Coverage limit | Notes                                |
-| -------------------- | --------- | -------------- | ------------------------------------ |
-| `'woven'`            | 0.2 mm    | 3.5 layers     | the baseline                         |
-| `'knit'`             | 0.5 mm    | 3.0 layers     | satin density floored at 0.45 mm     |
-| `'stretch'`          | 0.6 mm    | 2.8 layers     | satin density floored at 0.5 mm      |
-| `'denim'` / `'canvas'` | 0.15 mm | 4.0 layers     | stable, tolerates dense stitching    |
-| `'fleece'`           | 0.3 mm    | 2.6 layers     | doubled underlay, suggests a topping |
+| Fabric                 | Pull comp | Coverage limit | Notes                                |
+| ---------------------- | --------- | -------------- | ------------------------------------ |
+| `'woven'`              | 0.2 mm    | 3.5 layers     | the baseline                         |
+| `'knit'`               | 0.5 mm    | 3.0 layers     | satin density floored at 0.45 mm     |
+| `'stretch'`            | 0.6 mm    | 2.8 layers     | satin density floored at 0.5 mm      |
+| `'denim'` / `'canvas'` | 0.15 mm   | 4.0 layers     | stable, tolerates dense stitching    |
+| `'fleece'`             | 0.3 mm    | 2.6 layers     | doubled underlay, suggests a topping |
 
 Explicit commands after `fabric` override the preset.
 
@@ -1122,9 +1122,9 @@ Thread tension shrinks stitching along the stitch axis: a 4 mm satin column sews
 
 Underlay is stabilising stitching sewn automatically _underneath_ the visible layer — the single biggest difference between hobby and professional digitizing. It anchors the fabric to the backing, stops shifting, and lifts the topping out of the material. Underlay is sewn in correct machine order (before the topping), shown thinner in the preview, and identical to normal stitches in exports.
 
-| Command              | Modes                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `underlay 'auto'`    | for satin columns: `'center'` (spine, out and back), `'edge'` (runs offset ±30% width), `'zigzag'` (open zigzag at 60% width + return run), `'off'`. `'auto'` picks by width: < 1.5 mm none, < 4 mm center, wider zigzag. Classic `"auto` syntax also accepted                                                                                                        |
+| Command               | Modes                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `underlay 'auto'`     | for satin columns: `'center'` (spine, out and back), `'edge'` (runs offset ±30% width), `'zigzag'` (open zigzag at 60% width + return run), `'off'`. `'auto'` picks by width: < 1.5 mm none, < 4 mm center, wider zigzag. Classic `"auto` syntax also accepted                                                                                                             |
 | `fillunderlay 'auto'` | for fills: `'tatami'` (sparse cross-grain pass at `fillangle + 90`, inset 0.6 mm), `'edge'` (run tracing the boundary inset 0.5 mm), `'off'`. `'auto'` = tatami, plus the edge run on areas over 100 mm². Under a directional `fill dir @fn`, the tatami pass follows the field **rotated +90°** so the underlay still anchors across the grain even when the grain curves |
 
 A satin column is buffered while you draw it and sewn — underlay first, then the zigzag — when it ends (pen up, mode change, colour change, trim, fill, or end of program). The turtle's position and heading are unaffected.
@@ -1288,13 +1288,13 @@ Travels of 7 mm or more (configurable 3–30, `autotrim 0` off) automatically ge
 
 | Tool                      | What it does                                                                                                                                                                                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `print expr`              | log a value to the console. A string prints its raw contents (no quotes). A list prints as `[1, 'a', …]`                                                                                                                                                    |
+| `print expr`              | log a value to the console. A string prints its raw contents (no quotes). A list prints as `[1, 'a', …]`                                                                                                                                                     |
 | `print "label expr`       | …with a label: `print "radius :r` → `radius: 1.5`                                                                                                                                                                                                            |
 | `print(v1, v2, …)`        | variadic call form: concatenates all rendered values with no separator — `print('piece: ', i)` → `piece: 3`                                                                                                                                                  |
 | `printloc`                | log the needle's current local-frame position: `loc: [12.5, -3.0]`. The coordinates are what `pos()` returns — local-frame, so under a transform they reflect what the turtle "thinks"                                                                       |
 | `printloc "label`         | …with a custom label: `printloc "origin` → `origin: [0, 0]`                                                                                                                                                                                                  |
 | `mark`                    | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats                                                                                              |
-| `mark 'label'`            | …with an optional string label on the pin: `mark 'centre'` or `mark lower(name)`                                                                                                                                                                            |
+| `mark 'label'`            | …with an optional string label on the pin: `mark 'centre'` or `mark lower(name)`                                                                                                                                                                             |
 | `assert cond`             | stop with an error (and line number) if the condition is false — great for geometric invariants (`assert (distance 0 0) < 47`)                                                                                                                               |
 | `assert(cond, message)`   | …with a message string shown on failure. The message is only evaluated if the assertion fails (safe for expensive expressions)                                                                                                                               |
 | Playback scrubber         | scrub the design stitch by stitch; the **source line being sewn is highlighted** in the editor and shown in the playback bar                                                                                                                                 |

@@ -1,0 +1,60 @@
+---
+title: 'Choose your on-ramp'
+part: 'Part 0 — Start Here'
+partNumber: 0
+order: 3
+subtitle: 'Programmer, maker, or generative-artist track'
+---
+
+This book has three kinds of readers. You don't need to pick one track and stick to it — the book is linear and the tracks are signposts, not walls.
+
+## The programmer track
+
+You know a programming language. You've seen loops and functions before. What you don't know is embroidery.
+
+**What to expect:** The syntax will feel familiar (it's Logo-flavoured — think turtle graphics). The five things that will trip you up are:
+
+1. Blocks use `[ ]`, never `{ }`.
+2. Variables are declared once with `let`; blocks are not scopes.
+3. No shadowing — not of outer variables, not of built-ins.
+4. Negative literals need parentheses: `fd (-5)`, not `fd -5`.
+5. There are two dialects (classic Logo-style and modern parenthesized) — both always work.
+
+Fast-track boxes throughout the book translate NeedleScript to patterns you already know.
+
+## The maker track
+
+You know embroidery — thread, tension, stabilizers, your machine's quirks. You haven't programmed before, or not recently.
+
+**What to expect:** The code vocabulary is tiny: about 20 core words. You already know the hard part — you understand thread. Part 0–II will feel comfortable. Part III (the language) is where you slow down. That's fine: Part III is thorough.
+
+The book talks to embroiderers as equals. It will explain _why_ a satin column buffers, not just _that_ it does.
+
+## The generative-artist track
+
+You've used p5.js, Processing, or similar. You want the thread output.
+
+**Key differences from a draw loop:**
+
+| Processing / p5       | NeedleScript                        |
+| --------------------- | ----------------------------------- |
+| Frame loop (`draw()`) | One-shot execution (no loop)        |
+| Pixels                | mm (millimetres, sewable space)     |
+| `random()`            | `random(n)` — seeded, deterministic |
+| Any color             | Thread palette (numbered stops)     |
+
+The `<SeedGrid>` widget (coming in Part IV) is your equivalent of a `random seed` explorer.
+
+## A quick quiz
+
+<Quiz
+  question="NeedleScript blocks use which bracket style?"
+  options={['{ curly braces }', '( parentheses )', '[ square brackets ]', '< angle brackets >']}
+  answer={2}
+  explanation="Square brackets [ ] are the NeedleScript block delimiter. This is one of the five things programmers trip over — curly braces don't exist in NeedleScript."
+/>
+
+<Checkpoint chapterId="ch-0-3">
+  Answer the quiz above. Then read the section that applies to you (programmer, maker, or
+  generative-artist). Mark complete when you're ready to continue.
+</Checkpoint>

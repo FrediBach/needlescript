@@ -1,0 +1,52 @@
+---
+title: 'How this book works'
+part: 'Part 0 — Start Here'
+partNumber: 0
+order: 2
+subtitle: 'Running cells, the scrubber, and checkpoints'
+---
+
+Every page of this book mixes prose and runnable code. You do not need anything installed — the compiler runs right here in your browser.
+
+## The Run cell
+
+A **Run cell** is an editable code editor with a live preview below it. Edit the code, then press **Run ▶** (or **Cmd/Ctrl+Enter**) to see the result immediately. The **Reset** button restores the original code.
+
+Try it:
+
+<Run>
+  {`// Draw a square
+repeat 4 [
+  fd 20
+  rt 90
+]`}
+</Run>
+
+Change `20` to `40` and run again. Change `4` to `6` and `90` to `60`. Every number you change is an experiment.
+
+## The Scrub cell
+
+A **Scrub cell** adds a playback scrubber below the preview. Drag the slider left to rewind stitch by stitch — or press **▶** to watch the design build up in real time. The highlighted line in the editor shows which line of code produced the current stitch.
+
+<Scrub>
+  {`repeat 8 [
+  fd 20
+  rt 45
+]`}
+</Scrub>
+
+Scrub cells are especially useful when the book teaches _order_ concepts — buffered satin columns, trimming, fill regions.
+
+## Read-only cells
+
+Some cells are **read-only** — they show a finished example without inviting edits. Click **Edit ✎** to fork the cell into a full editable version and experiment freely.
+
+## Checkpoints
+
+Each chapter ends with a **Checkpoint**. Complete the task described, then click **Mark complete ✓**. Your progress is saved in this browser and shown as checkmarks in the sidebar.
+
+<Checkpoint chapterId="ch-0-2">
+  Run both cells on this page. Drag the scrubber in the Scrub cell all the way to the left (0
+  stitches), then play it back. When you understand how the scrubber works, mark this checkpoint
+  complete.
+</Checkpoint>
