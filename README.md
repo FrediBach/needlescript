@@ -100,6 +100,8 @@ Annotate variable declarations with comment brackets to expose them as **live co
 | `let n = 4  // [0.5:0.5:8]`          | **stepped slider** — `[min:step:max]`; any positive step including fractional |
 | `let wave = 1  // [switch]`          | **toggle** — `0` = off, `1` = on                                              |
 | `let mode = 0  // [switch:hypo,epi]` | **labelled toggle** — label pair shown on each side                           |
+| `let name = 'Anna'  // [text]`       | **free text input** — any string value                                        |
+| `let op = 'union'  // [text:union,difference,intersect]` | **dropdown** — string value limited to the listed choices |
 | `// --- Section ---`                 | **section divider** — groups controls with a horizontal rule and title        |
 
 All three declaration styles work: `let name = value`, `make "name value`, and bare `name = value`.
@@ -177,7 +179,7 @@ The intended idiom is a mix: classic prefix words where they shine (`fd 10 rt 90
 
 This guide is organised from the ground up. If you're new, read it top to bottom; if you're hunting a specific command, jump to its tier:
 
-1. **Language fundamentals** — [Basics](#basics), [Movement](#movement), [Control flow](#control-flow), [Procedures](#procedures), [Variables](#variables), [Expressions](#expressions), [Lists](#lists).
+1. **Language fundamentals** — [Basics](#basics), [Movement](#movement), [Control flow](#control-flow), [Procedures](#procedures), [Variables](#variables), [Expressions](#expressions), [Strings](#strings), [Lists](#lists).
 2. **Embroidery fundamentals** — [how embroidery actually works](#how-embroidery-actually-works), [Thread & stitch quality](#thread--stitch-quality), [Fills](#fills).
 3. **Generative toolkit** — [Generative math](#generative-math), [Randomness & determinism](#randomness--determinism).
 4. **Advanced shaping** — [Transforms](#transforms), [Effects](#effects).
@@ -190,9 +192,8 @@ This guide is organised from the ground up. If you're new, read it top to bottom
 - Words are **case-insensitive** (`FD 10` = `fd 10`).
 - `//`, `#`, and `;` each start a comment to the end of the line. A lone `/` is still division — only two _adjacent_ slashes comment.
 - There are no statement separators — whitespace and newlines are interchangeable.
-- The only value type is the **number** (millimetres, degrees, counts, truth values).
-- Truthiness: `0` is false, anything else is true. Comparisons return `1` or `0`. `true` and `false` are literals for `1` and `0`.
-- The `'` character is reserved (`single-quote strings are reserved for a future version`) — it has never been valid, so quoted strings can arrive later without changing any program's meaning.
+- There are three value types: **numbers** (millimetres, degrees, counts, truth values — `0` is false, anything else true), **strings** (immutable sequences of characters, single-quoted), and **lists** (ordered nestable sequences). Lists and strings never reach the stitch stream.
+- Truthiness: `0` is false, anything else is true. Comparisons return `1` or `0`. `true` and `false` are literals for `1` and `0`. A string or list in a condition is an error.
 
 ### Negative numbers vs subtraction
 
@@ -405,9 +406,142 @@ seth ( noise2 xcor / 16 ycor / 16 ) * 720
 | `heading`       | the needle's heading in degrees           |
 | `repcount`      | 1-based counter of the innermost `repeat` |
 
+## Strings
+
+A third value type alongside numbers and lists: an **immutable sequence of characters**, written in single quotes. Strings never reach the stitch stream — they live in the program as labels, mode names, and computed text.
+
+```text
+let name = 'meadow'
+print name                          // meadow
+let mode = 'difference'
+clippaths(disc, bite, mode)        // computed mode argument
+```
+
+### Literals and escapes
+
+Strings start and end with `'` on the same source line. Four escape sequences, no others:
+
+| Escape | Meaning |
+| ------ | ------- |
+| `\'`   | single quote |
+| `\\`   | backslash |
+| `\n`   | newline |
+| `\t`   | tab |
+
+Any other backslash sequence is a hard error (`Unknown escape "\q"`). A string that reaches end-of-line without closing is a hard error (`Unterminated string`).
+
+**String contents are case-sensitive** — the one island in a case-insensitive language:
+
+```text
+print 'Anna' == 'anna'              // 0 — exact match only
+PRINT 'Anna'                        // Anna — the PRINT command is case-insensitive; the data is not
+```
+
+### Classic quoted words as strings
+
+A quoted word like `"knit` or `"difference` in **expression position** now evaluates to a string (lowercased, as always). Every program that worked before still works; the mode words just become ordinary values you can store, pass, and pick:
+
+```text
+fabric "knit                        // identical to: fabric 'knit'
+clippaths(disc, bite, "difference)  // identical to: clippaths(disc, bite, 'difference')
+
+let ops = ['union', 'difference', 'intersect']
+seed 11
+clippaths(disc, bite, pick(ops))    // computed mode — one draw, safe
+```
+
+Binding positions — `make "x`, `for "i`, `print "label` — are unchanged.
+
+### Value semantics
+
+Strings are **immutable**. No in-place mutation: every operation returns a new string.
+
+- **Equality** `=`/`==`: exact, case-sensitive. Cross-type is `0` (not an error).
+- **Truthiness**: none — `if s [ … ]` is an error; use `len(s) > 0`.
+- **Ordering** `<`/`>`/…: not defined — these are loud errors.
+- **`+`**: not defined — use `concat(a, b)`.
+- **Indexing** `s[i]`: 0-based, negatives from end, returns a 1-character string.
+- **Index assignment** `s[i] = …`: error — strings are immutable.
+- **`for c in s [ … ]`**: iterates 1-character strings.
+
+```text
+let s = 'hello'
+print s[0]                          // h
+print s[-1]                         // o
+print s[0] = 'H'                    // ERROR: strings are immutable
+```
+
+### Sequence function overloads
+
+These existing list functions also accept strings:
+
+| Function | On a string |
+| --- | --- |
+| `len(s)` | character count |
+| `first(s)` · `last(s)` | `s[0]` · `s[-1]` as 1-char strings |
+| `slice(s, a)` · `slice(s, a, b)` | substring, Python semantics, bounds clamped |
+| `reverse(s)` | new reversed string |
+| `concat(a, b)` | new joined string (both must be strings; `concat('a', 1)` is an error) |
+| `contains(s, sub)` · `indexof(s, sub)` | substring test · first index or −1 |
+| `copy(s)` | identity (immutable — documented, harmless) |
+
+### New string functions
+
+All call-syntax only, Library tier (shadowable with a note):
+
+| Function | Returns |
+| --- | --- |
+| `str(v)` | string rendering of a number — exactly what `print` shows. Identity on a string |
+| `num(s)` · `num(s, fallback)` | parse string as number; error (or return fallback) on non-numeric |
+| `isstring(v)` | `1`/`0` — the sibling of `islist(v)` |
+| `chars(s)` | list of 1-character strings — bridge to `map`, `filter`, `pick`, … |
+| `split(s, sep)` | list of strings; `sep` must be non-empty (use `chars` to split to individual characters) |
+| `joinstr(xs, sep)` | join a list of strings with separator; every element must be a string |
+| `upper(s)` · `lower(s)` | ASCII-cased copies (A–Z / a–z only) |
+| `strip(s)` | remove leading/trailing whitespace — **`trim` cuts the thread; use `strip` for whitespace** |
+| `repeatstr(s, n)` | `s` repeated `n` times (non-negative integer) |
+
+`@str`, `@upper`, `@lower`, and all other string functions work as `@`-references with `map`, `filter`, `compose`:
+
+```text
+let labels = map(range(5), @str)            // ['0','1','2','3','4']
+let upper_names = map(names, @upper)
+```
+
+### print, assert, mark extensions
+
+```text
+// print — variadic call form concatenates renderings with no separator
+print('piece-', i, ': ', len(piece), ' pts')
+
+// assert — optional message, evaluated only on failure
+assert(len(pieces) > 0, concat('clip produced nothing at tile ', str(i)))
+
+// mark — optional string label on the preview pin
+mark 'anchor'
+mark lower(name)
+```
+
+Classic forms (`print expr`, `print "label expr`, `assert cond`) are untouched.
+
+### Mode consumers
+
+`fabric`, `underlay`, `fillunderlay`, and `clippaths` accept any string expression for their mode argument, matched **case-insensitively**. Both the old quoted-word syntax and new string literals are always valid:
+
+```text
+fabric 'knit'       // same as: fabric "knit
+underlay 'auto'     // same as: underlay "auto
+```
+
+Unknown modes give the same loud error as before, with did-you-mean.
+
+### Strings inside lists
+
+Lists may contain strings as elements. Inside a list rendering, strings appear single-quoted: `print ['a', 1]` → `['a', 1]`. `pick`, `shuffle`, `contains`, `indexof`, `for … in`, and destructuring all work naturally. Aggregates (`sum`, `sort`, etc.) error on string elements.
+
 ## Lists
 
-A second value type alongside numbers: ordered, nestable, ragged lists of numbers (and other lists). A point is `[x, y]`, a path is a list of points, a palette is a list of thread numbers. Lists live entirely in the program — they never reach the stitch stream.
+A second value type alongside numbers: ordered, nestable, ragged lists of numbers, strings, and other lists. A point is `[x, y]`, a path is a list of points, a palette is a list of thread numbers. Lists live entirely in the program — they never reach the stitch stream.
 
 ```text
 let palette = [2, 3, 5, 7]      // literal; nesting and trailing commas allowed
@@ -673,7 +807,7 @@ Backed by Clipper2 on ×1000 integer coordinates (µm precision) — results are
 | Function                 | Returns                                                                                                                                                                                          |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `offsetpath(region, mm)` | list of regions — positive inflates, negative shrinks. Shrinking may split a shape into several or into **none** (an empty list, not an error — loops over it naturally do nothing). Round joins |
-| `clippaths(a, b, "op)`   | boolean of two regions; op ∈ `"union` `"intersect` `"difference` `"xor`; returns a list of regions                                                                                               |
+| `clippaths(a, b, 'op')` | boolean of two regions; op ∈ `'union'` `'intersect'` `'difference'` `'xor'` (also accepts the classic `"op` quoted-word form); returns a list of regions |
 | `inpath(p, region)`      | 1/0, even-odd rule (consistent with fills)                                                                                                                                                       |
 
 ### Library names may be shadowed
@@ -876,7 +1010,7 @@ NeedleScript's two worlds are asymmetric: data flows _into_ drawing — `sewpath
 let disc = trace [ arc 360 28 ]
 let bite = trace [ up setxy 18 0 down arc 360 14 ]
 
-for piece in clippaths(disc, bite, "difference) [
+for piece in clippaths(disc, bite, 'difference') [
   beginfill sewpath(resample(piece, 2)) endfill
   trim
 ]
@@ -966,16 +1100,17 @@ Geometry alone doesn't survive the sewing machine: thread tension pulls fabric i
 The quickest route is a fabric preset:
 
 ```text
-fabric "knit       ; pull comp 0.5, auto underlay, lighter satin, density limit 1.2
+fabric 'knit'      // pull comp 0.5, auto underlay, lighter satin, density limit 3.0
+// also accepts the classic quoted-word form:  fabric "knit
 ```
 
 | Fabric               | Pull comp | Coverage limit | Notes                                |
 | -------------------- | --------- | -------------- | ------------------------------------ |
-| `"woven`             | 0.2 mm    | 3.5 layers     | the baseline                         |
-| `"knit`              | 0.5 mm    | 3.0 layers     | satin density floored at 0.45 mm     |
-| `"stretch`           | 0.6 mm    | 2.8 layers     | satin density floored at 0.5 mm      |
-| `"denim` / `"canvas` | 0.15 mm   | 4.0 layers     | stable, tolerates dense stitching    |
-| `"fleece`            | 0.3 mm    | 2.6 layers     | doubled underlay, suggests a topping |
+| `'woven'`            | 0.2 mm    | 3.5 layers     | the baseline                         |
+| `'knit'`             | 0.5 mm    | 3.0 layers     | satin density floored at 0.45 mm     |
+| `'stretch'`          | 0.6 mm    | 2.8 layers     | satin density floored at 0.5 mm      |
+| `'denim'` / `'canvas'` | 0.15 mm | 4.0 layers     | stable, tolerates dense stitching    |
+| `'fleece'`           | 0.3 mm    | 2.6 layers     | doubled underlay, suggests a topping |
 
 Explicit commands after `fabric` override the preset.
 
@@ -989,8 +1124,8 @@ Underlay is stabilising stitching sewn automatically _underneath_ the visible la
 
 | Command              | Modes                                                                                                                                                                                                                                                                                                                                                                  |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `underlay "auto`     | for satin columns: `"center` (spine, out and back), `"edge` (runs offset ±30% width), `"zigzag` (open zigzag at 60% width + return run), `"off`. `"auto` picks by width: < 1.5 mm none, < 4 mm center, wider zigzag                                                                                                                                                    |
-| `fillunderlay "auto` | for fills: `"tatami` (sparse cross-grain pass at `fillangle + 90`, inset 0.6 mm), `"edge` (run tracing the boundary inset 0.5 mm), `"off`. `"auto` = tatami, plus the edge run on areas over 100 mm². Under a directional `fill dir @fn`, the tatami pass follows the field **rotated +90°** so the underlay still anchors across the grain even when the grain curves |
+| `underlay 'auto'`    | for satin columns: `'center'` (spine, out and back), `'edge'` (runs offset ±30% width), `'zigzag'` (open zigzag at 60% width + return run), `'off'`. `'auto'` picks by width: < 1.5 mm none, < 4 mm center, wider zigzag. Classic `"auto` syntax also accepted                                                                                                        |
+| `fillunderlay 'auto'` | for fills: `'tatami'` (sparse cross-grain pass at `fillangle + 90`, inset 0.6 mm), `'edge'` (run tracing the boundary inset 0.5 mm), `'off'`. `'auto'` = tatami, plus the edge run on areas over 100 mm². Under a directional `fill dir @fn`, the tatami pass follows the field **rotated +90°** so the underlay still anchors across the grain even when the grain curves |
 
 A satin column is buffered while you draw it and sewn — underlay first, then the zigzag — when it ends (pen up, mode change, colour change, trim, fill, or end of program). The turtle's position and heading are unaffected.
 
@@ -1153,12 +1288,15 @@ Travels of 7 mm or more (configurable 3–30, `autotrim 0` off) automatically ge
 
 | Tool                      | What it does                                                                                                                                                                                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `print expr`              | log a value to the console                                                                                                                                                                                                                                   |
+| `print expr`              | log a value to the console. A string prints its raw contents (no quotes). A list prints as `[1, 'a', …]`                                                                                                                                                    |
 | `print "label expr`       | …with a label: `print "radius :r` → `radius: 1.5`                                                                                                                                                                                                            |
+| `print(v1, v2, …)`        | variadic call form: concatenates all rendered values with no separator — `print('piece: ', i)` → `piece: 3`                                                                                                                                                  |
 | `printloc`                | log the needle's current local-frame position: `loc: [12.5, -3.0]`. The coordinates are what `pos()` returns — local-frame, so under a transform they reflect what the turtle "thinks"                                                                       |
 | `printloc "label`         | …with a custom label: `printloc "origin` → `origin: [0, 0]`                                                                                                                                                                                                  |
 | `mark`                    | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats                                                                                              |
+| `mark 'label'`            | …with an optional string label on the pin: `mark 'centre'` or `mark lower(name)`                                                                                                                                                                            |
 | `assert cond`             | stop with an error (and line number) if the condition is false — great for geometric invariants (`assert (distance 0 0) < 47`)                                                                                                                               |
+| `assert(cond, message)`   | …with a message string shown on failure. The message is only evaluated if the assertion fails (safe for expensive expressions)                                                                                                                               |
 | Playback scrubber         | scrub the design stitch by stitch; the **source line being sewn is highlighted** in the editor and shown in the playback bar                                                                                                                                 |
 | Did-you-mean              | typos in commands, variables, and procedure names suggest the closest match across every namespace, labelled by kind: `Unknown command "stichlen" — did you mean the command "stitchlen"?`                                                                   |
 | Warnings                  | non-fatal issues surface as chips and console lines: clamped values, merged tiny stitches, unclosed fills, hoop overflow, excessive density                                                                                                                  |
@@ -1177,6 +1315,8 @@ NeedleScript guards both your browser and your machine:
 | Max list length                                        | 100,000 elements                                                                        |
 | Max total live list cells                              | 1,000,000                                                                               |
 | Max list nesting depth                                 | 16                                                                                      |
+| Max string length                                      | 10,000 characters per string                                                            |
+| Max total string allocations                           | 1,000,000 characters (monotonic budget, like list cells)                                |
 | Max `scatter` output                                   | 20,000 points                                                                           |
 | Max `voronoi` / `triangulate` / `hull` / `relax` input | 10,000 points                                                                           |
 | Max `offsetpath` / `clippaths` input                   | 50,000 vertices per call                                                                |
@@ -1211,7 +1351,7 @@ const stats = designStats(result.events); // counts, bounding box, max stitch…
 const bytes = toDST(result.events, 'rose'); // Uint8Array, ready to save
 ```
 
-Also exported: `tokenize`, `parse`, `toPES`, `toEXP`, `toSVG`, `applyLocks`, `applyAutoTrim`, `densityMap`, `makeRNG`, `makeNoise`, `fork`, `gauss`, `suggest`, the command tables (`BUILTIN_ARITY`, `QWORD_BUILTINS`, `FABRICS`, `FUNC_ARITY`, `ALIASES`, `RESERVED`, `ZERO_FUNCS`, `LIST_FUNCS`, `LIST_CMDS`, `GEN_FUNCS`, `GEN_CMDS`, `LIBRARY_FUNCS`), `LIMITS`, and `NeedlescriptError` (which carries the source line in `slLine`).
+Also exported: `tokenize`, `parse`, `toPES`, `toEXP`, `toSVG`, `applyLocks`, `applyAutoTrim`, `densityMap`, `makeRNG`, `makeNoise`, `fork`, `gauss`, `suggest`, the command tables (`BUILTIN_ARITY`, `QWORD_BUILTINS`, `FABRICS`, `FUNC_ARITY`, `ALIASES`, `RESERVED`, `ZERO_FUNCS`, `LIST_FUNCS`, `LIST_CMDS`, `GEN_FUNCS`, `GEN_CMDS`, `STRING_FUNCS`, `LIBRARY_FUNCS`), `LIMITS`, `NeedlescriptError` (which carries the source line in `slLine`), `isList`, `isString`.
 
 The engine's only runtime dependencies are three exactly-pinned libraries that each do something genuinely hard: `simplex-noise` (seeded noise tables), `delaunator` (Delaunay triangulation) and `clipper2-ts` (polygon offsetting & booleans). Everything else — `lerp` through `catmull`, even Bridson's Poisson-disc — is hand-rolled, because owning the code is cheaper than auditing a dependency for determinism. None of them touch `Math.random` (the test suite proves it).
 

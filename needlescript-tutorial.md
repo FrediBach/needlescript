@@ -22,6 +22,7 @@ This tutorial walks you from the absolute basics up to seeded noise fields, Voro
 10. [The two dialects, and call syntax](#10-the-two-dialects-and-call-syntax)
 11. [Randomness and determinism](#11-randomness-and-determinism)
 12. [Lists](#12-lists)
+12b. [Strings](#strings)
 13. [Generative math: scalars, noise, vectors](#13-generative-math-scalars-noise-vectors)
 14. [Paths and curves](#14-paths-and-curves)
 15. [Generators: scatter, Voronoi, hull](#15-generators-scatter-voronoi-hull)
@@ -51,7 +52,7 @@ A few facts to anchor everything else:
 - **Heading is in degrees, measured clockwise from north.** `0` faces up, `90` faces right (east), `180` is down, `270` is left. This is the Logo convention and it's used _everywhere_ — including the vector and noise functions later on.
 - **Words are case-insensitive.** `FD 10` and `fd 10` are the same.
 - **There are no statement separators.** Whitespace and newlines are interchangeable. You can put a whole program on one line or spread one command across several.
-- **The only everyday value is the number.** Millimetres, degrees, counts, and truth values are all just numbers. (`0` is false, anything else is true. Comparisons return `1` or `0`, and `true`/`false` are literally `1` and `0`.) Lists arrive later as a second value type, but they never reach the stitch stream — they live in your program.
+- **There are three value types.** _Numbers_ are the everyday workhorse: millimetres, degrees, counts, truth values. (`0` is false, anything else is true.) _Strings_ are immutable character sequences, written in single quotes (`'hello'`) — useful for labels, mode names, and computed text; they never reach the stitch stream. _Lists_ hold ordered sequences of numbers, strings, and other lists — for paths, palettes, and data pipelines; they too never reach the stitch stream.
 
 Comments start with `//`, `#`, or `;` and run to the end of the line. A lone `/` is still division — only _two adjacent_ slashes start a comment.
 
@@ -741,6 +742,142 @@ for i = 0 to 11 [
 
 ---
 
+## Strings
+
+NeedleScript has three value types: numbers, lists, and **strings** — immutable sequences of characters. Strings are delimited by single quotes and never reach the stitch stream; they live in the program as labels, mode arguments, and computed text.
+
+```text
+let name = 'meadow'
+print name                         // meadow
+print concat('piece-', str(3))     // piece-3
+```
+
+### Why strings?
+
+Two pressures made strings worth adding:
+
+1. **Debugging with computed messages.** `print "label expr` has a fixed label baked in at parse time. With strings you can compute the message: `print('tile ', i, ': radius = ', r)`.
+2. **Mode words become programmable.** `clippaths(a, b, "difference)` works, but the operation is frozen. With strings: `clippaths(a, b, pick(['union', 'difference', 'xor']))` — the mode is an ordinary value you can store in a variable, return from a reporter, or pick from a list.
+
+### Literals and escapes
+
+Strings open and close on the same source line with `'`. Four escape sequences:
+
+| Escape | Meaning |
+| --- | --- |
+| `\'` | single quote |
+| `\\` | backslash |
+| `\n` | newline |
+| `\t` | tab |
+
+Any other `\x` is a hard error (`Unknown escape "\x"`). A string that reaches end-of-line without closing is a hard error (`Unterminated string`).
+
+> **The case-sensitivity island.** NeedleScript words are case-insensitive (`FD 10` = `fd 10`). String _contents_ are case-sensitive — they're data, not words. `'Anna'` and `'anna'` are different strings. The command `PRINT` is still case-insensitive; what it prints isn't.
+
+### Classic quoted words as strings
+
+A quoted word like `"knit` in **expression position** now evaluates to its string value (lowercased). Every existing program is unchanged:
+
+```text
+fabric "knit                        // works, means 'knit'
+clippaths(disc, bite, "difference)  // works, means 'difference'
+```
+
+And the new forms are equivalent:
+
+```text
+fabric 'knit'
+let ftype = 'stretch'
+fabric ftype                        // computed at runtime
+clippaths(disc, bite, pick(['union', 'difference']))
+```
+
+Binding positions — `make "x 5`, `for "i ...`, `print "label` — are unchanged; there the `"name` is a name, not a value.
+
+### Value semantics
+
+Strings are **immutable**: no in-place mutation, no aliasing. Every "modification" returns a new string.
+
+```text
+let s = 'hello'
+print s[0]                          // h      — 0-based indexing
+print s[-1]                         // o      — negatives from the end
+print reverse(s)                    // olleh  — new string
+```
+
+- **Equality** `=`/`==`: exact, case-sensitive. `'Anna' == 'anna'` is `0`. Cross-type (`'x' == 1`) is `0`, not an error.
+- **Truthiness**: none — `if s [ … ]` is a loud error. Use `len(s) > 0` or a comparison.
+- **Arithmetic and ordering**: no operators are defined on strings except `=`/`!=`. Use the library functions.
+- **Index assignment** `s[0] = 'H'`: error — strings are immutable. Use `concat` or `slice` to build a new one.
+
+### Sequence overloads
+
+These list functions extend naturally to strings:
+
+| Function | On a string |
+| --- | --- |
+| `len(s)` | character count |
+| `first(s)` · `last(s)` | `s[0]` · `s[-1]` |
+| `slice(s, a, b)` | substring (Python semantics, clamped) |
+| `reverse(s)` | reversed |
+| `concat(a, b)` | joined string — **both must be strings** (`concat('x', 1)` errors) |
+| `contains(s, sub)` | `1`/`0` substring test |
+| `indexof(s, sub)` | first index or −1 |
+| `copy(s)` | identity (strings are immutable values) |
+
+### New string functions
+
+All call-syntax only, Library tier (shadowable). The prefix `strip` comes from `trim` being permanently taken — `trim` cuts the thread, forever.
+
+| Function | Returns |
+| --- | --- |
+| `str(v)` | number → string (same rendering as `print`). Identity on a string |
+| `num(s)` · `num(s, fallback)` | string → number; error or return fallback if non-numeric |
+| `isstring(v)` | `1`/`0` |
+| `chars(s)` | list of 1-char strings — bridge to `map`, `filter`, `pick` |
+| `split(s, sep)` | list of strings — sep must be non-empty |
+| `joinstr(xs, sep)` | join list of strings with sep — all elements must be strings |
+| `upper(s)` · `lower(s)` | ASCII case only (A–Z, a–z) |
+| `strip(s)` | remove leading/trailing whitespace |
+| `repeatstr(s, n)` | repeat `n` times (non-negative integer) |
+
+`@str`, `@upper`, `@lower` etc. work as `@`-references with `map`, `filter`, `compose`:
+
+```text
+let labels = map(range(5), @str)     // ['0', '1', '2', '3', '4']
+print joinstr(labels, '-')           // 0-1-2-3-4
+```
+
+### print, assert, mark — new forms
+
+```text
+// print — variadic call form, no separator
+print('tile ', i, ' of ', total, ': r = ', r, ' mm')
+
+// assert — optional message, lazy (only evaluated on failure)
+assert(len(pieces) > 0, concat('clip empty at tile ', str(i)))
+
+// mark — optional label on the preview pin
+mark 'anchor'
+mark lower(name)
+```
+
+Classic forms (`print expr`, `print "label expr`, `assert cond`) are unchanged.
+
+### Strings inside lists
+
+Lists may contain strings: `['union', 'difference']`. `pick`, `shuffle`, `for … in`, `contains`, `indexof`, destructuring, and deep equality all extend naturally:
+
+```text
+seed 11
+let fabs = ['woven', 'knit', 'stretch']
+fabric pick(fabs)                    // random fabric, seeded
+```
+
+> **`trim` vs `strip`.** This is the one footgun worth calling out explicitly. `trim` cuts the thread and takes no arguments — that meaning is permanent. For whitespace removal use `strip(s)`. Writing `trim('hello')` gives an error that explains this and points to `strip`.
+
+---
+
 ## 13. Generative math: scalars, noise, vectors
 
 Lists make data representable; the generative-math builtins make it _generatable_. Three conventions, stated once and used everywhere: **a point is `[x, y]`, a path is a list of points, a region is a closed path** (the closing segment is implicit). Every function speaks that vocabulary, so the output of one feeds the input of the next. These are all **call-syntax only.**
@@ -895,7 +1032,7 @@ For precise shape manipulation, NeedleScript wraps the Clipper2 library on integ
 | Function                 | Returns                                                                                                                                                                                              |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `offsetpath(region, mm)` | a **list** of regions — positive inflates, negative shrinks. Shrinking may split a shape into several, or into **none** (an empty list, not an error — loops over it simply do nothing). Round joins |
-| `clippaths(a, b, "op)`   | a boolean of two regions; _op_ ∈ `"union` `"intersect` `"difference` `"xor`; returns a **list** of regions                                                                                           |
+| `clippaths(a, b, 'op')`  | a boolean of two regions; _op_ ∈ `'union'` `'intersect'` `'difference'` `'xor'` (also accepts the classic `"op` form); returns a **list** of regions                                               |
 | `inpath(p, region)`      | `1`/`0` by the even-odd rule (consistent with fills)                                                                                                                                                 |
 
 Two things to internalise. First, `offsetpath` and `clippaths` always return _lists_ of regions, because these operations can produce multiple pieces (or zero) — so you iterate the result:
@@ -1158,16 +1295,17 @@ Geometry that looks right on screen doesn't automatically _sew_ right. Thread te
 The quickest route is to declare your fabric, which sets sensible defaults for everything below:
 
 ```text
-fabric "knit       ; pull comp 0.5, auto underlay, lighter satin, density limit 1.2
+fabric 'knit'      // pull comp 0.5, auto underlay, lighter satin, density limit 3.0
+// classic quoted-word syntax works identically:  fabric "knit
 ```
 
 | Fabric               | Pull comp | Coverage limit | Notes                                |
 | -------------------- | --------- | -------------- | ------------------------------------ |
-| `"woven`             | 0.2 mm    | 3.5 layers     | the baseline                         |
-| `"knit`              | 0.5 mm    | 3.0 layers     | satin density floored at 0.45 mm     |
-| `"stretch`           | 0.6 mm    | 2.8 layers     | satin density floored at 0.5 mm      |
-| `"denim` / `"canvas` | 0.15 mm   | 4.0 layers     | stable, tolerates dense stitching    |
-| `"fleece`            | 0.3 mm    | 2.6 layers     | doubled underlay, suggests a topping |
+| `'woven'`            | 0.2 mm    | 3.5 layers     | the baseline                         |
+| `'knit'`             | 0.5 mm    | 3.0 layers     | satin density floored at 0.45 mm     |
+| `'stretch'`          | 0.6 mm    | 2.8 layers     | satin density floored at 0.5 mm      |
+| `'denim'` / `'canvas'` | 0.15 mm | 4.0 layers     | stable, tolerates dense stitching    |
+| `'fleece'`           | 0.3 mm    | 2.6 layers     | doubled underlay, suggests a topping |
 
 Any explicit command after `fabric` overrides that part of the preset.
 
@@ -1179,10 +1317,10 @@ Thread tension shrinks stitching along the stitch axis — a 4 mm satin column a
 
 Underlay is stabilising stitching sewn automatically _underneath_ the visible layer — the single biggest difference between hobby and professional digitizing. It anchors the fabric to the backing, stops it shifting, and lifts the top stitching out of the material. It's sewn in correct machine order (before the top layer), shown thinner and lighter in the preview, and identical to normal stitches in exports.
 
-| Command              | Modes                                                                                                                                                                                                                               |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `underlay "auto`     | for satin: `"center` (a spine, out and back), `"edge` (runs offset to ±30% width), `"zigzag` (open zigzag at 60% width plus a return run), `"off`. `"auto` picks by width — under 1.5 mm none, under 4 mm center, wider gets zigzag |
-| `fillunderlay "auto` | for fills: `"tatami` (sparse cross-grain pass), `"edge` (a run tracing the boundary), `"off`. `"auto` = tatami, plus the edge run on areas over 100 mm²                                                                             |
+| Command                | Modes                                                                                                                                                                                                                               |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `underlay 'auto'`      | for satin: `'center'` (spine, out and back), `'edge'` (runs offset ±30% width), `'zigzag'` (open zigzag at 60% width plus a return run), `'off'`. `'auto'` picks by width. Classic `"auto` form also works                         |
+| `fillunderlay 'auto'`  | for fills: `'tatami'` (sparse cross-grain pass), `'edge'` (run tracing the boundary), `'off'`. `'auto'` = tatami, plus the edge run on areas over 100 mm². Classic `"auto` form also works                                          |
 
 A satin column is buffered while you draw it and sewn — underlay first, then the zigzag — when it ends (a pen up, mode change, colour change, trim, fill, or end of program). The turtle's position and heading are unaffected.
 
@@ -1339,14 +1477,17 @@ def adaptive(p) [
 
 Generative designs surprise you. These tools tell you what actually happened.
 
-| Tool                | What it does                                                                                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `print expr`        | log a value to the console                                                                                                                                                                       |
-| `print "label expr` | the same, with a label — `print "radius r` prints `radius: 1.5`                                                                                                                                  |
-| `printloc`          | log the needle's current local-frame position: `loc: [12.5, -3.0]`. Under a transform the coordinates reflect the turtle's own frame — which is usually what you want when debugging motif logic |
-| `printloc "label`   | the same, with a custom label — `printloc "here` prints `here: [x, y]`                                                                                                                           |
-| `mark`              | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats                                  |
-| `assert cond`       | stop with an error (and line number) if the condition is false — ideal for geometric invariants: `assert (distance 0 0) < 47`                                                                    |
+| Tool                    | What it does                                                                                                                                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `print expr`            | log a value to the console. A string prints its raw contents; a list prints as `[1, 'a', …]`                                                                                                    |
+| `print "label expr`     | the same, with a static label — `print "radius r` prints `radius: 1.5`                                                                                                                          |
+| `print(v1, v2, …)`      | variadic call form — concatenates all renderings: `print('tile ', i, ': r = ', r)` → `tile 3: r = 1.5`                                                                                          |
+| `printloc`              | log the needle's current local-frame position: `loc: [12.5, -3.0]`. Under a transform the coordinates reflect the turtle's own frame — usually what you want when debugging motif logic          |
+| `printloc "label`       | the same, with a custom label — `printloc "here` prints `here: [x, y]`                                                                                                                           |
+| `mark`                  | drop a numbered pin on the preview at the needle's position. Pins appear as playback reaches them and are **never exported** to the machine or counted in stats                                  |
+| `mark 'label'`          | optional string label on the pin — `mark lower(name)` shows the label instead of a number                                                                                                       |
+| `assert cond`           | stop with an error (and line number) if the condition is false — ideal for geometric invariants: `assert (distance 0 0) < 47`                                                                    |
+| `assert(cond, message)` | the same, with a message string shown on failure. The message is only evaluated on failure (safe for expensive computations)                                                                     |
 
 Beyond commands, the playground itself is a debugger:
 
@@ -1367,6 +1508,12 @@ repeat 50 [
 ]
 ```
 
+With the 2-arg form you can add computed context:
+
+```text
+assert(len(pieces) > 0, concat('clip empty at tile ', str(i)))
+```
+
 ---
 
 ## 23. Safety limits
@@ -1382,6 +1529,8 @@ NeedleScript guards both your browser and your machine. Hit one of these and you
 | Max list length                                        | 100,000 elements                                                 |
 | Max total live list cells                              | 1,000,000                                                        |
 | Max list nesting depth                                 | 16                                                               |
+| Max string length                                      | 10,000 characters                                                |
+| Max total string allocations                           | 1,000,000 characters                                             |
 | Max `scatter` output                                   | 20,000 points                                                    |
 | Max `voronoi` / `triangulate` / `hull` / `relax` input | 10,000 points                                                    |
 | Max `offsetpath` / `clippaths` input                   | 50,000 vertices per call                                         |
@@ -1418,7 +1567,7 @@ let bite = trace [ up setxy 44 0 down arc 360 14 ]  // pokes through the rim
 
 moveto 20 10       // imagine earlier work parked the needle here
 
-for piece in clippaths(disc, bite, "difference) [
+for piece in clippaths(disc, bite, 'difference') [
   beginfill sewpath(resample(piece, 1)) endfill
   trim
 ]
@@ -1429,7 +1578,7 @@ The difference is a clean pac-man shape, yet the fill shows a skinny triangular 
 The habit that prevents this — and it should become reflexive — is **park before you sew**: jump onto the data before opening the fill.
 
 ```text
-for piece in clippaths(disc, bite, "difference) [
+for piece in clippaths(disc, bite, 'difference') [
   let ring = resample(piece, 1)
   up setpos(ring[0]) down            // park the needle ON the data first
   beginfill sewpath(ring) endfill
@@ -1478,7 +1627,7 @@ If you wanted one merged blob, do the boolean in the data world first, then fill
 let a = trace [ circle 16 ]
 let b = trace [ up setxy 20 0 down circle 16 ]
 
-for piece in clippaths(a, b, "union) [
+for piece in clippaths(a, b, 'union') [
   let ring = resample(piece, 1.5)
   up setpos(ring[0]) down
   beginfill sewpath(ring) endfill
@@ -1533,7 +1682,7 @@ Before blaming the engine, walk this list — it catches the great majority of v
 
 1. **Park before you sew.** `up setpos(ring[0]) down` (or `moveto`) before every `sewpath`, and _especially_ before every `beginfill`.
 2. **Close your outlines.** A region's closing segment is implicit in data; add the final `setpos(ring[0])` when sewing a loop.
-3. **Booleans before the fill, parity inside it.** Overlapping rings in one fill is xor; use `clippaths(a, b, "union)` when you mean union.
+3. **Booleans before the fill, parity inside it.** Overlapping rings in one fill is xor; use `clippaths(a, b, 'union')` when you mean union.
 4. **One shape, one fill.** Rings that jointly describe a shape (boundary + holes, border bands) go in a single `beginfill`, separated by `moveto`.
 5. **Trims outside `trace`.** The sandbox discards machine commands; cut thread where you sew, not where you capture.
 6. **Sort your travel.** Scattered sewing order means jumps and trims; a swept order means clean fabric and a faster machine.
@@ -1570,7 +1719,7 @@ def stem(steps) [
 ]
 
 // --- the scene ---
-fabric "woven        // sensible underlay + pull compensation
+fabric 'woven'       // sensible underlay + pull compensation
 seed 11
 stitchlen 2
 
@@ -1628,6 +1777,8 @@ Pure values in, values out — nothing here ever moves the needle:
 **Scalar math:** `random`, `gauss`, `noise`, `noise2`, `snoise2`, `snoise3`, `fbm2`, `sin`, `cos`, `sqrt`, `abs`, `round`, `floor`, `ceil`, `min`, `max`, `pow`, `mod`, `lerp`, `remap`, `clamp`, `smoothstep`
 
 **Lists:** `filled`, `len`, `islist`, `first`, `last`, `append`, `prepend`, `insertat`, `removeat`, `concat`, `slice`, `reverse`, `sort`, `copy`, `indexof`, `contains`, `sum`, `mean`, `minof`, `maxof`, `pick`, `shuffle`, `range`, `steps`
+
+**Strings:** `str`, `num`, `isstring`, `chars`, `split`, `joinstr`, `upper`, `lower`, `strip`, `repeatstr` — plus the list functions above that are overloaded to work on strings too: `len`, `first`, `last`, `slice`, `reverse`, `concat`, `contains`, `indexof`, `copy`
 
 **Higher-order:** `map`, `filter`, `reduce`, `compose`, and `@name` references themselves
 
