@@ -1,0 +1,25 @@
+---
+title: 'Part VI capstone: Shatter, rebuilt'
+part: 'Part VI — Computational Geometry'
+partNumber: 6
+order: 4
+subtitle: 'The full generative-geometry pipeline from scratch'
+---
+
+_Content coming soon._
+
+<Run>{`// Placeholder — shatter capstone pipeline
+seed 42
+let boundary = trace [ repeat 36 [ fd 5 rt 10 ] ]
+let pts = relax(scatter(5, boundary), 3)
+let cells = voronoi(pts, boundary)
+for cell in cells [
+  beginfill
+  up  setpos cell[0]  down
+  sewpath cell
+  endfill
+]`}</Run>
+
+<Checkpoint chapterId="ch-38">
+  Chapter content coming soon.
+</Checkpoint>

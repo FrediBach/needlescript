@@ -1,0 +1,23 @@
+---
+title: 'Offsets and booleans'
+part: 'Part VI — Computational Geometry'
+partNumber: 6
+order: 3
+subtitle: 'offsetpath, clippaths, and parity vs union'
+---
+
+_Content coming soon._
+
+<Run>{`// Concentric inset fills via offsetpath
+let shape = trace [ repeat 36 [ fd 4 rt 10 ] ]
+let rings = [shape]
+while len(rings) > 0 [
+  let outer = rings[len(rings) - 1]
+  let inner = offsetpath(outer, (-2))
+  if len(inner) > 0 [ rings = append(rings, inner[0]) ]
+  else [ rings = [] ]
+]`}</Run>
+
+<Checkpoint chapterId="ch-37">
+  Chapter content coming soon.
+</Checkpoint>

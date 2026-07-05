@@ -1,0 +1,23 @@
+---
+title: 'Tessellations: Voronoi, Delaunay, hull'
+part: 'Part VI — Computational Geometry'
+partNumber: 6
+order: 2
+subtitle: 'voronoi, triangulate, hull, inpath, and travel order'
+---
+
+_Content coming soon._
+
+<Run>{`// Voronoi cells from scattered seeds
+seed 42
+let boundary = trace [ repeat 36 [ fd 4 rt 10 ] ]
+let seeds = scatter(6, boundary)
+let cells = voronoi(seeds, boundary)
+for cell in cells [
+  up  setpos cell[0]  down
+  sewpath cell
+]`}</Run>
+
+<Checkpoint chapterId="ch-36">
+  Chapter content coming soon.
+</Checkpoint>

@@ -1,0 +1,20 @@
+---
+title: 'Curves and smoothing'
+part: 'Part V — Paths, Curves, and the Data Bridge'
+partNumber: 5
+order: 3
+subtitle: 'chaikin, catmull, bezier, and resampling discipline'
+---
+
+_Content coming soon._
+
+<Run>{`// Chaikin smoothing applied to a jagged polygon
+let pts = [[0,0],[20,5],[15,20],[(-5),15],[(-10),5]]
+let smooth = chaikin(pts, 3)
+let path = resample(smooth, 2)
+up  setpos path[0]  down
+sewpath path`}</Run>
+
+<Checkpoint chapterId="ch-31">
+  Chapter content coming soon.
+</Checkpoint>

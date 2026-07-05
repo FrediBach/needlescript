@@ -1,0 +1,21 @@
+---
+title: 'The shaping toolkit'
+part: 'Part IV — Randomness and Generative Math'
+partNumber: 4
+order: 3
+subtitle: 'lerp, remap, clamp, smoothstep, and trig modulation'
+---
+
+_Content coming soon._
+
+<Run>{`// remap noise into a useful design range
+seed 42
+repeat 36 [
+  let t = repcount / 36
+  let r = remap(snoise2(t, 0), (-1), 1, 8, 22)
+  fd r  rt 10
+]`}</Run>
+
+<Checkpoint chapterId="ch-25">
+  Chapter content coming soon.
+</Checkpoint>

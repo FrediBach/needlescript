@@ -1,0 +1,23 @@
+---
+title: 'Noise fields'
+part: 'Part IV — Randomness and Generative Math'
+partNumber: 4
+order: 2
+subtitle: 'snoise2/3, fbm2, flow fields, and organic variation'
+---
+
+_Content coming soon._
+
+<Run>{`// A simple noise-guided flow field
+seed 42
+let n = 30
+repeat n [
+  let x = (repcount - n/2) * 3
+  seth snoise2(x/20, 0) * 180
+  moveto x 0
+  fd 10
+]`}</Run>
+
+<Checkpoint chapterId="ch-24">
+  Chapter content coming soon.
+</Checkpoint>

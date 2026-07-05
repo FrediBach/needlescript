@@ -1,0 +1,22 @@
+---
+title: 'Segments and proximity'
+part: 'Part IV — Randomness and Generative Math'
+partNumber: 4
+order: 5
+subtitle: 'segisect, segdist, nearestonpath, and self-avoiding walkers'
+---
+
+_Content coming soon._
+
+<Run>{`// A simple walker that stays near the origin
+seed 42
+let steps = 30
+repeat steps [
+  let d = vdist([0,0], pos())
+  if d > 25 [ rt 180 ]
+  fd 4  rt (random(60) - 30)
+]`}</Run>
+
+<Checkpoint chapterId="ch-27">
+  Chapter content coming soon.
+</Checkpoint>

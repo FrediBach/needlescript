@@ -1,0 +1,19 @@
+---
+title: 'Paths as data'
+part: 'Part V — Paths, Curves, and the Data Bridge'
+partNumber: 5
+order: 1
+subtitle: 'pathlen, centroid, bbox, resample, and sewpath'
+---
+
+_Content coming soon._
+
+<Run>{`// Build a path as data, then sew it
+let ring = trace [ repeat 36 [ fd 4 rt 10 ] ]
+let resampled = resample(ring, 2.5)
+up  setpos resampled[0]  down
+sewpath resampled`}</Run>
+
+<Checkpoint chapterId="ch-29">
+  Chapter content coming soon.
+</Checkpoint>

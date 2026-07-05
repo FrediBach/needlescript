@@ -1,0 +1,22 @@
+---
+title: 'Vectors'
+part: 'Part IV — Randomness and Generative Math'
+partNumber: 4
+order: 4
+subtitle: 'vadd, vnorm, vfromheading, and polar geometry'
+---
+
+_Content coming soon._
+
+<Run>{`// Phyllotaxis spiral using vectors
+let golden = 137.508
+repeat 40 [
+  let r = sqrt(repcount) * 4
+  let pt = vfromheading(repcount * golden, r)
+  up  setpos pt  down
+  repeat 6 [ fd 1.5 rt 60 ]
+]`}</Run>
+
+<Checkpoint chapterId="ch-26">
+  Chapter content coming soon.
+</Checkpoint>

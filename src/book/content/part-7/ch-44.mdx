@@ -1,0 +1,22 @@
+---
+title: 'Programmable satin'
+part: 'Part VII — Fabric Physics and the Professional Layer'
+partNumber: 7
+order: 5
+subtitle: 'The generator contract: (t, s, i, u) → column tuple'
+---
+
+_Content coming soon._
+
+<Run>{`// A tapered satin leaf using satnpair
+def taper(t, s, i, u) [
+  let w = smoothstep(0, 0.5, s) * 4
+  return satinpair(0.4, w)
+]
+satin @taper
+repeat 8 [ fd 15 rt 5 ]
+repeat 8 [ fd 15 rt 5 ]`}</Run>
+
+<Checkpoint chapterId="ch-44">
+  Chapter content coming soon.
+</Checkpoint>

@@ -1,0 +1,22 @@
+---
+title: 'Transforms'
+part: 'Part V — Paths, Curves, and the Data Bridge'
+partNumber: 5
+order: 4
+subtitle: 'translate, rotate, mirror, scale, and data twins'
+---
+
+_Content coming soon._
+
+<Run>{`// Stamp a petal motif six times with rotateabout
+def petal() [
+  repeat 8 [ fd 10 rt 22.5 ]
+  repeat 8 [ fd 10 rt 22.5 ]
+]
+repeat 6 [
+  rotateabout 0 0 (repcount * 60) [ petal() ]
+]`}</Run>
+
+<Checkpoint chapterId="ch-32">
+  Chapter content coming soon.
+</Checkpoint>

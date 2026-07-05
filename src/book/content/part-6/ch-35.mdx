@@ -1,0 +1,22 @@
+---
+title: 'Point generators'
+part: 'Part VI — Computational Geometry'
+partNumber: 6
+order: 1
+subtitle: 'scatter, relax, Poisson-disc, and density budgets'
+---
+
+_Content coming soon._
+
+<Run>{`// Poisson-disc scattered points inside a circle
+seed 42
+let region = trace [ repeat 36 [ fd 4 rt 10 ] ]
+let pts = scatter(4, region)
+for p in pts [
+  up  setpos p  down
+  repeat 6 [ fd 1.5 rt 60 ]
+]`}</Run>
+
+<Checkpoint chapterId="ch-35">
+  Chapter content coming soon.
+</Checkpoint>
