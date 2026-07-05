@@ -22,23 +22,23 @@ This tutorial walks you from the absolute basics up to seeded noise fields, Voro
 10. [The two dialects, and call syntax](#10-the-two-dialects-and-call-syntax)
 11. [Randomness and determinism](#11-randomness-and-determinism)
 12. [Lists](#12-lists)
-12b. [Strings](#strings)
-13. [Generative math: scalars, noise, vectors](#13-generative-math-scalars-noise-vectors)
-14. [Paths and curves](#14-paths-and-curves)
-15. [Generators: scatter, Voronoi, hull](#15-generators-scatter-voronoi-hull)
-16. [Geometry: offsets and booleans](#16-geometry-offsets-and-booleans)
-17. [Transforms: stamping motifs](#17-transforms-stamping-motifs)
-18. [Effects: warp, humanize, snaptogrid](#18-effects-warp-humanize-snaptogrid)
-19. [Trace: capturing paths as data](#19-trace-capturing-paths-as-data)
-20. [Professional embroidery and fabric physics](#20-professional-embroidery-and-fabric-physics)
-21. [Programmable satin, fills, and closed-loop generation](#21-programmable-satin-fills-and-closed-loop-generation)
-22. [Debugging](#22-debugging)
-23. [Safety limits](#23-safety-limits)
-24. [Exporting and reusing your work](#24-exporting-and-reusing-your-work)
-25. [Sewing gotchas](#25-sewing-gotchas)
-26. [A capstone project](#26-a-capstone-project)
-27. [Two worlds](#27-two-worlds)
-28. [AI generation assistant](#28-ai-generation-assistant)
+13. [Strings](#13-strings)
+14. [Generative math: scalars, noise, vectors](#14-generative-math-scalars-noise-vectors)
+15. [Paths and curves](#15-paths-and-curves)
+16. [Generators: scatter, Voronoi, hull](#16-generators-scatter-voronoi-hull)
+17. [Geometry: offsets and booleans](#17-geometry-offsets-and-booleans)
+18. [Transforms: stamping motifs](#18-transforms-stamping-motifs)
+19. [Effects: warp, humanize, snaptogrid](#19-effects-warp-humanize-snaptogrid)
+20. [Trace: capturing paths as data](#20-trace-capturing-paths-as-data)
+21. [Professional embroidery and fabric physics](#21-professional-embroidery-and-fabric-physics)
+22. [Programmable satin, fills, and closed-loop generation](#22-programmable-satin-fills-and-closed-loop-generation)
+23. [Debugging](#23-debugging)
+24. [Safety limits](#24-safety-limits)
+25. [Exporting and reusing your work](#25-exporting-and-reusing-your-work)
+26. [Sewing gotchas](#26-sewing-gotchas)
+27. [A capstone project](#27-a-capstone-project)
+28. [Two worlds](#28-two-worlds)
+29. [AI generation assistant](#29-ai-generation-assistant)
 
 ---
 
@@ -878,7 +878,7 @@ fabric pick(fabs)                    // random fabric, seeded
 
 ---
 
-## 13. Generative math: scalars, noise, vectors
+## 14. Generative math: scalars, noise, vectors
 
 Lists make data representable; the generative-math builtins make it _generatable_. Three conventions, stated once and used everywhere: **a point is `[x, y]`, a path is a list of points, a region is a closed path** (the closing segment is implicit). Every function speaks that vocabulary, so the output of one feeds the input of the next. These are all **call-syntax only.**
 
@@ -967,7 +967,7 @@ The first call finds where on the polyline `p` is closest; the second measures t
 
 ---
 
-## 14. Paths and curves
+## 15. Paths and curves
 
 Once you can build lists of points, you can treat them as paths and curves, then convert them into evenly-spaced stitches.
 
@@ -994,7 +994,7 @@ Because `sewpath` honours the current stitch mode, switching `satin 3` on before
 
 ---
 
-## 15. Generators: scatter, Voronoi, hull
+## 16. Generators: scatter, Voronoi, hull
 
 These functions _generate_ point sets and regions — the raw material of generative tessellation and stippling. All are seeded (see [section 11](#11-randomness-and-determinism)).
 
@@ -1025,7 +1025,7 @@ For organic stippling, run `relax` on your scattered points first — a few roun
 
 ---
 
-## 16. Geometry: offsets and booleans
+## 17. Geometry: offsets and booleans
 
 For precise shape manipulation, NeedleScript wraps the Clipper2 library on integer micro-coordinates, so results are exact and platform-stable.
 
@@ -1052,7 +1052,7 @@ Combine these with the generators and you can do things like: scatter points, bu
 
 ---
 
-## 17. Transforms: stamping motifs
+## 18. Transforms: stamping motifs
 
 You often want the _same_ motif in many places — rotated, scaled, mirrored — without rewriting it each time. That is exactly what transforms give you: a command takes its arguments **then a block**, applies a coordinate transform to whatever that block draws, and restores the previous frame afterwards. It is the same stack discipline you already know from `push`/`pop`, but operating on a 2-D coordinate frame instead of the turtle pose.
 
@@ -1108,7 +1108,7 @@ One caution: `scale`, `rotate`, `translate`, `mirror`, `skew`, `transform` (and 
 
 ---
 
-## 18. Effects: warp, humanize, snaptogrid
+## 19. Effects: warp, humanize, snaptogrid
 
 Transforms are the _linear_ case of a bigger idea. A transform maps every emitted point through a fixed matrix; an **effect** maps it through an arbitrary function. Effects sit on the same block-scoped stack and nest freely with transforms — same discipline, but nonlinear and, in two cases, stochastic. They all read as "run this block, but pass the emitted points through _this_ map."
 
@@ -1182,7 +1182,7 @@ let pixels = snappath(scatter(8), 2)                 // Poisson dots on a 2 mm g
 
 ---
 
-## 19. Trace: capturing paths as data
+## 20. Trace: capturing paths as data
 
 So far, data flows _into_ drawing — `sewpath(region)` walks a point list with the full pen/mode/transform machinery — but drawing never flows back _out_ into data. If you want a hexagon as a region for `offsetpath`, `clippaths`, or `scatter`, you have to build it point by point: `vfromheading`, trigonometry, `append`. And yet the turtle already knows how to draw one: `repeat 6 [ fd 30 rt 60 ]`. `trace` bridges the gap.
 
@@ -1286,7 +1286,7 @@ A trace inside a trace is allowed — the inner trace is a pure expression, invi
 
 ---
 
-## 20. Professional embroidery and fabric physics
+## 21. Professional embroidery and fabric physics
 
 Geometry that looks right on screen doesn't automatically _sew_ right. Thread tension pulls fabric inward, stitches sink into the material, tight curves crowd the needle, and layered stitching becomes a stiff, puckered patch. The following commands compensate for the physics. They are **opt-in** — without them, your program sews exactly as written.
 
@@ -1340,7 +1340,7 @@ Travels of 7 mm or more (configurable 3–30; `autotrim 0` off) automatically ge
 
 ---
 
-## 21. Programmable satin, fills, and closed-loop generation
+## 22. Programmable satin, fills, and closed-loop generation
 
 The professional layer in §20 _shapes_ the built-in stitches. The three features here go further: they let you replace the stitch generators themselves with your own reporters, and even read the fabric back as you sew. This is the most advanced corner of NeedleScript — and it reuses machinery you already know: the `@name` procedure references from [§18](#18-effects-warp-humanize-snaptogrid), and the coverage grid from [§20](#20-professional-embroidery-and-fabric-physics).
 
@@ -1473,7 +1473,7 @@ def adaptive(p) [
 
 ---
 
-## 22. Debugging
+## 23. Debugging
 
 Generative designs surprise you. These tools tell you what actually happened.
 
@@ -1516,7 +1516,7 @@ assert(len(pieces) > 0, concat('clip empty at tile ', str(i)))
 
 ---
 
-## 23. Safety limits
+## 24. Safety limits
 
 NeedleScript guards both your browser and your machine. Hit one of these and you'll get a clear error rather than a hang or a damaged garment:
 
@@ -1539,7 +1539,7 @@ NeedleScript guards both your browser and your machine. Hit one of these and you
 
 ---
 
-## 24. Exporting and reusing your work
+## 25. Exporting and reusing your work
 
 When a design is ready, **Download .DST** produces a standard Tajima file: 3-byte ternary delta records, moves longer than 12.1 mm split automatically, colour changes as stop records, trims as triple jumps, and a correct 512-byte header. Load it onto any machine, or into commercial software for a final check.
 
@@ -1547,13 +1547,13 @@ You can also bring artwork _in_: **Import SVG** (a button, or drag and drop) con
 
 ---
 
-## 25. Sewing gotchas: where artefacts come from
+## 26. Sewing gotchas: where artefacts come from
 
 NeedleScript's promise is that what you preview is what the machine sews. The flip side of that honesty is that when something strange appears on the stage — a phantom wedge, an unfilled sliver, a gap in an outline, a loose thread across the hoop — it is almost never a rendering bug. It is geometry you asked for without noticing.
 
 Nearly every such surprise comes from one underlying tension: the language has **two worlds**. The data world of lists, paths, and regions is pure and stateless — a region doesn't care where it is, closes itself implicitly, and can be transformed, clipped, and resampled without consequence. The thread world is a physical cursor dragging real thread through real fabric — it is always _somewhere_, it is always _trailing something_, and every millimetre it moves either sews, jumps, or becomes part of a boundary. Artefacts are born at the seam between the two. This section walks through the five confusions that cause them, and the habits that prevent each one.
 
-### 25.1 The needle is always somewhere
+### 26.1 The needle is always somewhere
 
 Data has no position; the needle always does. Every sewing command starts _from wherever the last one ended_ — and that includes `sewpath`, which is exactly `for p in path [ setpos(p) ]`. The very first `setpos` sews a segment from the needle's current position to `path[0]`. If the needle happens to be parked across the hoop, that segment is a stray straight stitch right through your design.
 
@@ -1588,7 +1588,7 @@ for piece in clippaths(disc, bite, 'difference') [
 
 A cousin of the same confusion: `home` returns to the origin, and if the pen is down it **sews a line straight back**. Reposition with `moveto` or `gohome`, which jump.
 
-### 25.2 Regions close themselves; thread doesn't
+### 26.2 Regions close themselves; thread doesn't
 
 A region is "a closed path — the closing segment is implicit." Implicit is the operative word: the last point of the list is _not_ the first point, and nothing in the data ever traverses the gap between them. The data world doesn't need to; `inpath`, `clippaths`, and `endfill` all treat the closure as given.
 
@@ -1605,7 +1605,7 @@ setpos(ring[0])          // sew the implicit closing segment yourself
 
 Fills, by contrast, close every ring for you — the boundary is data for the fill generator, not thread — which is exactly why the stray leading edge in §25.1 got silently welded into a closed ring.
 
-### 25.3 A fill is parity, not paint
+### 26.3 A fill is parity, not paint
 
 `endfill` does not flood-fill from a point the way a paint bucket does. It counts **boundary crossings**: a location is filled when a ray from it crosses the accumulated rings an odd number of times. Three consequences follow, and each is a classic artefact when it surprises you — or a technique when it doesn't.
 
@@ -1658,7 +1658,7 @@ Note `moveto` doing double duty here: because it jumps, it both parks the needle
 
 Finally, parity explains why boundary self-touching misbehaves: a spur (a path that doubles back on itself) or two nearly-coincident edges is a zero-width slit — mathematically nothing, but the moment `humanize` or a coarse resample nudges the two sides apart, the slit opens into a visible unfilled crack. Keep boundaries simple; let `clippaths` produce them if the shape is compound.
 
-### 25.4 Thread exists between shapes, too
+### 26.4 Thread exists between shapes, too
 
 In the data world, two shapes are simply two list entries. On fabric, moving between them strings a physical connector thread across the hoop — the dashed lines in the preview are not decoration, they are thread that will dangle, snag, and shadow through light fabric.
 
@@ -1666,7 +1666,7 @@ The tools: `trim` cuts at the current point, `autotrim` (on by default at 7 mm) 
 
 One sandbox interaction is worth engraving: **machine commands inside `trace` are discarded.** The sandbox exists to capture geometry, so a `trim` or `color` inside a trace block mutates sandboxed state and is thrown away (with a one-time console note). Trims live in the sewing code, never in the region constructor — if your connectors aren't being cut, check whether the `trim` accidentally rode along into a trace.
 
-### 25.5 Stitches are physical
+### 26.5 Stitches are physical
 
 The last family of gotchas has nothing to do with topology — the geometry is right, but the _thread_ can't follow it.
 
@@ -1692,7 +1692,7 @@ None of these are workarounds — they are the two worlds' border crossings, mad
 
 ---
 
-## 26. A capstone project
+## 27. A capstone project
 
 Let's combine what you've learned into one piece that exercises the whole pipeline: a generative seeded "meadow" of stems that grow along a noise field, each topped with a small satin leaf, all sitting on stable fabric.
 
@@ -1750,7 +1750,7 @@ Happy stitching.
 
 ---
 
-## 27. Two Worlds
+## 28. Two Worlds
 
 Sewing or data world? Does a command emit stitches or only data values?
 
@@ -1809,7 +1809,7 @@ Neither world — control flow and structure: `repeat`, `while`, `for` (all spel
 
 ---
 
-## 28. AI generation assistant
+## 29. AI generation assistant
 
 The REPL doubles as an AI interface. Any line starting with `/ai` is intercepted and dispatched to a language model of your choice via [OpenRouter](https://openrouter.ai), rather than being appended to the editor. The model receives the full NeedleScript language reference as its system prompt, along with your current code and any compile errors, and its output lands directly in the editor and runs.
 
