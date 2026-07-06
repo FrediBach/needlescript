@@ -6,35 +6,316 @@ order: 1
 subtitle: 'A gallery of the possible'
 ---
 
-Before any syntax, a question: _what can you actually make with NeedleScript?_
+**Part 0 · Start Here**
 
-The answer is: designs that can't be drawn in traditional embroidery software — organic noise fields, recursive fractals, parametric geometry. And because everything runs on your device, what you preview is _exactly_ what your machine will sew.
+# 0.1 — What you'll make
 
-## Generative embroidery
+Before any definitions, a finished piece.
 
-Traditional digitizing is drawing. You trace shapes, assign stitch types, tweak by hand. NeedleScript is programming. You describe rules — _how_ a design is built — and the machine resolves them into thread.
+This is **meadow**: eighteen stems of thread growing through an invisible field of mathematical wind, each one topped with a small satin leaf. Nobody drew those stems. Nobody could — no two of them curve the same way, yet all of them lean together, because every stem is reading its direction from the same underlying noise field. A program about thirty lines long grew the whole thing.
 
-This means:
+Press play and watch it sew, stitch by stitch. Or drag the scrubber slowly and watch the editor: the line of code responsible for the stitch currently under the needle lights up as you go. You don't need to understand a word of the code yet. That's what the rest of the book is for.
 
-- The same six lines of code can produce twelve completely different pieces by changing a single number (the **seed**).
-- You can build things that would take hours to digitize manually — noise-guided flow fields, recursively branching trees, Voronoi-shattered fills — in minutes.
-- Every design is reproducible: same code + same seed = identical `.DST` file, every time.
+<Scrub>
+{`// --- a single leaf: a small two-arc lens in satin ---
+def leaf(size) [
+  satin 1.6
+  repeat 2 [
+    repeat 18 [ fd size rt 5 ]
+    rt 90
+  ]
+  satin 0
+]
 
-## A first taste
+// --- a stem that drifts upward through a noise field ---
+def stem(n) [
+  repeat n [
+    seth (snoise2(xcor / 18, ycor / 18)) * 60
+    fd 1.6
+    if distance(0, 0) > 44 [ return ]
+  ]
+  leaf(0.9)
+]
 
-Here is the simplest possible NeedleScript program. Run it, then try changing the `20` to `30` and running again.
+// --- the scene ---
+fabric 'woven'
+seed 11
+stitchlen 2
 
-<Run>{`repeat 6 [ fd 20 rt 60 ]`}</Run>
+color 1
+repeat 18 [
+  moveto random(70) - 35, random(30) - 38
+  stem(round(random(14)) + 14)
+  trim
+]`}
+</Scrub>
 
-Six lines radiating in a hexagonal star — twelve words of code.
+Everything in that cell is real. The preview you're looking at is not an artist's impression — it is the exact sequence of needle penetrations an embroidery machine will make, and one click exports it as a `.DST` file any machine can sew. By the end of this Part you'll have exported your first one.
 
-## What the rest of the book adds
+## 0.1.1 A gallery of finished pieces
 
-By the end of Part 0 you will understand the preview, the scrubber, and how to export. By Part I you'll command the turtle freely. Parts II–IX go deeper: every stitch mode, the full language, generative math, geometric operations, and the physical craft of sewing out your designs.
+Here are three more pieces, smaller cousins of the bundled examples you'll meet in the playground's Examples menu (*bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch, meadow, echo, shatter*). Each cell below is scrubbable — and each one exists to show off a different superpower you're going to acquire.
 
-The whole book is interactive. Every code example runs right here. Every concept has a scrubber so you can watch stitches form one by one.
+**Bloom** is the power of *repetition with structure*. One `petal` procedure is defined once and stamped eight times around a centre, each time rotated a little further. Change the `8` and the `45` together and the flower reorganises itself. The glossy columns are satin stitch (Chapter 7); the jump-out-and-back choreography between petals is the turtle stack (Chapter 4).
+
+<Scrub>
+{`// bloom — eight satin petals around an open centre
+def petal(size) [
+  satin 1.8
+  repeat 2 [
+    repeat 15 [ fd size rt 6 ]
+    rt 90
+  ]
+  satin 0
+]
+
+color 1
+repeat 8 [
+  push
+  up fd 6 down
+  petal(1.3)
+  trim
+  pop
+  rt 45
+]
+
+// a bold ring to finish the middle
+color 2
+moveto -3 0
+seth 0
+bean 3
+circle 3
+bean 1`}
+</Scrub>
+
+**Tree** is the power of *recursion*: a procedure that calls itself. The whole plant is one rule — "sew a branch, then grow two smaller trees from its tip" — applied to its own output until the branches get too small to matter. There is no line of code for any individual twig. Recursion arrives properly in Chapter 16; scrub this one and notice how the machine finishes entire sub-trees before returning to a fork.
+
+<Scrub>
+{`// tree — one rule, applied to itself
+def branch(len) [
+  if len < 3 [ return ]
+  fd len
+  push  lt 28  branch(len * 0.68)  pop
+  push  rt 32  branch(len * 0.62)  pop
+]
+
+stitchlen 1.8
+moveto 0 -42
+branch(15)`}
+</Scrub>
+
+**Shatter** is the power of *generators and geometry*. The program never says where any tile goes. It scatters well-spaced points across the hoop, asks for the Voronoi cell around each point, shrinks every cell inward to leave a grout line, and sews the outlines with perfectly even stitches. Four function calls, an entire mosaic — and a taste of the data pipeline you'll build in Parts V and VI.
+
+<Scrub>
+{`// shatter — Poisson points, Voronoi tiles, inset outlines
+seed 4
+stitchlen 2
+
+let tiles = voronoi(scatter(9))
+for cell in tiles [
+  for ring in offsetpath(cell, -0.9) [
+    let pts = resample(ring, 2.2)
+    moveto(pts[0][0], pts[0][1])
+    sewpath(pts)
+    trim
+  ]
+]`}
+</Scrub>
+
+## 0.1.2 What "generative embroidery" means
+
+Traditional embroidery software is a drawing tool: you place shapes with a mouse, and the program converts each shape into stitches. It's very good at that. But every design is a *specific arrangement* — move one element and you move one element, nothing else notices.
+
+A generative design is different: it's a *recipe*, not an arrangement. The program describes the rules a design follows — how petals relate to a centre, how a branch spawns smaller branches, how far apart tiles should sit — and the design is whatever falls out when those rules run. Change one rule, or one number, and the entire piece reorganises itself coherently, in a way no amount of mouse-dragging could reproduce. That's what makes noise fields, recursion, and tessellations effectively impossible to draw by hand, and trivial to program.
+
+Here is that idea at its smallest. This whole design is governed by a single number — the turn angle. Run it, then change `91` to `90`, `121`, or `144` and run again (`Cmd`/`Ctrl`+`Enter`):
+
+<Run>
+{`// one number is the whole design — try 90, 91, 119, 121, 144
+repeat 60 [
+  fd repcount / 2
+  rt 91
+]`}
+</Run>
+
+At `90` you get a tidy square spiral. At `91`, the same square starts to precess into a whirlpool. At `144`, a five-pointed star unwinds from the centre. Nobody redrew anything between those three designs — you renegotiated one rule, and sixty moves rearranged themselves to honour it.
+
+## 0.1.3 The promise: what you preview is what the machine sews
+
+There's an obvious worry hiding in all this. Generative art traditions like p5.js celebrate randomness — but embroidery is *physical*. Thread and fabric are committed the moment the machine starts. A design that's different every run would be unshippable: you'd preview one piece and sew another.
+
+NeedleScript's answer is that **every run is deterministic**. All of its randomness — `random`, `noise`, `pick`, `shuffle`, `scatter`, all of it — is driven by a seed. Same program, same seed: the identical design, stitch for stitch, today and next year. The design below "scatters" twenty circles at "random" — run it five times and watch precisely nothing change:
+
+<Run>
+{`seed 7
+repeat 20 [
+  moveto random(60) - 30, random(60) - 30
+  circle random(3) + 1
+  trim
+]`}
+</Run>
+
+That determinism is the load-bearing promise of the whole system. It's why the preview isn't an approximation but the actual stitch plan; why the `.DST` file you export (Chapter 0.5 — yes, that soon) sews out exactly as previewed; and why every screenshot, quiz answer, and challenge in this book is reproducible on your machine.
+
+> **For the curious** — the promise is enforced mechanically, not by good intentions. The engine's test suite replaces JavaScript's `Math.random` with a function that *throws*, so nondeterminism physically cannot sneak in through any code path or dependency. Exact output values per seed are pinned by tests; an algorithm change that alters them is treated as a breaking release.
+
+<Quiz
+  question="You run a NeedleScript program today and again next month — same code, same seed. What does the machine sew?"
+  options={[
+    'Two identical pieces, stitch for stitch',
+    'Two similar pieces with small random variation',
+    'It depends on the embroidery machine',
+    'Something different every run — that is what generative means'
+  ]}
+  answer={0}
+  explanation="Every source of randomness in NeedleScript is driven by the seed. Same program + same seed = the identical stitch sequence, forever. Variation is something you ask for — by changing the seed."
+/>
+
+## Same program, twelve pieces
+
+Determinism plus a seed gives you something better than randomness: **controlled variation**. If one seed is one exact piece, then a seed is a *name* for a piece — and a single program is an infinite edition of finished works, each reproducible on demand.
+
+Here's the meadow again, editable this time. The only thing worth changing right now is the number after `seed`. Try `3`. Try `8`. Try your birth year:
+
+<Run>
+{`def leaf(size) [
+  satin 1.6
+  repeat 2 [
+    repeat 18 [ fd size rt 5 ]
+    rt 90
+  ]
+  satin 0
+]
+
+def stem(n) [
+  repeat n [
+    seth (snoise2(xcor / 18, ycor / 18)) * 60
+    fd 1.6
+    if distance(0, 0) > 44 [ return ]
+  ]
+  leaf(0.9)
+]
+
+fabric 'woven'
+seed 11        // <- change me: try 3, 8, 27, 99, 2026...
+stitchlen 2
+
+color 1
+repeat 18 [
+  moveto random(70) - 35, random(30) - 38
+  stem(round(random(14)) + 14)
+  trim
+]`}
+</Run>
+
+Two more of its faces, so you can see how far one program stretches — same code as above, only the seed differs:
+
+<RunLocked canvasHeight={220}>
+{`def leaf(size) [
+  satin 1.6
+  repeat 2 [
+    repeat 18 [ fd size rt 5 ]
+    rt 90
+  ]
+  satin 0
+]
+
+def stem(n) [
+  repeat n [
+    seth (snoise2(xcor / 18, ycor / 18)) * 60
+    fd 1.6
+    if distance(0, 0) > 44 [ return ]
+  ]
+  leaf(0.9)
+]
+
+fabric 'woven'
+seed 27
+stitchlen 2
+
+color 1
+repeat 18 [
+  moveto random(70) - 35, random(30) - 38
+  stem(round(random(14)) + 14)
+  trim
+]`}
+</RunLocked>
+
+<RunLocked canvasHeight={220}>
+{`def leaf(size) [
+  satin 1.6
+  repeat 2 [
+    repeat 18 [ fd size rt 5 ]
+    rt 90
+  ]
+  satin 0
+]
+
+def stem(n) [
+  repeat n [
+    seth (snoise2(xcor / 18, ycor / 18)) * 60
+    fd 1.6
+    if distance(0, 0) > 44 [ return ]
+  ]
+  leaf(0.9)
+]
+
+fabric 'woven'
+seed 99
+stitchlen 2
+
+color 1
+repeat 18 [
+  moveto random(70) - 35, random(30) - 38
+  stem(round(random(14)) + 14)
+  trim
+]`}
+</RunLocked>
+
+Every seed is a complete, coherent, sewable meadow — and *seed plus source is the whole piece*. Sharing a design means sharing thirty lines of text and one number. Keep that in mind when you find a seed you love below.
+
+## Checkpoint
+
+<Quiz
+  question="What is the fastest way to get a completely different — but equally finished — meadow from the program above?"
+  options={[
+    'Rewrite the stem procedure',
+    'Change the number after seed and re-run',
+    'Re-run it until it comes out different',
+    'Export it twice'
+  ]}
+  answer={1}
+  explanation="The seed drives every random choice in the run. One new number reorganises all eighteen stems into a new, equally coherent piece — and that piece is then reproducible forever."
+/>
+
+<Quiz
+  question="Which of these is the thing traditional point-and-click embroidery software cannot realistically do?"
+  options={[
+    'Sew a straight 20 mm line',
+    'Fill a hexagon with stitches',
+    'Regenerate the entire design coherently from one changed rule',
+    'Change a thread colour'
+  ]}
+  answer={2}
+  explanation="Drawing tools store arrangements; NeedleScript stores rules. When a design is a recipe, changing one rule — a turn angle, a seed, a branch ratio — recomputes everything downstream of it. That is the definition of generative."
+/>
+
+<Quiz
+  question="Why does determinism matter more for embroidery than for on-screen generative art?"
+  options={[
+    'Embroidery machines cannot process random numbers',
+    'It makes programs run faster',
+    'Thread and fabric are physical: what you previewed must be exactly what gets sewn',
+    'It is required by the .DST file format'
+  ]}
+  answer={2}
+  explanation="A screen can re-render endlessly; a sew-out is committed in thread. Seeded determinism is what lets the preview be the actual stitch plan rather than an approximation of it."
+/>
 
 <Checkpoint chapterId="ch-0-1">
-  Run the hexagon cell above. Change one number and run again. When you have a different shape in
-  the preview, you're ready.
+  Three small tasks, no code knowledge required. **One:** scrub the meadow at the top of this page and use the source-line highlight to answer a question the code can't hide from you — which line sews the leaves? **Two:** in the editable meadow, hunt through seeds until you find one you'd genuinely wear, and write its number down; a seed plus its source is the whole piece, and you'll export your first design to a real machine file in Chapter 0.5. **Three:** in the spiral cell, find one turn angle nobody else would pick.
 </Checkpoint>
+
+---
+
+**Next: Chapter 0.2 — How this book works.** Every page of this book is made of cells like the ones you just used. The next chapter takes five minutes to show you everything they can do — running, editing, resetting, scrubbing, and how your progress and scratch work are saved.
