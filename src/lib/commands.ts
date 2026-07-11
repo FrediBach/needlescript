@@ -98,6 +98,7 @@ export const EFFECT_ARITY: Record<string, { min: number; max: number }> = {
   warp: { min: 1, max: 1 }, // a reporter reference: warp @fn [ … ]
   humanize: { min: 1, max: 1 }, // jitter amount in mm (angle knob deferred)
   snaptogrid: { min: 1, max: 5 }, // cell | cellx celly | …ox oy | …ang
+  declump: { min: 1, max: 2 }, // limit [maxshift] — default maxshift 1.5 mm
 };
 
 /** Builtins that take a single quoted-word argument, with their allowed words. */
@@ -268,6 +269,7 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   warppath: { min: 2, max: 2 }, // warppath(path, @fn)
   humanizepath: { min: 2, max: 2 }, // humanizepath(path, amount)
   snappath: { min: 2, max: 6 }, // snappath(path, cell | …grid spec)
+  declumppath: { min: 2, max: 3 }, // declumppath(path, limit) | declumppath(path, limit, maxshift)
   // DX: satin-tuple helpers — build the 5-number contract list by intent
   satinpair: { min: 2, max: 2 }, // (advance, width)  ≡ [advance, width, width, 0, 0]
   satinrake: { min: 3, max: 3 }, // (advance, width, lag) ≡ [advance, width, width, -lag, lag]

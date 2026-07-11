@@ -921,6 +921,7 @@ Reading inside-out: draw the leaf, humanize its penetrations, ripple the result,
 | `warp @fn`                                  | no      | local, post-transform  | before split | only if the reporter is |
 | `humanize amount`                           | no      | hoop, post-transform   | after split  | yes (forks)             |
 | `snaptogrid …`                              | no      | **fixed hoop lattice** | after split  | no                      |
+| `declump limit [maxshift]`                  | no      | hoop                   | after split  | no (drawless)           |
 
 The "stage" column is the one subtlety a naive implementation gets wrong. `warp` is a _geometric deformation_ — it maps the emitted path vertices **before** stitch-length splitting, so the deformed curve is still split into clean physical stitches (exactly like a transform). `humanize` and `snaptogrid` perturb _individual penetrations_, so they run **after** splitting — jitter or snap the final needle points, not the continuous path (warp-then-split would resample the irregularity away; snap-then-split would interpolate stitches back off the grid).
 
@@ -978,15 +979,37 @@ It overloads by arity (like `scatter`/`range`/`slice`), with the full form as th
 
 `snaptogrid` is **pure and drawless** — rounding consumes no RNG, so its determinism doesn't even depend on the seed. Two cautions: snapping can push adjacent penetrations onto the same node (a zero-length stitch) — these **merge with the existing tiny-stitch warning**, so pick a cell size compatible with your `stitchlen`. And after-split effects deliberately **skip satin columns** (quantizing or jittering a precise satin rail wrecks the column) — the column sews unaffected, with a one-time warning.
 
-### Effect paths — `warppath` / `humanizepath` / `snappath`
+### `declump limit [maxshift]` — along-axis crowd relief
+
+```text
+declump 2 1.5 [
+  repeat 24 [
+    moveto 0 0
+    seth repcount * 15
+    fd 40
+    trim
+  ]
+]
+```
+
+`declump` addresses a physical problem: generative designs naturally pile needle penetrations into the same place — radial spokes sharing a centre, converging paths, hatching that retraces itself — and past a threshold this shreds the fabric and builds thread into a stiff, bulletproof patch. `declump` relieves the pressure by easing each crowded penetration **along its own line of travel**, never sideways. A lateral nudge changes a stitch's _angle_ (immediately visible); an along-axis nudge changes only its _length_ (barely perceptible). The design's geometry is preserved while the physical stress is distributed.
+
+`limit` sets the coverage ceiling in layers (the same unit as the density heatmap). `maxshift` is how far a point can slide in mm (default 1.5, clamped 0–5). The fold is **greedy**: earlier stitches win the space; later ones absorb the displacement. In the example above, the first spokes sew exactly as drawn; as the centre saturates past 2 layers, later spokes' inner endpoints ease outward along their own shafts, reading as hand-drawn spoke-depth variation rather than algorithmic jitter.
+
+`declump` is **drawless**: it consumes zero values from the seeded stream, so adding or removing the block never reshuffles downstream randomness. A/B test by setting `maxshift` to 0 (cancels all easing without changing seed state) and comparing the heatmap.
+
+Typical values: `limit` 1.5–2.5 (under the default `maxdensity` warn threshold of 3.5), `maxshift` 0.5 for subtle relief or 1.5 (default) for standard use. **Recommended nesting:** `declump` outermost — `declump 2 [ humanize 0.3 [ … ] ]` eases the points where they actually land.
+
+### Effect paths — `warppath` / `humanizepath` / `snappath` / `declumppath`
 
 Like transforms, each effect has a pure-function companion that maps a **point list**, so effects compose with `scatter`/`voronoi`/`offsetpath` data, not just imperative drawing. The block form is exactly "run the block, mapping emitted points through the same function," and the two are pinned identical:
 
-| Function                     | Returns                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------- |
-| `warppath(path, @fn)`        | new path, every point mapped through the reporter                         |
-| `humanizepath(path, amount)` | new path, seeded coherent jitter (forks, like the block)                  |
-| `snappath(path, cell …)`     | new path, every point snapped to the fixed lattice (same arity overloads) |
+| Function                               | Returns                                                                                 |
+| -------------------------------------- | --------------------------------------------------------------------------------------- |
+| `warppath(path, @fn)`                  | new path, every point mapped through the reporter                                       |
+| `humanizepath(path, amount)`           | new path, seeded coherent jitter (forks, like the block)                                |
+| `snappath(path, cell …)`               | new path, every point snapped to the fixed lattice (same arity overloads)               |
+| `declumppath(path, limit[, maxshift])` | new path, along-axis crowd relief using committed history (reads only, commits nothing) |
 
 ```text
 let coast = humanizepath(resample(cell, 2.0), 0.3)
@@ -994,11 +1017,14 @@ sewpath(coast)
 
 let pts = snappath(scatter(8), 2)   // Poisson points, quantized to a 2 mm grid
 for p in pts [ up setpos(p) down arc 360 0.6 trim ]
+
+// Ease a pre-computed spine before sewing it
+sewpath(declumppath(resample(spine, 2.5), 2, 1.5))
 ```
 
-`@name` references and the effect names (`warp`, `humanize`, `snaptogrid`) are **Core** built-ins — they can't be redefined.
+`@name` references and the effect names (`warp`, `humanize`, `snaptogrid`, `declump`) are **Core** built-ins — they can't be redefined.
 
-(See the bundled **warp**, **humanize** and **snaptogrid** examples.)
+(See the bundled **warp**, **humanize**, **snaptogrid** and **declump** examples.)
 
 ## Trace — capturing paths as data
 
@@ -1078,18 +1104,18 @@ This yields the round-trip identity: inside any enclosing frame, `sewpath(trace 
 
 ### Interactions
 
-| Feature inside a trace block                  | Behaviour                                                           |
-| --------------------------------------------- | ------------------------------------------------------------------- |
-| Movement, `push`/`pop`, procedures, recursion | normal                                                              |
-| Transforms (`translate`, `rotate`, …)         | apply to captured points                                            |
-| `warp @fn`                                    | applies — it deforms the pre-split path                             |
-| `humanize`, `snaptogrid`                      | inert + one-time note — use `humanizepath`/`snappath` on the result |
-| `beginfill` / `endfill`                       | **error** — capture the boundary and fill afterward                 |
-| `seed`                                        | **error** — reseed outside trace                                    |
-| `return`/`exit` crossing the block boundary   | **error** — the trace must produce its value                        |
-| Machine commands (`color`, `trim`, `lock`, …) | inert + one-time note                                               |
-| Stitch-history queries (`coverat`, …)         | see the fabric as of trace entry                                    |
-| Nested `trace`/`tracerings`                   | allowed — the inner trace is invisible to the outer recorder        |
+| Feature inside a trace block                  | Behaviour                                                                         |
+| --------------------------------------------- | --------------------------------------------------------------------------------- |
+| Movement, `push`/`pop`, procedures, recursion | normal                                                                            |
+| Transforms (`translate`, `rotate`, …)         | apply to captured points                                                          |
+| `warp @fn`                                    | applies — it deforms the pre-split path                                           |
+| `humanize`, `snaptogrid`, `declump`           | inert + one-time note — use `humanizepath`/`snappath`/`declumppath` on the result |
+| `beginfill` / `endfill`                       | **error** — capture the boundary and fill afterward                               |
+| `seed`                                        | **error** — reseed outside trace                                                  |
+| `return`/`exit` crossing the block boundary   | **error** — the trace must produce its value                                      |
+| Machine commands (`color`, `trim`, `lock`, …) | inert + one-time note                                                             |
+| Stitch-history queries (`coverat`, …)         | see the fabric as of trace entry                                                  |
+| Nested `trace`/`tracerings`                   | allowed — the inner trace is invisible to the outer recorder                      |
 
 (See the bundled **trace-regions** and **trace-motifs** examples.)
 

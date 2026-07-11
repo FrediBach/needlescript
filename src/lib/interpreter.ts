@@ -55,6 +55,7 @@ import {
 } from './affine.ts';
 import type { Mat } from './affine.ts';
 import { humanizeMap, snapMapFromSpec } from './effects.ts';
+import { makeDeclumpState, declumpFoldPoint, MAXSHIFT_MAX } from './declump.ts';
 
 /** Thrown by `output` / `exit` to unwind to the enclosing procedure call. */
 class ReturnSignal {
@@ -895,6 +896,23 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         tickN(p.length, line);
         return path(p.map((pt) => fn(pt[0], pt[1])));
       }
+      case 'declumppath': {
+        // Pure data twin of `declump`: runs the identical greedy fold over an
+        // explicit point list, reading real committed history but committing
+        // nothing. Drawless — the fold is deterministic given the density grid.
+        // Resample to stitch pitch first: sewpath(declumppath(resample(spine, 2.5), 2, 1.5))
+        const p = pathArg(0);
+        const limit = Math.max(0, sc(1));
+        const maxshift = args.length >= 3 ? clampMaxshift(sc(2)) : 1.5;
+        tickN(p.length, line);
+        const state = makeDeclumpState(limit, maxshift);
+        const result: [number, number][] = p.map((pt, i) => {
+          const nextPt = i + 1 < p.length ? ([p[i + 1][0], p[i + 1][1]] as [number, number]) : null;
+          // density reads only — no _push, nothing committed
+          return declumpFoldPoint(state, [pt[0], pt[1]] as [number, number], nextPt, m.density);
+        });
+        return path(result);
+      }
 
       // ---- DX: satin-tuple helpers ----
       // Build the 5-slot contract list by intent rather than memorising slot order.
@@ -1586,6 +1604,16 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     return v;
   }
 
+  /** Clamp declump maxshift to the allowed physical range (0–5 mm), warning if out. */
+  function clampMaxshift(amount: number): number {
+    const v = Math.min(Math.max(amount, 0), MAXSHIFT_MAX);
+    if (v !== amount)
+      m.warnings.push(
+        `declump maxshift ${formatNum(amount)} clamped to ${formatNum(v)} mm (range 0–${MAXSHIFT_MAX})`,
+      );
+    return v;
+  }
+
   function execBlock(
     stmts: ASTNode[],
     env: Record<string, Val> | null,
@@ -1860,6 +1888,34 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           return;
         }
         const a = st.args.map((x) => num(evalExpr(x, env, repcount, depth), st.name, st.line));
+
+        if (st.name === 'declump') {
+          // declump: stateful along-axis crowd-relief fold. Drawless (zero
+          // RNG draws), so inserting/removing the block never reshuffles
+          // downstream randomness (§6 determinism contract). Inert inside
+          // trace (the sandbox has no committed history).
+          traceNote(
+            'declump',
+            'note: declump inside trace is inert — use declumppath(...) on the result instead',
+          );
+          const limit = Math.max(0, a[0]);
+          const maxshift = a.length >= 2 ? clampMaxshift(a[1]) : 1.5;
+          const state = makeDeclumpState(limit, maxshift);
+          m.pushDeclump(state);
+          try {
+            execBlock(st.body, env, repcount, depth, contextLine);
+          } finally {
+            m.flushSatin();
+            m.popDeclump();
+            // Saturation note: summarise points that had no along-axis relief (§7).
+            if (state.saturationCount > 0)
+              m.warnings.push(
+                `declump: ${state.saturationCount} penetration${state.saturationCount === 1 ? '' : 's'} stayed in saturated areas (no along-axis relief within maxshift)`,
+              );
+          }
+          return;
+        }
+
         let fn: (x: number, y: number) => [number, number];
         if (st.name === 'humanize') {
           traceNote(

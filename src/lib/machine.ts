@@ -28,6 +28,8 @@ import { IDENTITY, isIdentity, apply, linApply, compose, invert } from './affine
 import type { Mat } from './affine.ts';
 import { vfromheading, vheading } from './genmath.ts';
 import { DensityGrid } from './postprocess.ts';
+import type { DeclumpState } from './declump.ts';
+import { declumpFoldPoint, declumpResetRun } from './declump.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -97,6 +99,9 @@ interface MachineSnapshot {
   tinyDroppedSpotsLen: number;
   noEmit: boolean;
   _warnedSatinEffect: boolean;
+  _warnedDeclumpFill: boolean;
+  // Declump stack state (for trace sandbox restoration)
+  declumpStack: DeclumpState[];
   // Trace recording state (for nesting)
   traceRecording: boolean;
   traceRuns: [number, number][][];
@@ -199,12 +204,20 @@ export class Machine {
   // After-split penetration maps (`humanize` / `snaptogrid`): applied to each
   // final penetration point, after splitting, before the physics layer.
   penLayers: ((x: number, y: number) => [number, number])[] = [];
+  // Declump stack: stateful along-axis fold layers. Kept separate from penLayers
+  // because the fold is stateful, needs lookahead, and requires the full split-point
+  // sequence to be pre-computed before emission (see travel()).
+  declumpStack: DeclumpState[] = [];
   // Snapshot of the output stack taken when the current satin column began. A
   // column is always flushed at stack boundaries, so it lives under one map.
   satinCTM: Mat = IDENTITY;
   satinLayers: OutLayer[] = [];
   satinHasWarp = false;
   private _warnedSatinEffect = false;
+  // One-time note that declump skips fill boundary recording (fills are emitted
+  // via a separate path and a region-containment guard would be needed to ease
+  // near edges — deferred to a future version).
+  private _warnedDeclumpFill = false;
 
   /** Push an affine transform delta (translate/rotate/scale/…) onto the stack. */
   pushTransform(delta: Mat) {
@@ -239,6 +252,14 @@ export class Machine {
   }
   popPen() {
     this.penLayers.pop();
+  }
+
+  /** Push / pop a stateful declump fold layer. */
+  pushDeclump(state: DeclumpState) {
+    this.declumpStack.push(state);
+  }
+  popDeclump() {
+    this.declumpStack.pop();
   }
 
   // ── Trace sandbox (RFC-trace §4.1) ──────────────────────────────────────
@@ -312,6 +333,9 @@ export class Machine {
       tinyDroppedSpotsLen: this.tinyDroppedSpots.length,
       noEmit: this.noEmit,
       _warnedSatinEffect: this._warnedSatinEffect,
+      _warnedDeclumpFill: this._warnedDeclumpFill,
+      // Declump stack (for trace sandbox restoration)
+      declumpStack: this.declumpStack.slice(),
       // Trace recording (for nesting)
       traceRecording: this.traceRecording,
       traceRuns: this.traceRuns.map((r) => r.slice()),
@@ -328,9 +352,10 @@ export class Machine {
     this.outLayers = [];
     this.hasWarp = false;
     this.outSnap.length = 0;
-    // Clear pen effects — humanize/snap are post-split, inherently inert on
+    // Clear pen effects — humanize/snap/declump are post-split, inherently inert on
     // the pre-split capture. Clearing avoids any side-channel.
     this.penLayers = [];
+    this.declumpStack = [];
     // Pen starts down regardless of ambient state (§4.2)
     this.penDown = true;
     // Suppress all stitch emission
@@ -405,12 +430,14 @@ export class Machine {
     this.hasWarp = snap.hasWarp;
     this.outSnap.length = snap.outSnapLen;
     this.penLayers = snap.penLayers.slice();
+    this.declumpStack = snap.declumpStack.slice();
     // Other
     this.stateStack = snap.stateStack.slice();
     this.tinyDropped = snap.tinyDropped;
     this.tinyDroppedSpots.length = snap.tinyDroppedSpotsLen;
     this.noEmit = snap.noEmit;
     this._warnedSatinEffect = snap._warnedSatinEffect;
+    this._warnedDeclumpFill = snap._warnedDeclumpFill;
     // Trace recording (for nesting): restore the outer trace's state
     this.traceRecording = snap.traceRecording;
     this.traceRuns = snap.traceRuns.map((r) => r.slice());
@@ -477,6 +504,39 @@ export class Machine {
       }
     }
     this._push('stitch', px, py, u);
+  }
+
+  /**
+   * Apply all stateless penLayers to a point without emitting.
+   * Used by the declump-active path in travel() to pre-compute the humanized /
+   * snapped position of each planned split-point before running the fold.
+   */
+  _applyPenLayers(x: number, y: number): [number, number] {
+    if (this.penLayers.length === 0) return [x, y];
+    let px = x,
+      py = y;
+    for (let i = this.penLayers.length - 1; i >= 0; i--) {
+      const r = this.penLayers[i](px, py);
+      px = r[0];
+      py = r[1];
+    }
+    return [px, py];
+  }
+
+  /**
+   * Emit a point that has already been processed (declump-folded + penLayers
+   * pre-applied). Performs the tiny-stitch merge check then calls _push.
+   * Never applies penLayers — the caller is responsible for pre-applying them.
+   */
+  _emitRaw(x: number, y: number) {
+    if (this.lastEmit) {
+      const d = Math.hypot(x - this.lastEmit.x, y - this.lastEmit.y);
+      if (d < LIMITS.minStitch * 0.5) {
+        this._dropTiny(x, y);
+        return;
+      }
+    }
+    this._push('stitch', x, y);
   }
 
   /** Record a merged sub-minimum move so it can be located later. */
@@ -638,6 +698,14 @@ export class Machine {
           if (!this.curLocalRing) this.curLocalRing = [[ox, oy]];
           this.curLocalRing.push([nx, ny]);
         }
+        // declump cannot ease fill penetrations near a region edge without a
+        // containment guard — skipped with a one-time note.
+        if (this.declumpStack.length && !this._warnedDeclumpFill) {
+          this.warnings.push(
+            'declump skips fill blocks — use fill shape @fn reading coverat to widen spacing in fills',
+          );
+          this._warnedDeclumpFill = true;
+        }
       } else {
         this._closeRing();
       }
@@ -650,6 +718,11 @@ export class Machine {
       this.flushSatin();
       const [hnx, hny] = this.mapOut(nx, ny);
       this._push('jump', hnx, hny);
+      // Signal a new pen-down run to any active declump states so they reset
+      // their prev-point references (§4: "for each pen-down run …").
+      if (this.declumpStack.length) {
+        for (const ds of this.declumpStack) declumpResetRun(ds);
+      }
       this.x = nx;
       this.y = ny;
       return;
@@ -721,18 +794,55 @@ export class Machine {
     }
     const eff = Math.min(Math.max(this.stitchLen, LIMITS.minStitch), LIMITS.maxStitch);
     const steps = Math.max(1, Math.ceil(hlen / eff));
-    let pxv = hox,
-      pyv = hoy;
-    for (let s = 1; s <= steps; s++) {
-      const t = s / steps;
-      const tx = hox + hdx * t,
-        ty = hoy + hdy * t;
-      this._emitPen(tx, ty);
-      for (let r = 1; r < this.beanRepeats; r++) {
-        this._emitPen(r % 2 === 1 ? pxv : tx, r % 2 === 1 ? pyv : ty);
+
+    if (this.declumpStack.length > 0) {
+      // Declump-active path: pre-compute the full split sequence so the fold
+      // can receive p_{i+1} for the forward cap, and so bean repeats use the
+      // moved spine positions (spec §3: "decorations generated from the moved
+      // spine"). penLayers are pre-applied (they are stateless) so the fold
+      // sees the humanized / snapped positions as its input.
+      const innerPts: [number, number][] = [];
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        innerPts.push(this._applyPenLayers(hox + hdx * t, hoy + hdy * t));
       }
-      pxv = tx;
-      pyv = ty;
+
+      let prevRaw: [number, number] = this.lastEmit
+        ? [this.lastEmit.x, this.lastEmit.y]
+        : [hox, hoy];
+      for (let i = 0; i < innerPts.length; i++) {
+        const nextPt = i + 1 < innerPts.length ? innerPts[i + 1] : null;
+        let [rx, ry] = innerPts[i];
+
+        // Apply declumpStack innermost-first (highest index first, matching
+        // the penLayers convention: last-pushed = innermost = runs first).
+        for (let di = this.declumpStack.length - 1; di >= 0; di--) {
+          [rx, ry] = declumpFoldPoint(this.declumpStack[di], [rx, ry], nextPt, this.density);
+        }
+
+        this._emitRaw(rx, ry);
+
+        // Bean repeats use the moved spine positions (spec §3).
+        for (let r = 1; r < this.beanRepeats; r++) {
+          this._emitRaw(r % 2 === 1 ? prevRaw[0] : rx, r % 2 === 1 ? prevRaw[1] : ry);
+        }
+        prevRaw = [rx, ry];
+      }
+    } else {
+      // Normal path (no declump active): stateless penLayers applied per point.
+      let pxv = hox,
+        pyv = hoy;
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const tx = hox + hdx * t,
+          ty = hoy + hdy * t;
+        this._emitPen(tx, ty);
+        for (let r = 1; r < this.beanRepeats; r++) {
+          this._emitPen(r % 2 === 1 ? pxv : tx, r % 2 === 1 ? pyv : ty);
+        }
+        pxv = tx;
+        pyv = ty;
+      }
     }
     this.x = nx;
     this.y = ny;
@@ -849,12 +959,12 @@ export class Machine {
     const path = this.satinPath;
     this.satinPath = null;
     if (!path || path.length < 2) return;
-    // After-split effects (humanize / snaptogrid) deliberately skip satin: the
-    // rails are emitted via _push, not _emitPen, so they sew unaffected —
-    // quantizing or jittering a precise satin rail wrecks the column. Warn once.
-    if (this.penLayers.length && !this._warnedSatinEffect) {
+    // After-split effects (humanize / snaptogrid / declump) deliberately skip satin:
+    // the rails are emitted via _push, not _emitPen, so they sew unaffected —
+    // quantizing, jittering, or easing a precise satin rail wrecks the column. Warn once.
+    if ((this.penLayers.length || this.declumpStack.length) && !this._warnedSatinEffect) {
       this.warnings.push(
-        'humanize/snaptogrid skips satin columns — perturbing satin rails wrecks the column; it sews unaffected',
+        'humanize/snaptogrid/declump skips satin columns — perturbing satin rails wrecks the column; it sews unaffected',
       );
       this._warnedSatinEffect = true;
     }

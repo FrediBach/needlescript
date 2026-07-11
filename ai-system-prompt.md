@@ -285,6 +285,11 @@ mirror deg [ block ]
 warp @fn [ block ] — bend the path (fn takes [x,y] → [x,y])
 humanize amount [ block ] — coherent hand-stitch jitter (0–2 mm)
 snaptogrid cell [ block ] — snap to cross-stitch grid (frame-constant)
+declump limit [ block ] — ease crowded penetrations along the travel axis (limit in layers)
+declump limit maxshift [ block ] — full form; maxshift in mm, clamped 0–5, default 1.5
+// declump is drawless; adding/removing it never reshuffles downstream randomness.
+// Pure data twin: declumppath(path, limit) or declumppath(path, limit, maxshift)
+// Tip: resample first — sewpath(declumppath(resample(spine, 2.5), 2, 1.5))
 
 ## Trace (block expressions — capture turtle paths as data)
 
@@ -334,8 +339,9 @@ Density warning: ≥4 st/mm² average (heatmap shows hotspots)
 8. Use push/pop to branch and return, not up/down for navigation.
 9. Keep total stitches well under 60,000 — aim for 5,000–25,000 for typical designs.
 10. Use humanize 0.2–0.4 for a natural hand-sewn look.
-11. Avoid very short stitches (<0.5mm) and very tight repeat loops that overcrowd.
-12. Sample snoise2 with coordinates divided by 10–20 for smooth organic variation.
+11. Use declump 2 to relieve perforation buildup in dense radial or converging designs; wrap the whole motif, not individual spokes.
+12. Avoid very short stitches (<0.5mm) and very tight repeat loops that overcrowd.
+13. Sample snoise2 with coordinates divided by 10–20 for smooth organic variation.
 
 ## Style
 

@@ -1108,7 +1108,7 @@ One caution: `scale`, `rotate`, `translate`, `mirror`, `skew`, `transform` (and 
 
 ---
 
-## 19. Effects: warp, humanize, snaptogrid
+## 19. Effects: warp, humanize, snaptogrid, declump
 
 Transforms are the _linear_ case of a bigger idea. A transform maps every emitted point through a fixed matrix; an **effect** maps it through an arbitrary function. Effects sit on the same block-scoped stack and nest freely with transforms — same discipline, but nonlinear and, in two cases, stochastic. They all read as "run this block, but pass the emitted points through _this_ map."
 
@@ -1129,6 +1129,7 @@ Inside-out: draw the leaf, humanize its penetrations, ripple the result, scale t
 | `warp @fn`        | a geometric deformation (shader) | **before** stitch splitting — it bends the path, which is then split into clean stitches |
 | `humanize amount` | hand-stitched jitter             | **after** splitting — it nudges the final needle points                                  |
 | `snaptogrid …`    | grid quantizing                  | **after** splitting — it snaps the final needle points to a lattice                      |
+| `declump limit`   | along-axis crowd relief          | **after** splitting — it eases crowded penetrations along the thread's travel axis       |
 
 `warp` bends the _curve_ and lets the splitter make tidy physical stitches along it; `humanize`/`snaptogrid` perturb _individual penetrations_ (jittering or snapping the path before splitting would resample the irregularity away, or interpolate stitches back off the grid).
 
@@ -1167,18 +1168,46 @@ snaptogrid 2 [ repeat 4 [ fd 20 rt 90 ] ]
 
 `snaptogrid` snaps each penetration to a lattice. Its special trick is **frame-invariance**: a grid belongs to the fabric, not the motif, so the lattice is fixed in hoop space **outside** any enclosing transform. Stamp the same motif at four places with `translate` and all four snap to the _same_ lattice — they register across the whole piece. `scale 2 [ snaptogrid 1 [ … ] ]` does **not** make a 2 mm grid; the lattice stays 1 mm and the scaled motif simply lands on different nodes. It overloads by arity for rectangular, offset and rotated grids (`snaptogrid cellx celly ox oy ang [ … ]`), is pure and drawless (its result doesn't even depend on the seed), and merges any penetrations a coarse grid collapses onto one node (with the usual tiny-stitch warning). Like `humanize`, it leaves satin columns alone — quantizing a satin rail wrecks the column — and warns once if it finds one.
 
+### `declump limit [maxshift]` — along-axis crowd relief
+
+```text
+declump 2 1.5 [
+  repeat 24 [
+    moveto 0 0
+    seth repcount * 15
+    fd 40
+    trim
+  ]
+]
+```
+
+`declump` solves a physical problem: generative designs naturally pile needle penetrations into the same place — walkers converging on an attractor, radial spokes sharing a centre, hatching that retraces itself. Past a point, dense perforation shreds the fabric and thread builds into a stiff, bulletproof patch. `declump` relieves the pressure by easing each crowded penetration **along its own line of travel** — never sideways. A lateral nudge changes a stitch's _angle_ (immediately visible); an along-axis nudge changes only its _length_ (barely perceptible). The design's geometry is preserved while the physical stress is distributed.
+
+`limit` sets the coverage ceiling in layers (the same unit the density heatmap uses — a value of 2 means "don't exceed two threads' thickness on top of each other"). `maxshift` is how far a point can be moved in mm (default 1.5, clamped 0–5). The fold is **greedy**: earlier stitches win the space; later ones absorb the displacement. In the example above, the first spokes sew exactly as drawn; as the centre saturates past the limit, later spokes' inner endpoints ease outward along their own shafts, reading as slightly varied spoke depths — hand-drawn rather than jittered.
+
+`declump` is **drawless** — it consumes zero values from the seeded stream, so adding or removing the block never reshuffles downstream randomness. A/B test by setting `maxshift` to 0 (cancels all easing) and comparing the heatmap.
+
+Typical values: `limit` 1.5–2.5 (comfortably under the default `maxdensity` warn threshold of 3.5), `maxshift` 0.5 for subtle relief, 1.5 (default) for standard use, 3+ where a little visible variation is welcome. Because relief is confined to one axis, it relieves pressure more slowly than a radial scatter would — budget a slightly larger `maxshift` than intuition suggests.
+
+**Recommended nesting order:** `declump` outermost — `declump 2 [ humanize 0.3 [ … ] ]` eases the points where they actually land (after humanization). The reverse is legal but a humanize applied after easing can jitter points back into the crowd.
+
 ### Effects on data, not just drawing
 
-Each effect has a pure-function twin, exactly like the transforms: `warppath(path, @fn)`, `humanizepath(path, amount)`, `snappath(path, cell …)`. The block form is sugar for "run the block, mapping emitted points through the same function," so the two are interchangeable on path data:
+Each effect has a pure-function twin, exactly like the transforms: `warppath(path, @fn)`, `humanizepath(path, amount)`, `snappath(path, cell …)`, `declumppath(path, limit [, maxshift])`. The block form is sugar for "run the block, mapping emitted points through the same function," so the two are interchangeable on path data:
 
 ```text
 let coast = humanizepath(resample(cell, 2.0), 0.3)   // a hand-drawn coastline
 sewpath(coast)
 
 let pixels = snappath(scatter(8), 2)                 // Poisson dots on a 2 mm grid
+
+// Ease a pre-computed spine before sewing it
+sewpath(declumppath(resample(spine, 2.5), 2, 1.5))
 ```
 
-`warp`, `humanize`, `snaptogrid` (and `@name`) are **core** words — they can't be redefined. (See the bundled **warp**, **humanize** and **snaptogrid** examples.)
+`declumppath` is a _read_, like `coverat`: it runs the identical fold over the supplied points using real committed history, but commits nothing back to the density grid. Resample to stitch pitch before passing the path in — the twin doesn't resample for you.
+
+`warp`, `humanize`, `snaptogrid`, `declump` (and `@name`) are **core** words — they can't be redefined. (See the bundled **warp**, **humanize**, **snaptogrid** and **declump** examples.)
 
 ---
 
@@ -1766,7 +1795,7 @@ Everything that emits stitches or mutates turtle/machine/stitch state:
 
 **Transforms (block commands):** `translate`, `rotate`, `rotateabout`, `scale`, `scalexy`, `mirror`, `skew`, `transform`
 
-**Effects (block commands):** `warp`, `humanize`, `snaptogrid`
+**Effects (block commands):** `warp`, `humanize`, `snaptogrid`, `declump`
 
 **Professional / fabric physics:** `fabric`, `pullcomp`, `underlay`, `fillunderlay`, `shortstitch`, `maxdensity`
 
@@ -1788,7 +1817,7 @@ Pure values in, values out — nothing here ever moves the needle:
 
 **Generators & geometry:** `scatter`, `voronoi`, `triangulate`, `hull`, `relax`, `offsetpath`, `clippaths`, `inpath`
 
-**Effect-path twins:** `warppath`, `humanizepath`, `snappath`
+**Effect-path twins:** `warppath`, `humanizepath`, `snappath`, `declumppath`
 
 **Tuple helpers:** `satinpair`, `satinasym`, `satinrake`, `tatamirow` (they only _build_ the lists that satin/fill reporters return — pure)
 

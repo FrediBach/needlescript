@@ -602,6 +602,16 @@ const NS_ITEMS: NSItem[] = [
     isSnippet: true,
     params: [['cell']],
   },
+  {
+    label: 'declump',
+    kindName: 'keyword',
+    detail: 'along-axis perforation-crowd relief',
+    documentation:
+      "Ease crowded needle penetrations along the **thread's own line of travel** — never sideways, so stitch angles stay intact. Each penetration that exceeds `limit` layers of coverage is slid backward or forward along its axis until it finds clear fabric, within `maxshift` mm (default 1.5, clamped 0–5). Runs **after** stitch splitting, like `humanize`. Drawless (zero RNG draws) — adding or removing the block never reshuffles downstream randomness.\n\nThe fold is greedy: earlier stitches in the block win the space; later ones absorb the displacement. Sew the geometry whose fidelity matters most first.\n\n```\n// Relief for a radial motif whose centre takes dozens of hits\ndeclump 2 1.5 [\n  repeat 24 [\n    moveto 0 0\n    seth repcount * 15\n    fd 40\n    trim\n  ]\n]\n```\n\nExclusions: satin columns (warn + skip, as with `humanize`), fill boundary recording (skip + note), inside `trace` (inert + note).\n\nTypical values: `limit` 1.5–2.5, `maxshift` 0.5 (subtle) to 1.5 (default) to 3+ (visible variation).",
+    insertText: 'declump ${1:limit} [\n\t$0\n]',
+    isSnippet: true,
+    params: [['limit'], ['limit', 'maxshift']],
+  },
 
   // ── Trace block expressions (capture turtle paths as data) ───────────────
   {
@@ -1893,6 +1903,19 @@ const NS_ITEMS: NSItem[] = [
     isSnippet: true,
     params: [['path', 'cell']],
   },
+  {
+    label: 'declumppath',
+    kindName: 'function',
+    detail: 'along-axis crowd relief on a path (pure, read-only)',
+    documentation:
+      "Run the `declump` fold over an explicit point list, reading real committed coverage history but committing nothing — the pure data twin of `declump`. Drawless.\n\nThe fold self-interacts exactly as the block form does (consecutive points see each other's moved positions), but the results are never fed to the density grid, so `coverat` is unchanged after the call.\n\n**Important:** resample to stitch pitch first, then sew:\n\n```\nsewpath(declumppath(resample(spine, 2.5), 2, 1.5))\n```\n\nArgs: `declumppath(path, limit)` or `declumppath(path, limit, maxshift)` — same units as the block form.",
+    insertText: 'declumppath(${1:path}, ${2:limit})',
+    isSnippet: true,
+    params: [
+      ['path', 'limit'],
+      ['path', 'limit', 'maxshift'],
+    ],
+  },
 
   // ── Satin-tuple helpers (library tier) ──────────────────────────────────
   {
@@ -2229,6 +2252,7 @@ export function registerNeedlescript(monaco: Monaco): void {
       'warp',
       'humanize',
       'snaptogrid',
+      'declump',
     ],
 
     // ── Turtle movement & pen commands — sewing world (teal, italic) ─
@@ -2407,6 +2431,7 @@ export function registerNeedlescript(monaco: Monaco): void {
       'warppath',
       'humanizepath',
       'snappath',
+      'declumppath',
       // satin-tuple helpers
       'satinpair',
       'satinrake',
