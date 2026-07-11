@@ -1,0 +1,67 @@
+// ── Easing library ───────────────────────────────────────────
+// All take x in 0..1 and return ~0..1. Pure, no RNG → reproducible.
+
+def ease_in(x, p)      [ return pow(x, p) ]              // slow start
+def ease_out(x, p)     [ return 1 - pow(1 - x, p) ]      // slow end
+def ease_in_out(x, p)  [
+  if x < 0.5 [ return pow(2 * x, p) / 2 ]
+  return 1 - pow(2 - 2 * x, p) / 2
+]
+def ease_sine_io(x)    [ return (1 - cos(x * 180)) / 2 ] // trig is in degrees
+def ease_out_back(x)   [                                 // overshoots past 1
+  let d = x - 1
+  return 1 + 2.70158 * d * d * d + 1.70158 * d * d
+]
+def ease_out_elastic(x) [                                // decaying flutter
+  if x <= 0 [ return 0 ]
+  if x >= 1 [ return 1 ]
+  return pow(2, -10 * x) * sin((10 * x - 0.75) * 120) + 1   // 120° = 2π/3
+]
+
+// name → curve dispatcher (final return guarantees a value on every path)
+def ease(mode, x) [
+  if mode == 'in_quad'      [ return ease_in(x, 2) ]
+  if mode == 'out_quad'     [ return ease_out(x, 2) ]
+  if mode == 'in_out_quad'  [ return ease_in_out(x, 2) ]
+  if mode == 'in_cubic'     [ return ease_in(x, 3) ]
+  if mode == 'out_cubic'    [ return ease_out(x, 3) ]
+  if mode == 'in_out_cubic' [ return ease_in_out(x, 3) ]
+  if mode == 'in_out_sine'  [ return ease_sine_io(x) ]
+  if mode == 'out_back'     [ return ease_out_back(x) ]
+  if mode == 'out_elastic'  [ return ease_out_elastic(x) ]
+  return x                                     // 'linear' and anything unknown
+]
+
+// ── Eased-density ribbon ─────────────────────────────────────
+fabric 'woven'
+
+let rib_dense  = 0.35     // advance at the tips (mm)
+let rib_sparse = 1.7      // advance mid-column (mm)
+let rib_ramp   = 0.32     // fraction of length per ramp
+let rib_halfw  = 1.6      // rail half-width (~3.2 mm column)
+let rib_ease   = 'in_out_cubic'
+
+def ribbon(t, s, i, u) [
+  let edge = min(s, 1 - s)                    // distance to nearest tip
+  let x    = clamp(edge / rib_ramp, 0, 1)     // raw linear ramp progress
+  let k    = ease(rib_ease, x)                // shaped progress
+  let adv  = clamp(lerp(rib_dense, rib_sparse, k), 0.15, 4)
+  return satinpair(adv, rib_halfw)
+]
+
+// ── Sampler: one ribbon per easing, labelled preview pins ────
+satin @ribbon
+
+let sampler = ['linear', 'in_out_sine', 'in_out_cubic', 'out_quad', 'out_elastic']
+let yy = 24
+for m in sampler [
+  rib_ease = m               // reporter reads the global live
+  moveto -30 yy
+  mark m                     // pin each row with its easing name
+  seth 90
+  fd 60
+  trim
+  yy -= 12
+]
+
+satin 0
