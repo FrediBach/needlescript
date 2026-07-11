@@ -908,7 +908,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'sin',
     kindName: 'function',
     detail: 'sine (degrees)',
-    documentation: 'Sine in degrees.',
+    documentation:
+      'Sine of an angle in degrees. Returns a value in −1…1 that rises to 1 at 90°, falls back to 0 at 180°, reaches −1 at 270°, and completes the cycle at 360°. Multiply by the amplitude you need.\n\nIn embroidery: produces widths or offsets that wave along a path. Combine with `cos` to trace circular arcs or orbiting motifs.\n\n```\n// Oscillating satin width — pulses wide and narrow along the column\ndef wave(t, s, i, u) [\n  return satinpair(0.4, 1.5 + sin(s * 360) * 1.0)\n]\nsatin @wave  fd 60\n```',
     insertText: 'sin(${1:degrees})',
     isSnippet: true,
     params: [['degrees']],
@@ -917,7 +918,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'cos',
     kindName: 'function',
     detail: 'cosine (degrees)',
-    documentation: 'Cosine in degrees.',
+    documentation:
+      'Cosine of an angle in degrees. Identical to `sin` but shifted 90° — `cos(0)` is 1 (peak) while `sin(0)` is 0. Returns a value in −1…1.\n\nPair with `sin` to trace circular paths: `setxy r*sin(a), r*cos(a)` steps around a circle of radius `r` as `a` runs 0…360.\n\n```\n// Draw a circle step-by-step using sin and cos\nup\nrepeat 36 [\n  setxy 20 * sin(repcount * 10), 20 * cos(repcount * 10)\n  down\n]\n```',
     insertText: 'cos(${1:degrees})',
     isSnippet: true,
     params: [['degrees']],
@@ -926,7 +928,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'sqrt',
     kindName: 'function',
     detail: 'square root',
-    documentation: 'Square root. Negative argument is a runtime error.',
+    documentation:
+      'Square root — the inverse of squaring. The most common use in generative embroidery is computing Euclidean distance: `sqrt(dx*dx + dy*dy)` gives the length of a line segment. Negative input is a runtime error. For distances between stored points, `vdist` is usually simpler.\n\n```\nlet dx = xcor    let dy = ycor\nlet d = sqrt(dx*dx + dy*dy)  // distance from needle to origin\n// equivalent to: distance(0, 0)\n```',
     insertText: 'sqrt(${1:n})',
     isSnippet: true,
     params: [['n']],
@@ -935,7 +938,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'abs',
     kindName: 'function',
     detail: 'absolute value',
-    documentation: 'Absolute value.',
+    documentation:
+      'Strips the sign from a number — `abs(-3)` and `abs(3)` both return 3. Use it when you need a magnitude regardless of direction, such as mirroring a left/right offset or ensuring a width is never negative.\n\n```\n// Satin width grows with distance from centre, symmetrically left and right\ndef mirror_taper(t, s, i, u) [\n  return satinpair(0.4, abs(s - 0.5) * 4 + 0.5)\n]\n```',
     insertText: 'abs(${1:n})',
     isSnippet: true,
     params: [['n']],
@@ -944,7 +948,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'round',
     kindName: 'function',
     detail: 'round to nearest integer',
-    documentation: 'Round to nearest integer.',
+    documentation:
+      'Round to the nearest integer. `round(2.7)` → 3, `round(2.3)` → 2. Halfway values round away from zero: `round(2.5)` → 3.\n\nUseful for snapping a count or index to a whole number before using it in `repeat` or as a list subscript.',
     insertText: 'round(${1:n})',
     isSnippet: true,
     params: [['n']],
@@ -953,7 +958,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'floor',
     kindName: 'function',
     detail: 'round down (floor)',
-    documentation: 'Round down (floor).',
+    documentation:
+      'Round down toward negative infinity — always the integer at or below the value. `floor(2.9)` → 2, `floor(-2.1)` → -3.\n\nUse it for grid snapping ("which column does this x fall in?") or to produce a 0-based index from a continuous value: `floor(t / cellSize)`.',
     insertText: 'floor(${1:n})',
     isSnippet: true,
     params: [['n']],
@@ -962,7 +968,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'ceil',
     kindName: 'function',
     detail: 'round up (ceiling)',
-    documentation: 'Round up (ceiling).',
+    documentation:
+      'Round up toward positive infinity — always the integer at or above the value. `ceil(2.1)` → 3, `ceil(-2.9)` → -2.\n\nUse it when you need a count that is guaranteed to cover a range: "how many stitches of length `l` fit in distance `d`?" → `ceil(d / l)`.',
     insertText: 'ceil(${1:n})',
     isSnippet: true,
     params: [['n']],
@@ -1077,7 +1084,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'filled',
     kindName: 'function',
     detail: 'list of n copies of a value',
-    documentation: 'New list of n deep copies of v.',
+    documentation:
+      'Create a new list containing `count` deep copies of `value`. Useful for initialising a collection of slots that you will fill in later with a loop.\n\n```\n// Start with 10 widths all at 2.5 mm, then override some\nlet widths = filled(10, 2.5)\nwidths[2] = 1.0\nwidths[7] = 3.8\n```',
     insertText: 'filled(${1:count}, ${2:value})',
     isSnippet: true,
     params: [['count', 'value']],
@@ -1122,7 +1130,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'concat',
     kindName: 'function',
     detail: 'concatenate two lists',
-    documentation: 'Returns a new list (shallow — elements are shared references).',
+    documentation:
+      'Join two lists end-to-end, returning a new combined list. The elements are shared references (shallow copy) — mutating a nested list in the result also mutates the original. Use `copy` if you need full independence.\n\n```\n// Combine two traced paths into one continuous route\nlet full = concat(first_half, second_half)\nsewpath(resample(full, 2))\n```',
     insertText: 'concat(${1:a}, ${2:b})',
     isSnippet: true,
     params: [['a', 'b']],
@@ -1199,7 +1208,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'mean',
     kindName: 'function',
     detail: 'mean of list elements',
-    documentation: 'Arithmetic mean. Errors on an empty list.',
+    documentation:
+      'Arithmetic mean (average) of all elements in the list. Equivalent to `sum(xs) / len(xs)`. Errors on an empty list.\n\n```\n// Centre the needle on the average position of a point set\nlet xs = map(pts, @first)\nlet ys = map(pts, @last)\nmoveto mean(xs), mean(ys)\n```',
     insertText: 'mean(${1:list})',
     isSnippet: true,
     params: [['list']],
@@ -1208,7 +1218,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'minof',
     kindName: 'function',
     detail: 'minimum element',
-    documentation: 'Minimum element. Errors on an empty list.',
+    documentation:
+      'Smallest value in a list. Errors on an empty list. Often paired with `maxof` to find the full data range before remapping or normalising.\n\n```\nlet lo = minof(widths)\nlet hi = maxof(widths)\n// Normalise each width to 0..1\nfor w in widths [\n  print remap(w, lo, hi, 0, 1)\n]\n```',
     insertText: 'minof(${1:list})',
     isSnippet: true,
     params: [['list']],
@@ -1217,7 +1228,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'maxof',
     kindName: 'function',
     detail: 'maximum element',
-    documentation: 'Maximum element. Errors on an empty list.',
+    documentation:
+      'Largest value in a list. Errors on an empty list. Often paired with `minof` to find the full data range.\n\n```\nlet hi = maxof(distances)\n// Scale all distances to fit inside a 40 mm circle\nfor d in distances [\n  print d / hi * 20\n]\n```',
     insertText: 'maxof(${1:list})',
     isSnippet: true,
     params: [['list']],
@@ -1465,7 +1477,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'lerp',
     kindName: 'function',
     detail: 'linear interpolation',
-    documentation: '`a + (b−a)·t`, t unclamped.',
+    documentation:
+      'Blend smoothly between two values. Returns `a` when `t = 0`, `b` when `t = 1`, and the midpoint when `t = 0.5`. `t` is unclamped — values outside 0…1 extrapolate.\n\nThe classic tool for things that change gradually: tapering a satin column from wide at the base to thin at the tip, or easing a spacing as the needle moves along a path.\n\n```\n// Taper a satin column from 3 mm at the root to 0.5 mm at the tip\ndef taper(t, s, i, u) [\n  return satinpair(0.4, lerp(3, 0.5, s))\n]\nsatin @taper  fd 40\n```',
     insertText: 'lerp(${1:a}, ${2:b}, ${3:t})',
     isSnippet: true,
     params: [['a', 'b', 't']],
@@ -1474,7 +1487,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'remap',
     kindName: 'function',
     detail: 'remap value between ranges',
-    documentation: 'Linear remap from [inMin, inMax] to [outMin, outMax], unclamped.',
+    documentation:
+      'Linearly rescale a value from one range to another — like converting between units. `remap(value, inMin, inMax, outMin, outMax)` maps `inMin → outMin` and `inMax → outMax`. Result is unclamped; use `clamp` around it if the input might exceed the source range.\n\nCommon use: translate noise (which lives in 0…1 or −1…1) into a practical stitch width or spacing.\n\n```\n// noise2 returns 0…1; drive a satin width between 1.5 mm and 3.5 mm\ndef textured(t, s, i, u) [\n  let w = remap(noise2(t / 12, 0), 0, 1, 1.5, 3.5)\n  return satinpair(0.4, w)\n]\nsatin @textured  fd 40\n```',
     insertText: 'remap(${1:value}, ${2:inMin}, ${3:inMax}, ${4:outMin}, ${5:outMax})',
     isSnippet: true,
     params: [['value', 'inMin', 'inMax', 'outMin', 'outMax']],
@@ -1483,7 +1497,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'clamp',
     kindName: 'function',
     detail: 'clamp value to [min, max]',
-    documentation: '`min(hi, max(lo, v))`.',
+    documentation:
+      'Constrain a value so it never falls below `min` or above `max`. Equivalent to `min(max(value, lo), hi)`. Use it when a calculation might produce negative lengths, out-of-range widths, or other implausible values.\n\n```\n// Keep a noise-driven satin width inside a safe range\ndef safe(t, s, i, u) [\n  let w = noise2(t / 10, 0) * 5   // 0…5, but noise can spike\n  return satinpair(0.4, clamp(w, 0.5, 4))\n]\nsatin @safe  fd 40\n```',
     insertText: 'clamp(${1:value}, ${2:min}, ${3:max})',
     isSnippet: true,
     params: [['value', 'min', 'max']],
@@ -1492,7 +1507,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'smoothstep',
     kindName: 'function',
     detail: 'Hermite smooth ease (0…1)',
-    documentation: 'Hermite ease between edge0 and edge1, returning 0…1.',
+    documentation:
+      'S-curve transition: returns 0 when `x ≤ edge0`, 1 when `x ≥ edge1`, and a smooth ease-in/ease-out curve in between. The curve accelerates from 0 then decelerates into 1, so transitions look far more natural than a straight `lerp`.\n\nUse it for soft fade-ins at the start of a column, soft fade-outs at the end, or any width change that should feel gradual rather than mechanical.\n\n```\n// Fade a satin column up and back down — wide in the middle\ndef soft_taper(t, s, i, u) [\n  let fade = smoothstep(0, 0.2, s) * smoothstep(1, 0.8, s)\n  return satinpair(0.4, lerp(0.3, 3.5, fade))\n]\nsatin @soft_taper  fd 50\n```',
     insertText: 'smoothstep(${1:edge0}, ${2:edge1}, ${3:x})',
     isSnippet: true,
     params: [['edge0', 'edge1', 'x']],
@@ -1501,7 +1517,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'gauss',
     kindName: 'function',
     detail: 'seeded Gaussian random',
-    documentation: 'Seeded normal distribution (Box-Muller, exactly 2 RNG draws).',
+    documentation:
+      'Seeded normally-distributed random number centred on `mean` with spread `sigma`. Unlike `random` (uniform), most values land close to the mean — only occasionally straying far. The larger `sigma` is, the wider the spread.\n\nExactly 2 RNG draws per call (Box-Muller method) — predictable cost for downstream reproducibility.\n\nGood for organic variation: scatter placement that clusters naturally, jitter that feels hand-made, or noise that emphasises the average rather than the extreme.\n\n```\n// Scatter stems that cluster naturally around the centre\nrepeat 24 [\n  moveto gauss(0, 10), gauss(0, 5)\n  down  fd 12  up  trim\n]\n```',
     insertText: 'gauss(${1:mean}, ${2:sigma})',
     isSnippet: true,
     params: [['mean', 'sigma']],
@@ -1531,7 +1548,7 @@ const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'fractal Brownian motion',
     documentation:
-      'Fractal sum of `snoise2`: lacunarity 2.0, gain 0.5, 1–8 octaves (clamped), normalised to ≈−1…1.',
+      'Fractal Brownian motion — layers multiple octaves of `snoise2` at increasing frequencies and decreasing amplitudes. Each octave adds finer detail on top of the large-scale shape, producing a rich, cloud-like texture. Returns approximately −1…1.\n\n- `octaves` controls how many detail layers are stacked. 1 = smooth (same as `snoise2`), 4–6 = rich and detailed, 8 = maximum.\n- `lacunarity` = 2.0 (each octave doubles in frequency)\n- `gain` = 0.5 (each octave halves in amplitude)\n\nSample at low spatial frequency: divide coordinates by 10–20 for broad organic drift.\n\n```\n// Flow-fill with richly textured noise direction\ndef noisy_dir(p) [\n  return fbm2(p[0] / 15, p[1] / 15, 5) * 45\n]\nfill dir @noisy_dir\nbeginfill\n  repeat 6 [ fd 30 rt 60 ]\nendfill\n```',
     insertText: 'fbm2(${1:x}, ${2:y}, ${3:octaves})',
     isSnippet: true,
     params: [['x', 'y', 'octaves']],
@@ -1542,7 +1559,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vadd',
     kindName: 'function',
     detail: 'add two vectors',
-    documentation: 'Returns a new point: element-wise addition.',
+    documentation:
+      'Add two 2D vectors (stored as `[x, y]` lists), returning a new point. Use it to offset a position by a direction or to accumulate steps.\n\n```\nlet p = [10, 5]\nlet nudge = [0, 3]\nsetpos vadd(p, nudge)   // moves to [10, 8]\n```',
     insertText: 'vadd(${1:a}, ${2:b})',
     isSnippet: true,
     params: [['a', 'b']],
@@ -1551,7 +1569,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vsub',
     kindName: 'function',
     detail: 'subtract two vectors',
-    documentation: 'Returns a new point: element-wise subtraction.',
+    documentation:
+      'Subtract vector `b` from `a`, returning a new point `[a[0]-b[0], a[1]-b[1]]`. The result is also the displacement vector from `b` to `a` — useful for computing the direction between two stored positions before normalising with `vnorm`.\n\n```\n// Direction from base to tip, then normalise to unit length\nlet dir = vnorm(vsub(tip, base))\nseth vheading(dir)   fd vdist(base, tip)\n```',
     insertText: 'vsub(${1:a}, ${2:b})',
     isSnippet: true,
     params: [['a', 'b']],
@@ -1560,7 +1579,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vscale',
     kindName: 'function',
     detail: 'scale a vector',
-    documentation: 'Returns a new point: element-wise scale by scalar s.',
+    documentation:
+      'Multiply both components of a vector by scalar `s`, returning a new point. Use it to extend or shorten a direction vector, or to resize an offset.\n\n```\n// Push a point 5 mm further away from the origin\nlet dir = vnorm(p)           // unit direction toward p\nlet pushed = vscale(dir, vlen(p) + 5)\n```',
     insertText: 'vscale(${1:vector}, ${2:scale})',
     isSnippet: true,
     params: [['vector', 'scale']],
@@ -1569,7 +1589,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vlerp',
     kindName: 'function',
     detail: 'lerp between two vectors',
-    documentation: 'Returns a new point: linear interpolation between a and b at t.',
+    documentation:
+      'Interpolate between two 2D points — returns `a` at `t = 0`, `b` at `t = 1`. Works like `lerp` but for positions. Good for moving along a line segment, finding a midpoint, or distributing jump targets evenly between two anchor points.\n\n```\n// Find the midpoint between two corners\nlet mid = vlerp(cornerA, cornerB, 0.5)\nmoveto mid[0], mid[1]\n```',
     insertText: 'vlerp(${1:a}, ${2:b}, ${3:t})',
     isSnippet: true,
     params: [['a', 'b', 't']],
@@ -1578,7 +1599,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vdot',
     kindName: 'function',
     detail: 'dot product',
-    documentation: 'Dot product of two vectors.',
+    documentation:
+      'Dot product: `a[0]*b[0] + a[1]*b[1]`. Measures how much two vectors point in the same direction. Positive when they agree, 0 when perpendicular, negative when they oppose each other.\n\nThe key projection tool: `vdot(v, dir)` (where `dir` is a unit vector) gives the signed distance of `v` along that direction.\n\n```\n// How far along the path has the needle advanced?\nlet fwd = vfromheading(heading, 1)         // forward unit vector\nlet advance = vdot(vsub(pos(), start), fwd)\n```',
     insertText: 'vdot(${1:a}, ${2:b})',
     isSnippet: true,
     params: [['a', 'b']],
@@ -1587,7 +1609,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vlen',
     kindName: 'function',
     detail: 'vector length (magnitude)',
-    documentation: 'Length (magnitude) of a vector.',
+    documentation:
+      'Length (magnitude) of a vector: `sqrt(v[0]² + v[1]²)`. Returns the distance from the origin to the point, or the "size" of a direction vector. To measure between two stored points, use `vdist`.\n\n```\n// Scale satin width proportional to distance from centre\nlet d = vlen(pos())   // distance from origin\nsatin clamp(d / 10, 0.5, 3.5)\n```',
     insertText: 'vlen(${1:vector})',
     isSnippet: true,
     params: [['vector']],
@@ -1596,7 +1619,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vdist',
     kindName: 'function',
     detail: 'distance between two points',
-    documentation: 'Euclidean distance between two points.',
+    documentation:
+      'Euclidean distance between two `[x, y]` points. Equivalent to `vlen(vsub(b, a))` but more readable. Use whenever you need the gap between two stored positions (e.g. decide whether to trim, check spacing, scale a motif).\n\n```\nif vdist(pos(), target) > 5 [\n  moveto target[0], target[1]\n]\n```',
     insertText: 'vdist(${1:a}, ${2:b})',
     isSnippet: true,
     params: [['a', 'b']],
@@ -1605,7 +1629,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vnorm',
     kindName: 'function',
     detail: 'normalize to unit vector',
-    documentation: 'Returns the unit vector. The zero vector is a runtime error.',
+    documentation:
+      'Returns a unit vector (length exactly 1.0) pointing in the same direction. Use it when you need a pure direction without caring about magnitude — then multiply by the length you want with `vscale`. The zero vector is a runtime error.\n\n```\n// Aim the needle toward a target, then sew 10 mm that way\nlet dir = vnorm(vsub(target, pos()))\nseth vheading(dir)\nfd 10\n```',
     insertText: 'vnorm(${1:vector})',
     isSnippet: true,
     params: [['vector']],
@@ -1614,7 +1639,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vrot',
     kindName: 'function',
     detail: 'rotate a vector (clockwise)',
-    documentation: 'Returns a new vector rotated clockwise by deg degrees (matches `rt`).',
+    documentation:
+      'Rotate a vector clockwise by `deg` degrees. The rotation matches NeedleScript\'s turtle convention (clockwise positive, 0 = north). Use it to create perpendicular offsets, fan spread patterns, or to generate N evenly-rotated copies of a direction.\n\n```\n// Place 6 radial motifs evenly around the centre\nlet base = [0, 20]    // 20 mm north\nrepeat 6 [\n  let p = vrot(base, (repcount - 1) * 60)\n  moveto p[0], p[1]   fd 8   trim\n]\n```',
     insertText: 'vrot(${1:vector}, ${2:degrees})',
     isSnippet: true,
     params: [['vector', 'degrees']],
@@ -1623,7 +1649,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'vheading',
     kindName: 'function',
     detail: 'turtle heading of a vector',
-    documentation: 'Turtle heading of the vector (equivalent to `atan(a[0], a[1])`).',
+    documentation:
+      'Convert a 2D vector to a turtle heading in degrees (0 = north, clockwise positive). Equivalent to `atan(v[0], v[1])`. Use it with `seth` to aim the needle along a computed direction or path tangent.\n\n```\n// Aim along the tangent of a stored path segment\nlet tangent = vsub(path[i + 1], path[i])\nseth vheading(tangent)\n```',
     insertText: 'vheading(${1:vector})',
     isSnippet: true,
     params: [['vector']],
@@ -1633,7 +1660,7 @@ const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'vector from heading + length',
     documentation:
-      "Make a vector from turtle heading + length. `vfromheading(heading, 1)` is the needle's direction unit vector.",
+      "Make a 2D vector of the given `length` pointing in turtle heading `deg`. The inverse of `vheading`. Use it to compute offsets in any direction relative to the needle's current path.\n\n```\n// Step 5 mm to the right of the current heading\nlet sideways = vfromheading(heading + 90, 5)\nsetpos vadd(pos(), sideways)\n```\n\n`vfromheading(heading, 1)` gives the unit forward direction vector.",
     insertText: 'vfromheading(${1:degrees}, ${2:length})',
     isSnippet: true,
     params: [['degrees', 'length']],
@@ -1676,7 +1703,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'pathlen',
     kindName: 'function',
     detail: 'total path length (mm)',
-    documentation: 'Total polyline length in mm.',
+    documentation:
+      'Total length of a polyline path in mm — the sum of all segment lengths. Use it to normalise travel along a curve (compute `t = distanceSoFar / pathlen(path)`), decide how many stitches to place, or verify a path is the expected size.\n\n```\nlet spine = trace [ fd 50  rt 30  fd 30 ]\nlet total = pathlen(spine)\nprint "spine mm:" total\n// Walk it with evenly-spaced motifs\nlet spacing = 8\nrepeat floor(total / spacing) [\n  // ... place motif at steps along the path\n]\n```',
     insertText: 'pathlen(${1:path})',
     isSnippet: true,
     params: [['path']],
@@ -1686,7 +1714,7 @@ const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'resample path to spacing (mm)',
     documentation:
-      'New path whose segments are each exactly spacing mm long (last may be shorter). The bridge between math curves and physical stitch spacing.',
+      'New path whose consecutive vertices are each exactly `spacing` mm apart (last segment may be shorter). The bridge between math curves and physical stitch spacing — generate an arbitrary shape with `trace`/`bezier`/`catmull`, then `resample` it to stitch pitch before `sewpath`.\n\n```\nlet curve = bezier([-20,0], [-10,20], [10,-20], [20,0], 0.5)\nsewpath(resample(curve, 2))    // sew at 2 mm stitches\n```',
     insertText: 'resample(${1:path}, ${2:spacing})',
     isSnippet: true,
     params: [['path', 'spacing']],
@@ -1695,7 +1723,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'chaikin',
     kindName: 'function',
     detail: 'corner-cut smoothing',
-    documentation: 'Corner-cut smoothing applied n times (1–6).',
+    documentation:
+      'Corner-cut smoothing: each pass replaces every sharp vertex with two new points placed 25% and 75% along the incoming and outgoing edges, rounding the bend into a smooth curve. Applying multiple iterations produces progressively rounder, more organic shapes.\n\nUse it to soften a jagged polygon or set of clicked waypoints before sewing.\n\n`iterations` 1–6 (values beyond 4 are rarely distinguishable).\n\n```\n// A rough pentagon becomes a flowing oval after 3 cuts\nlet poly = [[0,0],[20,5],[35,-8],[40,20],[15,30]]\nlet smooth = chaikin(poly, 3)\nsewpath(resample(smooth, 2))\n```',
     insertText: 'chaikin(${1:path}, ${2:iterations})',
     isSnippet: true,
     params: [['path', 'iterations']],
@@ -1704,7 +1733,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'catmull',
     kindName: 'function',
     detail: 'Catmull-Rom spline',
-    documentation: 'Catmull-Rom spline through control points, resampled at spacing mm.',
+    documentation:
+      'Smooth curve that passes exactly through every control point. Unlike Bézier curves, you do not need to supply separate handles — the spline infers the curvature from neighbouring points automatically. Resampled to `spacing` mm for sewing.\n\nGreat for animating paths through a set of waypoints or tracing an organic outline defined by hand-placed anchors.\n\n```\n// Sew a smooth curve through 4 waypoints\nlet pts = [[-20,0],[-5,20],[5,-20],[20,0]]\nsewpath(catmull(pts, 2))\n```',
     insertText: 'catmull(${1:points}, ${2:spacing})',
     isSnippet: true,
     params: [['points', 'spacing']],
@@ -1714,7 +1744,7 @@ const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'cubic Bézier curve',
     documentation:
-      'Cubic Bézier from p0 to p1 through control points c0, c1, resampled at spacing mm.',
+      'Cubic Bézier from start `p0` to end `p1`, shaped by control handles `c0` (near the start) and `c1` (near the end). The curve is pulled toward the handles without passing through them — the further out you place a handle, the more the curve bends in that direction. Resampled to `spacing` mm for sewing.\n\n```\nlet p0 = [-20, 0]   let c0 = [-10, 20]\nlet c1 = [10, -20]  let p1 = [20, 0]\nsewpath(bezier(p0, c0, c1, p1, 2))\n```',
     insertText: 'bezier(${1:p0}, ${2:c0}, ${3:c1}, ${4:p1}, ${5:spacing})',
     isSnippet: true,
     params: [['p0', 'c0', 'c1', 'p1', 'spacing']],
@@ -1723,7 +1753,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'centroid',
     kindName: 'function',
     detail: 'centroid of a path',
-    documentation: 'Returns the centroid (centre point) of a path.',
+    documentation:
+      'The geometric centre of a path — the average position of all its vertices. Use it to anchor rotation, find the middle of a region, or place a motif at the heart of a `voronoi` cell or scatter cluster.\n\n```\nlet cells = voronoi(scatter(8))\nfor cell in cells [\n  let c = centroid(cell)\n  moveto c[0], c[1]\n  down  arc 360 1  up  trim   // dot at cell centre\n]\n```',
     insertText: 'centroid(${1:path})',
     isSnippet: true,
     params: [['path']],
@@ -1732,7 +1763,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'bbox',
     kindName: 'function',
     detail: 'bounding box [minx, miny, maxx, maxy]',
-    documentation: 'Bounding box as `[minx, miny, maxx, maxy]`.',
+    documentation:
+      'Returns the smallest axis-aligned rectangle enclosing the path, as `[minx, miny, maxx, maxy]`. Use it to check a design\'s extents, frame a motif, compute a safe scatter region, or normalise coordinates to fit a specific area.\n\n```\nlet b = bbox(region)\nlet w = b[2] - b[0]   // width\nlet h = b[3] - b[1]   // height\nprint "size mm:" w h\n// Centre the region at the origin\nxlate(region, -(b[0] + w/2), -(b[1] + h/2))\n```',
     insertText: 'bbox(${1:path})',
     isSnippet: true,
     params: [['path']],
@@ -1764,7 +1796,7 @@ const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'Voronoi cells from points',
     documentation:
-      'One region per input point, in input order, clipped to the sewable field or a given region. Max 10,000 input points.',
+      'Divide the canvas into cells, one per input point. Each cell contains every location that is closer to its seed point than to any other seed. Returns a list of closed regions in input order, clipped to the sewable field (or a given region).\n\nCommon uses: organic tiling, stipple shading, cell-based fill patterns, or growing a motif inside each natural territory.\n\nMax 10,000 input points.\n\n```\nlet seeds = scatter(10)\nlet cells = voronoi(seeds)\nfor cell in cells [\n  beginfill\n    sewpath(resample(cell, 2))\n  endfill  trim\n]\n```',
     insertText: 'voronoi(${1:points})',
     isSnippet: true,
     params: [['points'], ['points', 'region']],
@@ -1773,7 +1805,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'triangulate',
     kindName: 'function',
     detail: 'Delaunay triangulation',
-    documentation: 'Delaunay triangles: list of 3-point regions. Max 10,000 input points.',
+    documentation:
+      'Delaunay triangulation: connects a set of points into triangles such that the circumcircle of each triangle contains no other point. Returns a list of 3-point regions. The "dual" of Voronoi — the same seeds that define Voronoi cells also define the triangle mesh connecting them.\n\nCommon uses: structural weaving patterns (sew along each triangle edge), mesh-based fill, or truss-like geometric motifs.\n\nMax 10,000 input points.\n\n```\nlet pts = scatter(14)\nlet tris = triangulate(pts)\nfor tri in tris [\n  up  setpos(tri[0])  down\n  sewpath(tri)\n  setpos(tri[0])  up  trim\n]\n```',
     insertText: 'triangulate(${1:points})',
     isSnippet: true,
     params: [['points']],
@@ -1782,7 +1815,8 @@ const NS_ITEMS: NSItem[] = [
     label: 'hull',
     kindName: 'function',
     detail: 'convex hull of points',
-    documentation: 'Convex hull as a region (counter-clockwise winding).',
+    documentation:
+      'Convex hull: the smallest convex polygon that encloses all given points, returned as a counter-clockwise region. Think of it as wrapping a rubber band around all the points — only the outermost ones form the boundary.\n\nUse it as a bounding region for scatter or fill, to outline a cluster of points, or as a clip region.\n\n```\nlet pts = scatter(5)\nlet outline = hull(pts)\nbeginfill\n  sewpath(resample(outline, 2))\nendfill  trim\n```',
     insertText: 'hull(${1:points})',
     isSnippet: true,
     params: [['points']],
