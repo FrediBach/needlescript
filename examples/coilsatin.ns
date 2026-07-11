@@ -1,0 +1,35 @@
+// ── Tapered-density satin ribbon ──────────────────────────────
+// Tight stitch pairs at both ends of every column, airy middle.
+
+fabric 'woven'
+
+let rib_dense  = 0.35    // advance (mm) at the tips  → close satin
+let rib_sparse = 1.6     // advance (mm) mid-column   → open, airy
+let rib_ramp   = 0.30    // fraction of the length spent ramping at each end
+let rib_halfw  = 1.6     // rail half-width → ~3.2 mm total column
+
+def ribbon(t, s, i, u) [
+  let edge = min(s, 1 - s)                  // 0 at either tip, 0.5 at centre
+  let k    = smoothstep(0, rib_ramp, edge)  // 0 at tips → 1 past the ramp
+  let adv  = lerp(rib_dense, rib_sparse, k)
+  return satinpair(adv, rib_halfw)          // symmetric perpendicular bite
+]
+
+satin @ribbon
+
+// 1 · straight ribbon
+moveto -30 20
+seth 90
+fd 60
+trim                      // flushes the buffered column, cuts thread
+
+// 2 · Bézier S-curve — sewpath spines get the same treatment
+moveto -30 4
+sewpath(bezier([-30, 4], [-8, 18], [8, -10], [30, 4], 1))
+trim
+
+// 3 · arc ribbon (gentle smile, stays well inside the hoop)
+moveto -22.5 -9
+seth 150
+arc -120 26
+trim
