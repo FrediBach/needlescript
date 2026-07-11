@@ -180,6 +180,14 @@ export default function App() {
   // ── Panel split, SVG import, and share ───────────────────────────────────
   const { leftWidth, isMobile, mainRef, handleHorizDrag, handleHorizReset } = usePanelSplit();
 
+  // Keep --ns-editor-width in sync so Monaco tooltip CSS can constrain its width.
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--ns-editor-width',
+      isMobile ? '100vw' : `${leftWidth}px`,
+    );
+  }, [leftWidth, isMobile]);
+
   // SVG import size derived from current hoop (fits within the sewable area)
   const fitMM = Math.min(selectedHoop.widthMM, selectedHoop.heightMM) - 10;
 

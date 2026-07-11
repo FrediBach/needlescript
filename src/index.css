@@ -327,3 +327,18 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Monaco widget width cap ──────────────────────────────────────────────────
+   Monaco computes hover max-width as max(editorWidth * 0.66, 750px), which
+   overflows into the preview panel on typical screen sizes. We cap the hover
+   and suggest-details widgets to the actual editor panel width (kept in sync
+   via App.tsx → --ns-editor-width) minus a small gutter, so they never bleed
+   across the panel boundary. !important is required because Monaco sets these
+   as inline styles.
+   ──────────────────────────────────────────────────────────────────────────── */
+.monaco-editor .monaco-hover {
+  max-width: 420px !important;
+}
+.monaco-editor .suggest-widget .details {
+  max-width: calc(var(--ns-editor-width, 520px) - 48px) !important;
+}
