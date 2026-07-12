@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DesignState, LineStitchBounds } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import type { WarningLocation } from '../lib/engine.ts';
 import { THREADS } from '../data.ts';
+import { projectPoint } from '../lib/parse-parameters.ts';
+import type { PointParamDef, XYRegion } from '../lib/parse-parameters.ts';
 import {
   canvasJumpThread,
   canvasNeedlePoint,
@@ -23,6 +25,8 @@ import {
   canvasWarnMarkerCore,
   fontMono,
   fsBase,
+  gold,
+  goldHi,
 } from '../theme.ts';
 
 interface Props {
@@ -39,6 +43,19 @@ interface Props {
   overlays?: CanvasOverlay[];
   /** Click-to-pick handler in mm space, for canvas → row linking (optional). */
   onPick?: (mm: { x: number; y: number }) => void;
+  // ── XY handle props ────────────────────────────────────────────────────────
+  /** Point parameters to render as draggable handles on the stage. */
+  pointParams?: PointParamDef[];
+  /** Whether to show handles (can be toggled with the "handles" chip). */
+  showHandles?: boolean;
+  /** Name of the handle currently highlighted (from panel row hover / Locate). */
+  highlightedHandle?: string | null;
+  /** Names of locked params — locks render as gold-filled handles. */
+  lockedHandles?: Set<string>;
+  /** Fired while the user is dragging a handle (throttled by caller). */
+  onHandleDrag?: (name: string, line: number, x: number, y: number) => void;
+  /** Fired on pointer-up (or Esc-cancel with restored start values). */
+  onHandleCommit?: (name: string, line: number, x: number, y: number) => void;
 }
 
 /** A set of rings drawn over the stitches for the staging workspace. */
@@ -72,6 +89,23 @@ type DragState = {
   currentY: number;
 };
 
+/** State for an in-progress handle drag. */
+type HandleDragState = {
+  name: string;
+  line: number;
+  region: XYRegion;
+  snap?: number;
+  /** Handle position when drag started — used as baseline for Alt precision mode */
+  startMmX: number;
+  startMmY: number;
+  /** Pointer position (mm) when drag started — used for Alt precision mode */
+  startPointerMmX: number;
+  startPointerMmY: number;
+  /** Current projected position during drag */
+  currentMmX: number;
+  currentMmY: number;
+};
+
 export default function StageCanvas({
   design,
   hoop,
@@ -82,6 +116,12 @@ export default function StageCanvas({
   hoveredLineBounds,
   overlays,
   onPick,
+  pointParams,
+  showHandles = true,
+  highlightedHandle,
+  lockedHandles,
+  onHandleDrag,
+  onHandleCommit,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<RenderTransform | null>(null);
@@ -89,7 +129,34 @@ export default function StageCanvas({
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
 
-  // ── draw on prop / viewport change ──────────────────────────────────────
+  // ── Handle interaction state ─────────────────────────────────────────────
+  /** Active handle drag — kept in a ref (not state) to avoid re-render thrash */
+  const handleDragRef = useRef<HandleDragState | null>(null);
+  /** Which handle name is under the pointer (idle hover — drives cursor + region show) */
+  const [hoveredHandleName, setHoveredHandleName] = useState<string | null>(null);
+  /** Which handle is being actively dragged (in state so canvas redraws) */
+  const [draggingHandleName, setDraggingHandleName] = useState<string | null>(null);
+  /** Live drag position in mm — updated per pointer-move, triggers redraw */
+  const [dragMm, setDragMm] = useState<{ x: number; y: number } | null>(null);
+
+  // Stable refs so pointer handlers always read the latest props without
+  // being re-created (same pattern as lineStitchMapRef in EditorPane).
+  const pointParamsRef = useRef(pointParams);
+  const showHandlesRef = useRef(showHandles);
+  const highlightedHandleRef = useRef(highlightedHandle);
+  const lockedHandlesRef = useRef(lockedHandles);
+  const onHandleDragRef = useRef(onHandleDrag);
+  const onHandleCommitRef = useRef(onHandleCommit);
+  useLayoutEffect(() => {
+    pointParamsRef.current = pointParams;
+    showHandlesRef.current = showHandles;
+    highlightedHandleRef.current = highlightedHandle;
+    lockedHandlesRef.current = lockedHandles;
+    onHandleDragRef.current = onHandleDrag;
+    onHandleCommitRef.current = onHandleCommit;
+  });
+
+  // ── draw on prop / viewport / handle-state change ────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -111,6 +178,13 @@ export default function StageCanvas({
       warningLoc,
       hoveredLineBounds ?? null,
       overlays,
+      pointParams ?? [],
+      showHandles,
+      hoveredHandleName,
+      draggingHandleName,
+      dragMm,
+      highlightedHandle ?? null,
+      lockedHandles ?? new Set(),
     );
   }, [
     design,
@@ -122,6 +196,13 @@ export default function StageCanvas({
     warningLoc,
     hoveredLineBounds,
     overlays,
+    pointParams,
+    showHandles,
+    hoveredHandleName,
+    draggingHandleName,
+    dragMm,
+    highlightedHandle,
+    lockedHandles,
   ]);
 
   // ── redraw on container resize ───────────────────────────────────────────
@@ -147,6 +228,13 @@ export default function StageCanvas({
         warningLoc,
         hoveredLineBounds ?? null,
         overlays,
+        pointParamsRef.current ?? [],
+        showHandlesRef.current ?? true,
+        hoveredHandleName,
+        draggingHandleName,
+        dragMm,
+        highlightedHandleRef.current ?? null,
+        lockedHandlesRef.current ?? new Set(),
       );
     });
     ro.observe(canvas.parentElement!);
@@ -161,73 +249,190 @@ export default function StageCanvas({
     warningLoc,
     hoveredLineBounds,
     overlays,
+    hoveredHandleName,
+    draggingHandleName,
+    dragMm,
   ]);
+
+  // ── Esc cancels an in-progress handle drag ───────────────────────────────
+  useEffect(() => {
+    if (!draggingHandleName) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const drag = handleDragRef.current;
+      if (drag) {
+        // Restore the drag-start position
+        onHandleCommitRef.current?.(drag.name, drag.line, drag.startMmX, drag.startMmY);
+        handleDragRef.current = null;
+      }
+      setDraggingHandleName(null);
+      setDragMm(null);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [draggingHandleName]);
 
   // ── pointer handlers ─────────────────────────────────────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setDragState({ startX: x, startY: y, currentX: x, currentY: y });
+    const cssX = e.clientX - rect.left;
+    const cssY = e.clientY - rect.top;
+
+    // Hit-test handles first; they take priority over canvas panning
+    const t = transformRef.current;
+    if (t && showHandlesRef.current && (pointParamsRef.current?.length ?? 0) > 0) {
+      const dpr = window.devicePixelRatio || 1;
+      const threshold = e.pointerType === 'touch' ? 24 : 12;
+      let bestHandle: PointParamDef | null = null;
+      let bestDist = threshold;
+      for (const p of pointParamsRef.current ?? []) {
+        const hcssX = (t.cx + (p.valueX - t.viewCX) * t.scale) / dpr;
+        const hcssY = (t.cy - (p.valueY - t.viewCY) * t.scale) / dpr;
+        const dist = Math.sqrt((cssX - hcssX) ** 2 + (cssY - hcssY) ** 2);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestHandle = p;
+        }
+      }
+      if (bestHandle) {
+        canvas.setPointerCapture(e.pointerId);
+        const pointerMmX = t.viewCX + (cssX * dpr - t.cx) / t.scale;
+        const pointerMmY = t.viewCY - (cssY * dpr - t.cy) / t.scale;
+        handleDragRef.current = {
+          name: bestHandle.name,
+          line: bestHandle.line,
+          region: bestHandle.region,
+          snap: bestHandle.snap,
+          startMmX: bestHandle.valueX,
+          startMmY: bestHandle.valueY,
+          startPointerMmX: pointerMmX,
+          startPointerMmY: pointerMmY,
+          currentMmX: bestHandle.valueX,
+          currentMmY: bestHandle.valueY,
+        };
+        setDraggingHandleName(bestHandle.name);
+        setDragMm({ x: bestHandle.valueX, y: bestHandle.valueY });
+        return; // consumed — skip zoom drag
+      }
+    }
+
+    // No handle hit — start zoom drag
+    setDragState({ startX: cssX, startY: cssY, currentX: cssX, currentY: cssY });
     canvas.setPointerCapture(e.pointerId);
   }, []);
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
-      if (!dragState) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setDragState((prev) => (prev ? { ...prev, currentX: x, currentY: y } : null));
-    },
-    [dragState],
-  );
-
-  const handlePointerUp = useCallback(
-    (_e: React.PointerEvent<HTMLCanvasElement>) => {
-      if (!dragState) return;
-
-      const { startX, startY, currentX, currentY } = dragState;
-      setDragState(null);
-
-      const dx = currentX - startX;
-      const dy = currentY - startY;
-
-      // Ignore tiny drags (accidental clicks, double-click pair)
-      if (Math.abs(dx) < 10 || Math.abs(dy) < 10) return;
-
-      const t = transformRef.current;
-      if (!t) return;
-
+      const cssX = e.clientX - rect.left;
+      const cssY = e.clientY - rect.top;
       const dpr = window.devicePixelRatio || 1;
-      const { scale, cx, cy, viewCX, viewCY } = t;
+      const t = transformRef.current;
 
-      // CSS pixels → mm using current (possibly zoomed) transform
-      const cssToMmX = (cssX: number) => viewCX + (cssX * dpr - cx) / scale;
-      const cssToMmY = (cssY: number) => viewCY - (cssY * dpr - cy) / scale;
+      // ── Active handle drag ────────────────────────────────────────────────
+      const drag = handleDragRef.current;
+      if (drag) {
+        if (!t) return;
+        const pointerMmX = t.viewCX + (cssX * dpr - t.cx) / t.scale;
+        const pointerMmY = t.viewCY - (cssY * dpr - t.cy) / t.scale;
 
-      const mmX1 = cssToMmX(startX);
-      const mmY1 = cssToMmY(startY);
-      const mmX2 = cssToMmX(currentX);
-      const mmY2 = cssToMmY(currentY);
+        const precision = e.altKey ? 0.25 : 1.0;
+        const rawX = drag.startMmX + (pointerMmX - drag.startPointerMmX) * precision;
+        const rawY = drag.startMmY + (pointerMmY - drag.startPointerMmY) * precision;
 
-      const halfW = Math.abs(mmX2 - mmX1) / 2;
-      const halfH = Math.abs(mmY2 - mmY1) / 2;
-      if (halfW < 0.01 || halfH < 0.01) return;
+        // Shift key: disable declared snap if present, or enable 1 mm snap if not
+        let effSnap = drag.snap;
+        if (drag.snap !== undefined && e.shiftKey) effSnap = undefined;
+        else if (drag.snap === undefined && e.shiftKey) effSnap = 1;
 
-      setViewport({
-        centerX: (mmX1 + mmX2) / 2,
-        centerY: (mmY1 + mmY2) / 2,
-        halfW,
-        halfH,
-      });
+        const { x: projX, y: projY } = projectPoint({ x: rawX, y: rawY }, drag.region, effSnap);
+        drag.currentMmX = projX;
+        drag.currentMmY = projY;
+
+        setDragMm({ x: projX, y: projY });
+        onHandleDragRef.current?.(drag.name, drag.line, projX, projY);
+        return;
+      }
+
+      // ── Zoom drag ─────────────────────────────────────────────────────────
+      if (dragState) {
+        setDragState((prev) => (prev ? { ...prev, currentX: cssX, currentY: cssY } : null));
+        return;
+      }
+
+      // ── Idle hover: update hovered handle for cursor + region rendering ───
+      if (t && showHandlesRef.current && (pointParamsRef.current?.length ?? 0) > 0) {
+        const threshold = e.pointerType === 'touch' ? 24 : 12;
+        let found: string | null = null;
+        let bestDist = threshold;
+        for (const p of pointParamsRef.current ?? []) {
+          const hcssX = (t.cx + (p.valueX - t.viewCX) * t.scale) / dpr;
+          const hcssY = (t.cy - (p.valueY - t.viewCY) * t.scale) / dpr;
+          const dist = Math.sqrt((cssX - hcssX) ** 2 + (cssY - hcssY) ** 2);
+          if (dist < bestDist) {
+            bestDist = dist;
+            found = p.name;
+          }
+        }
+        setHoveredHandleName((prev) => (prev === found ? prev : found));
+      }
     },
     [dragState],
   );
+
+  const handlePointerUp = useCallback(() => {
+    // ── Commit handle drag ────────────────────────────────────────────────
+    const drag = handleDragRef.current;
+    if (drag) {
+      onHandleCommitRef.current?.(drag.name, drag.line, drag.currentMmX, drag.currentMmY);
+      handleDragRef.current = null;
+      setDraggingHandleName(null);
+      setDragMm(null);
+      return;
+    }
+
+    // ── Zoom drag commit ──────────────────────────────────────────────────
+    if (!dragState) return;
+
+    const { startX, startY, currentX, currentY } = dragState;
+    setDragState(null);
+
+    const dx = currentX - startX;
+    const dy = currentY - startY;
+
+    // Ignore tiny drags (accidental clicks, double-click pair)
+    if (Math.abs(dx) < 10 || Math.abs(dy) < 10) return;
+
+    const t = transformRef.current;
+    if (!t) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const { scale, cx, cy, viewCX, viewCY } = t;
+
+    // CSS pixels → mm using current (possibly zoomed) transform
+    const cssToMmX = (cssXp: number) => viewCX + (cssXp * dpr - cx) / scale;
+    const cssToMmY = (cssYp: number) => viewCY - (cssYp * dpr - cy) / scale;
+
+    const mmX1 = cssToMmX(startX);
+    const mmY1 = cssToMmY(startY);
+    const mmX2 = cssToMmX(currentX);
+    const mmY2 = cssToMmY(currentY);
+
+    const halfW = Math.abs(mmX2 - mmX1) / 2;
+    const halfH = Math.abs(mmY2 - mmY1) / 2;
+    if (halfW < 0.01 || halfH < 0.01) return;
+
+    setViewport({
+      centerX: (mmX1 + mmX2) / 2,
+      centerY: (mmY1 + mmY2) / 2,
+      halfW,
+      halfH,
+    });
+  }, [dragState]);
 
   const handleDoubleClick = useCallback(() => {
     // Only reset if currently zoomed in; no-op when already at default view
@@ -239,6 +444,8 @@ export default function StageCanvas({
   // ── click-to-pick (canvas → row linking) ─────────────────────────────────
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
+      // If a handle drag just finished, don't fire onPick
+      if (draggingHandleName !== null) return;
       if (!onPick) return;
       const canvas = canvasRef.current;
       const t = transformRef.current;
@@ -251,13 +458,10 @@ export default function StageCanvas({
       const mmY = t.viewCY - (cssY * dpr - t.cy) / t.scale;
       onPick({ x: mmX, y: mmY });
     },
-    [onPick],
+    [onPick, draggingHandleName],
   );
 
   // ── derive zoom level for indicator ─────────────────────────────────────
-  // Computed directly from canvasRef + viewport during render so the badge
-  // always reflects the new viewport in the same render pass that sets it
-  // (no stale-ref lag).
   const zoomLevel = (() => {
     if (!viewport) return null;
     const canvas = canvasRef.current;
@@ -279,6 +483,14 @@ export default function StageCanvas({
       ? dragState
       : null;
 
+  // Cursor: grab when hovering a handle, grabbing while dragging
+  const cursor =
+    draggingHandleName !== null
+      ? 'grabbing'
+      : hoveredHandleName !== null && showHandles
+        ? 'grab'
+        : 'crosshair';
+
   return (
     <>
       <canvas
@@ -294,7 +506,7 @@ export default function StageCanvas({
           width: '100%',
           height: '100%',
           display: 'block',
-          cursor: 'crosshair',
+          cursor,
         }}
       />
 
@@ -353,6 +565,13 @@ function draw(
   warningLoc: WarningLocation | null,
   hoveredLineBounds: LineStitchBounds | null,
   overlays: CanvasOverlay[] = [],
+  pointParams: PointParamDef[] = [],
+  showHandles: boolean = true,
+  hoveredHandleName: string | null = null,
+  draggingHandleName: string | null = null,
+  dragMm: { x: number; y: number } | null = null,
+  highlightedHandle: string | null = null,
+  lockedHandles: Set<string> = new Set(),
 ): RenderTransform {
   const ctx = canvas.getContext('2d');
   if (!ctx) return { scale: 1, cx: 0, cy: 0, viewCX: 0, viewCY: 0 };
@@ -392,7 +611,24 @@ function draw(
 
   const pts = design.pts;
   const upto = Math.min(pts.length, scrubPos || 0);
-  if (pts.length === 0) return { scale, cx, cy, viewCX, viewCY };
+  if (pts.length === 0) {
+    if (showHandles && pointParams.length > 0) {
+      drawHandles(
+        ctx,
+        pointParams,
+        X,
+        Y,
+        scale,
+        dpr,
+        hoveredHandleName,
+        draggingHandleName,
+        dragMm,
+        highlightedHandle,
+        lockedHandles,
+      );
+    }
+    return { scale, cx, cy, viewCX, viewCY };
+  }
 
   // Jumps (under the thread) — hidden when hideJumps is active
   ctx.lineCap = 'round';
@@ -498,16 +734,13 @@ function draw(
     });
   }
 
-  // Hovered-line bounding box — semi-transparent rect around the stitches
-  // produced by the source line currently under the cursor in the editor.
-  // Drawn above the stitches/pins but below warning markers so both remain
-  // legible when a hotspot line is also hovered.
+  // Hovered-line bounding box
   if (hoveredLineBounds) {
     const b = hoveredLineBounds;
-    const pad = 1.5; // mm padding on every side
-    const MIN_HALF = 1.0; // mm — keep single-point lines visible as a small rect
+    const pad = 1.5;
+    const MIN_HALF = 1.0;
     const rx = X(b.minX - pad);
-    const ry = Y(b.maxY + pad); // y-up flip: top of rect is maxY in mm space
+    const ry = Y(b.maxY + pad);
     const rw = Math.max(2 * MIN_HALF, b.maxX - b.minX + 2 * pad) * scale;
     const rh = Math.max(2 * MIN_HALF, b.maxY - b.minY + 2 * pad) * scale;
     ctx.save();
@@ -520,25 +753,231 @@ function draw(
     ctx.restore();
   }
 
-  // Warning location marker — shown while a locatable warning is hovered in
-  // the console. Drawn last so it sits above everything, and independent of
-  // the scrub position (the defect is a property of the finished design).
+  // Warning location marker
   if (warningLoc && warningLoc.points.length) {
-    const pts = warningLoc.points;
-    // A single hotspot gets a prominent crosshair marker; a cluster of many
-    // spots (e.g. merged tiny moves) gets light ringed dots so the preview
-    // doesn't drown in crosshairs.
-    if (pts.length <= 4) {
-      for (const p of pts) drawWarnCrosshair(ctx, X(p.x), Y(p.y), dpr);
+    const wpts = warningLoc.points;
+    if (wpts.length <= 4) {
+      for (const p of wpts) drawWarnCrosshair(ctx, X(p.x), Y(p.y), dpr);
     } else {
-      for (const p of pts) drawWarnDot(ctx, X(p.x), Y(p.y), dpr);
+      for (const p of wpts) drawWarnDot(ctx, X(p.x), Y(p.y), dpr);
     }
   }
 
-  // Selection highlight drawn last so it sits above the stitches.
+  // Selection highlight drawn last
   drawOverlays(ctx, overlays, X, Y, dpr, 'highlight');
 
+  // ── XY handles — drawn above everything else ───────────────────────────
+  if (showHandles && pointParams.length > 0) {
+    drawHandles(
+      ctx,
+      pointParams,
+      X,
+      Y,
+      scale,
+      dpr,
+      hoveredHandleName,
+      draggingHandleName,
+      dragMm,
+      highlightedHandle,
+      lockedHandles,
+    );
+  }
+
   return { scale, cx, cy, viewCX, viewCY };
+}
+
+// ── XY handle rendering ───────────────────────────────────────────────────────
+
+const HANDLE_RING_R = 7; // CSS px radius for the handle ring
+const HANDLE_DOT_R = 2.5; // CSS px radius for the center dot
+
+function drawHandles(
+  ctx: CanvasRenderingContext2D,
+  params: PointParamDef[],
+  X: (mx: number) => number,
+  Y: (my: number) => number,
+  scale: number,
+  dpr: number,
+  hoveredHandleName: string | null,
+  draggingHandleName: string | null,
+  dragMm: { x: number; y: number } | null,
+  highlightedHandle: string | null,
+  lockedHandles: Set<string>,
+) {
+  const ringR = HANDLE_RING_R * dpr;
+  const dotR = HANDLE_DOT_R * dpr;
+
+  ctx.save();
+  ctx.font = `${Math.round(fsBase * 0.85) * dpr}px ${fontMono}`;
+  ctx.textBaseline = 'middle';
+
+  for (const p of params) {
+    const isDragging = draggingHandleName === p.name;
+    const isHovered = hoveredHandleName === p.name;
+    const isHighlighted = highlightedHandle === p.name;
+    const isLocked = lockedHandles.has(p.name);
+    const isActive = isDragging || isHovered || isHighlighted;
+
+    // Use live drag position while dragging
+    const mmX = isDragging && dragMm ? dragMm.x : p.valueX;
+    const mmY = isDragging && dragMm ? dragMm.y : p.valueY;
+    const px = X(mmX);
+    const py = Y(mmY);
+
+    // Draw constraint region when active
+    if (isActive) {
+      ctx.save();
+      ctx.setLineDash([4 * dpr, 4 * dpr]);
+      ctx.lineWidth = 1 * dpr;
+      ctx.strokeStyle = `rgba(203,161,109,0.55)`;
+      ctx.fillStyle = `rgba(203,161,109,0.06)`;
+      drawRegionShape(ctx, p.region, X, Y, scale, dpr);
+      ctx.restore();
+    }
+
+    // Draw live coordinate tooltip while dragging
+    if (isDragging) {
+      ctx.save();
+      const label = `${mmX.toFixed(1)}, ${mmY.toFixed(1)}`;
+      const labelW = ctx.measureText(label).width;
+      const pad = 5 * dpr;
+      const lx = px + ringR + 4 * dpr;
+      const ly = py - 9 * dpr;
+      ctx.fillStyle = 'rgba(20,15,10,0.7)';
+      ctx.beginPath();
+      ctx.rect(lx - pad * 0.5, ly - 9 * dpr, labelW + pad, 18 * dpr);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,245,230,0.95)';
+      ctx.fillText(label, lx, ly + 0.5 * dpr);
+      ctx.restore();
+    }
+
+    ctx.globalAlpha = isActive || isHighlighted ? 1.0 : 0.6;
+
+    // Ring
+    ctx.beginPath();
+    ctx.arc(px, py, ringR, 0, Math.PI * 2);
+    if (isLocked) {
+      // Locked: filled gold ring
+      ctx.fillStyle = gold;
+      ctx.fill();
+      ctx.strokeStyle = goldHi;
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.stroke();
+    } else if (isHighlighted) {
+      ctx.strokeStyle = goldHi;
+      ctx.lineWidth = 2.5 * dpr;
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = isActive ? goldHi : gold;
+      ctx.lineWidth = 2 * dpr;
+      ctx.stroke();
+    }
+
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(px, py, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = isLocked ? goldHi : isActive ? goldHi : gold;
+    ctx.fill();
+
+    // Label
+    ctx.save();
+    ctx.globalAlpha = isActive ? 0.9 : 0.55;
+    ctx.fillStyle = 'rgba(255,245,230,0.95)';
+    ctx.textAlign = 'left';
+    ctx.fillText(p.name, px + ringR + 3 * dpr, py);
+    ctx.restore();
+
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+}
+
+/** Draw the constraint region (outline + fill) for a handle. */
+function drawRegionShape(
+  ctx: CanvasRenderingContext2D,
+  region: XYRegion,
+  X: (mx: number) => number,
+  Y: (my: number) => number,
+  scale: number,
+  dpr: number,
+) {
+  const HOOP_R = 47;
+  switch (region.kind) {
+    case 'free': {
+      // The hoop itself is the boundary — don't redraw it
+      break;
+    }
+    case 'rect': {
+      const rx = X(region.minX);
+      const ry = Y(region.maxY); // y-up: maxY maps to lower canvas y
+      const rw = (region.maxX - region.minX) * scale;
+      const rh = (region.maxY - region.minY) * scale;
+      ctx.beginPath();
+      ctx.rect(rx, ry, rw, rh);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'disc': {
+      const px = X(region.cx);
+      const py = Y(region.cy);
+      const r = region.radius * scale;
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'axis': {
+      const chordHalf = Math.sqrt(
+        Math.max(0, HOOP_R * HOOP_R - region.fixedCoord * region.fixedCoord),
+      );
+      if (region.axis === 'x') {
+        // Horizontal segment: y is fixed, x varies
+        const lo = isFinite(region.rangeMin) ? region.rangeMin : -chordHalf;
+        const hi = isFinite(region.rangeMax) ? region.rangeMax : chordHalf;
+        const py = Y(region.fixedCoord);
+        ctx.beginPath();
+        ctx.moveTo(X(lo), py);
+        ctx.lineTo(X(hi), py);
+        ctx.stroke();
+        // Tick marks at ends
+        const tick = 4 * dpr;
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(X(lo), py - tick);
+        ctx.lineTo(X(lo), py + tick);
+        ctx.moveTo(X(hi), py - tick);
+        ctx.lineTo(X(hi), py + tick);
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        // Vertical segment: x is fixed, y varies
+        const lo = isFinite(region.rangeMin) ? region.rangeMin : -chordHalf;
+        const hi = isFinite(region.rangeMax) ? region.rangeMax : chordHalf;
+        const px = X(region.fixedCoord);
+        ctx.beginPath();
+        ctx.moveTo(px, Y(lo));
+        ctx.lineTo(px, Y(hi));
+        ctx.stroke();
+        // Tick marks at ends
+        const tick = 4 * dpr;
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(px - tick, Y(lo));
+        ctx.lineTo(px + tick, Y(lo));
+        ctx.moveTo(px - tick, Y(hi));
+        ctx.lineTo(px + tick, Y(hi));
+        ctx.stroke();
+        ctx.restore();
+      }
+      break;
+    }
+  }
 }
 
 /** Draw staging overlays (ghost outlines, source artwork, selection highlight). */
@@ -664,10 +1103,6 @@ function computeAutoFitScale(w: number, h: number, design: DesignState, hoop: Ho
 
 // ── 1 cm grid ────────────────────────────────────────────────────────────────
 
-/** Draws a 1 cm (10 mm) reference grid in mm-space so it scales and pans with
- *  the viewport. Drawn before the hoop overlay so the overlay naturally dims
- *  grid lines outside the hoop, matching the CSS fabric weave behaviour.
- *  Suppressed once lines are closer than 8 physical px (extreme zoom-out). */
 function drawGrid(
   ctx: CanvasRenderingContext2D,
   scale: number,
@@ -682,7 +1117,6 @@ function drawGrid(
   const CELL = 10; // mm — 1 cm
   if (CELL * scale < 8) return;
 
-  // Visible mm extents of the current viewport
   const minMmX = viewCX - cx / scale;
   const maxMmX = viewCX + cx / scale;
   const minMmY = viewCY - cy / scale;
@@ -693,14 +1127,12 @@ function drawGrid(
   ctx.lineWidth = dpr;
   ctx.beginPath();
 
-  // Vertical lines at each 10 mm X tick
   for (let x = Math.ceil(minMmX / CELL) * CELL; x <= maxMmX; x += CELL) {
     const px = cx + (x - viewCX) * scale;
     ctx.moveTo(px, 0);
     ctx.lineTo(px, h);
   }
 
-  // Horizontal lines at each 10 mm Y tick (Y-up → Y-down flip)
   for (let y = Math.ceil(minMmY / CELL) * CELL; y <= maxMmY; y += CELL) {
     const py = cy - (y - viewCY) * scale;
     ctx.moveTo(0, py);
@@ -727,11 +1159,9 @@ function drawHoop(
   const rx = (hoop.widthMM / 2) * scale;
   const ry = (hoop.heightMM / 2) * scale;
 
-  // Hoop center in canvas-pixel space (may be off-center when zoomed)
   const hcx = cx + (0 - viewCX) * scale;
   const hcy = cy - (0 - viewCY) * scale;
 
-  // Dark overlay outside the hoop (even-odd fill)
   ctx.save();
   ctx.fillStyle = canvasHoopOverlay;
   ctx.beginPath();
@@ -740,7 +1170,6 @@ function drawHoop(
   ctx.fill('evenodd');
   ctx.restore();
 
-  // Hoop boundary line
   ctx.save();
   ctx.beginPath();
   addHoopPath(ctx, hoop, rx, ry, hcx, hcy, scale);

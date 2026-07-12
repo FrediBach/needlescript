@@ -1,8 +1,14 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronUp, Shuffle, Lock, LockOpen, Copy } from 'lucide-react';
-import { parseParameters, parsePresets, snapValue } from '../lib/parse-parameters.ts';
-import type { ParamItem, ParamDef, Preset } from '../lib/parse-parameters.ts';
+import { ChevronDown, ChevronUp, Shuffle, Lock, LockOpen, Copy, Crosshair } from 'lucide-react';
+import {
+  parseParameters,
+  parsePresets,
+  snapValue,
+  projectPoint,
+  sampleRegion,
+} from '../lib/parse-parameters.ts';
+import type { ParamItem, ParamDef, PointParamDef, Preset } from '../lib/parse-parameters.ts';
 import { Slider } from '@/components/ui/slider.tsx';
 import { Switch } from '@/components/ui/switch.tsx';
 import { Input } from '@/components/ui/input.tsx';
@@ -11,16 +17,23 @@ import styles from './ParametersPanel.module.css';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface ParamChange {
+export interface ParamChange {
   name: string;
   line: number;
-  value: number;
+  value: number | [number, number];
 }
 
 interface Props {
   source: string;
   onParamChange: (name: string, line: number, value: number) => void;
   onAllParamsChange: (changes: ParamChange[]) => void;
+  /** Lock state managed by parent (App.tsx) so stage can also show locked handles */
+  lockedParams: Set<string>;
+  onToggleLock: (name: string) => void;
+  /** Cross-link: hovering a row or clicking Locate notifies the stage to highlight that handle */
+  onHighlightHandle?: (name: string | null) => void;
+  /** Which handle the stage is currently highlighting (from stage hover → back to panel) */
+  highlightedHandle?: string | null;
 }
 
 // ── Section separator ────────────────────────────────────────────────────────
@@ -47,26 +60,24 @@ interface SliderRowProps {
 function SliderRow({ def, onChange, isLocked, onToggleLock }: SliderRowProps) {
   const { name, value, min, max, step, sliderKind, line } = def;
 
-  // Local input state so the field is freely editable while typing.
-  const [inputVal, setInputVal] = useState(() => formatSliderValue(value, sliderKind));
-  // Keep input display in sync when source changes externally.
-  const prevValueRef = useRef(value);
-  if (prevValueRef.current !== value) {
-    prevValueRef.current = value;
-    setInputVal(formatSliderValue(value, sliderKind));
-  }
+  // When focused, we keep a local draft string so the user can type freely.
+  // While not focused we display the prop value directly (no sync needed).
+  const [draft, setDraft] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const display = isEditing ? draft : formatSliderValue(value, sliderKind);
+
+  const handleFocus = useCallback(() => {
+    setDraft(formatSliderValue(value, sliderKind));
+    setIsEditing(true);
+  }, [value, sliderKind]);
 
   const commitInput = useCallback(() => {
-    const raw = parseFloat(inputVal);
-    if (!Number.isFinite(raw)) {
-      // Reset to current value on bad input
-      setInputVal(formatSliderValue(value, sliderKind));
-      return;
-    }
+    setIsEditing(false);
+    const raw = parseFloat(draft);
+    if (!Number.isFinite(raw)) return;
     const snapped = snapValue(raw, min, max, step);
-    setInputVal(formatSliderValue(snapped, sliderKind));
     onChange(name, line, snapped);
-  }, [inputVal, value, min, max, step, sliderKind, name, line, onChange]);
+  }, [draft, min, max, step, name, line, onChange]);
 
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -74,12 +85,12 @@ function SliderRow({ def, onChange, isLocked, onToggleLock }: SliderRowProps) {
       else if (e.key === 'ArrowUp') {
         e.preventDefault();
         const next = snapValue(value + step, min, max, step);
-        setInputVal(formatSliderValue(next, sliderKind));
+        setDraft(formatSliderValue(next, sliderKind));
         onChange(name, line, next);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         const next = snapValue(value - step, min, max, step);
-        setInputVal(formatSliderValue(next, sliderKind));
+        setDraft(formatSliderValue(next, sliderKind));
         onChange(name, line, next);
       }
     },
@@ -90,10 +101,11 @@ function SliderRow({ def, onChange, isLocked, onToggleLock }: SliderRowProps) {
     (vals: number | readonly number[]) => {
       const raw = Array.isArray(vals) ? (vals as number[])[0] : (vals as number);
       const snapped = snapValue(raw, min, max, step);
-      setInputVal(formatSliderValue(snapped, sliderKind));
+      // Keep draft in sync when slider moves while editing
+      if (isEditing) setDraft(formatSliderValue(snapped, sliderKind));
       onChange(name, line, snapped);
     },
-    [min, max, step, sliderKind, name, line, onChange],
+    [min, max, step, sliderKind, name, line, onChange, isEditing],
   );
 
   return (
@@ -118,8 +130,9 @@ function SliderRow({ def, onChange, isLocked, onToggleLock }: SliderRowProps) {
       </div>
       <Input
         type="number"
-        value={inputVal}
-        onChange={(e) => setInputVal(e.target.value)}
+        value={display}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={handleFocus}
         onBlur={commitInput}
         onKeyDown={handleInputKeyDown}
         className={styles.valueInput}
@@ -203,25 +216,172 @@ function SwitchRow({ def, onChange, isLocked, onToggleLock }: SwitchRowProps) {
   );
 }
 
+// ── Point row ─────────────────────────────────────────────────────────────────
+
+interface PointRowProps {
+  def: PointParamDef;
+  isLocked: boolean;
+  isHighlighted: boolean;
+  onChange: (name: string, line: number, x: number, y: number) => void;
+  onToggleLock: () => void;
+  onLocate: (name: string) => void;
+  onHoverEnter: (name: string) => void;
+  onHoverLeave: () => void;
+}
+
+function PointRow({
+  def,
+  isLocked,
+  onChange,
+  onToggleLock,
+  onLocate,
+  onHoverEnter,
+  onHoverLeave,
+}: PointRowProps) {
+  const { name, valueX, valueY, line, region, snap } = def;
+
+  const xFixed = region.kind === 'axis' && region.axis === 'y'; // x is FIXED when axis='y'
+  const yFixed = region.kind === 'axis' && region.axis === 'x'; // y is FIXED when axis='x'
+
+  // While focused we keep a local draft; otherwise display the prop value directly.
+  const [xDraft, setXDraft] = useState('');
+  const [yDraft, setYDraft] = useState('');
+  const [xEditing, setXEditing] = useState(false);
+  const [yEditing, setYEditing] = useState(false);
+  const displayX = xEditing ? xDraft : formatPointCoord(valueX);
+  const displayY = yEditing ? yDraft : formatPointCoord(valueY);
+
+  const commitXInput = useCallback(() => {
+    setXEditing(false);
+    const raw = parseFloat(xDraft);
+    if (!Number.isFinite(raw)) return;
+    const { x, y } = projectPoint({ x: raw, y: valueY }, region, snap);
+    onChange(name, line, x, y);
+  }, [xDraft, valueY, region, snap, name, line, onChange]);
+
+  const commitYInput = useCallback(() => {
+    setYEditing(false);
+    const raw = parseFloat(yDraft);
+    if (!Number.isFinite(raw)) return;
+    const { x, y } = projectPoint({ x: valueX, y: raw }, region, snap);
+    onChange(name, line, x, y);
+  }, [yDraft, valueX, region, snap, name, line, onChange]);
+
+  const handleXKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+  }, []);
+
+  const handleYKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+  }, []);
+
+  return (
+    <div
+      className={styles.paramRow}
+      onMouseEnter={() => onHoverEnter(name)}
+      onMouseLeave={onHoverLeave}
+    >
+      <span className={cn(styles.paramName, styles.pointParamName)} title={name}>
+        {name}
+      </span>
+      <div className={styles.pointWrap}>
+        <span className={styles.pointLabel}>x</span>
+        <Input
+          type="number"
+          value={displayX}
+          onChange={(e) => setXDraft(e.target.value)}
+          onFocus={() => {
+            setXDraft(formatPointCoord(valueX));
+            setXEditing(true);
+          }}
+          onBlur={commitXInput}
+          onKeyDown={handleXKeyDown}
+          className={styles.pointInput}
+          aria-label={`${name} x`}
+          disabled={xFixed}
+          step={snap ?? 0.1}
+        />
+        <span className={styles.pointLabel}>y</span>
+        <Input
+          type="number"
+          value={displayY}
+          onChange={(e) => setYDraft(e.target.value)}
+          onFocus={() => {
+            setYDraft(formatPointCoord(valueY));
+            setYEditing(true);
+          }}
+          onBlur={commitYInput}
+          onKeyDown={handleYKeyDown}
+          className={styles.pointInput}
+          aria-label={`${name} y`}
+          disabled={yFixed}
+          step={snap ?? 0.1}
+        />
+        <button
+          className={styles.locateBtn}
+          type="button"
+          title={`Locate ${name} handle on stage`}
+          aria-label={`Locate ${name} handle on stage`}
+          onClick={() => onLocate(name)}
+        >
+          <Crosshair size={10} aria-hidden="true" />
+        </button>
+      </div>
+      <button
+        className={cn(styles.lockBtn, isLocked && styles.lockBtnLocked)}
+        onClick={onToggleLock}
+        type="button"
+        title={isLocked ? `Unlock ${name}` : `Lock ${name}`}
+        aria-label={isLocked ? `Unlock ${name}` : `Lock ${name}`}
+        aria-pressed={isLocked}
+      >
+        {isLocked ? (
+          <Lock size={11} aria-hidden="true" />
+        ) : (
+          <LockOpen size={11} aria-hidden="true" />
+        )}
+      </button>
+    </div>
+  );
+}
+
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-export default function ParametersPanel({ source, onParamChange, onAllParamsChange }: Props) {
+export default function ParametersPanel({
+  source,
+  onParamChange,
+  onAllParamsChange,
+  lockedParams,
+  onToggleLock,
+  onHighlightHandle,
+  highlightedHandle,
+}: Props) {
   const items = useMemo(() => parseParameters(source), [source]);
   const presets = useMemo(() => parsePresets(source), [source]);
-  const paramCount = items.filter((i) => i.kind === 'param').length;
+  const paramCount = items.filter((i) => i.kind === 'param' || i.kind === 'point').length;
 
   const [open, setOpen] = useState(true);
-  const [lockedParams, setLockedParams] = useState<Set<string>>(() => new Set());
   const [activePreset, setActivePreset] = useState<string | null>(null);
 
-  // ── Lock toggle ─────────────────────────────────────────────────────────
-  const toggleLock = useCallback((name: string) => {
-    setLockedParams((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
+  // ── Flash timer for locate ───────────────────────────────────────────
+  const locateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLocate = useCallback(
+    (name: string) => {
+      if (locateTimerRef.current) clearTimeout(locateTimerRef.current);
+      onHighlightHandle?.(name);
+      locateTimerRef.current = setTimeout(() => {
+        onHighlightHandle?.(null);
+        locateTimerRef.current = null;
+      }, 1500);
+    },
+    [onHighlightHandle],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (locateTimerRef.current) clearTimeout(locateTimerRef.current);
+    };
   }, []);
 
   // ── Wrap onParamChange so any manual edit deselects the active preset ───
@@ -233,9 +393,17 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
     [onParamChange],
   );
 
+  const handlePointChange = useCallback(
+    (name: string, line: number, x: number, y: number) => {
+      setActivePreset(null);
+      onAllParamsChange([{ name, line, value: [x, y] }]);
+    },
+    [onAllParamsChange],
+  );
+
   // ── Randomize (respects locks, clears active preset) ────────────────────
   const handleRandomize = useCallback(() => {
-    const changes = items
+    const scalarChanges = items
       .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
       .filter(({ def }) => !lockedParams.has(def.name))
       .map(({ def }) => {
@@ -243,6 +411,20 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
         const raw = min + Math.random() * (max - min);
         return { name, line, value: snapValue(raw, min, max, step) };
       });
+
+    const pointChanges = items
+      .filter((item): item is Extract<ParamItem, { kind: 'point' }> => item.kind === 'point')
+      .filter(({ def }) => !lockedParams.has(def.name))
+      .map(({ def }) => {
+        const sampled = sampleRegion(def.region, def.snap, Math.random);
+        return {
+          name: def.name,
+          line: def.line,
+          value: [sampled.x, sampled.y] as [number, number],
+        };
+      });
+
+    const changes = [...scalarChanges, ...pointChanges];
     if (changes.length > 0) {
       setActivePreset(null);
       onAllParamsChange(changes);
@@ -254,14 +436,32 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
     (presetName: string) => {
       const preset = presets.find((p: Preset) => p.name === presetName);
       if (!preset) return;
-      const changes = items
+
+      const scalarChanges = items
         .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
-        .filter(({ def }) => def.name in preset.values)
+        .filter(({ def }) => {
+          const v = preset.values[def.name];
+          return v !== undefined && typeof v === 'number';
+        })
         .map(({ def }) => ({
           name: def.name,
           line: def.line,
-          value: snapValue(preset.values[def.name], def.min, def.max, def.step),
+          value: snapValue(preset.values[def.name] as number, def.min, def.max, def.step),
         }));
+
+      const pointChanges = items
+        .filter((item): item is Extract<ParamItem, { kind: 'point' }> => item.kind === 'point')
+        .filter(({ def }) => {
+          const v = preset.values[def.name];
+          return v !== undefined && Array.isArray(v);
+        })
+        .map(({ def }) => {
+          const [px, py] = preset.values[def.name] as [number, number];
+          const { x, y } = projectPoint({ x: px, y: py }, def.region, def.snap);
+          return { name: def.name, line: def.line, value: [x, y] as [number, number] };
+        });
+
+      const changes = [...scalarChanges, ...pointChanges];
       if (changes.length > 0) {
         setActivePreset(presetName);
         onAllParamsChange(changes);
@@ -272,11 +472,15 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
 
   // ── Copy current param state as a ready-to-paste @preset comment ────────
   const handleCopy = useCallback(() => {
-    const paramDefs = items
-      .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
-      .map(({ def }) => def);
-    const assignments = paramDefs
-      .map((def) => `${def.name}=${formatPresetValue(def.value)}`)
+    const assignments = items
+      .filter(
+        (i): i is Extract<ParamItem, { kind: 'param' | 'point' }> =>
+          i.kind === 'param' || i.kind === 'point',
+      )
+      .map((i) => {
+        if (i.kind === 'param') return `${i.def.name}=${formatPresetValue(i.def.value)}`;
+        return `${i.def.name}=[${formatPointCoord(i.def.valueX)},${formatPointCoord(i.def.valueY)}]`;
+      })
       .join(', ');
     const name = activePreset ?? 'My Preset';
     navigator.clipboard.writeText(`// @preset ${name} : ${assignments}`);
@@ -389,6 +593,22 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
             if (item.kind === 'section') {
               return <SectionHeader key={`s-${idx}`} title={item.title} />;
             }
+            if (item.kind === 'point') {
+              const { def } = item;
+              return (
+                <PointRow
+                  key={`${def.name}-${def.line}`}
+                  def={def}
+                  isLocked={lockedParams.has(def.name)}
+                  isHighlighted={highlightedHandle === def.name}
+                  onChange={handlePointChange}
+                  onToggleLock={() => onToggleLock(def.name)}
+                  onLocate={handleLocate}
+                  onHoverEnter={(n) => onHighlightHandle?.(n)}
+                  onHoverLeave={() => onHighlightHandle?.(null)}
+                />
+              );
+            }
             const { def } = item;
             if (def.controlType === 'switch') {
               return (
@@ -397,7 +617,7 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
                   def={def}
                   isLocked={lockedParams.has(def.name)}
                   onChange={handleParamChange}
-                  onToggleLock={() => toggleLock(def.name)}
+                  onToggleLock={() => onToggleLock(def.name)}
                 />
               );
             }
@@ -407,7 +627,7 @@ export default function ParametersPanel({ source, onParamChange, onAllParamsChan
                 def={def}
                 isLocked={lockedParams.has(def.name)}
                 onChange={handleParamChange}
-                onToggleLock={() => toggleLock(def.name)}
+                onToggleLock={() => onToggleLock(def.name)}
               />
             );
           })}
@@ -458,4 +678,9 @@ function formatSliderBound(value: number, kind: ParamDef['sliderKind']): string 
 function formatPresetValue(value: number): string {
   if (Number.isFinite(value) && Math.floor(value) === value) return String(Math.round(value));
   return parseFloat(value.toPrecision(6)).toString();
+}
+
+/** Format a point coordinate for display — 1 decimal place. */
+function formatPointCoord(value: number): string {
+  return value.toFixed(1);
 }

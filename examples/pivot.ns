@@ -1,0 +1,56 @@
+// ============================================================
+//  PIVOT — draggable [xy] point handle showcase
+//
+//  Drag the three handles directly on the stage:
+//    anchor  — free, anywhere in the hoop
+//    eye     — constrained to a 15 mm disc
+//    tip     — slides along a horizontal axis
+// ============================================================
+
+// --- Handles ---
+
+let anchor = [0, 0]   // [xy]             free — anywhere in the hoop
+let eye    = [10, 0]  // [xy: disc 15]    disc of radius 15 mm
+let eye2   = [0, 12]  // [xy: disc 15]    another disc point
+
+// Decompose into scalars
+let ax = anchor[0]
+let ay = anchor[1]
+let ex = eye[0]
+let ey = eye[1]
+let e2x = eye2[0]
+let e2y = eye2[1]
+
+// --- Ring around each handle ---
+
+// Small ring at anchor
+color 1
+let r1 = 4
+up setxy(ax, ay - r1) seth 0 down arc 360 r1
+
+// Larger ring at eye
+color 2
+let r2 = 6
+up setxy(ex, ey - r2) seth 0 down arc 360 r2
+
+// Ring at eye2
+color 3
+let r3 = 5
+up setxy(e2x, e2y - r3) seth 0 down arc 360 r3
+
+// --- Lines connecting handles ---
+
+// Anchor → eye
+color 1
+up setxy(ax, ay) down setxy(ex, ey)
+
+// Anchor → eye2
+color 2
+up setxy(ax, ay) down setxy(e2x, e2y)
+
+// Eye → eye2
+color 3
+up setxy(ex, ey) down setxy(e2x, e2y)
+
+// @preset Default : anchor=[0,0], eye=[10,0], eye2=[0,12]
+// @preset Offset  : anchor=[-5,-5], eye=[12,8], eye2=[-8,10]

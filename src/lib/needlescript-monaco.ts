@@ -1640,7 +1640,7 @@ const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'rotate a vector (clockwise)',
     documentation:
-      'Rotate a vector clockwise by `deg` degrees. The rotation matches NeedleScript\'s turtle convention (clockwise positive, 0 = north). Use it to create perpendicular offsets, fan spread patterns, or to generate N evenly-rotated copies of a direction.\n\n```\n// Place 6 radial motifs evenly around the centre\nlet base = [0, 20]    // 20 mm north\nrepeat 6 [\n  let p = vrot(base, (repcount - 1) * 60)\n  moveto p[0], p[1]   fd 8   trim\n]\n```',
+      "Rotate a vector clockwise by `deg` degrees. The rotation matches NeedleScript's turtle convention (clockwise positive, 0 = north). Use it to create perpendicular offsets, fan spread patterns, or to generate N evenly-rotated copies of a direction.\n\n```\n// Place 6 radial motifs evenly around the centre\nlet base = [0, 20]    // 20 mm north\nrepeat 6 [\n  let p = vrot(base, (repcount - 1) * 60)\n  moveto p[0], p[1]   fd 8   trim\n]\n```",
     insertText: 'vrot(${1:vector}, ${2:degrees})',
     isSnippet: true,
     params: [['vector', 'degrees']],

@@ -1,6 +1,7 @@
 import type { DesignState, LineSegment, LineStitchBounds } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import type { WarningLocation } from '../lib/engine.ts';
+import type { PointParamDef } from '../lib/parse-parameters.ts';
 import StageCanvas from './StageCanvas.tsx';
 import PlaybackBar from './PlaybackBar.tsx';
 import StatsChips from './StatsChips.tsx';
@@ -20,6 +21,14 @@ interface Props {
   onToggleDensity: () => void;
   hideJumps: boolean;
   onToggleHideJumps: () => void;
+  // ── XY handle props ───────────────────────────────────────────────────────
+  pointParams?: PointParamDef[];
+  showHandles?: boolean;
+  onToggleHandles?: () => void;
+  highlightedHandle?: string | null;
+  lockedHandles?: Set<string>;
+  onHandleDrag?: (name: string, line: number, x: number, y: number) => void;
+  onHandleCommit?: (name: string, line: number, x: number, y: number) => void;
 }
 
 // ── Small pill switch sized for the canvas toolbar ────────────────────────────
@@ -84,7 +93,17 @@ export default function StagePane({
   onToggleDensity,
   hideJumps,
   onToggleHideJumps,
+  pointParams,
+  showHandles = true,
+  onToggleHandles,
+  highlightedHandle,
+  lockedHandles,
+  onHandleDrag,
+  onHandleCommit,
 }: Props) {
+  // Only show the handles toggle when there are point params to show
+  const hasHandles = (pointParams?.length ?? 0) > 0;
+
   return (
     <section className={styles.pane}>
       <div className={styles.fabric}>
@@ -96,6 +115,12 @@ export default function StagePane({
           hideJumps={hideJumps}
           warningLoc={warningLoc}
           hoveredLineBounds={hoveredLineBounds}
+          pointParams={pointParams}
+          showHandles={showHandles}
+          highlightedHandle={highlightedHandle}
+          lockedHandles={lockedHandles}
+          onHandleDrag={onHandleDrag}
+          onHandleCommit={onHandleCommit}
         />
         <StatsChips design={design} />
         <div className="absolute top-[10px] right-[10px] flex items-center gap-[10px]">
@@ -111,6 +136,14 @@ export default function StagePane({
             label="density"
             title="Toggle the stitch-density heatmap"
           />
+          {hasHandles && (
+            <CanvasSwitch
+              checked={showHandles}
+              onCheckedChange={() => onToggleHandles?.()}
+              label="handles"
+              title="Toggle draggable point handles"
+            />
+          )}
         </div>
       </div>
       <PlaybackBar

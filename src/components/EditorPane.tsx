@@ -8,7 +8,8 @@ import type { WarningLocation } from '../lib/engine.ts';
 import type { AIModelInfo } from '../hooks/useAI.ts';
 import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
-import { updateParameter } from '../lib/parse-parameters.ts';
+import { updateParameter, updatePointParameter } from '../lib/parse-parameters.ts';
+import type { ParamChange } from './ParametersPanel.tsx';
 import Splitter from './Splitter.tsx';
 import ParametersPanel from './ParametersPanel.tsx';
 import styles from './EditorPane.module.css';
@@ -49,6 +50,14 @@ interface Props {
    *  Shown as a badge; non-null means /autosave is available. */
   activeSnippetName?: string | null;
   style?: React.CSSProperties;
+  // ── XY handle cross-link ─────────────────────────────────────────────────
+  /** Lock state managed here so the stage can also show locked handles */
+  lockedParams: Set<string>;
+  onToggleLock: (name: string) => void;
+  /** Notified when a panel row is hovered or Locate is clicked */
+  onHighlightHandle?: (name: string | null) => void;
+  /** Which handle name the stage is currently highlighting */
+  highlightedHandle?: string | null;
 }
 
 // Font settings — sourced from theme.ts to stay in sync with the design system
@@ -92,6 +101,10 @@ export default function EditorPane({
   savedSnippetNames,
   activeSnippetName,
   style,
+  lockedParams,
+  onToggleLock,
+  onHighlightHandle,
+  highlightedHandle,
 }: Props) {
   const [replValue, setReplValue] = useState('');
   const replHistoryRef = useRef<string[]>([]);
@@ -180,13 +193,17 @@ export default function EditorPane({
   );
 
   const handleAllParamsChange = useCallback(
-    (changes: Array<{ name: string; line: number; value: number }>) => {
+    (changes: ParamChange[]) => {
       // Apply every change sequentially to an accumulating source string so all
       // updates land in a single onSourceChange call (avoids last-write-wins when
       // each patched value is read from the same stale sourceRef.current).
       let src = sourceRef.current;
       for (const { name, line, value } of changes) {
-        src = updateParameter(src, line, name, value);
+        if (Array.isArray(value)) {
+          src = updatePointParameter(src, line, name, value[0], value[1]);
+        } else {
+          src = updateParameter(src, line, name, value);
+        }
       }
       onSourceChange(src);
       if (runTimerRef.current !== null) clearTimeout(runTimerRef.current);
@@ -603,6 +620,10 @@ export default function EditorPane({
         source={source}
         onParamChange={handleParamChange}
         onAllParamsChange={handleAllParamsChange}
+        lockedParams={lockedParams}
+        onToggleLock={onToggleLock}
+        onHighlightHandle={onHighlightHandle}
+        highlightedHandle={highlightedHandle}
       />
 
       <Splitter

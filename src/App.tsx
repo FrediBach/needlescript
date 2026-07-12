@@ -18,6 +18,8 @@ import { toSVG } from './lib/svg.ts';
 import { THREADS, EXAMPLES, DEFAULT_HOOP } from './data.ts';
 import type { HoopConfig } from './data.ts';
 import type { ExportFormat } from './components/Header.tsx';
+import { parseParameters, updatePointParameter } from './lib/parse-parameters.ts';
+import type { PointParamDef } from './lib/parse-parameters.ts';
 import { usePanelSplit } from './hooks/usePanelSplit.ts';
 import { useSvgImport } from './hooks/useSvgImport.ts';
 import { useShare } from './hooks/useShare.ts';
@@ -177,6 +179,40 @@ export default function App() {
   });
   const { design, messages, scrubPos } = program;
 
+  // ── Lock state (shared between ParametersPanel and StageCanvas) ──────────
+  const [lockedParams, setLockedParams] = useState<Set<string>>(() => new Set());
+  const toggleLock = useCallback((name: string) => {
+    setLockedParams((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
+
+  // ── Handle visibility toggle ──────────────────────────────────────────────
+  const [showHandles, setShowHandles] = useState(true);
+
+  // ── Highlighted handle (panel hover ↔ stage) ─────────────────────────────
+  const [highlightedHandle, setHighlightedHandle] = useState<string | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleHighlightHandle = useCallback((name: string | null) => {
+    if (highlightTimerRef.current) {
+      clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = null;
+    }
+    setHighlightedHandle(name);
+  }, []);
+
+  // ── Point params derived from source (for stage handles) ─────────────────
+  const pointParamDefs = useMemo<PointParamDef[]>(() => {
+    const items = parseParameters(source);
+    return items
+      .filter((i): i is Extract<typeof i, { kind: 'point' }> => i.kind === 'point')
+      .map((i) => i.def);
+  }, [source]);
+
   // ── Panel split, SVG import, and share ───────────────────────────────────
   const { leftWidth, isMobile, mainRef, handleHorizDrag, handleHorizReset } = usePanelSplit();
 
@@ -279,6 +315,50 @@ export default function App() {
     },
     [addMsg, compile],
   );
+
+  // ── XY handle drag callbacks ──────────────────────────────────────────────
+  // Use a ref to track the latest pending rAF id, and another to track the
+  // latest source-after-drag so rapid events always build on the freshest base.
+  const xyDragRafRef = useRef<number | null>(null);
+  const xySourceRef = useRef<string | null>(null);
+
+  const handleXYHandleDrag = useCallback(
+    (name: string, line: number, x: number, y: number) => {
+      const base = xySourceRef.current ?? sourceRef.current;
+      const updated = updatePointParameter(base, line, name, x, y);
+      xySourceRef.current = updated;
+      setSource(updated);
+
+      if (xyDragRafRef.current !== null) cancelAnimationFrame(xyDragRafRef.current);
+      xyDragRafRef.current = requestAnimationFrame(() => {
+        xyDragRafRef.current = null;
+        const latest = xySourceRef.current ?? sourceRef.current;
+        runProgram(latest, design.name);
+      });
+    },
+    [design.name, runProgram],
+  );
+
+  const handleXYHandleCommit = useCallback(
+    (name: string, line: number, x: number, y: number) => {
+      const base = xySourceRef.current ?? sourceRef.current;
+      const updated = updatePointParameter(base, line, name, x, y);
+      xySourceRef.current = null; // reset pending source after final commit
+      setSource(updated);
+      if (xyDragRafRef.current !== null) {
+        cancelAnimationFrame(xyDragRafRef.current);
+        xyDragRafRef.current = null;
+      }
+      runProgram(updated, design.name);
+    },
+    [design.name, runProgram],
+  );
+
+  // When the source changes from outside (editor, example, share), clear the
+  // pending drag source so the next drag uses the fresh source.
+  useEffect(() => {
+    xySourceRef.current = null;
+  }, [source]);
 
   const {
     isDragging,
@@ -548,6 +628,10 @@ export default function App() {
           savedSnippetNames={savedSnippetNames}
           activeSnippetName={activeSnippetName}
           style={!isMobile ? { width: leftWidth, flexShrink: 0 } : undefined}
+          lockedParams={lockedParams}
+          onToggleLock={toggleLock}
+          onHighlightHandle={handleHighlightHandle}
+          highlightedHandle={highlightedHandle}
         />
         {!isMobile && (
           <Splitter orientation="horizontal" onDrag={handleHorizDrag} onReset={handleHorizReset} />
@@ -565,6 +649,13 @@ export default function App() {
           onToggleDensity={() => setShowDensity((v) => !v)}
           hideJumps={hideJumps}
           onToggleHideJumps={() => setHideJumps((v) => !v)}
+          pointParams={pointParamDefs}
+          showHandles={showHandles}
+          onToggleHandles={() => setShowHandles((v) => !v)}
+          highlightedHandle={highlightedHandle}
+          lockedHandles={lockedParams}
+          onHandleDrag={handleXYHandleDrag}
+          onHandleCommit={handleXYHandleCommit}
         />
       </main>
 

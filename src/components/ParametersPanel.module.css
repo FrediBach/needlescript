@@ -341,6 +341,94 @@
   padding-top: 8px; /* align with name label */
 }
 
+/* ── Point row ──────────────────────────────────────────────────────────── */
+
+.pointWrap {
+  grid-column: 2 / 4; /* span controls + value-input columns so lock lands in col 4 */
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-top: 6px;
+}
+
+.pointLabel {
+  font-size: var(--fs-badge);
+  color: var(--text-warm-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  width: 10px;
+  text-align: center;
+}
+
+.pointInput {
+  width: 52px !important;
+  height: 28px !important;
+  padding: 3px 6px !important;
+  font-size: var(--fs-sub) !important;
+  text-align: right;
+  background: var(--bg-warm-deep) !important;
+  border-color: var(--border-warm-sub) !important;
+  color: var(--text-warm) !important;
+  border-radius: 5px !important;
+  -moz-appearance: textfield;
+  flex-shrink: 0;
+}
+
+.pointInput:hover {
+  border-color: var(--text-warm-muted) !important;
+}
+
+.pointInput:focus-within,
+.pointInput:focus {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 2px var(--gold-20) !important;
+  outline: none !important;
+}
+
+.pointInput:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pointInput::-webkit-outer-spin-button,
+.pointInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.locateBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-warm-faint);
+  opacity: 0;
+  transition:
+    color 0.15s,
+    opacity 0.15s;
+}
+
+.paramRow:hover .locateBtn {
+  opacity: 1;
+}
+
+.locateBtn:hover {
+  color: var(--text-warm);
+  background-color: var(--text-warm-faint);
+}
+
+.pointParamName {
+  padding-top: 6px; /* align with point inputs (shallower than slider) */
+}
+
 .switchLabel {
   font-size: var(--fs-label);
   color: var(--text-warm-faint);

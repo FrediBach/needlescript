@@ -1,6 +1,7 @@
 // Shared constants for the NeedleScript playground UI
 
 import bloomRaw from '../examples/bloom.ns?raw';
+import pivotRaw from '../examples/pivot.ns?raw';
 import wreathRaw from '../examples/wreath.ns?raw';
 import wanderRaw from '../examples/wander.ns?raw';
 import starRaw from '../examples/star.ns?raw';
@@ -114,6 +115,7 @@ export const DEFAULT_HOOP: HoopConfig = HOOPS[0];
 // Keys are the short display names used as labels and as lookup keys in App.tsx.
 export const EXAMPLES: Record<string, string> = {
   bloom: bloomRaw,
+  pivot: pivotRaw,
   wreath: wreathRaw,
   wander: wanderRaw,
   star: starRaw,
@@ -284,6 +286,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'functional',
       'ornaline',
       'snake',
+      'pivot',
     ],
   },
 ];
