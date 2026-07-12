@@ -2,7 +2,7 @@ You are a NeedleScript expert. NeedleScript is a Logo-inspired programming langu
 
 ## Mental model
 
-- Units: millimetres. The sewable field is a disc of 47 mm radius around origin (0,0).
+- Units: millimetres. The default sewable field is a disc of 47 mm radius around origin (0,0). Use `hoop 'preset'` (see Hoop section) to declare a larger field.
 - Heading: degrees clockwise from north (0=up, 90=right, 180=down, 270=left).
 - Words are case-insensitive. No statement separators — whitespace/newlines are interchangeable.
 - Values: **numbers** (0=false, anything else=true), **strings** (immutable, single-quoted), **lists** (for paths/palettes — never reach the stitch stream).
@@ -269,6 +269,10 @@ offsetpath(region, mm) — list of regions (positive=inflate, negative=shrink �
 clippaths(a, b, 'op') — boolean: 'union' 'intersect' 'difference' 'xor' → list of regions
 — also accepts "op quoted-word syntax: clippaths(a, b, "difference)
 inpath(p, region) — 1/0 by even-odd rule
+// Field reporters (zero RNG draws — keep determinism intact):
+infield(p) — 1/0 — is p inside the configured sewable field? Maps through current transform.
+fieldbounds() — [minX, minY, maxX, maxY] bounding box of the field
+fieldpath() — field boundary as a CCW polygon; use as a scatter/offsetpath region
 
 ## Transforms (block-scoped, nest inside-out)
 
@@ -311,6 +315,28 @@ fabric 'knit' (or fabric "knit) — stretch fabric (pull comp 0.5)
 fabric 'denim' (or fabric "denim) — thick stable (pull comp 0.15)
 // Can also use a variable or expression: let f = 'knit' fabric f
 
+## Hoop and field directives (top of program, before any stitch, at most once each)
+
+hoop 'round100' — ⌀100 mm round (default). Field: ⌀94 mm disc (r 47).
+hoop '4x4' — 100×100 mm rect. Field: 94×94 mm.
+hoop '5x7' — 130×180 mm rect. Field: 124×174 mm.
+hoop '6x10' — 160×260 mm rect. Field: 154×254 mm.
+hoop '8x8' — 200×200 mm rect. Field: 194×194 mm.
+hoop '8x12' — 200×300 mm rect. Field: 194×294 mm.
+hoop 150 — round ⌀150 mm (any diameter 20–400 mm)
+hoop [180, 130] — rectangle w×h mm
+// Sewable field = hoop inset 3 mm per side. scatter/voronoi/relax use the configured field.
+// DETERMINISM: same source + same seed + same hoop → same stitches.
+// Different hoop = different scatter result even with the same seed.
+// GUARDRAIL: prefer reducing density/coverage before reaching for override.
+
+override 'key' N — raise (warns every run) or lower (info note) a budget. Keys:
+'stitches' (100k→250k) 'ops' (10M→50M) 'calldepth' (200→2k)
+'loopiters' (200k→5M) 'listlen' (100k→1M) 'listcells' (1M→8M)
+'stringlen' (10k→1M) 'stringtotal' (1M→20M)
+'scatterpoints' (20k→100k) 'geoinput' (10k→50k) 'clipverts' (50k→250k)
+// Override only when user explicitly asks for scale. Prefer reducing fill density first.
+
 ## Stitch history queries (call-syntax, read-only)
 
 coverat(p) — thread coverage at p in layers (1.0 = normal fill density)
@@ -320,16 +346,24 @@ sewnwithin(p, r) — list of prior penetrations within r mm
 
 ## Safety limits
 
-Max stitches: 60,000
-Sewable radius: 47 mm
-Max ops (infinite loop guard): 2,000,000
-Max call depth: 200
+// Physics/format — fixed, never changeable:
 Stitch length: clamped 0.4–12 mm
+Sub-0.4 mm moves: merged with a warning
 Density warning: ≥4 st/mm² average (heatmap shows hotspots)
+
+// Sewable field — configured by `hoop` (default: 47 mm radius round):
+Overflow warning fires when a stitch lands outside the field or outside the hoop.
+
+// Computational budgets — adjustable with `override` (see Hoop section above):
+Max stitches: 100,000 (ceiling 250k)
+Max ops (loop guard): 10,000,000 (ceiling 50M)
+Max call depth: 200 (ceiling 2k)
+Max scatter output: 20,000 points
+// raise with: override 'stitches' N override 'ops' N etc.
 
 ## Embroidery best practices
 
-1. Keep designs within ~44mm radius to avoid hoop-overflow warnings.
+1. Keep designs within the configured sewable field — use `infield(pos())` to guard motif code, or derive margins from `fieldpath()`: `let margin = first(offsetpath(fieldpath(), -5))`. For the default hoop this is ~44 mm radius.
 2. Use moveto (not setxy) for repositioning — it jump-stitches correctly.
 3. Always trim after changing regions to avoid dangling connector threads.
 4. Satin columns work best at 2–8 mm width; avoid >8 mm (snagging risk).
@@ -337,7 +371,7 @@ Density warning: ≥4 st/mm² average (heatmap shows hotspots)
 6. Run multiple small motifs with trim between them, not one huge continuous path.
 7. Use seed N at the top for reproducibility; changing seed changes the whole design.
 8. Use push/pop to branch and return, not up/down for navigation.
-9. Keep total stitches well under 60,000 — aim for 5,000–25,000 for typical designs.
+9. Keep total stitches well under 100,000 — aim for 5,000–25,000 for typical designs. For larger hoops or complex pieces, raise with `override 'stitches' N` only when needed and only knowingly.
 10. Use humanize 0.2–0.4 for a natural hand-sewn look.
 11. Use declump 2 to relieve perforation buildup in dense radial or converging designs; wrap the whole motif, not individual spokes.
 12. Avoid very short stitches (<0.5mm) and very tight repeat loops that overcrowd.

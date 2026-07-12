@@ -230,7 +230,7 @@ This guide is organised from the ground up. If you're new, read it top to bottom
 
 ## Basics
 
-- **Units are millimetres.** The hoop is 100 mm across; the sewable field is a 47 mm radius around the origin `(0, 0)` at the centre.
+- **Units are millimetres.** By default the hoop is 100 mm across and the sewable field is a 47 mm radius around the origin `(0, 0)` at the centre. Use the [`hoop` directive](#hoop-and-field) to set a different hoop. Stray outside the field and you'll get an overflow warning.
 - **Heading is in degrees, `0` = up/north, clockwise** (Logo convention). `rt 90` faces east.
 - Words are **case-insensitive** (`FD 10` = `fd 10`).
 - `//`, `#`, and `;` each start a comment to the end of the line. A lone `/` is still division — only two _adjacent_ slashes comment.
@@ -835,13 +835,13 @@ for h in hlines [
 
 ### Generators (seeded)
 
-| Function                                        | Returns                                                                                                              |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `scatter(mindist)` · `scatter(mindist, region)` | Poisson-disc (Bridson) points — over the sewable 47 mm field, or inside the region polygon. Capped at 20,000 points  |
-| `voronoi(points)` · `voronoi(points, region)`   | one cell (a region) per input point, **in input order**, clipped to the sewable disc or the given region             |
-| `triangulate(points)`                           | Delaunay triangles: a list of 3-point regions                                                                        |
-| `hull(points)`                                  | convex hull as a region, counter-clockwise                                                                           |
-| `relax(points, n)`                              | _n_ rounds of Lloyd's relaxation (each point moves to its Voronoi cell's centroid) — evens out spacing for stippling |
+| Function                                        | Returns                                                                                                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `scatter(mindist)` · `scatter(mindist, region)` | Poisson-disc (Bridson) points — over the **configured sewable field** (default: 47 mm radius; affected by `hoop`), or inside the region polygon. Capped at 20,000 points |
+| `voronoi(points)` · `voronoi(points, region)`   | one cell (a region) per input point, **in input order**, clipped to the configured field or the given region                                                             |
+| `triangulate(points)`                           | Delaunay triangles: a list of 3-point regions                                                                                                                            |
+| `hull(points)`                                  | convex hull as a region, counter-clockwise                                                                                                                               |
+| `relax(points, n)`                              | _n_ rounds of Lloyd's relaxation (each point moves to its Voronoi cell's centroid) — evens out spacing for stippling. Uses the configured field like `voronoi`           |
 
 ### Geometry ops
 
@@ -852,6 +852,81 @@ Backed by Clipper2 on ×1000 integer coordinates (µm precision) — results are
 | `offsetpath(region, mm)` | list of regions — positive inflates, negative shrinks. Shrinking may split a shape into several or into **none** (an empty list, not an error — loops over it naturally do nothing). Round joins |
 | `clippaths(a, b, 'op')`  | boolean of two regions; op ∈ `'union'` `'intersect'` `'difference'` `'xor'` (also accepts the classic `"op` quoted-word form); returns a list of regions                                         |
 | `inpath(p, region)`      | 1/0, even-odd rule (consistent with fills)                                                                                                                                                       |
+
+## Hoop and field
+
+### `hoop` — set the physical hoop
+
+```text
+hoop 'round100'        // default — ⌀100 mm round hoop, 47 mm sewable radius
+hoop '5x7'             // 130 × 180 mm portrait hoop, 124 × 174 mm field
+hoop 150               // custom round hoop, ⌀150 mm
+hoop [180, 130]        // custom rectangle (landscape 5×7)
+```
+
+`hoop` declares the physical hoop for the design. It must appear at the top of the program before any stitches. The **sewable field** is the hoop inset by 3 mm on every side — `hoop '5x7'` gives a 130 × 180 mm hoop and a 124 × 174 mm field. Everything that follows the field — overflow warnings, `scatter`/`voronoi`/`relax` default domain, the preview outline — tracks the configured field, not a hard-coded disc.
+
+**Named presets:**
+
+| Preset       | Hoop          | Sewable field                 |
+| ------------ | ------------- | ----------------------------- |
+| `'round100'` | ⌀100 mm round | ⌀94 mm disc — **the default** |
+| `'4x4'`      | 100 × 100 mm  | 94 × 94 mm                    |
+| `'5x7'`      | 130 × 180 mm  | 124 × 174 mm                  |
+| `'6x10'`     | 160 × 260 mm  | 154 × 254 mm                  |
+| `'8x8'`      | 200 × 200 mm  | 194 × 194 mm                  |
+| `'8x12'`     | 200 × 300 mm  | 194 × 294 mm                  |
+
+Preset matching is case-insensitive. For any other size, use the numeric form (round) or list form (rectangular). Rectangular presets are portrait (`w ≤ h`); write `hoop [180, 130]` for a landscape orientation.
+
+**Placement rules:** `hoop` is top-level only (not inside loops, `if` branches, or procedures), before any committed stitch, at most once per program. Procedure _definitions_ before `hoop` are fine — they don't execute. The practical guidance: put `hoop` on line 1.
+
+**Determinism note:** `scatter`, `voronoi`, and `relax` are functions of the field. **Same seed + same hoop → same design.** Changing the hoop without changing the seed changes the design (the field is an input, like the seed). Since `hoop` lives in the source, the full invariant holds for any shared `.ns` file.
+
+### Field reporters
+
+Three read-only reporters return information about the current sewable field. All are Library tier (call-syntax only, like `inpath`/`bbox`), zero RNG draws, so branching on them keeps determinism intact.
+
+| Call            | Returns                                                                                                                                                                 |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `infield(p)`    | `1`/`0` — true if `p` is inside the sewable field. Maps `p` through the current transform (consistent with `coverat`). The idiomatic guard is `if infield(pos()) [ … ]` |
+| `fieldbounds()` | `[minX, minY, maxX, maxY]` — bounding box of the field, same format as `bbox()`                                                                                         |
+| `fieldpath()`   | the field boundary as a closed region (CCW polygon) — round fields polygonised at ≤ 2 mm chords, ready for `clippaths`/`offsetpath`/`scatter`                           |
+
+```text
+hoop '5x7'
+seed 12
+// 6 mm safety margin inside whatever hoop the program declares
+let margin = first(offsetpath(fieldpath(), -6))
+let pts = relax(scatter(5, margin), 2)
+for p in pts [ moveto p[0] p[1]  circle 1.5  trim ]
+```
+
+### `override` — raise or lower run-envelope limits
+
+```text
+override 'stitches' 120000   // raise the stitch ceiling for a large piece
+override 'ops' 8000000       // raise the op budget
+override 'stitches' 8000     // lower it: self-imposed budget guard
+```
+
+`override` adjusts a named run-envelope budget. **Raising** any limit above stock emits a console warning every run with a cost estimate — the friction is deliberate and cannot be silenced. **Lowering** below stock emits a one-line info note. Both must appear at the top of the program (alongside `hoop`), before any stitches, at most once per key. A large hoop does **not** auto-raise `'stitches'` — implicit escalation would defeat the warning contract.
+
+**Overridable limits:**
+
+| Key               | Stock      | Ceiling    | Guards against                               |
+| ----------------- | ---------- | ---------- | -------------------------------------------- |
+| `'stitches'`      | 100,000    | 250,000    | slow previews, long sew-outs                 |
+| `'ops'`           | 10,000,000 | 50,000,000 | infinite loops / runaway recursion           |
+| `'calldepth'`     | 200        | 2,000      | stack exhaustion                             |
+| `'loopiters'`     | 200,000    | 5,000,000  | runaway single loops                         |
+| `'listlen'`       | 100,000    | 1,000,000  | one giant list                               |
+| `'listcells'`     | 1,000,000  | 8,000,000  | total list memory                            |
+| `'stringlen'`     | 10,000     | 1,000,000  | one giant string                             |
+| `'stringtotal'`   | 1,000,000  | 20,000,000 | total string allocation                      |
+| `'scatterpoints'` | 20,000     | 100,000    | Poisson-disc blowup                          |
+| `'geoinput'`      | 10,000     | 50,000     | `voronoi`/`triangulate`/`hull`/`relax` input |
+| `'clipverts'`     | 50,000     | 250,000    | `offsetpath`/`clippaths` input               |
 
 ### Library names may be shadowed
 
@@ -866,6 +941,8 @@ seed 7
 ```
 
 The same seed always reproduces the same design — change the seed, change the piece. This matters for embroidery: what you previewed is exactly what the machine sews. The test suite enforces it mechanically: `Math.random` is stubbed to **throw** during every engine test, so nondeterminism can't sneak in through a dependency.
+
+The full determinism contract is: **same source + same seed + same hoop → same stitches.** Since `hoop` lives in the source, sharing a `.ns` file always shares the full design. The caveat: `scatter`, `voronoi`, and `relax` are functions of the field, so the same seed with a different `hoop` gives a different design (the field is an input, like the seed).
 
 Draw accounting follows the **fork convention**, so editing one part of a design doesn't reshuffle the rest:
 
@@ -1373,24 +1450,41 @@ Travels of 7 mm or more (configurable 3–30, `autotrim 0` off) automatically ge
 
 ## Safety limits
 
-NeedleScript guards both your browser and your machine:
+Limits fall into three categories with different policies:
 
-| Limit                                                  | Value                                                                                   |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| Max stitches per design                                | 60,000                                                                                  |
-| Max interpreter operations                             | 2,000,000 (catches infinite `while`/recursion; list element reads and writes count too) |
-| Max call depth                                         | 200                                                                                     |
-| Max `repeat` / `for` iterations                        | 200,000                                                                                 |
-| Max list length                                        | 100,000 elements                                                                        |
-| Max total live list cells                              | 1,000,000                                                                               |
-| Max list nesting depth                                 | 16                                                                                      |
-| Max string length                                      | 10,000 characters per string                                                            |
-| Max total string allocations                           | 1,000,000 characters (monotonic budget, like list cells)                                |
-| Max `scatter` output                                   | 20,000 points                                                                           |
-| Max `voronoi` / `triangulate` / `hull` / `relax` input | 10,000 points                                                                           |
-| Max `offsetpath` / `clippaths` input                   | 50,000 vertices per call                                                                |
-| Stitch length                                          | clamped to 0.4–12 mm                                                                    |
-| Sub-0.4 mm moves                                       | merged into neighbours (too short to sew safely), with a warning                        |
+### Physics and format constraints — fixed, never overridable
+
+These protect the machine, the fabric, and the file format:
+
+| Constraint                       | Value                                                            |
+| -------------------------------- | ---------------------------------------------------------------- |
+| Stitch length                    | clamped to 0.4–12 mm                                             |
+| Sub-0.4 mm moves                 | merged into neighbours (too short to sew safely), with a warning |
+| Move > 12.1 mm                   | auto-split (DST format constraint)                               |
+| Max list nesting depth           | 16                                                               |
+| State stack depth (`push`/`pop`) | 500 entries                                                      |
+
+### The sewable field — configured by `hoop`
+
+The default is a ⌀100 mm round hoop (47 mm sewable radius). Use the [`hoop` directive](#hoop-and-field) to describe the physical hoop you're actually using. Overflow warnings fire when a stitch lands outside the configured field.
+
+### Computational budgets — adjustable with `override`
+
+Stock values protect the browser tab and catch runaway programs early. They can be raised (with a recurring warning) or lowered (with an info note) via the [`override` directive](#override--raise-or-lower-run-envelope-limits).
+
+| Key                                                   | Stock           | Ceiling    |
+| ----------------------------------------------------- | --------------- | ---------- |
+| `'stitches'` max per design                           | 100,000         | 250,000    |
+| `'ops'` (catches infinite loops)                      | 10,000,000      | 50,000,000 |
+| `'calldepth'`                                         | 200             | 2,000      |
+| `'loopiters'` max `repeat`/`for` iters                | 200,000         | 5,000,000  |
+| `'listlen'` max list length                           | 100,000         | 1,000,000  |
+| `'listcells'` total list cells                        | 1,000,000       | 8,000,000  |
+| `'stringlen'` per string                              | 10,000 chars    | 1,000,000  |
+| `'stringtotal'` monotonic budget                      | 1,000,000 chars | 20,000,000 |
+| `'scatterpoints'`                                     | 20,000          | 100,000    |
+| `'geoinput'` (`voronoi`/`triangulate`/`hull`/`relax`) | 10,000          | 50,000     |
+| `'clipverts'` (`offsetpath`/`clippaths`)              | 50,000          | 250,000    |
 
 ---
 
@@ -1410,11 +1504,13 @@ npm install needlescript
 import { run, designStats, toDST } from 'needlescript';
 
 const result = run('repeat 36 [ fd 4 rt 10 ]', { seed: 7 });
-// result.events   — stitch/jump/color/trim/mark stream ({ t, x, y, c, line, u })
-// result.warnings — non-fatal issues (clamps, density hotspots, hoop overflow…)
-// result.printed  — output of print
-// result.locks    — number of tie-in/tie-off locks added
-// result.density  — local density grid, peak, and hotspot list
+// result.events         — stitch/jump/color/trim/mark stream ({ t, x, y, c, line, u })
+// result.warnings       — non-fatal issues (clamps, density hotspots, hoop overflow…)
+// result.printed        — output of print
+// result.locks          — number of tie-in/tie-off locks added
+// result.density        — local density grid, peak, and hotspot list
+// result.activeHoop     — HoopInfo if a `hoop` directive was present, else undefined
+// result.activeOverrides — overridden budget keys, if any override was present
 
 const stats = designStats(result.events); // counts, bounding box, max stitch…
 const bytes = toDST(result.events, 'rose'); // Uint8Array, ready to save

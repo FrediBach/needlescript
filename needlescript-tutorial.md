@@ -26,6 +26,7 @@ This tutorial walks you from the absolute basics up to seeded noise fields, Voro
 14. [Generative math: scalars, noise, vectors](#14-generative-math-scalars-noise-vectors)
 15. [Paths and curves](#15-paths-and-curves)
 16. [Generators: scatter, Voronoi, hull](#16-generators-scatter-voronoi-hull)
+    16a. [Hoop, field, and limits](#16a-hoop-field-and-limits)
 17. [Geometry: offsets and booleans](#17-geometry-offsets-and-booleans)
 18. [Transforms: stamping motifs](#18-transforms-stamping-motifs)
 19. [Effects: warp, humanize, snaptogrid](#19-effects-warp-humanize-snaptogrid)
@@ -48,7 +49,7 @@ NeedleScript gives you a **turtle**: an imaginary needle that carries thread. Yo
 
 A few facts to anchor everything else:
 
-- **Units are millimetres.** The virtual hoop is 100 mm across. The _sewable_ field is a disc of 47 mm radius around the origin `(0, 0)`, which sits at the centre. Stray outside it and you'll get a hoop-overflow warning.
+- **Units are millimetres.** By default the virtual hoop is 100 mm across. The _sewable_ field is a disc of 47 mm radius around the origin `(0, 0)`, which sits at the centre. Stray outside it and you'll get a hoop-overflow warning. You can change the hoop with the [`hoop` directive](#16a-hoop-field-and-limits) at the top of your program — more on that in [§16a](#16a-hoop-field-and-limits).
 - **Heading is in degrees, measured clockwise from north.** `0` faces up, `90` faces right (east), `180` is down, `270` is left. This is the Logo convention and it's used _everywhere_ — including the vector and noise functions later on.
 - **Words are case-insensitive.** `FD 10` and `fd 10` are the same.
 - **There are no statement separators.** Whitespace and newlines are interchangeable. You can put a whole program on one line or spread one command across several.
@@ -619,6 +620,8 @@ seed 7
 
 The same seed always reproduces the same design; change the seed, change the piece.
 
+The full determinism contract is: **same source + same seed + same hoop → same stitches.** `scatter`, `voronoi`, and `relax` are functions of the field — the same seed with a different `hoop` directive gives a different design. Since `hoop` lives in the source, sharing a `.ns` file always shares the full design (see [§16a](#16a-hoop-field-and-limits)).
+
 The simplest source of variation is `random n`, returning a reproducible number in `0…n`:
 
 ```text
@@ -1051,13 +1054,13 @@ Because `sewpath` honours the current stitch mode, switching `satin 3` on before
 
 These functions _generate_ point sets and regions — the raw material of generative tessellation and stippling. All are seeded (see [section 11](#11-randomness-and-determinism)).
 
-| Function                                        | Returns                                                                                                                            |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `scatter(mindist)` · `scatter(mindist, region)` | Poisson-disc (Bridson) points — no two closer than _mindist_ — over the sewable field, or inside a region. Capped at 20,000 points |
-| `voronoi(points)` · `voronoi(points, region)`   | one Voronoi cell (a region) per input point, **in input order**, clipped to the sewable disc or a given region                     |
-| `triangulate(points)`                           | Delaunay triangles, as a list of 3-point regions                                                                                   |
-| `hull(points)`                                  | the convex hull as a region, counter-clockwise                                                                                     |
-| `relax(points, n)`                              | _n_ rounds of Lloyd's relaxation — each point moves to its Voronoi cell's centroid, evening out spacing for stippling              |
+| Function                                        | Returns                                                                                                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scatter(mindist)` · `scatter(mindist, region)` | Poisson-disc (Bridson) points — no two closer than _mindist_ — over the **configured sewable field** (default: 47 mm radius), or inside a region. Capped at 20,000 points |
+| `voronoi(points)` · `voronoi(points, region)`   | one Voronoi cell (a region) per input point, **in input order**, clipped to the configured field or a given region                                                        |
+| `triangulate(points)`                           | Delaunay triangles, as a list of 3-point regions                                                                                                                          |
+| `hull(points)`                                  | the convex hull as a region, counter-clockwise                                                                                                                            |
+| `relax(points, n)`                              | _n_ rounds of Lloyd's relaxation — each point moves to its Voronoi cell's centroid, evening out spacing for stippling. Uses the configured field like `voronoi`           |
 
 The canonical pipeline is `scatter → voronoi → offsetpath → resample → sewpath`. Here's a cracked-tile / stained-glass effect:
 
@@ -1075,6 +1078,86 @@ for cell in tiles [
 `scatter(9)` lays down well-spaced seed points; `voronoi` turns them into interlocking cells; insetting each cell by 0.9 mm leaves a gap between tiles; resampling makes the stitches uniform. (The bundled **shatter** example extends this with flow-field hatching inside each tile.)
 
 For organic stippling, run `relax` on your scattered points first — a few rounds of Lloyd's relaxation removes clumps and gives the even, hand-stippled look.
+
+---
+
+## 16a. Hoop, field, and limits
+
+### Declaring your hoop
+
+Every embroidery machine ships with a range of hoops. If you're sewing on a 5×7 inch hoop you'll get better overflow warnings — and better `scatter` / `voronoi` coverage — by telling NeedleScript about it:
+
+```text
+hoop '5x7'     // 130 × 180 mm portrait hoop
+seed 12
+```
+
+Put `hoop` on line 1, before any stitches. The **sewable field** is the hoop inset by 3 mm on every side (matching the hold-down ring). So a 130 × 180 mm hoop gives you a 124 × 174 mm sewable field. `scatter`, `voronoi`, and `relax` with no explicit region will now fill that rectangle instead of the default disc.
+
+**Named presets** (case-insensitive):
+
+| Preset       | Hoop          | Field                         |
+| ------------ | ------------- | ----------------------------- |
+| `'round100'` | ⌀100 mm round | ⌀94 mm disc — **the default** |
+| `'4x4'`      | 100 × 100 mm  | 94 × 94 mm                    |
+| `'5x7'`      | 130 × 180 mm  | 124 × 174 mm                  |
+| `'6x10'`     | 160 × 260 mm  | 154 × 254 mm                  |
+| `'8x8'`      | 200 × 200 mm  | 194 × 194 mm                  |
+| `'8x12'`     | 200 × 300 mm  | 194 × 294 mm                  |
+
+For anything else: `hoop 150` (round ⌀150 mm) or `hoop [180, 130]` (landscape 5×7 rectangle).
+
+**Determinism note:** The field is an input like the seed — same source + same seed + same hoop → same design. Swapping `hoop '5x7'` for `hoop '6x10'` (with the same seed) changes the design, because `scatter` now fills a different domain.
+
+**Rules:** `hoop` is top-level only (not inside loops, `if`, or procedures), before any stitch, at most once per program.
+
+### Field reporters
+
+Once you have a hoop you want your motif code to adapt to whatever field is active, rather than hard-coding `vlen(p) < 47`. Three read-only reporters give you the current field as data:
+
+| Call            | Returns                                                                                                                                  |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `infield(p)`    | `1`/`0` — is point `p` inside the sewable field? Maps through the current transform, like `coverat`. Use it as `if infield(pos()) [ … ]` |
+| `fieldbounds()` | `[minX, minY, maxX, maxY]` bounding box of the field                                                                                     |
+| `fieldpath()`   | the field boundary as a CCW polygon — use it as a region for `scatter`, `offsetpath`, etc.                                               |
+
+The one-liner for "fill the field with a 5 mm inset" works for any hoop:
+
+```text
+let margin = first(offsetpath(fieldpath(), -5))
+let pts = relax(scatter(5, margin), 2)
+```
+
+All three reporters draw nothing from the random stream, so they don't affect determinism.
+
+### Raising limits with `override`
+
+The default stitch budget is 100,000 — plenty for most designs, but a 6×10 jacket back can exceed it. `override` lets you raise (or lower) any run-envelope budget, with friction:
+
+```text
+hoop '6x10'
+override 'stitches' 120000   // raises limit — a warning fires every run
+```
+
+Raising a limit above stock emits a console warning **every run** with an honest cost estimate (slower preview, longer sew-out). That friction is deliberate — you're supposed to notice it. Lowering a limit is a first-class feature ("budget mode") and only emits a one-time info note.
+
+The 11 overridable keys (all at the top of the program, before any stitch):
+
+```text
+override 'stitches'     N   // max stitches (stock 100,000 → ceiling 250,000)
+override 'ops'          N   // op budget for infinite-loop detection (10M → 50M)
+override 'calldepth'    N   // recursion depth (200 → 2,000)
+override 'loopiters'    N   // max repeat/for iterations (200,000 → 5M)
+override 'listlen'      N   // max list length (100,000 → 1M)
+override 'listcells'    N   // total list cells (1M → 8M)
+override 'stringlen'    N   // per-string character limit (10,000 → 1M)
+override 'stringtotal'  N   // total string allocation (1M → 20M)
+override 'scatterpoints' N  // max scatter output (20,000 → 100,000)
+override 'geoinput'     N   // voronoi/triangulate/hull/relax input (10,000 → 50,000)
+override 'clipverts'    N   // offsetpath/clippaths input (50,000 → 250,000)
+```
+
+A large hoop does **not** auto-raise `'stitches'` — if you fill a 6×10 hoop and hit the limit, the error will suggest the override you need.
 
 ---
 
@@ -1600,24 +1683,41 @@ assert(len(pieces) > 0, concat('clip empty at tile ', str(i)))
 
 ## 24. Safety limits
 
-NeedleScript guards both your browser and your machine. Hit one of these and you'll get a clear error rather than a hang or a damaged garment:
+NeedleScript's limits fall into three distinct categories with different policies.
 
-| Limit                                                  | Value                                                            |
-| ------------------------------------------------------ | ---------------------------------------------------------------- |
-| Max stitches per design                                | 60,000                                                           |
-| Max interpreter operations                             | 2,000,000 (catches infinite loops and runaway recursion)         |
-| Max call depth                                         | 200                                                              |
-| Max `repeat` / `for` iterations                        | 200,000                                                          |
-| Max list length                                        | 100,000 elements                                                 |
-| Max total live list cells                              | 1,000,000                                                        |
-| Max list nesting depth                                 | 16                                                               |
-| Max string length                                      | 10,000 characters                                                |
-| Max total string allocations                           | 1,000,000 characters                                             |
-| Max `scatter` output                                   | 20,000 points                                                    |
-| Max `voronoi` / `triangulate` / `hull` / `relax` input | 10,000 points                                                    |
-| Max `offsetpath` / `clippaths` input                   | 50,000 vertices per call                                         |
-| Stitch length                                          | clamped to 0.4–12 mm                                             |
-| Sub-0.4 mm moves                                       | merged into neighbours (too short to sew safely), with a warning |
+### Physics and format constraints — fixed forever
+
+These protect the machine, the fabric, and the file format. They cannot be changed under any spelling:
+
+| Constraint                 | Value                                                            |
+| -------------------------- | ---------------------------------------------------------------- |
+| Stitch length              | clamped to 0.4–12 mm                                             |
+| Sub-0.4 mm moves           | merged into neighbours (too short to sew safely), with a warning |
+| Move > 12.1 mm             | auto-split (DST format)                                          |
+| List nesting depth         | 16                                                               |
+| State stack (`push`/`pop`) | 500 entries                                                      |
+
+### The sewable field — configured by `hoop`
+
+The default is a ⌀100 mm round hoop (47 mm sewable radius). Declare your physical hoop with the `hoop` directive (see [§16a](#16a-hoop-field-and-limits)) and overflow warnings will target the right boundary. Stitch length clamping and machine-format rules run regardless.
+
+### Computational budgets — stock values and ceilings
+
+These protect the browser tab and catch runaway programs early. They can be raised (with a recurring warning) or lowered (info note only) using `override` (see [§16a](#16a-hoop-field-and-limits)):
+
+| Key                           | Stock           | Ceiling    |
+| ----------------------------- | --------------- | ---------- |
+| `'stitches'`                  | 100,000         | 250,000    |
+| `'ops'` (infinite-loop guard) | 10,000,000      | 50,000,000 |
+| `'calldepth'`                 | 200             | 2,000      |
+| `'loopiters'`                 | 200,000         | 5,000,000  |
+| `'listlen'`                   | 100,000         | 1,000,000  |
+| `'listcells'`                 | 1,000,000       | 8,000,000  |
+| `'stringlen'`                 | 10,000 chars    | 1,000,000  |
+| `'stringtotal'`               | 1,000,000 chars | 20,000,000 |
+| `'scatterpoints'`             | 20,000          | 100,000    |
+| `'geoinput'`                  | 10,000          | 50,000     |
+| `'clipverts'`                 | 50,000          | 250,000    |
 
 ---
 
