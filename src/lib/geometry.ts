@@ -33,10 +33,10 @@ const fromPaths64 = (paths: Paths64): Pt[][] =>
     .map((path) => path.map((p) => [p.x / SCALE, p.y / SCALE] as Pt))
     .filter((path) => path.length >= 3);
 
-function checkVertexBudget(what: string, count: number, line?: number) {
-  if (count > MAX_CLIP_VERTICES)
+function checkVertexBudget(what: string, count: number, max: number, line?: number) {
+  if (count > max)
     throw new NeedlescriptError(
-      `${what}: too many vertices (${count.toLocaleString('en-US')}, limit ${MAX_CLIP_VERTICES.toLocaleString('en-US')} per call)`,
+      `${what}: too many vertices (${count.toLocaleString('en-US')}, limit ${max.toLocaleString('en-US')} per call)`,
       line,
     );
 }
@@ -47,8 +47,13 @@ function checkVertexBudget(what: string, count: number, line?: number) {
  * `for ring in offsetpath(cell, -2) [ … ]` naturally does nothing when the
  * shape vanishes. Round joins, arc tolerance 0.05 mm.
  */
-export function offsetRegion(region: Pt[], delta: number, line?: number): Pt[][] {
-  checkVertexBudget('offsetpath', region.length, line);
+export function offsetRegion(
+  region: Pt[],
+  delta: number,
+  line?: number,
+  maxVerts: number = MAX_CLIP_VERTICES,
+): Pt[][] {
+  checkVertexBudget('offsetpath', region.length, maxVerts, line);
   const out = inflatePaths(
     [toPath64(region)],
     delta * SCALE,
@@ -61,8 +66,14 @@ export function offsetRegion(region: Pt[], delta: number, line?: number): Pt[][]
 }
 
 /** Boolean of two regions; even-odd fill rule (consistent with inpath). */
-export function clipRegions(a: Pt[], b: Pt[], op: string, line?: number): Pt[][] {
-  checkVertexBudget('clippaths', a.length + b.length, line);
+export function clipRegions(
+  a: Pt[],
+  b: Pt[],
+  op: string,
+  line?: number,
+  maxVerts: number = MAX_CLIP_VERTICES,
+): Pt[][] {
+  checkVertexBudget('clippaths', a.length + b.length, maxVerts, line);
   const sa: Paths64 = [toPath64(a)];
   const sb: Paths64 = [toPath64(b)];
   let out: Paths64;

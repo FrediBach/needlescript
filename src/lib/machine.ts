@@ -14,15 +14,67 @@ export const LIMITS = {
   maxStringLength: 10000, // characters in a single string
   maxStringChars: 1000000, // monotonic allocation budget across all string ops
   // Generative math (RFC-3 §8)
-  sewableRadius: 47, // the sewable field inside the 100 mm hoop, in mm
+  sewableRadius: 47, // the default sewable field radius (round100 hoop), in mm
   maxScatterPoints: 20000,
   maxDelaunayPoints: 10000, // voronoi / triangulate / hull / relax input
-  maxTraceVertices: 50000, // trace/tracerings vertex cap (matches MAX_CLIP_VERTICES)
+  maxTraceVertices: 50000, // trace/tracerings vertex cap
+};
+
+// ---------- Overridable budget limits ----------
+//
+// These match LIMITS exactly but are separated so the `override` command can
+// mutate per-run copies without touching the physics/format constants above.
+
+/** Stock values for run-envelope budgets.  Changed only when adding new limits. */
+export const STOCK_LIMITS = {
+  maxStitches: LIMITS.maxStitches,
+  maxOps: LIMITS.maxOps,
+  maxCallDepth: LIMITS.maxCallDepth,
+  maxLoopIters: 200000,
+  maxListLen: LIMITS.maxListLen,
+  maxListCells: LIMITS.maxListCells,
+  maxStringLength: LIMITS.maxStringLength,
+  maxStringChars: LIMITS.maxStringChars,
+  maxScatterPoints: LIMITS.maxScatterPoints,
+  maxDelaunayPoints: LIMITS.maxDelaunayPoints,
+  maxClipVerts: 50000, // offsetpath / clippaths (separate from maxTraceVertices)
+} as const;
+
+export type BudgetKey = keyof typeof STOCK_LIMITS;
+
+/** Maximum each budget limit may be raised to via `override`. */
+export const OVERRIDE_CEILINGS: Record<BudgetKey, number> = {
+  maxStitches: 250000,
+  maxOps: 50000000,
+  maxCallDepth: 2000,
+  maxLoopIters: 5000000,
+  maxListLen: 1000000,
+  maxListCells: 8000000,
+  maxStringLength: 1000000,
+  maxStringChars: 20000000,
+  maxScatterPoints: 100000,
+  maxDelaunayPoints: 50000,
+  maxClipVerts: 250000,
+};
+
+/** Minimum each budget limit may be lowered to via `override`. */
+export const OVERRIDE_FLOORS: Record<BudgetKey, number> = {
+  maxStitches: 100,
+  maxOps: 10000,
+  maxCallDepth: 10,
+  maxLoopIters: 100,
+  maxListLen: 1000,
+  maxListCells: 10000,
+  maxStringLength: 100,
+  maxStringChars: 10000,
+  maxScatterPoints: 100,
+  maxDelaunayPoints: 100,
+  maxClipVerts: 1000,
 };
 
 // ---------- Stitch machine ----------
 
-import type { StitchEvent, EventType } from './types.ts';
+import type { StitchEvent, EventType, HoopInfo } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
 import { IDENTITY, isIdentity, apply, linApply, compose, invert } from './affine.ts';
 import type { Mat } from './affine.ts';
@@ -30,6 +82,7 @@ import { vfromheading, vheading } from './genmath.ts';
 import { DensityGrid } from './postprocess.ts';
 import type { DeclumpState } from './declump.ts';
 import { declumpFoldPoint, declumpResetRun } from './declump.ts';
+import { DEFAULT_HOOP_INFO, inHoopField, inHoopOuter } from './hoop-presets.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -174,6 +227,24 @@ export class Machine {
   tinyDroppedSpots: { x: number; y: number; line?: number }[] = [];
   currentLine: number | undefined = undefined; // source line being executed
   stateStack: { x: number; y: number; heading: number; penDown: boolean }[] = [];
+
+  // Hoop and field configuration (set by the `hoop` command, §hoop).
+  hoopInfo: HoopInfo = DEFAULT_HOOP_INFO;
+  hoopSet = false;
+  hoopSetLine: number | undefined = undefined;
+  // Locked when any generator (scatter/voronoi/relax) runs with the implicit
+  // field domain, so a subsequent `hoop` call produces a clear error.
+  fieldLocked = false;
+  // Overflow tracking: stitches outside the sewable field or hoop boundary.
+  // Capped at 50 to bound memory; only 'stitch' events are checked.
+  fieldOverflows: { x: number; y: number; line?: number; kind: 'field' | 'hoop' }[] = [];
+
+  // Per-run budget limits — start as a mutable copy of STOCK_LIMITS and can be
+  // raised (with a warning) or lowered (with an info note) by the `override`
+  // command (§override).
+  effectiveLimits: { -readonly [K in keyof typeof STOCK_LIMITS]: number } = { ...STOCK_LIMITS };
+  // Active overrides keyed by OverrideKey string; value is {value, line}.
+  activeOverrides: Map<string, { value: number; line: number }> = new Map();
   // Live coverage / penetration index, fed in sewing order from _push and read
   // by the history queries (coverat/countat/nearestsewn/sewnwithin/
   // stitchedpoints). Finalized at program end for the heatmap — one grid, so a
@@ -548,18 +619,32 @@ export class Machine {
 
   _push(t: EventType, x: number, y: number, u = false) {
     if (this.noEmit) return;
-    if (this.events.length >= LIMITS.maxStitches)
+    if (this.events.length >= this.effectiveLimits.maxStitches) {
+      const raised = this.effectiveLimits.maxStitches > STOCK_LIMITS.maxStitches;
       throw new NeedlescriptError(
-        `Design exceeds ${LIMITS.maxStitches.toLocaleString('en-US')} stitches — stopped. Reduce repeats, raise stitchlen, or raise fillspacing.` +
+        `Design exceeds ${this.effectiveLimits.maxStitches.toLocaleString('en-US')} stitches — stopped.` +
+          (raised
+            ? ` (raised by override from ${STOCK_LIMITS.maxStitches.toLocaleString('en-US')})`
+            : ` Reduce repeats, raise stitchlen, or raise fillspacing. Or: override 'stitches' N (ceiling ${OVERRIDE_CEILINGS.maxStitches.toLocaleString('en-US')}).`) +
           (this.usedQuery
             ? ' A feedback loop may not be terminating — is your coverage target reachable? Cap it with  repeat N [ … if done [ break ] ].'
             : ''),
       );
+    }
     const ev: StitchEvent = { t, x, y, c: this.colorIdx, line: this.currentLine };
     if (u) ev.u = 1;
     this.events.push(ev);
     this.density.feed(t, x, y, this.currentLine);
     if (t === 'stitch' || t === 'jump') this.lastEmit = { x, y };
+    // Overflow check: collect the first 50 stitches outside the sewable field.
+    if (t === 'stitch' && this.fieldOverflows.length < 50 && !inHoopField(this.hoopInfo, x, y)) {
+      this.fieldOverflows.push({
+        x,
+        y,
+        line: this.currentLine,
+        kind: inHoopOuter(this.hoopInfo, x, y) ? 'field' : 'hoop',
+      });
+    }
   }
 
   _ensureStart() {
@@ -635,9 +720,9 @@ export class Machine {
     this.flushSatin();
     const [hx, hy] = this.mapOut(this.x, this.y);
     if (this.noEmit) return;
-    if (this.events.length >= LIMITS.maxStitches)
+    if (this.events.length >= this.effectiveLimits.maxStitches)
       throw new NeedlescriptError(
-        `Design exceeds ${LIMITS.maxStitches.toLocaleString('en-US')} stitches — stopped.`,
+        `Design exceeds ${this.effectiveLimits.maxStitches.toLocaleString('en-US')} stitches — stopped.`,
       );
     const ev: StitchEvent = { t: 'mark', x: hx, y: hy, c: this.colorIdx, line: this.currentLine };
     if (label !== undefined) ev.label = label;
@@ -1293,7 +1378,7 @@ export class Machine {
     let advWarned = false;
     let prev: Pen | null = null;
     let guard = 0;
-    const guardMax = LIMITS.maxStitches + 10;
+    const guardMax = this.effectiveLimits.maxStitches + 10;
 
     while (cursor < L - 1e-9 && guard++ < guardMax) {
       const ret = reporter(cursor, cursor / L, pair, resolve(cursor).heading);

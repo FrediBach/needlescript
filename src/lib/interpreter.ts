@@ -1,6 +1,14 @@
 // ---------- Interpreter ----------
 
-import type { ASTNode, ExprNode, RunResult, RunOptions, WarningLocation } from './types.ts';
+import type {
+  ASTNode,
+  ExprNode,
+  RunResult,
+  RunOptions,
+  WarningLocation,
+  HoopInfo,
+  OverrideKey,
+} from './types.ts';
 import { NeedlescriptError } from './errors.ts';
 import { makeRNG, makeNoise, fork, gauss } from './prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
@@ -15,7 +23,8 @@ import {
   QWORD_BUILTINS,
   GEN_QWORD_ARG,
 } from './commands.ts';
-import { Machine, LIMITS } from './machine.ts';
+import { Machine, LIMITS, STOCK_LIMITS, OVERRIDE_CEILINGS, OVERRIDE_FLOORS } from './machine.ts';
+import type { BudgetKey } from './machine.ts';
 import { tokenize } from './tokenizer.ts';
 import { parse } from './parser.ts';
 import { applyAutoTrim, applyLocks } from './postprocess.ts';
@@ -56,6 +65,15 @@ import {
 import type { Mat } from './affine.ts';
 import { humanizeMap, snapMapFromSpec } from './effects.ts';
 import { makeDeclumpState, declumpFoldPoint, MAXSHIFT_MAX } from './declump.ts';
+import {
+  lookupHoopPreset,
+  HOOP_PRESET_NAMES,
+  buildHoopInfo,
+  hoopFieldDomain,
+  hoopFieldPolygon,
+  fieldDescription,
+  hoopDescription,
+} from './hoop-presets.ts';
 
 /** Thrown by `output` / `exit` to unwind to the enclosing procedure call. */
 class ReturnSignal {
@@ -108,6 +126,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   // Trace sandbox state (RFC-trace §4)
   let insideTrace = 0;
   const traceNoted = new Set<string>();
+  // Structural block depth: incremented inside repeat/for/while/forin/if/transform/effect
+  // so that the `hoop` and `override` placement guards can detect nested placement.
+  let structuralDepth = 0;
 
   /** Emit a one-time note (warning) inside a trace block. */
   function traceNote(kind: string, msg: string) {
@@ -118,19 +139,23 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   }
 
   function tick(line?: number) {
-    if (++ops > LIMITS.maxOps) throw new NeedlescriptError(overlongMsg(), line);
+    if (++ops > m.effectiveLimits.maxOps) throw new NeedlescriptError(overlongMsg(), line);
   }
 
   /** Charge n element reads/writes against the op budget. */
   function tickN(n: number, line?: number) {
     ops += n;
-    if (ops > LIMITS.maxOps) throw new NeedlescriptError(overlongMsg(), line);
+    if (ops > m.effectiveLimits.maxOps) throw new NeedlescriptError(overlongMsg(), line);
   }
 
   /** The op-limit message, made loop-aware once a history query has run. */
   function overlongMsg(): string {
+    const raised = m.effectiveLimits.maxOps > STOCK_LIMITS.maxOps;
     return (
       'Program ran too long (possible infinite loop) — stopped' +
+      (raised
+        ? ` (op limit raised by override from ${STOCK_LIMITS.maxOps.toLocaleString('en-US')})`
+        : '') +
       (m.usedQuery
         ? ' — a feedback loop may not be terminating; is your coverage target reachable? Cap it with  repeat N [ … if done [ break ] ].'
         : '')
@@ -140,9 +165,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   /** Charge n freshly allocated list cells (and the op budget). */
   function charge(n: number, line?: number) {
     cells += n;
-    if (cells > LIMITS.maxListCells)
+    if (cells > m.effectiveLimits.maxListCells)
       throw new NeedlescriptError(
-        `Too many list cells (over ${LIMITS.maxListCells.toLocaleString('en-US')}) — stopped`,
+        `Too many list cells (over ${m.effectiveLimits.maxListCells.toLocaleString('en-US')}) — stopped`,
         line,
       );
     tickN(n, line);
@@ -150,15 +175,15 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   /** Allocate a new string, enforcing per-string and total-char budgets. */
   function allocString(s: string, line?: number): string {
-    if (s.length > LIMITS.maxStringLength)
+    if (s.length > m.effectiveLimits.maxStringLength)
       throw new NeedlescriptError(
-        `String is too long (${s.length.toLocaleString('en-US')} chars, limit ${LIMITS.maxStringLength.toLocaleString('en-US')})`,
+        `String is too long (${s.length.toLocaleString('en-US')} chars, limit ${m.effectiveLimits.maxStringLength.toLocaleString('en-US')})`,
         line,
       );
     stringChars += s.length;
-    if (stringChars > LIMITS.maxStringChars)
+    if (stringChars > m.effectiveLimits.maxStringChars)
       throw new NeedlescriptError(
-        `String allocation budget exceeded (over ${LIMITS.maxStringChars.toLocaleString('en-US')} total chars) — stopped`,
+        `String allocation budget exceeded (over ${m.effectiveLimits.maxStringChars.toLocaleString('en-US')} total chars) — stopped`,
         line,
       );
     return s;
@@ -166,9 +191,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   /** Allocate a new list, enforcing the length limit and charging cells. */
   function allocList(items: Val[], line?: number): NsList {
-    if (items.length > LIMITS.maxListLen)
+    if (items.length > m.effectiveLimits.maxListLen)
       throw new NeedlescriptError(
-        `List too long (${items.length.toLocaleString('en-US')} elements, limit ${LIMITS.maxListLen.toLocaleString('en-US')})`,
+        `List too long (${items.length.toLocaleString('en-US')} elements, limit ${m.effectiveLimits.maxListLen.toLocaleString('en-US')})`,
         line,
       );
     charge(items.length, line);
@@ -248,9 +273,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const s = args.length === 3 ? num(args[2], 'range', line) : 1;
         if (s === 0) throw new NeedlescriptError("range step can't be 0", line);
         const count = Math.max(0, Math.ceil((b - a) / s - 1e-9));
-        if (count > LIMITS.maxListLen)
+        if (count > m.effectiveLimits.maxListLen)
           throw new NeedlescriptError(
-            `List too long (${count.toLocaleString('en-US')} elements, limit ${LIMITS.maxListLen.toLocaleString('en-US')})`,
+            `List too long (${count.toLocaleString('en-US')} elements, limit ${m.effectiveLimits.maxListLen.toLocaleString('en-US')})`,
             line,
           );
         const out: Val[] = [];
@@ -265,9 +290,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             `filled expected a whole number of elements, got ${formatNum(n)}`,
             line,
           );
-        if (r > LIMITS.maxListLen)
+        if (r > m.effectiveLimits.maxListLen)
           throw new NeedlescriptError(
-            `List too long (${r.toLocaleString('en-US')} elements, limit ${LIMITS.maxListLen.toLocaleString('en-US')})`,
+            `List too long (${r.toLocaleString('en-US')} elements, limit ${m.effectiveLimits.maxListLen.toLocaleString('en-US')})`,
             line,
           );
         const out: Val[] = [];
@@ -460,9 +485,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         if ((end - start) * step < 0) return allocList([], line);
         // Inclusive end with floating-point tolerance
         const count = Math.floor(Math.abs((end - start) / step) + 1e-9) + 1;
-        if (count > LIMITS.maxListLen)
+        if (count > m.effectiveLimits.maxListLen)
           throw new NeedlescriptError(
-            `List too long (${count.toLocaleString('en-US')} elements, limit ${LIMITS.maxListLen.toLocaleString('en-US')})`,
+            `List too long (${count.toLocaleString('en-US')} elements, limit ${m.effectiveLimits.maxListLen.toLocaleString('en-US')})`,
             line,
           );
         const out: Val[] = [];
@@ -648,15 +673,18 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         rs.map((r) => path(r) as Val),
         line,
       );
-    const domainArg = (i: number): Domain =>
-      args.length > i
-        ? { kind: 'poly', pts: regionArg(i) }
-        : { kind: 'disc', r: LIMITS.sewableRadius };
+    const domainArg = (i: number): Domain => {
+      if (args.length > i) return { kind: 'poly', pts: regionArg(i) };
+      // No explicit region: use the configured field and lock it so a subsequent
+      // `hoop` call produces a clear error instead of silently using the wrong field.
+      m.fieldLocked = true;
+      return hoopFieldDomain(m.hoopInfo);
+    };
     const delaunayInput = (i: number, min: number) => {
       const pts = pathArg(i, min);
-      if (pts.length > LIMITS.maxDelaunayPoints)
+      if (pts.length > m.effectiveLimits.maxDelaunayPoints)
         throw new NeedlescriptError(
-          `${name}: too many points (${pts.length.toLocaleString('en-US')}, limit ${LIMITS.maxDelaunayPoints.toLocaleString('en-US')})`,
+          `${name}: too many points (${pts.length.toLocaleString('en-US')}, limit ${m.effectiveLimits.maxDelaunayPoints.toLocaleString('en-US')})`,
           line,
         );
       tickN(pts.length, line);
@@ -746,22 +774,22 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         return gm.pathlen(p);
       }
       case 'resample':
-        return path(gm.resample(pathArg(0), sc(1), LIMITS.maxListLen, line));
+        return path(gm.resample(pathArg(0), sc(1), m.effectiveLimits.maxListLen, line));
       case 'chaikin': {
         const p = pathArg(0);
         const want = Math.round(sc(1));
         const n = gm.clamp(want, 1, 6);
         if (n !== want)
           m.warnings.push(`chaikin iterations ${formatNum(sc(1))} clamped to ${n} (range 1–6)`);
-        if (p.length * Math.pow(2, n) > LIMITS.maxListLen)
+        if (p.length * Math.pow(2, n) > m.effectiveLimits.maxListLen)
           throw new NeedlescriptError(
-            `List too long (chaikin would produce over ${LIMITS.maxListLen.toLocaleString('en-US')} points)`,
+            `List too long (chaikin would produce over ${m.effectiveLimits.maxListLen.toLocaleString('en-US')} points)`,
             line,
           );
         return path(gm.chaikin(p, n));
       }
       case 'catmull':
-        return path(gm.catmull(pathArg(0), sc(1), LIMITS.maxListLen, line));
+        return path(gm.catmull(pathArg(0), sc(1), m.effectiveLimits.maxListLen, line));
       case 'bezier':
         return path(
           gm.bezier(
@@ -770,7 +798,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             pointArg(2),
             pointArg(3),
             sc(4),
-            LIMITS.maxListLen,
+            m.effectiveLimits.maxListLen,
             line,
           ),
         );
@@ -784,7 +812,13 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       // ----- §4.5 generators -----
       case 'scatter': {
         // fork convention (§7): exactly one main-stream draw
-        const pts = scatter(sc(0), domainArg(1), fork(rng), LIMITS.maxScatterPoints, line);
+        const pts = scatter(
+          sc(0),
+          domainArg(1),
+          fork(rng),
+          m.effectiveLimits.maxScatterPoints,
+          line,
+        );
         tickN(pts.length * 4, line);
         return path(pts.length ? pts : []);
       }
@@ -814,14 +848,16 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         if (n !== want)
           m.warnings.push(`relax iterations ${formatNum(sc(1))} clamped to ${n} (range 0–50)`);
         tickN(pts.length * 8 * Math.max(1, n), line);
-        return path(relax(pts, n, { kind: 'disc', r: LIMITS.sewableRadius }, line));
+        // Use the configured field (and lock it so a subsequent hoop call errors).
+        m.fieldLocked = true;
+        return path(relax(pts, n, hoopFieldDomain(m.hoopInfo), line));
       }
 
       // ----- §4.6 geometry ops -----
       case 'offsetpath': {
         const r = regionArg(0);
         tickN(r.length * 4, line);
-        return regions(offsetRegion(r, sc(1), line));
+        return regions(offsetRegion(r, sc(1), line, m.effectiveLimits.maxClipVerts));
       }
       case 'clippaths': {
         const a = regionArg(0),
@@ -841,10 +877,36 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             line,
           );
         tickN((a.length + b.length) * 4, line);
-        return regions(clipRegions(a, b, op, line));
+        return regions(clipRegions(a, b, op, line, m.effectiveLimits.maxClipVerts));
       }
       case 'inpath':
         return gm.pointInRegion(pointArg(0), regionArg(1)) ? 1 : 0;
+
+      // ----- §hoop: field reporters -----
+      case 'infield': {
+        // Map point through the CTM (local → hoop space) then test against field.
+        const p = gm.toPoint(args[0], 'infield', line);
+        const [hx, hy] = apply(m.ctm, p[0], p[1]);
+        return m.hoopInfo.shape === 'circle'
+          ? hx * hx + hy * hy <= (m.hoopInfo.fieldWidthMM / 2) ** 2
+            ? 1
+            : 0
+          : Math.abs(hx) <= m.hoopInfo.fieldWidthMM / 2 &&
+              Math.abs(hy) <= m.hoopInfo.fieldHeightMM / 2
+            ? 1
+            : 0;
+      }
+      case 'fieldbounds': {
+        // Bounding box of the sewable field: [minX, minY, maxX, maxY] (hoop space).
+        const hw = m.hoopInfo.fieldWidthMM / 2;
+        const hh = m.hoopInfo.fieldHeightMM / 2;
+        return allocList([-hw, -hh, hw, hh], line);
+      }
+      case 'fieldpath': {
+        // Sewable field boundary as a CCW polygon (hoop space). Zero RNG draws.
+        const pts = hoopFieldPolygon(m.hoopInfo, 2);
+        return path(pts);
+      }
 
       // ----- §4.7 pure path transforms (companions to the block commands) -----
       case 'xlate':
@@ -1008,9 +1070,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'stitchedpoints': {
         const pts = m.density.snapshot();
-        if (pts.length > LIMITS.maxListLen)
+        if (pts.length > m.effectiveLimits.maxListLen)
           throw new NeedlescriptError(
-            `stitchedpoints: ${pts.length.toLocaleString('en-US')} penetrations exceeds the list limit ${LIMITS.maxListLen.toLocaleString('en-US')}`,
+            `stitchedpoints: ${pts.length.toLocaleString('en-US')} penetrations exceeds the list limit ${m.effectiveLimits.maxListLen.toLocaleString('en-US')}`,
             line,
           );
         tickN(pts.length, line);
@@ -1036,9 +1098,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       case 'str':
         // String literals: check per-string limit only (no allocation budget
         // for literals — they come from source, not from computation).
-        if (node.v.length > LIMITS.maxStringLength)
+        if (node.v.length > m.effectiveLimits.maxStringLength)
           throw new NeedlescriptError(
-            `String literal is too long (${node.v.length} chars, limit ${LIMITS.maxStringLength})`,
+            `String literal is too long (${node.v.length} chars, limit ${m.effectiveLimits.maxStringLength})`,
             node.line,
           );
         return node.v;
@@ -1272,7 +1334,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     const proc = procs[name];
     if (!proc)
       throw new NeedlescriptError(`Procedure "${name}" is used before it is defined`, line);
-    if (depth >= LIMITS.maxCallDepth)
+    if (depth >= m.effectiveLimits.maxCallDepth)
       throw new NeedlescriptError(`Too much recursion in "${name}"`, line);
     const newEnv: Record<string, Val> = Object.create(null);
     proc.params.forEach((p, i) => {
@@ -1305,7 +1367,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     const proc = procs[name];
     if (!proc)
       throw new NeedlescriptError(`Procedure "${name}" is used before it is defined`, line);
-    if (depth >= LIMITS.maxCallDepth)
+    if (depth >= m.effectiveLimits.maxCallDepth)
       throw new NeedlescriptError(`Too much recursion in "${name}"`, line);
     const newEnv: Record<string, Val> = Object.create(null);
     proc.params.forEach((p, i) => {
@@ -1744,15 +1806,23 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       }
       case 'repeat': {
         const n = Math.floor(num(evalExpr(st.count, env, repcount, depth), 'repeat', st.line));
-        if (n > 200000) throw new NeedlescriptError(`repeat count too large (${n})`, st.line);
+        if (n > m.effectiveLimits.maxLoopIters)
+          throw new NeedlescriptError(
+            `repeat count too large (${n.toLocaleString('en-US')}, limit ${m.effectiveLimits.maxLoopIters.toLocaleString('en-US')})`,
+            st.line,
+          );
+        structuralDepth++;
         for (let i = 1; i <= n; i++) if (!runLoopBody(st.body, env, i, depth, contextLine)) break;
+        structuralDepth--;
         return;
       }
       case 'while': {
+        structuralDepth++;
         while (truthy(evalExpr(st.cond, env, repcount, depth), 'while', st.line) !== 0) {
           tick(st.line); // ops budget catches endless loops
           if (!runLoopBody(st.body, env, repcount, depth, contextLine)) break;
         }
+        structuralDepth--;
         return;
       }
       case 'for': {
@@ -1760,16 +1830,21 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const to = num(evalExpr(st.to, env, repcount, depth), 'for', st.line);
         const step = num(evalExpr(st.step, env, repcount, depth), 'for', st.line);
         if (step === 0) throw new NeedlescriptError('for step can\u2019t be 0', st.line);
-        if ((to - from) / step > 200000)
-          throw new NeedlescriptError('for runs too many times (over 200,000)', st.line);
+        if ((to - from) / step > m.effectiveLimits.maxLoopIters)
+          throw new NeedlescriptError(
+            `for runs too many times (over ${m.effectiveLimits.maxLoopIters.toLocaleString('en-US')})`,
+            st.line,
+          );
         const scope = env ?? globals;
         const had = st.varName in scope;
         const prev = scope[st.varName];
+        structuralDepth++;
         for (let v = from; step > 0 ? v <= to + 1e-9 : v >= to - 1e-9; v += step) {
           tick(st.line);
           scope[st.varName] = v;
           if (!runLoopBody(st.body, env, repcount, depth, contextLine)) break;
         }
+        structuralDepth--;
         if (had) scope[st.varName] = prev;
         else delete scope[st.varName];
         return;
@@ -1783,11 +1858,13 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           const scope = env ?? globals;
           const had = st.varName in scope;
           const prev = scope[st.varName];
+          structuralDepth++;
           for (const ch of v) {
             tick(st.line);
             scope[st.varName] = ch;
             if (!runLoopBody(st.body, env, repcount, depth, contextLine)) break;
           }
+          structuralDepth--;
           if (had) scope[st.varName] = prev;
           else delete scope[st.varName];
           return;
@@ -1801,19 +1878,23 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         const scope = env ?? globals;
         const had = st.varName in scope;
         const prev = scope[st.varName];
+        structuralDepth++;
         for (let i = 0; i < n; i++) {
           tick(st.line);
           scope[st.varName] = v.items[i];
           if (!runLoopBody(st.body, env, repcount, depth, contextLine)) break;
         }
+        structuralDepth--;
         if (had) scope[st.varName] = prev;
         else delete scope[st.varName];
         return;
       }
       case 'if': {
+        structuralDepth++;
         if (truthy(evalExpr(st.cond, env, repcount, depth), 'if', st.line) !== 0)
           execBlock(st.body, env, repcount, depth, contextLine);
         else if (st.elseBody) execBlock(st.elseBody, env, repcount, depth, contextLine);
+        structuralDepth--;
         return;
       }
       case 'transform': {
@@ -1854,9 +1935,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         m.currentLine = contextLine ?? st.line;
         m.flushSatin();
         m.pushTransform(delta);
+        structuralDepth++;
         try {
           execBlock(st.body, env, repcount, depth, contextLine);
         } finally {
+          structuralDepth--;
           m.flushSatin();
           m.popOut();
         }
@@ -1879,9 +1962,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
             );
           const ref = refVal;
           m.pushWarp((x, y) => applyReporter(ref, x, y, st.line));
+          structuralDepth++;
           try {
             execBlock(st.body, env, repcount, depth, contextLine);
           } finally {
+            structuralDepth--;
             m.flushSatin();
             m.popOut();
           }
@@ -1902,9 +1987,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           const maxshift = a.length >= 2 ? clampMaxshift(a[1]) : 1.5;
           const state = makeDeclumpState(limit, maxshift);
           m.pushDeclump(state);
+          structuralDepth++;
           try {
             execBlock(st.body, env, repcount, depth, contextLine);
           } finally {
+            structuralDepth--;
             m.flushSatin();
             m.popDeclump();
             // Saturation note: summarise points that had no along-axis relief (§7).
@@ -1937,9 +2024,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           fn = snapMapFromSpec(a, (msg) => new NeedlescriptError(`snaptogrid ${msg}`, st.line));
         }
         m.pushPen(fn);
+        structuralDepth++;
         try {
           execBlock(st.body, env, repcount, depth, contextLine);
         } finally {
+          structuralDepth--;
           m.flushSatin();
           m.popPen();
         }
@@ -2011,9 +2100,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
                 st.line,
               );
             const xs = list(a[0], st.name, st.line);
-            if (xs.items.length + 1 > LIMITS.maxListLen)
+            if (xs.items.length + 1 > m.effectiveLimits.maxListLen)
               throw new NeedlescriptError(
-                `List too long (limit ${LIMITS.maxListLen.toLocaleString('en-US')} elements)`,
+                `List too long (limit ${m.effectiveLimits.maxListLen.toLocaleString('en-US')} elements)`,
                 st.line,
               );
             checkDepth(a[1], st.line);
@@ -2029,9 +2118,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
                 st.line,
               );
             const xs = list(a[0], 'insertat', st.line);
-            if (xs.items.length + 1 > LIMITS.maxListLen)
+            if (xs.items.length + 1 > m.effectiveLimits.maxListLen)
               throw new NeedlescriptError(
-                `List too long (limit ${LIMITS.maxListLen.toLocaleString('en-US')} elements)`,
+                `List too long (limit ${m.effectiveLimits.maxListLen.toLocaleString('en-US')} elements)`,
                 st.line,
               );
             // 0…len allowed: inserting at len appends.
@@ -2174,7 +2263,179 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           }
           return;
         }
-        // mark — optional string label.
+        // ---------- hoop — configure the sewable field (§hoop) ----------
+        if (st.name === 'hoop') {
+          // Placement guards: top-level only, before any stitch, at most once.
+          const directiveGuard = (cmdName: string) => {
+            if (insideTrace > 0)
+              throw new NeedlescriptError(
+                `${cmdName} and override are program directives — add them to the top of the editor and re-run`,
+                st.line,
+              );
+            if (structuralDepth > 0 || depth > 0)
+              throw new NeedlescriptError(
+                `${cmdName} must be at the top level — not inside a loop, if branch, or procedure; put it on line 1`,
+                st.line,
+              );
+            if (m.started)
+              throw new NeedlescriptError(
+                `${cmdName} must run before the first stitch — ${m.events.filter((e) => e.t === 'stitch').length.toLocaleString('en-US')} stitch${m.events.filter((e) => e.t === 'stitch').length === 1 ? '' : 'es'} already sewn; move it to the top of the program`,
+                st.line,
+              );
+          };
+          directiveGuard('hoop');
+          if (m.hoopSet)
+            throw new NeedlescriptError(
+              `hoop already set${m.hoopSetLine !== undefined ? ` on line ${m.hoopSetLine}` : ''} — only one hoop directive is allowed per program`,
+              st.line,
+            );
+          if (m.fieldLocked)
+            throw new NeedlescriptError(
+              `hoop must be set before scatter/voronoi/relax uses the field — a generator already ran with the default field; move hoop to line 1`,
+              st.line,
+            );
+
+          // Parse the argument: string (preset), number (round), or list [w, h] (rect).
+          const arg = vals[0];
+          let info: HoopInfo;
+          if (typeof arg === 'string') {
+            const preset = lookupHoopPreset(arg);
+            if (!preset) {
+              const allNames = Array.from(HOOP_PRESET_NAMES);
+              throw new NeedlescriptError(
+                `Unknown hoop preset '${arg}'${didYouMean(arg.toLowerCase(), allNames)} — known presets: ${allNames.map((n) => `'${n}'`).join(', ')}. Or: hoop <diameter mm>  or  hoop [width, height]`,
+                st.line,
+              );
+            }
+            info = preset;
+          } else if (typeof arg === 'number') {
+            if (arg < 20 || arg > 400)
+              throw new NeedlescriptError(
+                `hoop ${formatNum(arg)} — diameter out of range (must be 20–400 mm)`,
+                st.line,
+              );
+            info = buildHoopInfo(arg, arg, 'circle');
+          } else if (isList(arg) && arg.items.length === 2) {
+            const w = num(arg.items[0], 'hoop', st.line);
+            const h = num(arg.items[1], 'hoop', st.line);
+            if (!isFinite(w) || !isFinite(h) || w <= 0 || h <= 0)
+              throw new NeedlescriptError(
+                `hoop [${formatNum(w)}, ${formatNum(h)}] — each dimension must be a positive finite number`,
+                st.line,
+              );
+            if (w < 20 || w > 400 || h < 20 || h > 400)
+              throw new NeedlescriptError(
+                `hoop [${formatNum(w)}, ${formatNum(h)}] — each dimension must be 20–400 mm`,
+                st.line,
+              );
+            info = buildHoopInfo(w, h, 'rectangle');
+          } else {
+            throw new NeedlescriptError(
+              `hoop expects a preset name (e.g. hoop '5x7'), a diameter (e.g. hoop 130), or [width, height] (e.g. hoop [130, 180])`,
+              st.line,
+            );
+          }
+
+          m.hoopInfo = info;
+          m.hoopSet = true;
+          m.hoopSetLine = st.line;
+          return;
+        }
+
+        // ---------- override — raise or lower a run-envelope budget (§override) ----------
+        if (st.name === 'override') {
+          // Placement guards (same as hoop).
+          if (insideTrace > 0)
+            throw new NeedlescriptError(
+              `hoop and override are program directives — add them to the top of the editor and re-run`,
+              st.line,
+            );
+          if (structuralDepth > 0 || depth > 0)
+            throw new NeedlescriptError(
+              `override must be at the top level — not inside a loop, if branch, or procedure; put it near the top of the program`,
+              st.line,
+            );
+          if (m.started)
+            throw new NeedlescriptError(
+              `override must run before the first stitch; move it to the top of the program`,
+              st.line,
+            );
+
+          const keyVal = vals[0];
+          if (typeof keyVal !== 'string')
+            throw new NeedlescriptError(
+              `override: first argument must be a limit name string, e.g. override 'stitches' 120000`,
+              st.line,
+            );
+          const keyStr = keyVal.toLowerCase() as OverrideKey;
+
+          // Map OverrideKey → BudgetKey
+          const KEY_MAP: Record<OverrideKey, BudgetKey> = {
+            stitches: 'maxStitches',
+            ops: 'maxOps',
+            calldepth: 'maxCallDepth',
+            loopiters: 'maxLoopIters',
+            listlen: 'maxListLen',
+            listcells: 'maxListCells',
+            stringlen: 'maxStringLength',
+            stringtotal: 'maxStringChars',
+            scatterpoints: 'maxScatterPoints',
+            geoinput: 'maxDelaunayPoints',
+            clipverts: 'maxClipVerts',
+          };
+          // Explanatory message for non-overridable physics/format keys.
+          const PHYSICS_KEYS: Record<string, string> = {
+            stitchlen: 'stitch length bounds protect the machine and fabric',
+            minstitch: 'stitch length bounds protect the machine and fabric',
+            maxstitch: 'stitch length bounds protect the machine and fabric',
+          };
+
+          if (keyStr in PHYSICS_KEYS) {
+            throw new NeedlescriptError(
+              `override '${keyStr}' — ${PHYSICS_KEYS[keyStr]}; they are not a computational budget and cannot be changed`,
+              st.line,
+            );
+          }
+
+          const budgetKey = KEY_MAP[keyStr];
+          if (!budgetKey) {
+            const allKeys = Object.keys(KEY_MAP);
+            throw new NeedlescriptError(
+              `override: unknown limit '${keyStr}'${didYouMean(keyStr, allKeys)} — valid keys: ${allKeys.map((k) => `'${k}'`).join(', ')}`,
+              st.line,
+            );
+          }
+
+          if (m.activeOverrides.has(keyStr))
+            throw new NeedlescriptError(
+              `'${keyStr}' already overridden on line ${m.activeOverrides.get(keyStr)!.line}`,
+              st.line,
+            );
+
+          const rawValue = num(vals[1], 'override', st.line);
+          const value = Math.floor(rawValue); // non-integers are floored silently
+          const floor = OVERRIDE_FLOORS[budgetKey];
+          const ceiling = OVERRIDE_CEILINGS[budgetKey];
+
+          if (value < floor || value > ceiling)
+            throw new NeedlescriptError(
+              `override '${keyStr}' ${value.toLocaleString('en-US')} — out of range (${floor.toLocaleString('en-US')}–${ceiling.toLocaleString('en-US')}; stock is ${STOCK_LIMITS[budgetKey].toLocaleString('en-US')})`,
+              st.line,
+            );
+
+          m.effectiveLimits[budgetKey] = value;
+          m.activeOverrides.set(keyStr, { value, line: st.line });
+
+          // Emit a note if lowering, a warning if raising.
+          const stock = STOCK_LIMITS[budgetKey];
+          if (value < stock) {
+            m.warnings.push(
+              `note: override '${keyStr}' set to ${value.toLocaleString('en-US')} (below stock ${stock.toLocaleString('en-US')}). Hitting it will produce: ${keyStr} budget reached — ${value.toLocaleString('en-US')} (lowered by override; stock is ${stock.toLocaleString('en-US')})`,
+            );
+          }
+          // Warnings for raises are emitted at end-of-run (so the console shows them every run).
+          return;
+        }
         if (st.name === 'mark') {
           traceNote(
             'mark',
@@ -2536,5 +2797,102 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     locks = secured.locks;
   }
 
-  return { events: m.events, warnings: m.warnings, warningLocations, printed, locks, density };
+  // ---------- Overflow warnings (§hoop §2.5) ----------
+  if (m.fieldOverflows.length > 0) {
+    const fieldHits = m.fieldOverflows.filter((o) => o.kind === 'field');
+    const hoopHits = m.fieldOverflows.filter((o) => o.kind === 'hoop');
+    if (fieldHits.length > 0) {
+      const pts = fieldHits.slice(0, 10);
+      const lines = [
+        ...new Set(pts.map((o) => o.line).filter((l): l is number => l !== undefined)),
+      ];
+      warningLocations.push({
+        index: m.warnings.length,
+        points: pts.map((o) => ({ x: o.x, y: o.y })),
+        lines,
+        kind: 'overflow',
+      });
+      const first = fieldHits[0];
+      m.warnings.push(
+        `${fieldHits.length} stitch${fieldHits.length === 1 ? '' : 'es'} outside the ${fieldDescription(m.hoopInfo)}` +
+          (first.line !== undefined ? `, line ${first.line}` : '') +
+          ` at (${first.x.toFixed(1)}, ${first.y.toFixed(1)})` +
+          (fieldHits.length > 1 ? ` and ${fieldHits.length - 1} more` : ''),
+      );
+    }
+    if (hoopHits.length > 0) {
+      const pts = hoopHits.slice(0, 10);
+      const lines = [
+        ...new Set(pts.map((o) => o.line).filter((l): l is number => l !== undefined)),
+      ];
+      warningLocations.push({
+        index: m.warnings.length,
+        points: pts.map((o) => ({ x: o.x, y: o.y })),
+        lines,
+        kind: 'overflow',
+      });
+      const first = hoopHits[0];
+      m.warnings.push(
+        `${hoopHits.length} stitch${hoopHits.length === 1 ? '' : 'es'} outside the ${hoopDescription(m.hoopInfo)} — the machine physically cannot reach this point` +
+          (first.line !== undefined ? `, line ${first.line}` : '') +
+          ` at (${first.x.toFixed(1)}, ${first.y.toFixed(1)})`,
+      );
+    }
+  }
+
+  // ---------- Override raise warnings (emitted every run, §override §3.5) ----------
+  for (const [keyStr, { value, line: overrideLine }] of m.activeOverrides) {
+    const budgetKey = (
+      {
+        stitches: 'maxStitches',
+        ops: 'maxOps',
+        calldepth: 'maxCallDepth',
+        loopiters: 'maxLoopIters',
+        listlen: 'maxListLen',
+        listcells: 'maxListCells',
+        stringlen: 'maxStringLength',
+        stringtotal: 'maxStringChars',
+        scatterpoints: 'maxScatterPoints',
+        geoinput: 'maxDelaunayPoints',
+        clipverts: 'maxClipVerts',
+      } as Record<string, BudgetKey>
+    )[keyStr];
+    if (!budgetKey) continue;
+    const stock = STOCK_LIMITS[budgetKey];
+    if (value <= stock) continue; // lowered limits get an info note at parse time, not here
+    const tailored: Record<string, string> = {
+      stitches: 'Expect a slower preview and longer sew-out time.',
+      ops: 'Expect a multi-second run. Avoid infinite loops.',
+      calldepth: 'Deep recursion may slow or crash some environments.',
+      loopiters: 'Very long loops may freeze the tab briefly.',
+      listlen: 'Large lists may use significant browser memory.',
+      listcells: 'Large total list allocation may use significant browser memory.',
+      stringlen: 'Very long strings may use significant browser memory.',
+      stringtotal: 'Large string allocation may use significant browser memory.',
+      scatterpoints: 'Poisson-disc at high density may be slow.',
+      geoinput: 'Voronoi/triangulate with many points may be slow.',
+      clipverts: 'Clip operations with many vertices may be slow.',
+    };
+    m.warnings.push(
+      `⚠ override: ${keyStr} raised ${stock.toLocaleString('en-US')} → ${value.toLocaleString('en-US')} (line ${overrideLine}). ${tailored[keyStr] ?? ''} You are outside the tested envelope.`,
+    );
+  }
+
+  // ---------- Build RunResult ----------
+  const activeHoop: typeof m.hoopInfo | undefined = m.hoopSet ? m.hoopInfo : undefined;
+  const activeOverrides: Partial<Record<OverrideKey, number>> | undefined =
+    m.activeOverrides.size > 0
+      ? Object.fromEntries([...m.activeOverrides.entries()].map(([k, v]) => [k, v.value]))
+      : undefined;
+
+  return {
+    events: m.events,
+    warnings: m.warnings,
+    warningLocations,
+    printed,
+    locks,
+    density,
+    activeHoop,
+    activeOverrides,
+  };
 }

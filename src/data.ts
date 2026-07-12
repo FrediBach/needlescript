@@ -78,6 +78,7 @@ import traceMotifsRaw from '../examples/trace-motifs.ns?raw';
 import tracemanRaw from '../examples/traceman.ns?raw';
 import coilsatinRaw from '../examples/coilsatin.ns?raw';
 import easingRaw from '../examples/easing.ns?raw';
+import bannerRaw from '../examples/banner.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -192,6 +193,7 @@ export const EXAMPLES: Record<string, string> = {
   traceman: tracemanRaw,
   coilsatin: coilsatinRaw,
   easing: easingRaw,
+  banner: bannerRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -287,6 +289,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'ornaline',
       'snake',
       'pivot',
+      'banner',
     ],
   },
 ];

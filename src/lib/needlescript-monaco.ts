@@ -821,6 +821,25 @@ const NS_ITEMS: NSItem[] = [
   },
   // QWORD commands — snippet with inline choice list
   {
+    label: 'hoop',
+    kindName: 'function',
+    detail: 'set the physical hoop and sewable field',
+    documentation:
+      "Configure the physical hoop for this design. The sewable field is the hoop inset by 3 mm on every side.\n\n**Named presets:**\n- `'round100'` — ⌀100 mm round (default)\n- `'4x4'` — 100 × 100 mm\n- `'5x7'` — 130 × 180 mm  \n- `'6x10'` — 160 × 260 mm\n- `'8x8'` — 200 × 200 mm\n- `'8x12'` — 200 × 300 mm\n\n**Numeric (round hoop):** `hoop 150` → ⌀150 mm\n**List (rectangular):** `hoop [130, 180]` → 130 × 180 mm\n\nMust be at the top of the program, before any stitches. At most one per program.\n\n```\nhoop '5x7'\nseed 42\nlet pts = scatter(8)  // fills the 124 × 174 mm field\n```",
+    insertText: "hoop '${1|round100,4x4,5x7,6x10,8x8,8x12|}'",
+    isSnippet: true,
+  },
+  {
+    label: 'override',
+    kindName: 'function',
+    detail: 'raise or lower a run-envelope budget',
+    documentation:
+      "Raise (with a warning) or lower (with an info note) a run-envelope budget.\n\n**Keys and stock values:**\n| Key | Stock | Ceiling |\n|---|---|---|\n| `'stitches'` | 100,000 | 250,000 |\n| `'ops'` | 10,000,000 | 50,000,000 |\n| `'calldepth'` | 200 | 2,000 |\n| `'loopiters'` | 200,000 | 5,000,000 |\n| `'listlen'` | 100,000 | 1,000,000 |\n| `'listcells'` | 1,000,000 | 8,000,000 |\n| `'stringlen'` | 10,000 | 1,000,000 |\n| `'stringtotal'` | 1,000,000 | 20,000,000 |\n| `'scatterpoints'` | 20,000 | 100,000 |\n| `'geoinput'` | 10,000 | 50,000 |\n| `'clipverts'` | 50,000 | 250,000 |\n\nMust be at the top of the program, before any stitches.\n\n```\nhoop '6x10'\noverride 'stitches' 120000\n```",
+    insertText:
+      "override '${1|stitches,ops,calldepth,loopiters,listlen,listcells,stringlen,stringtotal,scatterpoints,geoinput,clipverts|}' ${2:value}",
+    isSnippet: true,
+  },
+  {
     label: 'fabric',
     kindName: 'function',
     detail: 'fabric preset',
@@ -1861,6 +1880,38 @@ const NS_ITEMS: NSItem[] = [
     params: [['point', 'region']],
   },
 
+  // ── Field reporters (§hoop) ──────────────────────────────────────────────
+  {
+    label: 'infield',
+    kindName: 'function',
+    detail: '1 if point is inside the sewable field',
+    documentation:
+      '`1` if the point is inside the current sewable field, `0` otherwise. The point is mapped through the current transform (local frame → hoop space), consistent with `coverat`. Zero RNG draws.\n\n```\nif infield(pos()) [ fd 2 ]  // only sew if inside the field\n```',
+    insertText: 'infield(${1:point})',
+    isSnippet: true,
+    params: [['point']],
+  },
+  {
+    label: 'fieldbounds',
+    kindName: 'function',
+    detail: 'bounding box of the sewable field',
+    documentation:
+      'Returns `[minX, minY, maxX, maxY]` — the bounding box of the sewable field in hoop space (mm). Same format as `bbox()`. Zero RNG draws.\n\n```\nlet b = fieldbounds()  // e.g. [-47, -47, 47, 47] for round100\n```',
+    insertText: 'fieldbounds()',
+    isSnippet: false,
+    params: [],
+  },
+  {
+    label: 'fieldpath',
+    kindName: 'function',
+    detail: 'sewable field boundary as a CCW region',
+    documentation:
+      "Returns the boundary of the sewable field as a counter-clockwise polygon, ready for use as a region in `scatter`, `clippaths`, `offsetpath`, etc. Round fields are polygonised at ≤ 2 mm chords. Zero RNG draws.\n\n`offsetpath(fieldpath(), -5)` gives a 5 mm safety margin inside whatever hoop is configured.\n\n```\nhoop '5x7'\nlet margin = first(offsetpath(fieldpath(), -6))\nlet pts = scatter(5, margin)\n```",
+    insertText: 'fieldpath()',
+    isSnippet: false,
+    params: [],
+  },
+
   // ── Generative math — pure path transforms ───────────────────────────────
   {
     label: 'xlate',
@@ -2352,6 +2403,8 @@ export function registerNeedlescript(monaco: Monaco): void {
       'fabric',
       'underlay',
       'fillunderlay',
+      'hoop', // hoop directive (§hoop)
+      'override', // override directive (§override)
     ],
 
     // ── Debug / neutral / data-world auxiliaries (amber) ────────────
@@ -2457,6 +2510,9 @@ export function registerNeedlescript(monaco: Monaco): void {
       'offsetpath',
       'clippaths',
       'inpath',
+      'infield',
+      'fieldbounds',
+      'fieldpath',
       'sewpath',
       'xlate',
       'xrotate',

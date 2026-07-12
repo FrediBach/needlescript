@@ -369,6 +369,11 @@ describe('bundled examples', () => {
     const out = run(EXAMPLES[key]);
     const stats = designStats(out.events);
     expect(stats.stitches).toBeGreaterThan(0);
-    expect(stats.maxRadius).toBeLessThanOrEqual(47);
+    // When the example declares a hoop, allow the larger field radius.
+    // For rectangular hoops, use the half-diagonal as the outer bound.
+    const maxAllowed = out.activeHoop
+      ? Math.hypot(out.activeHoop.fieldWidthMM, out.activeHoop.fieldHeightMM) / 2 + 5
+      : 47;
+    expect(stats.maxRadius).toBeLessThanOrEqual(maxAllowed);
   });
 });

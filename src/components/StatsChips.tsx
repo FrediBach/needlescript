@@ -7,11 +7,22 @@ interface Props {
   design: DesignState;
 }
 
+function formatHoopChip(design: DesignState): string | null {
+  const h = design.activeHoop;
+  if (!h) return null;
+  const hoopStr = h.shape === 'circle' ? `hoop ⌀${h.widthMM}` : `hoop ${h.widthMM}×${h.heightMM}`;
+  const fieldStr =
+    h.shape === 'circle'
+      ? `field ⌀${h.fieldWidthMM}`
+      : `field ${h.fieldWidthMM}×${h.fieldHeightMM}`;
+  return `${hoopStr} · ${fieldStr} mm`;
+}
+
 export default function StatsChips({ design }: Props) {
   if (!design.stats) return null;
 
   const s = design.stats;
-  const chips: { text: string; type?: 'warn' | 'err' }[] = [];
+  const chips: { text: string; type?: 'warn' | 'err'; title?: string }[] = [];
 
   if (!design.ok) {
     chips.push({ text: 'program error — see console', type: 'err' });
@@ -26,6 +37,19 @@ export default function StatsChips({ design }: Props) {
     chips.push({ text: `${s.width.toFixed(1)} × ${s.height.toFixed(1)} mm` });
     if (design.density && design.density.peak > 0.5)
       chips.push({ text: `peak ${design.density.peak.toFixed(1)} layers` });
+
+    // Hoop chip: shown when a `hoop` directive is active
+    const hoopChip = formatHoopChip(design);
+    if (hoopChip) chips.push({ text: hoopChip });
+
+    // Limits chip: shown when any override *raises* a limit above stock
+    if (design.activeOverrides) {
+      const raised = Object.entries(design.activeOverrides).filter(([, v]) => v !== undefined);
+      if (raised.length > 0) {
+        const title = raised.map(([k, v]) => `${k}: ${(v as number).toLocaleString()}`).join(', ');
+        chips.push({ text: 'limits ⚠', type: 'warn', title });
+      }
+    }
   }
 
   return (
@@ -40,6 +64,7 @@ export default function StatsChips({ design }: Props) {
             chip.type === 'warn' && 'border-[var(--gold-60)] text-gold',
             chip.type === 'err' && 'bg-[var(--run-25)] border-[var(--run-50)] text-white',
           )}
+          title={chip.title}
         >
           {chip.text}
         </Badge>

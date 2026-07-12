@@ -9,7 +9,14 @@ import {
   lazy,
   Suspense,
 } from 'react';
-import type { StitchEvent, DesignStats, DensityResult, WarningLocation } from './lib/engine.ts';
+import type {
+  StitchEvent,
+  DesignStats,
+  DensityResult,
+  WarningLocation,
+  HoopInfo,
+  OverrideKey,
+} from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
 import { toDST } from './lib/dst.ts';
 import { toPES } from './lib/pes.ts';
@@ -65,6 +72,10 @@ export interface DesignState {
   warnings: string[];
   name: string;
   ok: boolean;
+  /** Set by the `hoop` directive; undefined = default round100. */
+  activeHoop?: HoopInfo;
+  /** Set by any `override` directive; undefined = all stock limits. */
+  activeOverrides?: Partial<Record<OverrideKey, number>>;
 }
 
 export interface ConsoleMessage {
@@ -308,6 +319,8 @@ export default function App() {
         warnings,
         name: designName,
         ok: true,
+        activeHoop: result.activeHoop,
+        activeOverrides: result.activeOverrides,
       };
       setErrorMarkers([]);
       lastErrorRef.current = null;
@@ -668,6 +681,7 @@ export default function App() {
         current={selectedHoop}
         onSelect={setSelectedHoop}
         onClose={() => setShowHoopDialog(false)}
+        isSetByCode={!!design.activeHoop}
       />
 
       <input

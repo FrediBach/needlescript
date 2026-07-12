@@ -60,9 +60,11 @@ interface Props {
   current: HoopConfig;
   onSelect: (hoop: HoopConfig) => void;
   onClose: () => void;
+  /** When true, the `hoop` language directive is active — show a "set by code" banner. */
+  isSetByCode?: boolean;
 }
 
-export default function HoopDialog({ open, current, onSelect, onClose }: Props) {
+export default function HoopDialog({ open, current, onSelect, onClose, isSetByCode }: Props) {
   // Keep keyboard shortcut for Escape (also handled natively by base-ui Dialog,
   // but we keep this for belt-and-suspenders consistency)
   useEffect(() => {
@@ -95,6 +97,17 @@ export default function HoopDialog({ open, current, onSelect, onClose }: Props) 
             ✕
           </DialogClose>
         </div>
+
+        {/* "set by code" banner */}
+        {isSetByCode && (
+          <div className="px-[14px] py-[8px] border-b border-dashed border-border bg-[var(--gold-08,rgba(180,140,60,0.08))]">
+            <span className="font-mono text-[10px] text-[var(--gold)] leading-[1.5]">
+              hoop set by{' '}
+              <code className="bg-[rgba(0,0,0,0.06)] px-[3px] rounded text-inherit">hoop</code>{' '}
+              directive in the source — selection below is for the visual fallback only.
+            </span>
+          </div>
+        )}
 
         {/* Grid of hoop options */}
         <div className="grid grid-cols-4 gap-2 p-[14px]">

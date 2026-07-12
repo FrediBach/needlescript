@@ -66,6 +66,12 @@ export const BUILTIN_ARITY: Record<string, number> = {
   fabric: 1,
   underlay: 1,
   fillunderlay: 1,
+  // Hoop and override directives (§hoop, §override). Both are Core words and
+  // accept mixed argument types (string / number / list for hoop; string +
+  // number for override), so they are handled before the bulk num() conversion
+  // in interpreter.ts — but still registered here for arity and RESERVED.
+  hoop: 1,
+  override: 2,
 };
 
 /**
@@ -260,6 +266,10 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   offsetpath: { min: 2, max: 2 },
   clippaths: { min: 3, max: 3 },
   inpath: { min: 2, max: 2 },
+  // §hoop: field reporters (Library tier, same soft-reservation as inpath/bbox).
+  infield: { min: 1, max: 1 }, // infield(p) → 0|1 — is p inside the sewable field?
+  fieldbounds: { min: 0, max: 0 }, // fieldbounds() → [minX, minY, maxX, maxY]
+  fieldpath: { min: 0, max: 0 }, // fieldpath() → boundary polygon (CCW region)
   // §4.7 pure path transforms (companions to the transform block commands)
   xlate: { min: 3, max: 3 },
   xrotate: { min: 2, max: 4 },

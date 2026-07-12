@@ -1,0 +1,25 @@
+// ============================================================
+//  BANNER — LARGE-HOOP SCATTER FIELD
+//  Demonstrates the `hoop` and `override` directives on a
+//  6×10 jacket-back canvas. The stitched field is larger than
+//  the default ⌀94 mm disc, so both directives are needed.
+//  Run this to see the limits ⚠ badge and the dashed field
+//  boundary in the preview.
+// ============================================================
+
+hoop '6x10'
+override 'stitches' 120000
+
+seed 12
+fabric 'denim'
+
+// 6 mm safety margin inside the 154 × 254 mm sewable field
+let margin = first(offsetpath(fieldpath(), -6))
+let pts = relax(scatter(5, margin), 2)
+
+color 1
+for p in pts [
+  moveto p[0] p[1]
+  circle 1.5
+  trim
+]

@@ -34,6 +34,8 @@ export type {
   DensityHotspot,
   DensityResult,
   RunOptions,
+  HoopInfo,
+  OverrideKey,
 } from './types.ts';
 export { NeedlescriptError } from './errors.ts';
 export { makeRNG, makeNoise, fork, gauss } from './prng.ts';
@@ -61,7 +63,20 @@ export { parse } from './parser.ts';
 export { NsList, isList, isString } from './list.ts';
 export type { Val } from './list.ts';
 export type { Pt } from './genmath.ts';
-export { LIMITS } from './machine.ts';
+export { LIMITS, STOCK_LIMITS, OVERRIDE_CEILINGS, OVERRIDE_FLOORS } from './machine.ts';
+export type { BudgetKey } from './machine.ts';
+export {
+  DEFAULT_HOOP_INFO,
+  HOOP_PRESET_NAMES,
+  lookupHoopPreset,
+  buildHoopInfo,
+  hoopFieldPolygon,
+  hoopFieldDomain,
+  inHoopField,
+  inHoopOuter,
+  fieldDescription,
+  hoopDescription,
+} from './hoop-presets.ts';
 export { applyLocks, applyAutoTrim, densityMap, designStats, DensityGrid } from './postprocess.ts';
 export { run } from './interpreter.ts';
 export { toSVG } from './svg.ts';

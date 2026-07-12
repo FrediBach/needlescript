@@ -10,14 +10,21 @@ import { NeedlescriptError } from './errors.ts';
 import { centroid, pointInRegion, signedArea } from './genmath.ts';
 import type { Pt } from './genmath.ts';
 
-/** Where generators operate: the sewable disc, or a polygon region. */
-export type Domain = { kind: 'disc'; r: number } | { kind: 'poly'; pts: Pt[] };
+/** Where generators operate: the sewable disc, a rectangle, or a polygon region. */
+export type Domain =
+  | { kind: 'disc'; r: number }
+  | { kind: 'rect'; w: number; h: number }
+  | { kind: 'poly'; pts: Pt[] };
 
-const inDomain = (p: Pt, d: Domain): boolean =>
-  d.kind === 'disc' ? p[0] * p[0] + p[1] * p[1] <= d.r * d.r : pointInRegion(p, d.pts);
+const inDomain = (p: Pt, d: Domain): boolean => {
+  if (d.kind === 'disc') return p[0] * p[0] + p[1] * p[1] <= d.r * d.r;
+  if (d.kind === 'rect') return Math.abs(p[0]) <= d.w / 2 && Math.abs(p[1]) <= d.h / 2;
+  return pointInRegion(p, d.pts);
+};
 
 function domainBBox(d: Domain): [number, number, number, number] {
   if (d.kind === 'disc') return [-d.r, -d.r, d.r, d.r];
+  if (d.kind === 'rect') return [-d.w / 2, -d.h / 2, d.w / 2, d.h / 2];
   let minx = Infinity,
     miny = Infinity,
     maxx = -Infinity,
@@ -34,6 +41,16 @@ function domainBBox(d: Domain): [number, number, number, number] {
 /** The domain as a boundary polygon (the disc as a regular 96-gon, CCW). */
 export function domainPolygon(d: Domain): Pt[] {
   if (d.kind === 'poly') return d.pts;
+  if (d.kind === 'rect') {
+    const hw = d.w / 2,
+      hh = d.h / 2;
+    return [
+      [-hw, -hh],
+      [hw, -hh],
+      [hw, hh],
+      [-hw, hh],
+    ];
+  }
   const out: Pt[] = [];
   for (let i = 0; i < 96; i++) {
     const t = (i / 96) * 2 * Math.PI;

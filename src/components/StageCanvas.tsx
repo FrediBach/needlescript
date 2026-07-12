@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DesignState, LineStitchBounds } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
-import type { WarningLocation } from '../lib/engine.ts';
+import type { WarningLocation, HoopInfo } from '../lib/engine.ts';
 import { THREADS } from '../data.ts';
 import { projectPoint } from '../lib/parse-parameters.ts';
 import type { PointParamDef, XYRegion } from '../lib/parse-parameters.ts';
@@ -32,6 +32,8 @@ import {
 interface Props {
   design: DesignState;
   hoop: HoopConfig;
+  /** Active hoop from the `hoop` language directive, if any. Overrides `hoop` dimensions when present. */
+  activeHoop?: HoopInfo;
   scrubPos: number;
   showDensity: boolean;
   hideJumps: boolean;
@@ -109,6 +111,7 @@ type HandleDragState = {
 export default function StageCanvas({
   design,
   hoop,
+  activeHoop,
   scrubPos,
   showDensity,
   hideJumps,
@@ -170,6 +173,7 @@ export default function StageCanvas({
       canvas,
       design,
       hoop,
+      activeHoop,
       scrubPos,
       dpr,
       showDensity,
@@ -189,6 +193,7 @@ export default function StageCanvas({
   }, [
     design,
     hoop,
+    activeHoop,
     scrubPos,
     showDensity,
     hideJumps,
@@ -220,6 +225,7 @@ export default function StageCanvas({
         canvas,
         design,
         hoop,
+        activeHoop,
         scrubPos,
         dpr,
         showDensity,
@@ -242,6 +248,7 @@ export default function StageCanvas({
   }, [
     design,
     hoop,
+    activeHoop,
     scrubPos,
     showDensity,
     hideJumps,
@@ -557,6 +564,7 @@ function draw(
   canvas: HTMLCanvasElement,
   design: DesignState,
   hoop: HoopConfig,
+  activeHoop: HoopInfo | undefined,
   scrubPos: number,
   dpr: number,
   showDensity: boolean,
@@ -582,7 +590,7 @@ function draw(
   ctx.clearRect(0, 0, w, h);
 
   // Auto-fit scale (shared logic with computeAutoFitScale helper)
-  const autoFitScale = computeAutoFitScale(w, h, design, hoop);
+  const autoFitScale = computeAutoFitScale(w, h, design, hoop, activeHoop);
 
   // Active scale and viewport center
   let scale: number;
@@ -605,7 +613,7 @@ function draw(
   const Y = (my: number) => cy - (my - viewCY) * scale; // y-up in mm
 
   drawGrid(ctx, scale, cx, cy, viewCX, viewCY, w, h, dpr);
-  drawHoop(ctx, hoop, scale, cx, cy, viewCX, viewCY, w, h);
+  drawHoop(ctx, hoop, activeHoop, scale, cx, cy, viewCX, viewCY, w, h);
 
   drawOverlays(ctx, overlays, X, Y, dpr);
 
@@ -1087,9 +1095,15 @@ function drawWarnDot(ctx: CanvasRenderingContext2D, px: number, py: number, dpr:
 
 /** Auto-fit scale in physical px/mm — used by draw() and the render-time zoom
  *  level indicator so both always agree without a stale-ref round-trip. */
-function computeAutoFitScale(w: number, h: number, design: DesignState, hoop: HoopConfig): number {
-  const hoopHalfW = hoop.widthMM / 2;
-  const hoopHalfH = hoop.heightMM / 2;
+function computeAutoFitScale(
+  w: number,
+  h: number,
+  design: DesignState,
+  hoop: HoopConfig,
+  activeHoop?: HoopInfo,
+): number {
+  const hoopHalfW = (activeHoop ? activeHoop.widthMM : hoop.widthMM) / 2;
+  const hoopHalfH = (activeHoop ? activeHoop.heightMM : hoop.heightMM) / 2;
   let extX = hoopHalfW + 6;
   let extY = hoopHalfH + 6;
   if (design.stats) {
@@ -1148,6 +1162,7 @@ function drawGrid(
 function drawHoop(
   ctx: CanvasRenderingContext2D,
   hoop: HoopConfig,
+  activeHoop: HoopInfo | undefined,
   scale: number,
   cx: number,
   cy: number,
@@ -1156,42 +1171,67 @@ function drawHoop(
   canvasW: number,
   canvasH: number,
 ) {
-  const rx = (hoop.widthMM / 2) * scale;
-  const ry = (hoop.heightMM / 2) * scale;
+  // Use activeHoop dimensions if a `hoop` directive is in effect.
+  const hoopW = activeHoop ? activeHoop.widthMM : hoop.widthMM;
+  const hoopH = activeHoop ? activeHoop.heightMM : hoop.heightMM;
+  const hoopShape: 'circle' | 'rectangle' = activeHoop
+    ? activeHoop.shape
+    : hoop.shape === 'oval'
+      ? 'circle'
+      : hoop.shape;
+
+  const rx = (hoopW / 2) * scale;
+  const ry = (hoopH / 2) * scale;
 
   const hcx = cx + (0 - viewCX) * scale;
   const hcy = cy - (0 - viewCY) * scale;
 
+  // Even-odd overlay: fill everything outside the hoop.
   ctx.save();
   ctx.fillStyle = canvasHoopOverlay;
   ctx.beginPath();
   ctx.rect(0, 0, canvasW, canvasH);
-  addHoopPath(ctx, hoop, rx, ry, hcx, hcy, scale);
+  addHoopPathFromDims(ctx, hoopShape, rx, ry, hcx, hcy, scale);
   ctx.fill('evenodd');
   ctx.restore();
 
+  // Outer hoop boundary (solid).
   ctx.save();
   ctx.beginPath();
-  addHoopPath(ctx, hoop, rx, ry, hcx, hcy, scale);
+  addHoopPathFromDims(ctx, hoopShape, rx, ry, hcx, hcy, scale);
   ctx.strokeStyle = canvasHoopBoundary;
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
+
+  // Field boundary (dashed, 3 mm inset each side) — only when field differs from hoop.
+  if (activeHoop) {
+    const frx = (activeHoop.fieldWidthMM / 2) * scale;
+    const fry = (activeHoop.fieldHeightMM / 2) * scale;
+    ctx.save();
+    ctx.beginPath();
+    addHoopPathFromDims(ctx, activeHoop.shape, frx, fry, hcx, hcy, scale);
+    ctx.strokeStyle = canvasHoopBoundary;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4 * scale, 3 * scale]);
+    ctx.globalAlpha = 0.5;
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
-function addHoopPath(
+/** Draw a hoop path from shape + half-dimensions (for activeHoop support). */
+function addHoopPathFromDims(
   ctx: CanvasRenderingContext2D,
-  hoop: HoopConfig,
+  shape: 'circle' | 'rectangle',
   rx: number,
   ry: number,
   cx: number,
   cy: number,
   scale: number,
 ) {
-  if (hoop.shape === 'circle') {
+  if (shape === 'circle') {
     ctx.arc(cx, cy, rx, 0, Math.PI * 2);
-  } else if (hoop.shape === 'oval') {
-    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   } else {
     const r = Math.min(5 * scale, rx * 0.12, ry * 0.12);
     const x = cx - rx,

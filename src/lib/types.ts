@@ -37,8 +37,41 @@ export interface WarningLocation {
   index: number; // index into RunResult.warnings
   points: { x: number; y: number }[]; // hoop-space coordinates (mm)
   lines: number[]; // source lines that contributed to the hotspot
-  kind: 'density' | 'stack' | 'tiny';
+  kind: 'density' | 'stack' | 'tiny' | 'overflow';
 }
+
+/** Physical hoop and derived sewable field, as configured by the `hoop` command. */
+export interface HoopInfo {
+  shape: 'circle' | 'rectangle';
+  /** Hoop outer dimension in mm. For circles this is the diameter. */
+  widthMM: number;
+  /** Hoop outer dimension in mm. For circles this equals widthMM. */
+  heightMM: number;
+  /** Sewable field width in mm (= widthMM − 6; 3 mm inset each side). */
+  fieldWidthMM: number;
+  /** Sewable field height in mm (= heightMM − 6; 3 mm inset each side). */
+  fieldHeightMM: number;
+  /** Set when the hoop was named, e.g. `'5x7'` or `'round100'`. */
+  presetName?: string;
+}
+
+/**
+ * The string keys accepted by the `override` command.  Each key maps to a
+ * run-envelope budget that can be raised (with a warning) or lowered (with an
+ * info note) relative to the stock value in STOCK_LIMITS.
+ */
+export type OverrideKey =
+  | 'stitches'
+  | 'ops'
+  | 'calldepth'
+  | 'loopiters'
+  | 'listlen'
+  | 'listcells'
+  | 'stringlen'
+  | 'stringtotal'
+  | 'scatterpoints'
+  | 'geoinput'
+  | 'clipverts';
 
 export interface RunResult {
   events: StitchEvent[];
@@ -47,6 +80,10 @@ export interface RunResult {
   printed: string[];
   locks: number;
   density: DensityResult;
+  /** The hoop configured by the `hoop` directive, if any. */
+  activeHoop?: HoopInfo;
+  /** Budget limits raised or lowered by `override` directives, if any. */
+  activeOverrides?: Partial<Record<OverrideKey, number>>;
 }
 
 export interface DesignStats {

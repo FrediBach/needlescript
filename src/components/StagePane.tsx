@@ -110,6 +110,7 @@ export default function StagePane({
         <StageCanvas
           design={design}
           hoop={hoop}
+          activeHoop={design.activeHoop}
           scrubPos={scrubPos}
           showDensity={showDensity}
           hideJumps={hideJumps}
