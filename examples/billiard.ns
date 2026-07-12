@@ -1,0 +1,77 @@
+// ----------------------------------------------------------------------
+// Billiard fill — one continuous thread bouncing inside a rectangle,
+// like the old bouncing-ball screensaver. Runs until the measured
+// thread coverage reaches a target, then trims.
+//
+// Anti-retrace: a rectangular billiard path is periodic exactly when
+// slope * (W/H) is rational. We pick slope = (H/W) * phi, so that
+// product is the golden ratio — maximally irrational — and every new
+// pass lands as far from the existing lines as possible.
+// ----------------------------------------------------------------------
+
+fabric 'woven'
+stitchlen 2.5
+autotrim 7                    // cut any long travels automatically
+
+// ---- rectangle, centred on origin (half-extents, mm) ----
+let hw = 32                   // 64 mm wide
+let hh = 20                   // 40 mm tall — corner at ~37.7 mm, inside the safe zone
+
+// ---- outline ----
+bean 3
+up moveto(-hw, -hh) down
+setxy(hw, -hh)  setxy(hw, hh)  setxy(-hw, hh)  setxy(-hw, -hh)
+bean 1
+trim
+
+// ---- bounce walls sit 1.2 mm inside the outline ----
+let bw = hw - 1.2
+let bh = hh - 1.2
+
+// ---- launch direction (unit vector, golden-ratio slope) ----
+let phi = 1.6180339
+let slope = (bh / bw) * phi   // => slope * (W/H) = phi, never periodic
+let hyp = sqrt(1 + slope * slope)
+let dx = 1 / hyp
+let dy = slope / hyp
+
+// ---- fill parameters ----
+let target_cov = 0.5          // stop here; 1.0 would equal a normal machine fill
+let max_bounce = 300          // hard cap — never loop open-ended on a condition
+let sensor_r = min(bw, bh) * 0.9
+
+// declare everything ONCE, assign inside the loop
+let x = 4.3 - bw              // start a little off-symmetric
+let y = 7.1 - bh
+let tx = 0
+let ty = 0
+let t = 0
+let cov = 0
+let bounce = 0
+
+up moveto(x, y) down
+
+repeat max_bounce [
+  // ray distance to the wall we're heading for, per axis
+  if dx > 0 [ tx = (bw - x) / dx ] else [ tx = (-bw - x) / dx ]
+  if dy > 0 [ ty = (bh - y) / dy ] else [ ty = (-bh - y) / dy ]
+  t = min(tx, ty)
+
+  // sew one straight segment to the impact point
+  x = clamp(x + dx * t, -bw, bw)
+  y = clamp(y + dy * t, -bh, bh)
+  setxy(x, y)
+
+  // reflect — a corner hit flips both components
+  if tx <= ty [ dx = -dx ]
+  if ty <= tx [ dy = -dy ]
+
+  bounce += 1
+  if bounce % 5 == 0 [
+    cov = coverat([0, 0], sensor_r)      // read the real laid thread
+    if cov >= target_cov [ break ]
+  ]
+]
+
+trim
+print('bounces: ', bounce, '   coverage: ', cov)
