@@ -377,6 +377,59 @@ repeat 200 [
 
 > **A classic-syntax trap.** Multi-argument prefix calls parse each argument as a _full expression_, so a trailing operator gets absorbed into the last argument: `distance 0 0 < 47` actually means `distance 0 (0 < 47)`. Parenthesise when you mean the comparison — `(distance 0 0) < 47` — or use call parens, where it can't happen: `distance(0, 0) < 47`. When in doubt, use the parentheses.
 
+### The Customizer: live parameter controls
+
+Any `let` declaration can be turned into a **live control** in the Parameters panel by adding a bracketed annotation in the line's comment. The annotation is a comment — the interpreter never sees it, and the declared value is the parameter's default. Updates happen without re-running the program.
+
+**Sliders and switches** work on scalar variables:
+
+```text
+let radius = 15    // [5:50]          integer slider (both bounds whole, range > 1)
+let smooth = 0.5   // [0:1]           smooth slider (float bound or range ≤ 1, 100 steps)
+let step   = 4     // [0.5:0.5:8]     stepped slider [min:step:max]
+let mirror = 0     // [switch]         toggle: 0 = off, 1 = on
+let mode   = 0     // [switch:hypo,epi]  labelled toggle
+```
+
+A `// --- Section ---` comment in the source inserts a divider with a title between groups of controls.
+
+**Point handles** work on two-element list literals. Annotate `let p = [x, y]` with `// [xy...]` and the variable is exposed as a **draggable ring directly on the stage canvas**, plus x/y input fields in the panel:
+
+```text
+let anchor = [0, 18]    // [xy]                 free — anywhere in the hoop
+let sun    = [-25, 25]  // [xy: -40:0, 0:40]    rectangle (x-range, y-range)
+let eye    = [8, 4]     // [xy: disc 12]         disc of radius 12 mm
+let tip    = [22, 0]    // [xy: x 5:40]          horizontal axis, x ∈ 5…40
+let edge   = [0, 20]    // [xy: y -30:30]        vertical axis
+let snappy = [5, 5]     // [xy: disc 20, snap 1] disc with 1 mm grid snapping
+```
+
+When you drag a handle, the declared value in the source updates and the design re-runs live. Dragging near the constraint boundary causes the handle to glide along the edge. Pressing **Esc** cancels the drag and restores the pre-drag value. **Shift** temporarily toggles snapping, and **Alt** slows the drag to ¼ speed for fine placement.
+
+To use a point handle's coordinates in your program, index the list variable:
+
+```text
+let anchor = [0, 18]  // [xy]
+
+// index with glued bracket — no space between name and [
+let ax = anchor[0]
+let ay = anchor[1]
+
+up setxy(ax, ay) down
+arc 360 6
+```
+
+**Shuffle and lock** work for point handles exactly as for sliders. The shuffle button samples uniformly within the constraint region (a disc samples area-uniformly; free handles randomize within a 40 mm radius to keep the design inside the hoop). The lock icon on a row pins that parameter from randomization.
+
+**Presets** use `name=[x,y]` syntax for point values:
+
+```text
+// @preset Compact : radius=10, anchor=[0,5], eye=[8,2]
+// @preset Wide    : radius=22, anchor=[-8,0], eye=[15,6]
+```
+
+Scalar and point values mix freely in one `@preset` line; only the named parameters are changed (partial presets). Values outside the declared region are projected into it on apply.
+
 ---
 
 ## 8. Control flow in depth

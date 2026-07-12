@@ -630,7 +630,7 @@ const SECTIONS: RefSection[] = [
   },
   {
     title: 'Customizer — parameters & presets',
-    note: 'Comment annotations expose variable declarations as live controls in the Parameters panel. The interpreter never sees them — a program with sliders is still an ordinary program. All three declaration styles work: let name = val, make "name val, or bare name = val.',
+    note: 'Comment annotations expose variable declarations as live controls in the Parameters panel. The interpreter never sees them — a program with sliders or handles is still an ordinary program. All three declaration styles work: let name = val, make "name val, or bare name = val.',
     entries: [
       {
         cmd: 'let x = 15  // [5:50]',
@@ -650,24 +650,48 @@ const SECTIONS: RefSection[] = [
         desc: 'labelled toggle — custom labels shown on each side of the switch',
       },
       {
+        cmd: 'let p = [0, 18]  // [xy]',
+        desc: 'draggable point handle on the stage — free within the hoop. The initializer must be a two-element numeric list literal; the declared value is the default',
+      },
+      {
+        cmd: 'let p = [-25, 25]  // [xy: -40:0, 0:40]',
+        desc: 'point handle constrained to a rectangle: x ∈ [−40, 0], y ∈ [0, 40]. Format: [xy: xMin:xMax, yMin:yMax]',
+      },
+      {
+        cmd: 'let p = [8, 4]  // [xy: disc 12]',
+        desc: 'point handle constrained to a disc of radius 12 mm centred at the origin. Add @ cx,cy for a non-centred disc: [xy: disc 12 @ 5,-3]',
+      },
+      {
+        cmd: 'let p = [22, 0]  // [xy: x 5:40]',
+        desc: 'horizontal axis — y is fixed at the declared value, x is free within 5…40. [xy: x] without bounds uses the hoop chord at that y. [xy: y] and [xy: y min:max] give a vertical axis',
+      },
+      {
+        cmd: 'let p = [0, 18]  // [xy: disc 25, snap 0.5]',
+        desc: 'snap S appended to any constraint snaps drags, typed input, and randomize to a S mm grid. Shift temporarily toggles snapping while dragging. Alt slows drag to ¼ speed',
+      },
+      {
         cmd: '// --- Section ---',
         desc: 'section divider between parameter groups. Any number of dashes; the text between them is the section label',
       },
       {
         cmd: 'shuffle button',
-        desc: 'randomises all unlocked parameters at once. The lock icon on each row (visible on row hover, gold when active) pins that parameter so randomize skips it',
+        desc: 'randomises all unlocked parameters at once. Point handles are sampled uniformly within their constraint region (free handles use a 40 mm disc). The lock icon on each row (visible on row hover, gold when active) pins that parameter so randomize skips it',
       },
       {
         cmd: '// @preset Name : k=v, k=v, …',
-        desc: "named snapshot of parameter values. @snapshot is an accepted alias. Partial presets (fewer keys than total params) set only the named parameters and leave the rest unchanged. Values are clamped and snapped to each param's range",
+        desc: 'named snapshot of parameter values. @snapshot is an accepted alias. Partial presets set only the named parameters and leave the rest unchanged. Scalar values are clamped to their range; point values use name=[x,y] syntax and are projected into the declared region',
+      },
+      {
+        cmd: '// @preset Name : anchor=[0,26], layers=8',
+        desc: 'point values in presets use [x,y] syntax — the bracket-aware parser keeps commas inside [...] from being treated as pair separators',
       },
       {
         cmd: 'preset dropdown',
-        desc: 'appears below the panel header when at least one @preset line exists. Selecting a preset applies all its values at once, overriding locks. Moving any slider afterwards resets the dropdown to — (custom state)',
+        desc: 'appears below the panel header when at least one @preset line exists. Selecting a preset applies all its values at once, overriding locks. Moving any slider or handle afterwards resets the dropdown to — (custom state)',
       },
       {
         cmd: 'copy button · right-click header',
-        desc: 'copies the current parameter values as a // @preset My Preset : … comment to the clipboard, ready to paste into source. Right-click the panel header works even before any presets are defined',
+        desc: 'copies the current parameter values as a // @preset My Preset : … comment to the clipboard. Point parameters are serialised as name=[x,y]. Right-click the panel header works even before any presets are defined',
       },
     ],
   },

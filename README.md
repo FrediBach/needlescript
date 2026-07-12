@@ -78,10 +78,10 @@ src/
 - **Editor** — write NeedleScript; `⌘`/`Ctrl`+`Enter` runs, `Tab` inserts two spaces.
 - **REPL** — type a single command below the console; it's appended to the program and re-run (`↑`/`↓` for history). Great for nudging a design live.
 - **Console** — run results, warnings, `print` output, and errors with line numbers.
-- **Stage** — a 100 mm virtual hoop rendered on canvas: thread per colour, underlay drawn thinner and lighter, dashed jump lines, needle penetration points when zoomed, hoop-overflow and density warnings as chips, plus a **density heatmap toggle** (thread coverage in layers) for spotting bulletproof patches before they pucker.
+- **Stage** — a 100 mm virtual hoop rendered on canvas: thread per colour, underlay drawn thinner and lighter, dashed jump lines, needle penetration points when zoomed, hoop-overflow and density warnings as chips, plus a **density heatmap toggle** (thread coverage in layers) and a **handles toggle** for draggable point handles (see [Point handles](#point-handles) below).
 - **Playback** — play (~7 s) or scrub the stitch sequence stitch by stitch. While scrubbed, the **source line currently sewing is highlighted in the editor** and shown next to the counter — the fastest way to answer "which line made this stitch?"
 - **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch, meadow, echo, shatter).
-- **Parameters** — annotate any variable with a `// [min:max]` comment to expose it as a live slider or toggle in the Parameters panel below the editor. Drag sliders, lock individual parameters, randomize unlocked ones with the shuffle button, and pick named presets from a dropdown — all without re-running the program. See [Customizer](#customizer) below.
+- **Parameters** — annotate any variable declaration with a comment to expose it as a live control in the Parameters panel below the editor: `// [min:max]` for sliders, `// [switch]` for toggles, or `// [xy]` on a two-element list literal for a **draggable point handle** rendered directly on the stage. Drag sliders or handles, lock individual parameters, randomize unlocked ones with the shuffle button, and pick named presets — all without editing the source. See [Customizer](#customizer) below.
 - **Download .DST** — export the current design as a Tajima stitch file.
 - **Import SVG** — convert an SVG (button or drag & drop) into _editable_ NeedleScript code: filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, colours map to the nearest thread. Supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, groups and transforms.
 
@@ -102,9 +102,52 @@ Annotate variable declarations with comment brackets to expose them as **live co
 | `let mode = 0  // [switch:hypo,epi]`                     | **labelled toggle** — label pair shown on each side                           |
 | `let name = 'Anna'  // [text]`                           | **free text input** — any string value                                        |
 | `let op = 'union'  // [text:union,difference,intersect]` | **dropdown** — string value limited to the listed choices                     |
+| `let p = [0, 18]  // [xy]`                               | **point handle** — draggable on the stage; free within the hoop               |
+| `let p = [-25, 25]  // [xy: -40:0, 0:40]`                | point handle constrained to a rect (x-range, y-range)                         |
+| `let p = [8, 4]  // [xy: disc 12]`                       | point handle constrained to a disc of radius 12 mm                            |
+| `let p = [8, 4]  // [xy: disc 12 @ 5,-3]`                | disc constraint centered at (5, −3)                                           |
+| `let p = [22, 0]  // [xy: x 5:40]`                       | horizontal axis — y fixed at declared value, x ∈ 5…40                         |
+| `let p = [0, 10]  // [xy: y -20:20]`                     | vertical axis — x fixed at declared value, y ∈ −20…20                         |
+| `let p = [0, 18]  // [xy: disc 25, snap 0.5]`            | any region with 0.5 mm snapping applied to drag, typed input, and randomize   |
 | `// --- Section ---`                                     | **section divider** — groups controls with a horizontal rule and title        |
 
 All three declaration styles work: `let name = value`, `make "name value`, and bare `name = value`.
+
+### Point handles
+
+Annotating a **two-element numeric list literal** with `// [xy]` exposes it as a draggable handle rendered directly on the stage canvas, plus an X/Y input row in the Parameters panel. The declared value is the default.
+
+**Constraint forms:**
+
+| Annotation                   | Region                                      |
+| ---------------------------- | ------------------------------------------- |
+| `[xy]`                       | free — anywhere in the 47 mm sewable disc   |
+| `[xy: xMin:xMax, yMin:yMax]` | rectangle                                   |
+| `[xy: disc R]`               | disc of radius R mm centred at the origin   |
+| `[xy: disc R @ cx,cy]`       | disc centred at (cx, cy)                    |
+| `[xy: x]`                    | horizontal axis — y fixed at declared value |
+| `[xy: x min:max]`            | horizontal axis with x bounds               |
+| `[xy: y]`                    | vertical axis — x fixed at declared value   |
+| `[xy: y min:max]`            | vertical axis with y bounds                 |
+| `[xy: …, snap S]`            | any region, with S mm grid snapping         |
+
+**Stage interaction:**
+
+- Handles render as ring + label in the UI accent colour, at screen-constant size regardless of zoom.
+- **Drag** the handle directly; it glides along the constraint boundary if you leave the region.
+- **Shift** temporarily toggles snapping (disables declared snap, or enables 1 mm snap if none declared).
+- **Alt** engages precision mode — pointer moves at ¼ speed.
+- **Esc** cancels the current drag and restores the pre-drag value.
+- The **handles toggle** chip on the stage (next to density/jumps) hides all handles for clean screenshots.
+- Hovering a row in the Parameters panel highlights the matching handle; clicking the **crosshair (⊕) button** flashes it.
+
+**Presets** use `name=[x,y]` syntax for point parameters:
+
+```text
+// @preset Tall Stem : anchor=[0,26], tip=[22,0], layers=8
+```
+
+The bracket-aware preset parser keeps `[x,y]` values together; top-level commas still separate pairs.
 
 ### Randomize & lock
 
@@ -122,7 +165,7 @@ Bundle curated values into named presets defined as comment lines — one per li
 
 `@snapshot` is accepted as an alias for `@preset`.
 
-**Partial presets** (fewer keys than the total parameter count) set only the named parameters and leave the rest at their current values — the most common case. Values are always numbers (including `0`/`1` for switches); they are clamped and snapped to each parameter's configured range on apply.
+**Partial presets** (fewer keys than the total parameter count) set only the named parameters and leave the rest at their current values — the most common case. Scalar values are clamped and snapped to each parameter's configured range on apply. Point values are written as `name=[x,y]` (see [Point handles](#point-handles)) and projected into the declared constraint region.
 
 When at least one `@preset` line exists, a **preset dropdown** appears below the panel header. Selecting a preset applies all its values immediately, overriding any locks. Moving any slider or switch after selecting a preset resets the dropdown to `—` to indicate a custom state.
 
