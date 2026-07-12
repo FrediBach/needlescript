@@ -1,0 +1,39 @@
+// Three vertical bars with xy corner handles
+// lo = [left, bottom]   hi = [right, top]
+
+// Left bar:
+let l_lo = [-24.452, -19.2061] // [xy]
+let l_hi = [-14.1061, 22.2337] // [xy]
+
+// Middle bar
+let m_lo = [-8.42705, -36.8565] // [xy]
+let m_hi = [8.2441, 35.796] // [xy]
+
+// Right bar:
+let r_lo = [13.5724, -8.95348] // [xy]
+let r_hi = [35.1794, 9.15573] // [xy]
+
+let l_ang = 225   // down and out, left
+let m_ang = 90    // horizontal rows
+let r_ang = 135   // down and out, right
+
+fabric 'woven'
+fillspacing 1
+stitchlen 2.5
+
+def bar(lo, hi, ang) [
+  assert(hi[0] > lo[0] and hi[1] > lo[1], 'bar: hi must be above-right of lo')
+  let w = hi[0] - lo[0]
+  let h = hi[1] - lo[1]
+  fillangle ang
+  moveto(lo[0], lo[1])
+  seth 0
+  beginfill
+    repeat 2 [ fd h rt 90 fd w rt 90 ]
+  endfill
+  trim
+]
+
+bar(l_lo, l_hi, l_ang)
+bar(m_lo, m_hi, m_ang)
+bar(r_lo, r_hi, r_ang)
