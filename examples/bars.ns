@@ -10,8 +10,8 @@ let m_lo = [-8.42705, -36.8565] // [xy]
 let m_hi = [8.2441, 35.796] // [xy]
 
 // Right bar:
-let r_lo = [13.5724, -8.95348] // [xy]
-let r_hi = [35.1794, 9.15573] // [xy]
+let r_lo = [-32.1241, -7.63837] // [xy]
+let r_hi = [35.1794, 7.98593] // [xy]
 
 let l_ang = 225   // down and out, left
 let m_ang = 90    // horizontal rows
