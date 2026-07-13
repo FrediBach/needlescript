@@ -238,7 +238,7 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     const nxt = peek();
     return (
       nxt.t === 'num' ||
-      nxt.t === 'str' ||
+      nxt.t === 'string' ||
       nxt.t === '[' ||
       nxt.t === '(' ||
       nxt.t === 'pref' ||

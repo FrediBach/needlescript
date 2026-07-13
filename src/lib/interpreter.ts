@@ -3111,5 +3111,6 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     density,
     activeHoop,
     activeOverrides,
+    globals,
   };
 }

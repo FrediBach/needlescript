@@ -84,6 +84,8 @@ export interface RunResult {
   activeHoop?: HoopInfo;
   /** Budget limits raised or lowered by `override` directives, if any. */
   activeOverrides?: Partial<Record<OverrideKey, number>>;
+  /** Top-level variables defined by `let` statements in the script. */
+  globals?: Record<string, unknown>;
 }
 
 export interface DesignStats {

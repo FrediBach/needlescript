@@ -1680,24 +1680,6 @@ export class Machine {
     this.traceCurRun = null;
   }
 
-  /** Close the current trace run if it has geometric content (≥2 vertices). */
-  _closeTraceRun() {
-    if (this.traceCurRun && this.traceCurRun.length >= 2) {
-      // Closing-vertex dedupe (§4.2): if a run's final vertex coincides with
-      // its first within 1e-6 mm, the duplicate is dropped — region closure is
-      // implicit, and returning it doubled would break pathlen and resample.
-      const first = this.traceCurRun[0];
-      const last = this.traceCurRun[this.traceCurRun.length - 1];
-      if (Math.hypot(last[0] - first[0], last[1] - first[1]) < 1e-6) {
-        this.traceCurRun.pop();
-        this.traceVertexCount--;
-      }
-      // After dedupe, still need ≥2 for a valid path
-      if (this.traceCurRun.length >= 2) this.traceRuns.push(this.traceCurRun);
-    }
-    this.traceCurRun = null;
-  }
-
   // ── Running-stitch reporter buffer (§stitchlen @fn) ──────────────────────
 
   /**
@@ -2644,7 +2626,7 @@ export class Machine {
         useAngle = vheading([hvx, hvy]);
         if (shape) {
           useSpacing = scSpacing;
-          useLen = scLen;
+          useLen = scLen ?? useLen;
         }
         disarm();
         // fall through to the built-in tatami pass below
