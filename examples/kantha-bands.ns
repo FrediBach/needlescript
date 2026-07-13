@@ -1,0 +1,89 @@
+// ================================================================
+//  KANTHA BANDS — three stitch rhythms on one cloth
+//
+//  Three forms of stitchlen and the filllen list, side by side:
+//
+//    filllen [3.5, 1.0]  — centre diamond
+//      Alternating long/short fill stitches create an under-over
+//      woven texture in the tatami rows, like hand-loom cloth.
+//
+//    stitchlen @organic  — scan-line bands
+//      A 2-D noise field is sampled at each hoop-space position
+//      [x, y], so the rhythm shifts continuously across the fabric
+//      rather than row-by-row — the spatial coherence is what makes
+//      it read as texture.  This is the Form 3 (reporter) mode.
+//
+//    stitchlen [5, 1.5]  — sashiko centre stripe
+//      Cycling long/short is the classic sashiko dash–dot accent.
+//      This is the Form 2 (list) mode.  The phase resets here
+//      because the trim above closed the previous stretch.
+//
+//  Inspired by kantha embroidery, where each line of running stitch
+//  carries the maker's breath — no two rows identical.
+//
+//  Controls:
+//    width   — half-width of scan lines (mm)
+//    bands   — scan lines each side of centre
+//    noiseS  — noise-field scale (higher = smoother variation)
+// ================================================================
+
+let width  = 42    // [20:2:56] scan-line half-width, mm
+let bands  = 9     // [4:1:16] scan lines on each side of centre
+let noiseS = 12    // [4:1:28] noise scale
+
+seed 42
+fabric 'woven'
+lock 0
+
+// ── 1. Woven-fill accent diamond (filllen list form) ──────────
+// The alternating [3.5, 1.0] cycle gives every other fill row a
+// different density — an over-under weave texture in the tatami.
+fillspacing 0.42
+filllen [3.5, 1.0]
+
+moveto 0 -10
+beginfill
+  setxy 16 0
+  setxy 0 10
+  setxy -16 0
+  setxy 0 -10
+endfill
+trim
+filllen 0
+
+// ── 2. Noise-field scan lines (stitchlen reporter form) ────────
+// The reporter is queried once per stitch. Sampling snoise2 at the
+// hoop position [x, y] gives spatial coherence: the stitch rhythm
+// is a property of the location on the fabric, not of the row.
+// Each trim closes one stretch; t, s, i reset for the next line.
+
+def organic(t, s, i, p) [
+  return remap(snoise2(p[0] / noiseS, p[1] / noiseS), -1, 1, 1.2, 4.8)
+]
+
+stitchlen @organic
+
+repeat bands [
+  let y = repcount * 1.8
+  up  setxy (0 - width) y  seth 90  down
+  fd (width * 2)
+  trim
+  up  setxy (0 - width) (0 - y)  seth 90  down
+  fd (width * 2)
+  trim
+]
+
+// ── 3. Sashiko centre stripe (stitchlen list form) ─────────────
+// A bolder accent in a contrasting colour uses the list form.
+// Long–short [5, 1.5] is the sashiko dash rhythm.  The phase
+// resets at the start of this new stretch, so the first stitch
+// is always the long one regardless of what came before.
+color 1
+stitchlen [5, 1.5]
+
+up  setxy (0 - width) 0  seth 90  down
+fd (width * 2)
+trim
+
+stitchlen 2.5   // numeric form disengages the list and the reporter
+color 0

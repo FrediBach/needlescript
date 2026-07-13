@@ -293,6 +293,14 @@ const SECTIONS: RefSection[] = [
         desc: 'running-stitch length, clamped 0.4–12 mm (default 2.5). Alias: stitchlength',
       },
       {
+        cmd: 'stitchlen [a, b, …]',
+        desc: 'list form: stitch i of a stretch draws length pat[i % len(pat)]. Optional second arg is the start-index phase offset: stitchlen [4, 1.5] 1. Resets to pat[0] at each new pen-down run. Elements validated and clamped 0.4–12 mm at command time',
+      },
+      {
+        cmd: 'stitchlen @fn',
+        desc: 'reporter form: def fn(t, s, i, p) [ return mm ] queried once per stitch. t = arc-length from stretch start (mm); s = normalised 0..1 over the whole stretch; i = 0-based stitch index; p = hoop-space position [x, y]. Return must be > 0 (a non-positive or non-number is an error). Clamped 0.4–12 mm. Numeric stitchlen disengages. Composes with humanize / snaptogrid / warp',
+      },
+      {
         cmd: 'satin mm',
         desc: "zigzag column of this width; penetration spacing set by density. satin 0 returns to running stitch. Widths over ~8 mm tend to snag (you'll get a warning)",
       },
@@ -341,6 +349,14 @@ const SECTIONS: RefSection[] = [
       {
         cmd: 'filllen mm',
         desc: "fill stitch length, 1–7 mm; by default follows stitchlen. Set filllen to override, filllen 0 to follow stitchlen again. Rows are brick-offset so penetrations don't line up",
+      },
+      {
+        cmd: 'filllen [a, b, …]',
+        desc: 'list form: cycling length pattern applied per stitch within each fill row (each row is one stretch). Optional second arg is phase offset. filllen 0 propagates whatever stitchlen form is active. Elements clamped 1–7 mm at command time',
+      },
+      {
+        cmd: 'filllen @fn',
+        desc: 'reporter form: def fn(t, s, i, p) [ return mm ] queried per fill-row stitch. Same (t, s, i, p) signature as stitchlen @fn; t/s/i reset per row',
       },
       {
         cmd: 'fill dir @field',
@@ -403,6 +419,14 @@ const SECTIONS: RefSection[] = [
       {
         cmd: 'resample(path, mm)',
         desc: 'new path whose segments are each exactly mm long (last may be shorter); first and last points preserved. The bridge between math curves and physical stitch spacing',
+      },
+      {
+        cmd: 'resample(path, [a, b, …])',
+        desc: 'list form: cycling length pattern per segment. Optional third arg is phase offset: resample(path, [4, 1.5], 1)',
+      },
+      {
+        cmd: 'resample(path, @fn)',
+        desc: 'reporter form: def fn(t, s, i, p) [ return mm ] queried per point (p in path coordinates). Same (t, s, i, p) signature as stitchlen @fn',
       },
       { cmd: 'chaikin(path, n)', desc: 'corner-cut smoothing, n iterations 1–6' },
       {

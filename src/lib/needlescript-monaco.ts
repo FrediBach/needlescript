@@ -639,12 +639,12 @@ const NS_ITEMS: NSItem[] = [
   {
     label: 'stitchlen',
     kindName: 'function',
-    detail: 'running stitch length (mm)',
+    detail: 'running stitch length — three forms',
     documentation:
-      'Running-stitch length, clamped 0.4–12 mm (default 2.5).\n\nAlias: `stitchlength`',
+      'Running-stitch length, clamped 0.4–12 mm (default 2.5).  Alias: `stitchlength`\n\n**Three forms:**\n\n- `stitchlen 2.5` — uniform numeric (unchanged)\n- `stitchlen [4, 1.5]` — cycling list; optional phase offset: `stitchlen [4, 1.5] 1`\n- `stitchlen @fn` — reporter, queried once per stitch:  \n  `def fn(t, s, i, p) [ return mm ]`  \n  `t` = arc-length from stretch start (mm); `s` = normalised 0..1; `i` = stitch index; `p` = hoop-space `[x, y]`.  \n  Must return a positive number.  Clamped 0.4–12 mm.\n\nA numeric `stitchlen` disengages the list or reporter.',
     insertText: 'stitchlen ${1:mm}',
     isSnippet: true,
-    params: [['mm']],
+    params: [['mm'], ['[a, b, …]'], ['[a, b, …] phase'], ['@fn']],
   },
   {
     label: 'stitchlength',
@@ -739,12 +739,12 @@ const NS_ITEMS: NSItem[] = [
   {
     label: 'filllen',
     kindName: 'function',
-    detail: 'fill stitch length (mm)',
+    detail: 'fill stitch length — three forms',
     documentation:
-      "Fill stitch length, 1–7 mm. Defaults to `stitchlen`. `filllen 0` to follow `stitchlen` again. Rows are brick-offset so penetrations don't line up.",
+      'Fill stitch length.  Defaults to `stitchlen`.  `filllen 0` follows `stitchlen` again.\n\n**Three forms:**\n\n- `filllen 3` — uniform numeric (1–7 mm)\n- `filllen [3.5, 1.0]` — cycling list per row stitch; optional phase offset\n- `filllen @fn` — reporter `def fn(t, s, i, p) [ return mm ]` per fill-row stitch\n\n`filllen 0` propagates whichever form `stitchlen` currently uses.',
     insertText: 'filllen ${1:mm}',
     isSnippet: true,
-    params: [['mm']],
+    params: [['mm'], ['[a, b, …]'], ['@fn']],
   },
   {
     label: 'color',

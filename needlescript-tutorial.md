@@ -231,6 +231,8 @@ stitchlen 2        // 2 mm stitches (clamped to 0.4–12 mm; default 2.5)
 fd 40
 ```
 
+`stitchlen` also accepts a **cycling list** for rhythm patterns or a **reporter** for per-stitch control — that's covered in §23.
+
 **Satin** is the glossy, solid zigzag used for borders, lettering, and leaves. You set a _width_, and the turtle's path becomes the centre-line (spine) of a filled column:
 
 ```text
@@ -1638,7 +1640,96 @@ def adaptive(p) [
 
 ---
 
-## 23. Debugging
+## 23. Programmable stitch splitting — `stitchlen @fn` and `stitchlen [list]`
+
+`satin @fn` let you replace the column generator. `fill @fn` let you replace the fill generator. This section lets you replace the **running-stitch splitter** — the piece that decides how far apart stitches are placed as the turtle moves. Same `@name` syntax, same sticky-mode rules.
+
+`stitchlen` now accepts three forms:
+
+```text
+stitchlen 2.5              // Form 1: uniform numeric (unchanged behaviour)
+stitchlen [4, 1.5]         // Form 2: cycling list
+stitchlen @organic         // Form 3: per-stitch reporter
+stitchlen 2.5              // any numeric form disengages list or reporter
+```
+
+### The list form
+
+The simplest extension. Stitch _n_ of a stretch draws its length from `pat[n % len(pat)]` — the pattern cycles indefinitely. Starting from scratch each pen-down run means that a motif sewn four times gives four identical rhythm signatures:
+
+```text
+stitchlen [4, 1.5]         // long–short–long–short… (sashiko rhythm)
+repeat 4 [ fd 60 rt 90 ]
+trim
+
+stitchlen [3, 3, 1]        // dot–dot–dash cadence
+fd 60
+trim
+```
+
+An optional second argument is the **phase offset** — which list element to start at:
+
+```text
+stitchlen [4, 1.5] 1       // starts at 1.5 (the second element), then 4, 1.5, …
+```
+
+Validation happens at command time: an empty list or any non-numeric element is an immediate error. Out-of-range elements are clamped 0.4–12 mm.
+
+### The reporter form
+
+The reporter is called once per stitch as the splitter walks the stretch. It receives `(t, s, i, p)` — the same arc-length, normalised position, index, and **hoop-space position** as the other reporters, with one deliberate difference: the fourth slot is position, not heading. The splitter runs downstream of transforms and warps, so its world is the fabric — the right space to sample a 2-D noise field or call `coverat(p)`.
+
+The stretch is buffered before the first stitch is placed, so `s = 0..1` is well-defined: you can make true tapers from both ends.
+
+```text
+// Organic variation — noise field sampled at the hoop position
+def organic(t, s, i, p) [
+  return remap(snoise2(p[0] / 12, p[1] / 12), -1, 1, 1.4, 4.2)
+]
+stitchlen @organic
+humanize 0.25 [           // stitch lengths vary AND penetrations jitter — different axes
+  arc 360 32
+]
+trim
+
+// Taper — fine at both ends, coarse in the middle
+def taper(t, s, i, p) [
+  return lerp(1, 4.5, sin(s * 180))
+]
+stitchlen @taper
+fd 70
+trim
+```
+
+The reporter must return a positive number. A non-positive return, a non-number, or a reporter that may not return on all paths are all line-numbered errors — the same rules as `satin @fn`. The return is clamped to the machine-safe 0.4–12 mm band with a one-time warning. Identical to `warp` and `satin @fn`: the splitter itself draws nothing from the seeded stream, so `snoise2`-driven stitch lengths are fully reproducible.
+
+### `filllen` gets the same three forms
+
+`filllen` gains the identical trio: `filllen 3`, `filllen [3, 1.5]`, `filllen @fn`. Scope is the fill row — each row is one stretch, and `t`/`s`/`i` reset per row. The clamp band is 1–7 mm. `filllen 0` propagates whichever `stitchlen` form is currently active.
+
+```text
+filllen [3.5, 1.0]         // alternating long/short gives an over-under texture in tatami
+beginfill
+  repeat 4 [ fd 40 rt 90 ]
+endfill
+```
+
+### `resample` data-space companions
+
+`resample(path, mm)` already bridges math-space curves to stitch spacing. It gains the same overloads for data-space work:
+
+```text
+resample(path, [4, 1.5])   // cycling pattern, optional third arg is phase offset
+resample(path, @fn)        // per-point reporter — (t, s, i, p) in path coordinates
+```
+
+These are the answer to "my stitchlen reporter won't affect `trace`": capture the spine first, resample it programmably, then `sewpath` the result.
+
+(See the bundled **kantha bands** example — all three forms of `stitchlen` and the `filllen` list in one design, inspired by the uneven hand stitching of kantha quilts.)
+
+---
+
+## 24. Debugging
 
 Generative designs surprise you. These tools tell you what actually happened.
 
@@ -1681,7 +1772,7 @@ assert(len(pieces) > 0, concat('clip empty at tile ', str(i)))
 
 ---
 
-## 24. Safety limits
+## 25. Safety limits
 
 NeedleScript's limits fall into three distinct categories with different policies.
 
@@ -1721,7 +1812,7 @@ These protect the browser tab and catch runaway programs early. They can be rais
 
 ---
 
-## 25. Exporting and reusing your work
+## 26. Exporting and reusing your work
 
 When a design is ready, **Download .DST** produces a standard Tajima file: 3-byte ternary delta records, moves longer than 12.1 mm split automatically, colour changes as stop records, trims as triple jumps, and a correct 512-byte header. Load it onto any machine, or into commercial software for a final check.
 
@@ -1729,7 +1820,7 @@ You can also bring artwork _in_: **Import SVG** (a button, or drag and drop) con
 
 ---
 
-## 26. Sewing gotchas: where artefacts come from
+## 27. Sewing gotchas: where artefacts come from
 
 NeedleScript's promise is that what you preview is what the machine sews. The flip side of that honesty is that when something strange appears on the stage — a phantom wedge, an unfilled sliver, a gap in an outline, a loose thread across the hoop — it is almost never a rendering bug. It is geometry you asked for without noticing.
 
@@ -1874,7 +1965,7 @@ None of these are workarounds — they are the two worlds' border crossings, mad
 
 ---
 
-## 27. A capstone project
+## 28. A capstone project
 
 Let's combine what you've learned into one piece that exercises the whole pipeline: a generative seeded "meadow" of stems that grow along a noise field, each topped with a small satin leaf, all sitting on stable fabric.
 
@@ -1932,7 +2023,7 @@ Happy stitching.
 
 ---
 
-## 28. Two Worlds
+## 29. Two Worlds
 
 Sewing or data world? Does a command emit stitches or only data values?
 
@@ -1991,7 +2082,7 @@ Neither world — control flow and structure: `repeat`, `while`, `for` (all spel
 
 ---
 
-## 29. AI generation assistant
+## 30. AI generation assistant
 
 The REPL doubles as an AI interface. Any line starting with `/ai` is intercepted and dispatched to a language model of your choice via [OpenRouter](https://openrouter.ai), rather than being appended to the editor. The model receives the full NeedleScript language reference as its system prompt, along with your current code and any compile errors, and its output lands directly in the editor and runs.
 

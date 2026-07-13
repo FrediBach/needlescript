@@ -706,7 +706,7 @@ These commands switch between the stitch families from the [primer](#how-embroid
 
 | Command                         | Effect                                                                                                                                                                                                                                                                            |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stitchlen mm` (`stitchlength`) | running-stitch length, clamped to 0.4–12 mm (default **2.5**)                                                                                                                                                                                                                     |
+| `stitchlen mm` (`stitchlength`) | running-stitch length, clamped to 0.4–12 mm (default **2.5**). **Three forms:** `stitchlen 2.5` (numeric, uniform), `stitchlen [4, 1.5]` (list, cycling long–short pattern), `stitchlen @fn` (reporter, per-stitch callback) — see _Programmable stitch splitting_ below          |
 | `satin mm`                      | zigzag column of this width; penetration spacing set by `density`. `satin 0` returns to running stitch. Widths over ~8 mm tend to snag (you'll get a warning). `satin @fn` instead drives the column from a **shape reporter** you write — see _Programmable satin columns_ below |
 | `density mm`                    | satin penetration spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                                                                                            |
 | `bean n`                        | bold line: each stitch sewn _n_ times (forced odd, max 9). `bean 1` off                                                                                                                                                                                                           |
@@ -728,13 +728,13 @@ beginfill
 endfill
 ```
 
-| Command                                   | Effect                                                                                                                                                                                                             |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `beginfill … endfill`                     | moves between them trace a **boundary** instead of sewing; `endfill` sews a tatami fill of the enclosed area. A pen-up move (`up … down`) starts a new ring — inner rings become **holes** (even-odd rule)         |
-| `fillangle deg`                           | direction of the fill rows (default 0)                                                                                                                                                                             |
-| `fillspacing mm`                          | row spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                                           |
-| `filllen mm`                              | fill stitch length, 1–7 mm. By default the fill follows `stitchlen`; set `filllen` to override, `filllen 0` to follow again. Rows are brick-offset so penetrations don't line up                                   |
-| `fill dir @field` / `fill shape @texture` | arms a **programmable fill** for the next `beginfill … endfill`: a reporter drives the row direction (a contour / grain / flow fill) and/or the per-row spacing, length and brick — see _Programmable fills_ below |
+| Command                                   | Effect                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `beginfill … endfill`                     | moves between them trace a **boundary** instead of sewing; `endfill` sews a tatami fill of the enclosed area. A pen-up move (`up … down`) starts a new ring — inner rings become **holes** (even-odd rule)                                                                                              |
+| `fillangle deg`                           | direction of the fill rows (default 0)                                                                                                                                                                                                                                                                  |
+| `fillspacing mm`                          | row spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                                                                                                                                |
+| `filllen mm`                              | fill stitch length, 1–7 mm. By default the fill follows `stitchlen`; set `filllen` to override, `filllen 0` to follow again. Rows are brick-offset so penetrations don't line up. **Three forms:** `filllen 3` (numeric), `filllen [3, 1.5]` (list, repeating rhythm per row), `filllen @fn` (reporter) |
+| `fill dir @field` / `fill shape @texture` | arms a **programmable fill** for the next `beginfill … endfill`: a reporter drives the row direction (a contour / grain / flow fill) and/or the per-row spacing, length and brick — see _Programmable fills_ below                                                                                      |
 
 ## Generative math
 
@@ -819,19 +819,19 @@ for h in hlines [
 
 ### Paths & curves
 
-| Function                                            | Returns                                                                                                                                                                 |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pathlen(path)`                                     | total polyline length                                                                                                                                                   |
-| `resample(path, mm)`                                | new path whose segments are each exactly _mm_ long (the last may be shorter), first & last preserved — the bridge between math-space curves and physical stitch spacing |
-| `chaikin(path, n)`                                  | corner-cut smoothing, _n_ iterations 1–6                                                                                                                                |
-| `catmull(points, mm)`                               | Catmull-Rom spline through the control points, resampled                                                                                                                |
-| `bezier(p0, c0, c1, p1, mm)`                        | cubic Bézier, resampled                                                                                                                                                 |
-| `centroid(path)` · `bbox(path)`                     | point · `[minx, miny, maxx, maxy]`                                                                                                                                      |
-| `xlate(path, dx, dy)`                               | new path, translated — the functional twin of `translate`                                                                                                               |
-| `xrotate(path, deg)` · `xrotate(path, deg, cx, cy)` | new path, rotated clockwise (optional pivot) — twin of `rotate`/`rotateabout`                                                                                           |
-| `xscale(path, s)` · `xscale(path, sx, sy)`          | new path, scaled uniformly or per-axis — twin of `scale`/`scalexy`                                                                                                      |
-| `xmirror(path, deg)`                                | new path, reflected across heading _deg_ — twin of `mirror`                                                                                                             |
-| `sewpath(path)`                                     | **command**: exactly `for p in path [ setpos(p) ]` — pen state, stitch mode, satin and auto-split all apply as if hand-walked                                           |
+| Function                                            | Returns                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pathlen(path)`                                     | total polyline length                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `resample(path, mm)`                                | new path whose segments are each exactly _mm_ long (the last may be shorter), first & last preserved — the bridge between math-space curves and physical stitch spacing. **List form:** `resample(path, [4, 1.5])` — cycling length pattern; optional third arg is the start-index phase offset. **Reporter form:** `resample(path, @fn)` — per-point reporter with the same `(t, s, i, p)` signature as `stitchlen @fn` |
+| `chaikin(path, n)`                                  | corner-cut smoothing, _n_ iterations 1–6                                                                                                                                                                                                                                                                                                                                                                                 |
+| `catmull(points, mm)`                               | Catmull-Rom spline through the control points, resampled                                                                                                                                                                                                                                                                                                                                                                 |
+| `bezier(p0, c0, c1, p1, mm)`                        | cubic Bézier, resampled                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `centroid(path)` · `bbox(path)`                     | point · `[minx, miny, maxx, maxy]`                                                                                                                                                                                                                                                                                                                                                                                       |
+| `xlate(path, dx, dy)`                               | new path, translated — the functional twin of `translate`                                                                                                                                                                                                                                                                                                                                                                |
+| `xrotate(path, deg)` · `xrotate(path, deg, cx, cy)` | new path, rotated clockwise (optional pivot) — twin of `rotate`/`rotateabout`                                                                                                                                                                                                                                                                                                                                            |
+| `xscale(path, s)` · `xscale(path, sx, sy)`          | new path, scaled uniformly or per-axis — twin of `scale`/`scalexy`                                                                                                                                                                                                                                                                                                                                                       |
+| `xmirror(path, deg)`                                | new path, reflected across heading _deg_ — twin of `mirror`                                                                                                                                                                                                                                                                                                                                                              |
+| `sewpath(path)`                                     | **command**: exactly `for p in path [ setpos(p) ]` — pen state, stitch mode, satin and auto-split all apply as if hand-walked                                                                                                                                                                                                                                                                                            |
 
 ### Generators (seeded)
 
@@ -1398,7 +1398,71 @@ beginfill repeat 4 [ fd 50 rt 90 ] endfill
 
 (See the bundled **custom fill** example — a contour swirl, a noise flow field, a graded-density fill, an adaptive fill that thins where it's already covered, and a curved grain with both channels, side by side.)
 
-### Local density — `maxdensity n` + heatmap
+### Programmable stitch splitting — `stitchlen @fn` and `stitchlen [list]`
+
+Where the two reporters above replace column and fill _generators_, these two forms replace the **running-stitch splitter itself** — the component that decides how far apart stitches are placed as the turtle walks. Like `satin @fn`, the extension is a sticky mode command (not a block), and like every stitch-mode command it applies to all pen-down travel until the next `stitchlen`.
+
+`stitchlen` now accepts three forms:
+
+```text
+stitchlen 2.5              // Form 1: uniform numeric (unchanged)
+stitchlen [4, 1.5]         // Form 2: cycling list — sashiko long–short rhythm
+stitchlen [4, 1.5] 1       // Form 2 with phase offset — start at index 1
+stitchlen @organic         // Form 3: reporter — per-stitch callback
+stitchlen 2.5              // numeric form disengages list or reporter
+```
+
+**Form 2 — the pattern list.** Stitch _i_ of a stretch requests `pat[i % len(pat)]`. The phase offset (optional second argument) shifts the starting index. The list is snapshot-copied at command time so mutating the source variable afterwards has no effect. The phase resets to `pat[0]` at every new pen-down stretch — a motif stamped four times sews four identical rhythms.
+
+```text
+stitchlen [4, 1.5]         // sashiko: long, short, long, short…
+repeat 4 [ fd 60 rt 90 ]   // each side is its own stretch; phase resets at each up/down
+trim
+```
+
+Validation is strict and eager: an empty list, a non-numeric element, or a nested list is a line-numbered error at command time. Out-of-range elements are clamped 0.4–12 mm with the standard clamp warning.
+
+**Form 3 — the reporter.** The reporter is called once per stitch as the splitter walks the stretch, and returns one number (the advance in mm):
+
+| Input | Unit | Meaning                                                                                                                                           |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `t`   | mm   | cursor arc-length from the stretch start — real mm, so spatial rhythms don't rescale with stretch length                                          |
+| `s`   | 0..1 | normalized position over the whole stretch (the stretch is buffered before splitting, so the total length is known — use it for tapers and fades) |
+| `i`   | —    | 0-based stitch index for this stretch                                                                                                             |
+| `p`   | mm   | cursor hoop-space position `[x, y]` — the point this stitch starts from                                                                           |
+
+The fourth slot is `p` (hoop position) rather than a heading: the splitter runs downstream of transforms and warp, so its world is the physical fabric — exactly the right space to sample a 2-D noise field or call `coverat(p)`.
+
+```text
+def organic(t, s, i, p) [
+  return remap(snoise2(p[0] / 12, p[1] / 12), -1, 1, 1.4, 4.2)
+]
+stitchlen @organic
+humanize 0.25 [           // stitch lengths vary AND penetrations jitter — different axes
+  arc 360 32
+]
+trim
+
+def taper(t, s, i, p) [   // fine at both ends, coarse in the middle
+  return lerp(1, 4.5, sin(s * 180))
+]
+stitchlen @taper
+fd 70
+trim
+```
+
+Return-value contract: a non-positive return is a line-numbered error (same rule as satin's `advance`); a non-number or NaN is also a line-numbered error; values outside 0.4–12 mm are clamped with a one-time warning. A reporter that may finish without `return`ing on some path is caught at **parse time** (existing reporter-path check). The reporter runs with identity CTM, so `coverat(p)` inside it treats `p` as hoop-space and reads the right grid cell.
+
+**`filllen` gains the same three forms** (`filllen 3`, `filllen [3, 1.5]`, `filllen @fn`), scoped to fill rows: each fill row is one stretch, and `t`/`s`/`i` reset per row. `filllen 0` ("follow `stitchlen`") propagates whichever form `stitchlen` is currently using. The clamp band is 1–7 mm (the fill-safe range). Example — alternating long/short creates an over-under woven texture in tatami:
+
+```text
+filllen [3.5, 1.0]
+beginfill
+  repeat 4 [ fd 40 rt 90 ]
+endfill
+```
+
+**`resample` gains matching overloads** (`resample(path, mm)`, `resample(path, [4, 1.5])`, `resample(path, [4, 1.5], phase)`, `resample(path, @fn)`). These are the data-space companions: if you need programmable spacing on a captured spine, `resample(path, @fn)` applies the same `(t, s, i, p)` reporter in path coordinates and returns the result as a new path you can `sewpath`. (See the bundled **kantha bands** example for all three forms in one design.)
 
 The physical quantity that matters is **thread coverage**: millimetres of thread per mm² of fabric, expressed in _layers_ — one layer is a clean satin column or tatami fill. Past ~2.5–3.5 layers (fabric-dependent) embroidery stops being fabric: needles deflect, thread breaks, the patch puckers. Every run computes a 1 mm coverage grid (deliberate tie-off micro stitches are excluded so thread ends don't read as false hotspots). Hotspots above the limit produce warnings **with coordinates and the source lines that caused them**, and repeated penetrations in the same hole (≥ 5 within 0.15 mm — fabric-cutting territory) are flagged separately. The stage has a heatmap toggle (orange from ~1.2 layers, red from 3); the stats row shows the peak. `maxdensity n` tunes the threshold (default 3.5), `maxdensity 0` silences it. Some constructions legitimately run hot — a satin border over a fill edge measures ~4 layers — and the right move is to raise the limit _knowingly_, as the bundled _patch_ example does.
 

@@ -144,7 +144,17 @@ Reporters: xcor, ycor, heading, pos() → [x,y], distance(x,y), towards(x,y)
 
 ## Stitch types
 
-stitchlen n — set stitch length (0.4–12 mm, default 2.5)
+stitchlen n — set stitch length, 0.4–12 mm, default 2.5
+
+// Three forms of stitchlen (sticky mode, applies until the next stitchlen):
+stitchlen 2.5 — Form 1: uniform numeric (unchanged)
+stitchlen [4, 1.5] — Form 2: cycling list; stitchlen [4, 1.5] 1 adds a phase offset
+stitchlen @fn — Form 3: reporter fn(t, s, i, p) returns one mm value per stitch
+t=arc-length from stretch start (mm), s=normalised 0..1,
+i=0-based stitch index, p=[x,y] in hoop space.
+Reporter must return a positive number; non-positive is an error.
+Use any numeric stitchlen to disengage list/reporter: stitchlen 2.5
+
 satin n — satin column n mm wide (n=0 for off). Width 2–8 mm recommended.
 bean n — bean stitch: each stitch sewn n times (1=off, max 9)
 estitch n — blanket stitch prongs n mm (0=off)
@@ -161,6 +171,14 @@ lock n — tie-in/tie-off size (0.3–1.5 mm; lock 0 disables; default on)
 fillangle deg — fill row direction (default 0)
 fillspacing mm — row spacing (0.25–5 mm, default 0.4)
 filllen mm — stitch length within fill (filllen 0 = follow stitchlen)
+
+// filllen also has three forms, same as stitchlen, clamp band 1–7 mm:
+filllen 3 — numeric
+filllen [3.5, 1.0] — cycling list (alternating lengths → woven texture)
+filllen [3.5, 1.0] 1 — list with phase offset
+filllen @fn — reporter fn(t, s, i, p) per fill-row stitch
+filllen 0 — follow stitchlen (propagates whatever form stitchlen uses)
+
 beginfill — start tracing fill boundary
 endfill — close and lay down fill
 // Holes: a pen-up move inside beginfill/endfill starts an inner ring (becomes a hole by even-odd rule)
@@ -247,6 +265,8 @@ nearestonpath(p,path) — closest point on an open polyline to p; O(len(path))
 ## Paths and curves (call-syntax only)
 
 resample(path, mm) — evenly-spaced path (bridges math and stitch space)
+resample(path, [4, 1.5]) — cycling list pattern; optional third arg is phase offset
+resample(path, @fn) — reporter fn(t, s, i, p) per point (p in path coordinates)
 chaikin(path, n) — corner-cutting smoothing (1–6 passes)
 catmull(points, mm) — Catmull-Rom spline, resampled
 bezier(p0,c0,c1,p1,mm) — cubic Bézier, resampled
