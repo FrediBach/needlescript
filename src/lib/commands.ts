@@ -18,6 +18,18 @@ export const ALIASES: Record<string, string> = {
   jump: 'moveto', // embroiderer term for a non-sewing travel
 };
 
+/**
+ * Commands that accept one required argument plus one optional trailing argument.
+ * The value is the count of optional extras (currently always 1).
+ * Both prefix form `cmd arg [opt]` and glued-call form `cmd(arg[, opt])` are
+ * handled. The optional arg is consumed only when the next token is an
+ * unambiguous expression start (number, variable, list, paren, @-ref, string).
+ */
+export const BUILTIN_ARITY_OPT: Record<string, number> = {
+  stitchlen: 1, // optional phase offset for the list form: stitchlen [4, 1.5] 1
+  filllen: 1, // optional phase offset for the list form: filllen [3, 1.5] 1
+};
+
 export const BUILTIN_ARITY: Record<string, number> = {
   fd: 1,
   bk: 1,
@@ -250,7 +262,7 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   nearestonpath: { min: 2, max: 2 },
   // §4.4 paths & curves
   pathlen: { min: 1, max: 1 },
-  resample: { min: 2, max: 2 },
+  resample: { min: 2, max: 3 }, // resample(path, mm) | resample(path, [pat]) | resample(path, [pat], phase) | resample(path, @fn)
   chaikin: { min: 2, max: 2 },
   catmull: { min: 2, max: 2 },
   bezier: { min: 5, max: 5 },

@@ -236,7 +236,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'traceman',
       'trace regions',
       'bars',
-      'fermat'
+      'fermat',
     ],
   },
   {

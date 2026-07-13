@@ -276,7 +276,136 @@ export function resample(path: Pt[], spacing: number, maxPoints: number, line?: 
   return out;
 }
 
-/** Chaikin corner-cutting, n iterations (1–6). Endpoints preserved. */
+/**
+ * Resample with a cycling length pattern (list form). Each output segment
+ * cycles through `pattern[i % len]` starting from `phase`. First and last
+ * input vertices are always preserved. The `phase` is the 0-based start index
+ * into the pattern (modulo pattern length).
+ */
+export function resampleList(
+  path: Pt[],
+  pattern: number[],
+  phase: number,
+  maxPoints: number,
+  line?: number,
+): Pt[] {
+  if (!pattern.length)
+    throw new NeedlescriptError('resample: pattern list must not be empty', line);
+  // Validate all pattern elements are positive.
+  for (let k = 0; k < pattern.length; k++) {
+    if (!(pattern[k] > 0))
+      throw new NeedlescriptError(`resample: pattern element ${k} must be greater than 0`, line);
+  }
+  const total = pathlen(path);
+  const avgSpacing = total / Math.max(pattern.reduce((s, v) => s + v, 0) / pattern.length, 1e-6);
+  if (avgSpacing + 2 > maxPoints)
+    throw new NeedlescriptError(
+      `List too long (resample would produce over ${maxPoints.toLocaleString('en-US')} points)`,
+      line,
+    );
+
+  const n = pattern.length;
+  const normPhase = ((Math.round(phase) % n) + n) % n;
+  const out: Pt[] = [[path[0][0], path[0][1]]];
+  let cur: Pt = out[0];
+  let i = 0; // segment index
+  let segStart: Pt = path[0];
+  let cycleIdx = 0; // pattern cycle index
+
+  while (i < path.length - 1) {
+    const spacing = pattern[(cycleIdx + normPhase) % n];
+    const a = segStart,
+      b = path[i + 1];
+    const dx = b[0] - a[0],
+      dy = b[1] - a[1];
+    const A = dx * dx + dy * dy;
+    if (A === 0) {
+      i++;
+      segStart = path[i];
+      continue;
+    }
+    const fx = a[0] - cur[0],
+      fy = a[1] - cur[1];
+    const B = 2 * (fx * dx + fy * dy);
+    const C = fx * fx + fy * fy - spacing * spacing;
+    const disc = B * B - 4 * A * C;
+    const t = disc >= 0 ? (-B + Math.sqrt(disc)) / (2 * A) : -1;
+    if (t >= 0 && t <= 1) {
+      const p: Pt = [a[0] + dx * t, a[1] + dy * t];
+      out.push(p);
+      cur = p;
+      segStart = p;
+      cycleIdx++;
+    } else {
+      i++;
+      segStart = path[i];
+    }
+  }
+  const last = path[path.length - 1];
+  if (vdist(cur, last) > 1e-9) out.push([last[0], last[1]]);
+  return out;
+}
+
+/**
+ * Resample with a per-point reporter (reporter form). The reporter receives
+ * (t, s, i, p) — arc-length cursor, normalised position, stitch index, and
+ * the cursor's position — and returns the desired spacing for the next step.
+ * First and last input vertices are always preserved.
+ */
+export function resampleReporter(
+  path: Pt[],
+  reporter: (t: number, s: number, i: number, p: Pt) => number,
+  maxPoints: number,
+  line?: number,
+): Pt[] {
+  const total = pathlen(path);
+  if (!(total > 0)) return path.length ? [[path[0][0], path[0][1]]] : [];
+
+  // Cumulative arc length.
+  const cum: number[] = [0];
+  for (let k = 1; k < path.length; k++) cum.push(cum[k - 1] + vdist(path[k - 1], path[k]));
+  const L = cum[cum.length - 1];
+
+  const at = (t: number): Pt => {
+    const a = Math.min(Math.max(t, 0), L);
+    let seg = 1;
+    while (seg < path.length - 1 && cum[seg] < a) seg++;
+    const segLen = cum[seg] - cum[seg - 1] || 1;
+    const f = (a - cum[seg - 1]) / segLen;
+    return [
+      path[seg - 1][0] + (path[seg][0] - path[seg - 1][0]) * f,
+      path[seg - 1][1] + (path[seg][1] - path[seg - 1][1]) * f,
+    ] as Pt;
+  };
+
+  const out: Pt[] = [[path[0][0], path[0][1]]];
+  let cursor = 0;
+  let stitchIdx = 0;
+  const guardMax = Math.ceil(L / 0.01) + path.length + 10;
+  let guard = 0;
+
+  while (cursor < L - 1e-9 && guard++ < guardMax) {
+    const p = at(cursor);
+    const rawSpacing = reporter(cursor, cursor / L, stitchIdx, p);
+    if (typeof rawSpacing !== 'number' || !isFinite(rawSpacing) || rawSpacing <= 0)
+      throw new NeedlescriptError(
+        'resample reporter must return a positive finite number, got ' + rawSpacing,
+        line,
+      );
+    cursor = Math.min(cursor + rawSpacing, L);
+    out.push(at(cursor));
+    stitchIdx++;
+    if (out.length > maxPoints)
+      throw new NeedlescriptError(
+        `List too long (resample reporter would produce over ${maxPoints.toLocaleString('en-US')} points)`,
+        line,
+      );
+  }
+  const last = path[path.length - 1];
+  const outLast = out[out.length - 1];
+  if (vdist(outLast, last) > 1e-9) out.push([last[0], last[1]]);
+  return out;
+}
 export function chaikin(path: Pt[], n: number): Pt[] {
   let pts = path;
   for (let k = 0; k < n; k++) {

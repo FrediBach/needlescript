@@ -773,8 +773,43 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         tickN(p.length, line);
         return gm.pathlen(p);
       }
-      case 'resample':
-        return path(gm.resample(pathArg(0), sc(1), m.effectiveLimits.maxListLen, line));
+      case 'resample': {
+        const pts = pathArg(0);
+        const spec = args[1];
+        if (isFuncRef(spec)) {
+          // Reporter form: resample(path, @fn)  [phase ignored]
+          const ref = spec;
+          // Arity check: the reporter must take 4 params (t, s, i, p)
+          applyStitchLenReporterArity(ref, line);
+          tickN(pts.length * 4, line);
+          return path(
+            gm.resampleReporter(
+              pts,
+              (t, s, i, p) => applyStitchLenReporter(ref, t, s, i, p, line),
+              m.effectiveLimits.maxListLen,
+              line,
+            ),
+          );
+        }
+        if (isList(spec)) {
+          // List form: resample(path, [pat])  or  resample(path, [pat], phase)
+          if (spec.items.length === 0)
+            throw new NeedlescriptError('resample: pattern list must not be empty', line);
+          const patRaw: number[] = spec.items.map((el, idx) => {
+            if (typeof el !== 'number' || isList(el))
+              throw new NeedlescriptError(
+                `resample: pattern element ${idx} must be a number, got ${describeVal(el)}`,
+                line,
+              );
+            return el as number;
+          });
+          const phase = args.length > 2 ? Math.round(sc(2)) : 0;
+          tickN(pts.length * 4, line);
+          return path(gm.resampleList(pts, patRaw, phase, m.effectiveLimits.maxListLen, line));
+        }
+        // Numeric form (unchanged)
+        return path(gm.resample(pts, sc(1), m.effectiveLimits.maxListLen, line));
+      }
       case 'chaikin': {
         const p = pathArg(0);
         const want = Math.round(sc(1));
@@ -1579,6 +1614,101 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     return [r[0], r[1], r[2], r[3], r[4]];
   }
 
+  // ---- Programmable stitchlen reporter (`stitchlen @fn`, §5) ----------
+  //
+  // Same two-phase posture as satin: eager arity check at the engage site,
+  // then a per-stitch return-value check. The reporter takes (t, s, i, p) and
+  // returns a single number (the advance in mm). Inputs are: t = arc-length from
+  // stretch start (mm), s = normalised 0..1, i = stitch index, p = hoop-space [x, y].
+  // The reporter runs with identity CTM (set by _splitBufferedStretch) so that
+  // coverat(p) calls inside it treat p as hoop-space.
+
+  function applyStitchLenReporterArity(ref: FuncRef, line?: number) {
+    const proc = procs[ref.name];
+    if (!proc)
+      throw new NeedlescriptError(`the stitchlen reporter @${ref.name} is not defined`, line);
+    if (proc.params.length !== 4)
+      throw new NeedlescriptError(
+        `the stitchlen reporter @${ref.name} must take exactly 4 parameters (t, s, i, p), but takes ${proc.params.length}`,
+        line,
+      );
+  }
+
+  /** Invoke a stitchlen reporter once; validates and returns the advance (mm). */
+  function applyStitchLenReporter(
+    ref: FuncRef,
+    t: number,
+    s: number,
+    i: number,
+    p: [number, number],
+    line?: number,
+  ): number {
+    const proc = procs[ref.name];
+    if (!proc)
+      throw new NeedlescriptError(`the stitchlen reporter @${ref.name} is not defined`, line);
+    const out = callProcVals(ref.name, [t, s, i, allocList([p[0], p[1]], line)], 0, line);
+    if (out === undefined)
+      throw new NeedlescriptError(
+        `the stitchlen reporter @${ref.name} never reached output/return — it must return a number (mm)`,
+        line,
+      );
+    if (typeof out !== 'number' || !isFinite(out))
+      throw new NeedlescriptError(
+        `the stitchlen reporter @${ref.name} must return a finite number (mm advance), got ${describeVal(out)}`,
+        line,
+      );
+    if (out <= 0)
+      throw new NeedlescriptError(
+        `the stitchlen reporter @${ref.name} returned ${formatNum(out)} — advance must be greater than 0 (a non-positive advance never terminates)`,
+        line,
+      );
+    return out;
+  }
+
+  // ---- Programmable fill rows — stitchlen equivalent (`filllen @fn`) ----------
+
+  function applyFillLenReporterArity(ref: FuncRef, line?: number) {
+    const proc = procs[ref.name];
+    if (!proc)
+      throw new NeedlescriptError(`the filllen reporter @${ref.name} is not defined`, line);
+    if (proc.params.length !== 4)
+      throw new NeedlescriptError(
+        `the filllen reporter @${ref.name} must take exactly 4 parameters (t, s, i, p), but takes ${proc.params.length}`,
+        line,
+      );
+  }
+
+  /** Invoke a filllen reporter once; validates and returns the requested advance (mm). */
+  function applyFillLenReporter(
+    ref: FuncRef,
+    t: number,
+    s: number,
+    i: number,
+    p: [number, number],
+    line?: number,
+  ): number {
+    const proc = procs[ref.name];
+    if (!proc)
+      throw new NeedlescriptError(`the filllen reporter @${ref.name} is not defined`, line);
+    const out = callProcVals(ref.name, [t, s, i, allocList([p[0], p[1]], line)], 0, line);
+    if (out === undefined)
+      throw new NeedlescriptError(
+        `the filllen reporter @${ref.name} never reached output/return — it must return a number (mm)`,
+        line,
+      );
+    if (typeof out !== 'number' || !isFinite(out))
+      throw new NeedlescriptError(
+        `the filllen reporter @${ref.name} must return a finite number (mm advance), got ${describeVal(out)}`,
+        line,
+      );
+    if (out <= 0)
+      throw new NeedlescriptError(
+        `the filllen reporter @${ref.name} returned ${formatNum(out)} — advance must be greater than 0`,
+        line,
+      );
+    return out;
+  }
+
   // ---- Programmable fill reporters (`fill dir @d shape @s`, §3) ----------
   // Same two-phase posture as satin: an eager arity check at the arming site,
   // then a per-sample return-value check. Every violation is a loud,
@@ -2230,6 +2360,84 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           }
           return;
         }
+        // `stitchlen [list]` — list-cycling form (§4). Optional second arg is the
+        // phase offset (start index).
+        // `stitchlen @fn` — reporter form (§5). Buffered: travel() accumulates
+        // the spine and flushRunningStitch() splits it at stretch end.
+        if (st.name === 'stitchlen' && (isFuncRef(vals[0]) || isList(vals[0]))) {
+          traceNote('stitchlen', 'note: stitchlen inside trace has no effect on the captured path');
+          m.flushSatin(); // flushes running-stitch buffer too
+          if (isFuncRef(vals[0])) {
+            // Reporter form
+            const ref = vals[0];
+            applyStitchLenReporterArity(ref, st.line);
+            m.stitchLenList = null;
+            m.stitchLenListPhase = 0;
+            m.stitchLenReporter = (t, s, i, p) => applyStitchLenReporter(ref, t, s, i, p, st.line);
+          } else {
+            // List form — validate elements
+            const raw = vals[0];
+            if (raw.items.length === 0)
+              throw new NeedlescriptError('stitchlen list must not be empty', st.line);
+            const clamped: number[] = raw.items.map((el, idx) => {
+              if (typeof el !== 'number' || isList(el))
+                throw new NeedlescriptError(
+                  `stitchlen list element ${idx} must be a number, got ${describeVal(el)}`,
+                  st.line,
+                );
+              const v = el as number;
+              if (v < LIMITS.minStitch || v > LIMITS.maxStitch)
+                m.warnings.push(
+                  `stitchlen list element ${idx} (${v}) clamped to ${Math.min(Math.max(v, LIMITS.minStitch), LIMITS.maxStitch)} mm`,
+                );
+              return Math.min(Math.max(v, LIMITS.minStitch), LIMITS.maxStitch);
+            });
+            const phase = vals.length > 1 ? Math.round(num(vals[1], 'stitchlen', st.line)) : 0;
+            m.stitchLenReporter = null;
+            m.stitchLenList = clamped; // snapshot at command time
+            m.stitchLenListPhase = ((phase % clamped.length) + clamped.length) % clamped.length;
+          }
+          m.stitchLenStretchStart = true;
+          m.stitchLenStretchIndex = 0;
+          return;
+        }
+        // `filllen [list]` / `filllen @fn` — list-cycling and reporter forms.
+        if (st.name === 'filllen' && (isFuncRef(vals[0]) || isList(vals[0]))) {
+          traceNote('filllen', 'note: filllen inside trace has no effect on the captured path');
+          if (isFuncRef(vals[0])) {
+            const ref = vals[0];
+            applyFillLenReporterArity(ref, st.line);
+            m.fillLenList = null;
+            m.fillLenListPhase = 0;
+            m.fillLen = null; // disengage numeric form
+            m.fillLenReporter = (t, s, i, p) => applyFillLenReporter(ref, t, s, i, p, st.line);
+          } else {
+            const raw = vals[0];
+            if (raw.items.length === 0)
+              throw new NeedlescriptError('filllen list must not be empty', st.line);
+            const FILL_MIN = 1,
+              FILL_MAX = 7;
+            const clamped: number[] = raw.items.map((el, idx) => {
+              if (typeof el !== 'number' || isList(el))
+                throw new NeedlescriptError(
+                  `filllen list element ${idx} must be a number, got ${describeVal(el)}`,
+                  st.line,
+                );
+              const v = el as number;
+              if (v < FILL_MIN || v > FILL_MAX)
+                m.warnings.push(
+                  `filllen list element ${idx} (${v}) clamped to ${Math.min(Math.max(v, FILL_MIN), FILL_MAX)} mm`,
+                );
+              return Math.min(Math.max(v, FILL_MIN), FILL_MAX);
+            });
+            const phase = vals.length > 1 ? Math.round(num(vals[1], 'filllen', st.line)) : 0;
+            m.fillLenReporter = null;
+            m.fillLen = null; // disengage numeric form
+            m.fillLenList = clamped;
+            m.fillLenListPhase = ((phase % clamped.length) + clamped.length) % clamped.length;
+          }
+          return;
+        }
         // String-argument mode commands — handled before the bulk num() conversion.
         if (st.name === 'fabric' || st.name === 'underlay' || st.name === 'fillunderlay') {
           traceNote(st.name, `note: ${st.name} inside trace has no effect on the captured path`);
@@ -2533,6 +2741,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
               'stitchlen',
               'note: stitchlen inside trace has no effect on the captured path',
             );
+            // Numeric form: disengage list/reporter and set plain length.
+            m.flushSatin(); // also flushes running-stitch buffer
+            m.stitchLenList = null;
+            m.stitchLenListPhase = 0;
+            m.stitchLenReporter = null;
             const v = a[0];
             if (v < LIMITS.minStitch || v > LIMITS.maxStitch)
               m.warnings.push(
@@ -2630,8 +2843,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
           }
           case 'filllen': {
             traceNote('filllen', 'note: filllen inside trace has no effect on the captured path');
+            // Numeric form: disengage list/reporter forms.
+            m.fillLenList = null;
+            m.fillLenListPhase = 0;
+            m.fillLenReporter = null;
             if (a[0] <= 0) {
-              m.fillLen = null;
+              m.fillLen = null; // 0 = "follow stitchlen"
               return;
             }
             const v = Math.min(Math.max(a[0], 1), 7);

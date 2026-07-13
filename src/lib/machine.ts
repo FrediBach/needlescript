@@ -101,6 +101,17 @@ interface MachineSnapshot {
   heading: number;
   penDown: boolean;
   stitchLen: number;
+  // Extended stitchlen forms (list / reporter)
+  stitchLenList: number[] | null;
+  stitchLenListPhase: number;
+  stitchLenStretchIndex: number;
+  stitchLenStretchStart: boolean;
+  stitchLenReporter: ((t: number, s: number, i: number, p: [number, number]) => number) | null;
+  // Running-stitch buffer (reporter buffered mode)
+  runBuffer: { x: number; y: number }[] | null;
+  runBufferCTM: Mat;
+  runBufferLayers: OutLayer[];
+  runBufferHasWarp: boolean;
   mode: 'run' | 'satin' | 'estitch';
   satinWidth: number;
   satinSpacing: number;
@@ -110,6 +121,10 @@ interface MachineSnapshot {
   fillAngle: number;
   fillSpacing: number;
   fillLen: number | null;
+  // Extended filllen forms (list / reporter)
+  fillLenList: number[] | null;
+  fillLenListPhase: number;
+  fillLenReporter: ((t: number, s: number, i: number, p: [number, number]) => number) | null;
   lockLen: number;
   pullComp: number;
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
@@ -168,6 +183,20 @@ export class Machine {
   heading = 0;
   penDown = true;
   stitchLen = 2.5;
+  // Extended stitchlen forms (list / reporter). Exactly one of stitchLenList /
+  // stitchLenReporter / numeric (stitchLen) is active at a time.
+  stitchLenList: number[] | null = null; // cycling length pattern; null = numeric or reporter
+  stitchLenListPhase: number = 0; // start index offset for the list form
+  stitchLenStretchIndex: number = 0; // cycling index within current stretch (list form)
+  stitchLenStretchStart: boolean = true; // true = reset index on next pen-down move
+  stitchLenReporter: ((t: number, s: number, i: number, p: [number, number]) => number) | null =
+    null; // per-stitch reporter; null = numeric/list form
+  // Running-stitch buffer for the reporter form. When non-null, travel() appends
+  // spine points here and defers splitting until flushRunningStitch() is called.
+  runBuffer: { x: number; y: number }[] | null = null;
+  runBufferCTM: Mat = IDENTITY; // transform snapshot taken at buffer start
+  runBufferLayers: OutLayer[] = []; // warp-layer snapshot
+  runBufferHasWarp: boolean = false;
   mode: 'run' | 'satin' | 'estitch' = 'run';
   satinWidth = 0;
   satinSpacing = 0.4;
@@ -177,6 +206,10 @@ export class Machine {
   fillAngle = 0;
   fillSpacing = 0.4;
   fillLen: number | null = null;
+  // Extended filllen forms (list / reporter). Exactly one active at a time.
+  fillLenList: number[] | null = null; // cycling length pattern for fill rows
+  fillLenListPhase: number = 0; // start index offset for the list form
+  fillLenReporter: ((t: number, s: number, i: number, p: [number, number]) => number) | null = null; // per-stitch reporter for fill rows
   lockLen = 0.7;
   pullComp = 0; // pull compensation in mm
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag' = 'off';
@@ -351,6 +384,15 @@ export class Machine {
       penDown: this.penDown,
       // Stitch configuration
       stitchLen: this.stitchLen,
+      stitchLenList: this.stitchLenList ? this.stitchLenList.slice() : null,
+      stitchLenListPhase: this.stitchLenListPhase,
+      stitchLenStretchIndex: this.stitchLenStretchIndex,
+      stitchLenStretchStart: this.stitchLenStretchStart,
+      stitchLenReporter: this.stitchLenReporter,
+      runBuffer: this.runBuffer ? this.runBuffer.slice() : null,
+      runBufferCTM: this.runBufferCTM,
+      runBufferLayers: this.runBufferLayers.slice(),
+      runBufferHasWarp: this.runBufferHasWarp,
       mode: this.mode,
       satinWidth: this.satinWidth,
       satinSpacing: this.satinSpacing,
@@ -360,6 +402,9 @@ export class Machine {
       fillAngle: this.fillAngle,
       fillSpacing: this.fillSpacing,
       fillLen: this.fillLen,
+      fillLenList: this.fillLenList ? this.fillLenList.slice() : null,
+      fillLenListPhase: this.fillLenListPhase,
+      fillLenReporter: this.fillLenReporter,
       lockLen: this.lockLen,
       pullComp: this.pullComp,
       underlayMode: this.underlayMode,
@@ -454,6 +499,15 @@ export class Machine {
     this.penDown = snap.penDown;
     // Stitch configuration
     this.stitchLen = snap.stitchLen;
+    this.stitchLenList = snap.stitchLenList ? snap.stitchLenList.slice() : null;
+    this.stitchLenListPhase = snap.stitchLenListPhase;
+    this.stitchLenStretchIndex = snap.stitchLenStretchIndex;
+    this.stitchLenStretchStart = snap.stitchLenStretchStart;
+    this.stitchLenReporter = snap.stitchLenReporter;
+    this.runBuffer = snap.runBuffer ? snap.runBuffer.slice() : null;
+    this.runBufferCTM = snap.runBufferCTM;
+    this.runBufferLayers = snap.runBufferLayers.slice();
+    this.runBufferHasWarp = snap.runBufferHasWarp;
     this.mode = snap.mode;
     this.satinWidth = snap.satinWidth;
     this.satinSpacing = snap.satinSpacing;
@@ -463,6 +517,9 @@ export class Machine {
     this.fillAngle = snap.fillAngle;
     this.fillSpacing = snap.fillSpacing;
     this.fillLen = snap.fillLen;
+    this.fillLenList = snap.fillLenList ? snap.fillLenList.slice() : null;
+    this.fillLenListPhase = snap.fillLenListPhase;
+    this.fillLenReporter = snap.fillLenReporter;
     this.lockLen = snap.lockLen;
     this.pullComp = snap.pullComp;
     this.underlayMode = snap.underlayMode;
@@ -686,7 +743,12 @@ export class Machine {
     if (Math.abs(deg) < 1e-9 || r < 1e-9) return;
     const arcLen = ((Math.abs(deg) * Math.PI) / 180) * r;
     const eff = Math.min(Math.max(this.stitchLen, LIMITS.minStitch), LIMITS.maxStitch);
-    const steps = Math.max(1, Math.ceil(Math.max(arcLen / eff, Math.abs(deg) / 15)));
+    // In reporter-buffered mode use geometry-only step count (≤15° per step) so
+    // the arc shape is faithfully captured in the buffer independent of stitch
+    // length. In all other modes combine arc-length and geometry requirements.
+    const steps = this.stitchLenReporter
+      ? Math.max(1, Math.ceil(Math.abs(deg) / 15))
+      : Math.max(1, Math.ceil(Math.max(arcLen / eff, Math.abs(deg) / 15)));
     const stepAng = deg / steps;
     const chord = 2 * r * Math.sin((Math.abs(stepAng) * Math.PI) / 360);
     for (let s = 0; s < steps; s++) {
@@ -869,14 +931,102 @@ export class Machine {
       this.y = ny;
       return;
     }
-
-    // Running stitch
+    // Running stitch — three forms dispatched by active stitchLen mode.
     if (hlen < LIMITS.minStitch * 0.5) {
       this._dropTiny(nx, ny);
       this.x = nx;
       this.y = ny;
       return;
     }
+
+    // ── Form 3: reporter buffered mode ──────────────────────────────────────
+    //
+    // Instead of splitting now, append this segment's endpoint to the spine
+    // buffer. The actual splitting happens when the stretch ends (flushRunningStitch).
+    if (this.stitchLenReporter) {
+      if (!this.runBuffer) {
+        this.runBuffer = [{ x: ox, y: oy }];
+        this.runBufferCTM = this.ctm;
+        this.runBufferHasWarp = this.hasWarp;
+        this.runBufferLayers = this.hasWarp ? this.outLayers.slice() : [];
+      }
+      this.runBuffer.push({ x: nx, y: ny });
+      this.x = nx;
+      this.y = ny;
+      return;
+    }
+
+    // ── Form 2: list-cycling mode ────────────────────────────────────────────
+    if (this.stitchLenList) {
+      const list = this.stitchLenList;
+      const listLen = list.length;
+      const phase = this.stitchLenListPhase;
+
+      // Reset per-stretch index at the first pen-down move of a new stretch.
+      if (this.stitchLenStretchStart) {
+        this.stitchLenStretchStart = false;
+        this.stitchLenStretchIndex = 0;
+      }
+
+      let remaining = hlen;
+      let slCursor = 0;
+      let cycleIdx = this.stitchLenStretchIndex;
+
+      if (this.declumpStack.length > 0) {
+        // Pre-compute all split points for the declump path.
+        const innerPts: [number, number][] = [];
+        while (remaining > 1e-9) {
+          const len = list[(cycleIdx + phase) % listLen];
+          const advance = Math.min(len, remaining);
+          slCursor += advance;
+          remaining -= advance;
+          const frac = slCursor / hlen;
+          innerPts.push(this._applyPenLayers(hox + hdx * frac, hoy + hdy * frac));
+          cycleIdx++;
+        }
+        let prevRaw: [number, number] = this.lastEmit
+          ? [this.lastEmit.x, this.lastEmit.y]
+          : [hox, hoy];
+        for (let i = 0; i < innerPts.length; i++) {
+          const nextPt = i + 1 < innerPts.length ? innerPts[i + 1] : null;
+          let [rx, ry] = innerPts[i];
+          for (let di = this.declumpStack.length - 1; di >= 0; di--) {
+            [rx, ry] = declumpFoldPoint(this.declumpStack[di], [rx, ry], nextPt, this.density);
+          }
+          this._emitRaw(rx, ry);
+          for (let r = 1; r < this.beanRepeats; r++) {
+            this._emitRaw(r % 2 === 1 ? prevRaw[0] : rx, r % 2 === 1 ? prevRaw[1] : ry);
+          }
+          prevRaw = [rx, ry];
+        }
+      } else {
+        // Normal path.
+        let pxv = hox,
+          pyv = hoy;
+        while (remaining > 1e-9) {
+          const len = list[(cycleIdx + phase) % listLen];
+          const advance = Math.min(len, remaining);
+          slCursor += advance;
+          remaining -= advance;
+          const frac = slCursor / hlen;
+          const tx = hox + hdx * frac,
+            ty = hoy + hdy * frac;
+          this._emitPen(tx, ty);
+          for (let r = 1; r < this.beanRepeats; r++) {
+            this._emitPen(r % 2 === 1 ? pxv : tx, r % 2 === 1 ? pyv : ty);
+          }
+          pxv = tx;
+          pyv = ty;
+          cycleIdx++;
+        }
+      }
+      this.stitchLenStretchIndex = cycleIdx;
+      this.x = nx;
+      this.y = ny;
+      return;
+    }
+
+    // ── Form 1: uniform numeric mode (unchanged) ────────────────────────────
     const eff = Math.min(Math.max(this.stitchLen, LIMITS.minStitch), LIMITS.maxStitch);
     const steps = Math.max(1, Math.ceil(hlen / eff));
 
@@ -1041,6 +1191,9 @@ export class Machine {
 
   /** Sew the buffered satin column: underlay passes first, then the zigzag. */
   flushSatin() {
+    // Flush any pending running-stitch buffer first — the same events that
+    // close a satin column also close a reporter-mode stretch.
+    this.flushRunningStitch();
     const path = this.satinPath;
     this.satinPath = null;
     if (!path || path.length < 2) return;
@@ -1107,7 +1260,7 @@ export class Machine {
   // ---- Transform-aware satin (CTM active) ----
 
   /** Map a local polyline into hoop space (through the satin snapshot map). */
-  _toHoop(pts: { x: number; y: number }[], _ctm: Mat): { x: number; y: number }[] {
+  _toHoop(pts: { x: number; y: number }[]): { x: number; y: number }[] {
     return pts.map((p) => {
       const [x, y] = this._mapSatin(p.x, p.y);
       return { x, y };
@@ -1139,7 +1292,7 @@ export class Machine {
     dist: number,
   ): { x: number; y: number }[] {
     const n = local.length;
-    if (n < 2) return this._toHoop(local, ctm);
+    if (n < 2) return this._toHoop(local);
     const out: { x: number; y: number }[] = [];
     for (let i = 0; i < n; i++) {
       const a = local[Math.max(0, i - 1)],
@@ -1159,7 +1312,7 @@ export class Machine {
     u: boolean,
     shortStitch: boolean,
   ) {
-    const hoop = this._toHoop(local, this.satinCTM);
+    const hoop = this._toHoop(local);
     const halfDesign = designWidth / 2;
     let prevUx: number | null = null,
       prevUy = 0;
@@ -1249,7 +1402,7 @@ export class Machine {
             : 'zigzag'
         : this.underlayMode;
     const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
-    const hoop = this._toHoop(local, ctm);
+    const hoop = this._toHoop(local);
     const revLocal = local.slice().reverse();
     const revHoop = hoop.slice().reverse();
     if (mode !== 'off' && this.doubleUnderlay && mode !== 'center') {
@@ -1482,7 +1635,7 @@ export class Machine {
         : this.underlayMode;
     if (mode === 'off') return;
     const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
-    const hoop = this._toHoop(local, this.satinCTM);
+    const hoop = this._toHoop(local);
     const revHoop = hoop.slice().reverse();
     const revLocal = local.slice().reverse();
     if (this.doubleUnderlay && mode !== 'center') {
@@ -1525,6 +1678,194 @@ export class Machine {
       if (this.traceCurRun.length >= 2) this.traceRuns.push(this.traceCurRun);
     }
     this.traceCurRun = null;
+  }
+
+  /** Close the current trace run if it has geometric content (≥2 vertices). */
+  _closeTraceRun() {
+    if (this.traceCurRun && this.traceCurRun.length >= 2) {
+      // Closing-vertex dedupe (§4.2): if a run's final vertex coincides with
+      // its first within 1e-6 mm, the duplicate is dropped — region closure is
+      // implicit, and returning it doubled would break pathlen and resample.
+      const first = this.traceCurRun[0];
+      const last = this.traceCurRun[this.traceCurRun.length - 1];
+      if (Math.hypot(last[0] - first[0], last[1] - first[1]) < 1e-6) {
+        this.traceCurRun.pop();
+        this.traceVertexCount--;
+      }
+      // After dedupe, still need ≥2 for a valid path
+      if (this.traceCurRun.length >= 2) this.traceRuns.push(this.traceCurRun);
+    }
+    this.traceCurRun = null;
+  }
+
+  // ── Running-stitch reporter buffer (§stitchlen @fn) ──────────────────────
+
+  /**
+   * Map a local point to hoop space through the running-stitch buffer's
+   * snapshot of the transform stack — identical to _mapSatin but for the run buffer.
+   */
+  _mapRunBuffer(lx: number, ly: number): [number, number] {
+    if (!this.runBufferHasWarp) return apply(this.runBufferCTM, lx, ly);
+    let px = lx,
+      py = ly;
+    for (let i = this.runBufferLayers.length - 1; i >= 0; i--) {
+      const L = this.runBufferLayers[i];
+      const r = L.kind === 'aff' ? apply(L.m, px, py) : L.fn(px, py);
+      px = r[0];
+      py = r[1];
+    }
+    return [px, py];
+  }
+
+  /**
+   * Flush the pending running-stitch reporter buffer (§stitchlen @fn).
+   * Called automatically from flushSatin() so every existing stretch-closing
+   * event (pen-up, trim, color, mode-change, end-of-program, …) triggers it.
+   * Also call directly when switching stitchlen forms mid-stretch to avoid
+   * leaving an orphaned buffer.
+   */
+  flushRunningStitch() {
+    const buf = this.runBuffer;
+    this.runBuffer = null;
+    // Reset the stretch-start flag regardless: the next pen-down is a new stretch.
+    this.stitchLenStretchStart = true;
+    this.stitchLenStretchIndex = 0;
+    if (!buf || buf.length < 2) return;
+    this._splitBufferedStretch(buf);
+  }
+
+  /**
+   * Walk the buffered spine under the stitchlen reporter and emit penetrations.
+   *
+   * Semantics (§3–§5 of the spec):
+   * - t  = arc-length cursor from the stretch start (in mm, hoop-space)
+   * - s  = t / L (normalised 0..1)
+   * - i  = 0-based stitch index, incremented for every placed stitch
+   * - p  = cursor position in hoop space [x, y]
+   *
+   * Pinned vertices: every buffer waypoint (each spine vertex / segment
+   * boundary) is a potential pin. If the reporter's advance would overshoot
+   * the next waypoint, the advance is truncated and a stitch is placed at the
+   * waypoint. The truncated stitch still increments i.
+   *
+   * The reporter runs with m.ctm = identity so that coverat(p) calls inside
+   * it treat p as hoop-space (the same contract as the warp reporter).
+   */
+  _splitBufferedStretch(buf: readonly { x: number; y: number }[]) {
+    const reporter = this.stitchLenReporter!;
+    const n = buf.length;
+    if (n < 2) return;
+
+    // Map all local points to hoop space using the snapshot transform.
+    const hoop: [number, number][] = buf.map((p) => this._mapRunBuffer(p.x, p.y));
+
+    // Cumulative arc-length table (hoop-space).
+    const cum: number[] = new Array(n);
+    cum[0] = 0;
+    for (let k = 1; k < n; k++) {
+      cum[k] = cum[k - 1] + Math.hypot(hoop[k][0] - hoop[k - 1][0], hoop[k][1] - hoop[k - 1][1]);
+    }
+    const L = cum[n - 1];
+    if (!(L > 1e-9)) return;
+
+    // Interpolate hoop position at arc-length t.
+    const atT = (t: number): [number, number] => {
+      const a = Math.min(Math.max(t, 0), L);
+      let seg = 1;
+      while (seg < n - 1 && cum[seg] < a) seg++;
+      const segLen = cum[seg] - cum[seg - 1] || 1;
+      const f = (a - cum[seg - 1]) / segLen;
+      return [
+        hoop[seg - 1][0] + (hoop[seg][0] - hoop[seg - 1][0]) * f,
+        hoop[seg - 1][1] + (hoop[seg][1] - hoop[seg - 1][1]) * f,
+      ];
+    };
+
+    // Temporarily set the CTM to identity so coverat(p) inside the reporter
+    // interprets p as hoop-space (no double-transform).
+    const savedCTM = this.ctm;
+    const savedLayers = this.outLayers;
+    const savedHasWarp = this.hasWarp;
+    this.ctm = IDENTITY;
+    this.outLayers = [];
+    this.hasWarp = false;
+
+    try {
+      let cursor = 0;
+      let stitchIdx = 0;
+      let advWarned = false;
+      let prevPt: [number, number] = hoop[0];
+      const guardMax = Math.ceil(L / LIMITS.minStitch) + n + 10;
+      let guard = 0;
+
+      while (cursor < L - 1e-9 && guard++ < guardMax) {
+        const [hx, hy] = atT(cursor);
+
+        const rawAdv = reporter(cursor, cursor / L, stitchIdx, [hx, hy]);
+
+        // Validate reporter return value.
+        if (typeof rawAdv !== 'number' || !isFinite(rawAdv)) {
+          throw new NeedlescriptError(
+            'stitchlen reporter must return a finite number — got ' +
+              (typeof rawAdv === 'number' ? 'NaN/Infinity' : typeof rawAdv),
+          );
+        }
+        if (rawAdv <= 0) {
+          throw new NeedlescriptError(
+            'stitchlen reporter returned ' +
+              rawAdv +
+              ' — advance must be greater than 0 (a non-positive advance never terminates)',
+          );
+        }
+
+        // Clamp to machine-safe band with a warning.
+        let adv = rawAdv;
+        if (rawAdv < LIMITS.minStitch || rawAdv > LIMITS.maxStitch) {
+          const clamped = Math.min(Math.max(rawAdv, LIMITS.minStitch), LIMITS.maxStitch);
+          if (!advWarned) {
+            this.warnings.push(
+              `stitchlen reporter returned ${rawAdv.toFixed(3)} mm — clamped to ${clamped.toFixed(3)} mm (machine-safe range ${LIMITS.minStitch}–${LIMITS.maxStitch})`,
+            );
+            advWarned = true;
+          }
+          adv = clamped;
+        }
+
+        // Find the next buffer vertex (pinned corner) after cursor.
+        let nextPin = L;
+        for (let k = 1; k < n; k++) {
+          if (cum[k] > cursor + 1e-9) {
+            nextPin = cum[k];
+            break;
+          }
+        }
+
+        // Advance at most to the next pin or to L.
+        const actualAdv = Math.min(adv, Math.min(nextPin, L) - cursor);
+
+        if (actualAdv < LIMITS.minStitch * 0.5) {
+          // Tiny remainder — merge (drop and record).
+          const [tx, ty] = atT(cursor + actualAdv);
+          this._dropTiny(tx, ty);
+          cursor += actualAdv;
+          stitchIdx++;
+          continue;
+        }
+
+        cursor += actualAdv;
+        const [nx2, ny2] = atT(cursor);
+        this._emitPen(nx2, ny2);
+        for (let r = 1; r < this.beanRepeats; r++) {
+          this._emitPen(r % 2 === 1 ? prevPt[0] : nx2, r % 2 === 1 ? prevPt[1] : ny2);
+        }
+        prevPt = [nx2, ny2];
+        stitchIdx++;
+      }
+    } finally {
+      this.ctm = savedCTM;
+      this.outLayers = savedLayers;
+      this.hasWarp = savedHasWarp;
+    }
   }
 
   beginFill() {
@@ -1989,10 +2330,44 @@ export class Machine {
       return sp;
     };
     const defaultLen =
-      this.fillLen !== null ? this.fillLen : Math.min(Math.max(this.stitchLen, 1), 7);
-    const lenFn = (lx: number, ly: number, rowIdx: number, v: number): number => {
-      if (opts.coarse || !opts.shape) return opts.coarse ? 4 : defaultLen;
-      return opts.shape(lx, ly, rowIdx, v)[1];
+      this.fillLenReporter !== null || this.fillLenList !== null
+        ? null // will be handled per-stitch by lenFn
+        : this.fillLen !== null
+          ? this.fillLen
+          : this.stitchLenList !== null || this.stitchLenReporter !== null
+            ? null // stitchlen form will be forwarded per-stitch
+            : Math.min(Math.max(this.stitchLen, 1), 7);
+
+    // Closures for the fill-len extended forms — captured once per _generateProgrammableFill call.
+    const fillLenList = this.fillLenList;
+    const fillLenListPhase = this.fillLenListPhase;
+    const fillLenReporter = this.fillLenReporter;
+    const stitchLenList = this.stitchLenList;
+    const stitchLenListPhase = this.stitchLenListPhase;
+    const stitchLen = this.stitchLen;
+    const fillCTM = this.fillCTM;
+
+    // Build the lenFn for this fill. Saved CTM is restored inside any reporter call.
+    const lenFn = (lx: number, ly: number, rowIdx: number, v: number, si: number): number => {
+      if (opts.coarse) return 4;
+      if (opts.shape) return opts.shape(lx, ly, rowIdx, v)[1];
+      if (fillLenReporter !== null) {
+        // call with hoop-affine position (≈ hoop-space when no warp)
+        const hp = apply(fillCTM, lx, ly) as [number, number];
+        return Math.min(Math.max(fillLenReporter(0, 0, si, hp), 1), 7);
+      }
+      if (fillLenList !== null) {
+        return fillLenList[(si + fillLenListPhase) % fillLenList.length];
+      }
+      if (defaultLen !== null) return defaultLen;
+      // Follow stitchlen
+      if (stitchLenList !== null) {
+        return Math.min(
+          Math.max(stitchLenList[(si + stitchLenListPhase) % stitchLenList.length], 1),
+          7,
+        );
+      }
+      return Math.min(Math.max(stitchLen, 1), 7);
     };
     const phaseFn = (lx: number, ly: number, rowIdx: number, v: number): number => {
       if (opts.coarse || !opts.shape) return 0.5;
@@ -2067,13 +2442,17 @@ export class Machine {
    * Walk a streamline polyline into penetrations spaced by `lenFn` (clamped
    * 1–7 mm), preserving the first and last vertex, with the start phase shifted
    * by the cumulative brick offset (§8). Returns hoop-affine penetration points.
+   *
+   * `lenFn` receives the local position, row index, cross-field v, and the
+   * within-row stitch index `si` — so list-cycling and reporter forms can use
+   * `si` without changing callers that don't need it.
    */
   _walkStreamline(
     poly: [number, number][],
     row: number,
     v: number,
     cumPhase: number,
-    lenFn: (x: number, y: number, row: number, v: number) => number,
+    lenFn: (x: number, y: number, row: number, v: number, si: number) => number,
     localOf: (x: number, y: number) => [number, number],
   ): [number, number][] {
     const out: [number, number][] = [];
@@ -2101,16 +2480,18 @@ export class Machine {
     // Brick offset: a fractional shift of the first interior penetration.
     const frac = ((cumPhase % 1) + 1) % 1;
     const [l0x, l0y] = localOf(poly[0][0], poly[0][1]);
-    const firstLen = Math.min(Math.max(lenFn(l0x, l0y, row, v), 1), 7);
+    const firstLen = Math.min(Math.max(lenFn(l0x, l0y, row, v, 0), 1), 7);
     let s = frac > 1e-6 ? frac * firstLen : firstLen;
     let guard = 0;
+    let si = 1; // stitch index within this row (0 = the first, above; si tracks subsequent)
     const guardMax = Math.ceil(total / 0.5) + 16;
     while (s < total - 1e-6 && guard++ < guardMax) {
       const p = at(s);
       out.push(p);
       const [lx, ly] = localOf(p[0], p[1]);
-      const len = Math.min(Math.max(lenFn(lx, ly, row, v), 1), 7);
+      const len = Math.min(Math.max(lenFn(lx, ly, row, v, si), 1), 7);
       s += len;
+      si++;
     }
     out.push([poly[poly.length - 1][0], poly[poly.length - 1][1]]);
     return out;
@@ -2129,7 +2510,17 @@ export class Machine {
     // Rings are recorded in hoop space, so the "end near" hint must be too.
     const [hx, hy] = this.mapOut(this.x, this.y);
     const endNear = { x: hx, y: hy };
-    const effLen = this.fillLen !== null ? this.fillLen : Math.min(Math.max(this.stitchLen, 1), 7);
+    // effLen: effective fixed stitch length for the built-in tatami path.
+    // When fillLenList / fillLenReporter is active the programmable path is
+    // used instead (see below), so effLen is only needed for the flat path.
+    const effLen =
+      this.fillLenList !== null || this.fillLenReporter !== null
+        ? null
+        : this.fillLen !== null
+          ? this.fillLen
+          : this.stitchLenList !== null || this.stitchLenReporter !== null
+            ? null // forward to programmable path
+            : Math.min(Math.max(this.stitchLen, 1), 7);
 
     // Effective row direction / spacing / length for the tatami pass. For a
     // built-in fill these are the fill-state fields; an armed programmable fill
@@ -2137,7 +2528,41 @@ export class Machine {
     // tatami short-circuit (§3.3/§7.5) drives the same generator.
     let useAngle = this.fillAngle;
     let useSpacing = this.fillSpacing;
-    let useLen = effLen;
+    let useLen = effLen ?? Math.min(Math.max(this.stitchLen, 1), 7); // fallback for display; overridden below
+
+    // When fillLenList / fillLenReporter (or their stitchlen equivalents) are
+    // active on a plain (non-armed) fill, route through _generateProgrammableFill
+    // so the extended lenFn gets called per stitch.  Temporarily populate
+    // localRings from the hoop-space rings with an identity fillCTM so the
+    // generator can work without a real arm-site transform snapshot.
+    if (!this.fillArmed && effLen === null) {
+      const savedLocalRings = this.localRings;
+      const savedFillCTM = this.fillCTM;
+      const savedFillHasWarp = this.fillHasWarp;
+      const savedFillLayers = this.fillLayers;
+      this.localRings = rings.slice();
+      this.fillCTM = IDENTITY;
+      this.fillHasWarp = false;
+      this.fillLayers = [];
+      try {
+        this._generateProgrammableFill({
+          dir: null,
+          shape: null,
+          constAngle: this.fillAngle,
+          rotate90: false,
+          coarse: false,
+          underlay: false,
+        });
+      } finally {
+        this.localRings = savedLocalRings;
+        this.fillCTM = savedFillCTM;
+        this.fillHasWarp = savedFillHasWarp;
+        this.fillLayers = savedFillLayers;
+      }
+      const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
+      if (back > 0.6) this._push('jump', hx, hy);
+      return;
+    }
 
     if (this.fillArmed) {
       const dir = this.fillDirReporter;

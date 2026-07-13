@@ -9,6 +9,7 @@ import { NeedlescriptError } from './errors.ts';
 import {
   ALIASES,
   BUILTIN_ARITY,
+  BUILTIN_ARITY_OPT,
   TRANSFORM_ARITY,
   EFFECT_ARITY,
   QWORD_BUILTINS,
@@ -225,6 +226,26 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
   }
 
   /** Parse a parenthesised argument list:  ( expr {, expr} [,] )  */
+  /**
+   * Returns true if the next token unambiguously opens an expression, so an
+   * optional extra arg can be consumed without stealing a subsequent command.
+   * Conservative: only tokens that can NEVER be the start of a statement
+   * (number, string, list, paren, :var, @name) are accepted; bare words are
+   * not, because they might be the next command.
+   */
+  function isOptArgStart(): boolean {
+    if (atEnd()) return false;
+    const nxt = peek();
+    return (
+      nxt.t === 'num' ||
+      nxt.t === 'str' ||
+      nxt.t === '[' ||
+      nxt.t === '(' ||
+      nxt.t === 'pref' ||
+      nxt.t === 'var'
+    );
+  }
+
   function parseParenArgs(callee: string, arity: number, line: number): ExprNode[] {
     return parseParenArgsRange(callee, arity, arity, line);
   }
@@ -761,7 +782,12 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       }
       if (BUILTIN_ARITY[canonical] !== undefined) {
         next();
-        const args = parseParenArgs(name, BUILTIN_ARITY[canonical], tok.line);
+        const fixedArity = BUILTIN_ARITY[canonical];
+        const optExtra = BUILTIN_ARITY_OPT[canonical] ?? 0;
+        const args =
+          optExtra > 0
+            ? parseParenArgsRange(name, fixedArity, fixedArity + optExtra, tok.line)
+            : parseParenArgs(name, fixedArity, tok.line);
         return { k: 'cmd', name: canonical, args, line: tok.line };
       }
       if (TRANSFORM_ARITY[name] !== undefined) {
@@ -916,6 +942,12 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
       next();
       const args: ExprNode[] = [];
       for (let a = 0; a < BUILTIN_ARITY[canonical]; a++) args.push(parseExpr());
+      // Consume optional extra args (e.g. phase offset for stitchlen/filllen list form)
+      const optExtra = BUILTIN_ARITY_OPT[canonical] ?? 0;
+      for (let a = 0; a < optExtra; a++) {
+        if (!isOptArgStart()) break;
+        args.push(parseExpr());
+      }
       return { k: 'cmd', name: canonical, args, line: tok.line };
     }
 
