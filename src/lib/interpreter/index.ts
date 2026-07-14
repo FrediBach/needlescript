@@ -7,7 +7,7 @@ import type { BudgetKey } from '../machine.ts';
 import { makeRNG, makeNoise } from '../prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { tokenize } from '../tokenizer.ts';
-import { parse } from '../parser.ts';
+import { parse } from '../parser/index.ts';
 import { applyAutoTrim, applyLocks } from '../postprocess.ts';
 import type { Val } from '../list.ts';
 import type { ASTNode } from '../types.ts';
