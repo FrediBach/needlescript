@@ -243,7 +243,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'trace regions',
       'bars',
       'fermat',
-      'vortex'
+      'vortex',
     ],
   },
   {
@@ -281,7 +281,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'coilsatin',
       'easing',
       'billiard',
-      'triangle'
+      'triangle',
     ],
   },
   {
