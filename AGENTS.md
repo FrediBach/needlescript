@@ -3,6 +3,18 @@
 NeedleScript is a logo-inspired programming language for generative embroidery.
 The repo contains two build targets: a Vite-based playground app and a publishable library (`src/lib/`).
 
+## Architecture documentation
+
+The language pipeline in `src/lib/` is documented in detail. Read the relevant document before making non-trivial changes to these areas — each explains the module layout, data flow, and design rationale, with `file:line` references.
+
+| Document                                    | Covers                                                                                             |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `needlescript-parser-architecture.md`       | Front-end: tokenizer, pre-scan, recursive-descent parser, AST (`tokenizer.ts`, `prescan.ts`, `parser/`) |
+| `needlescript-interpreter-architecture.md`  | Evaluation: tree-walking interpreter, value model, budgets, reporters (`interpreter/`, `list.ts`)  |
+| `needlescript-machine-architecture.md`      | Stitch machine: turtle, transform stacks, satin/fill generation, coverage, output (`machine/`)     |
+
+The end-to-end flow is: source → `tokenize` → `parse` → `run` (interpreter drives the `Machine`) → `RunResult` → exporters. Keep these docs updated when you change the corresponding modules.
+
 ## Dev environment
 
 - Node version is managed via `.nvmrc` (`lts/*`). Use `nvm use` before starting.
@@ -69,6 +81,7 @@ ESLint uses flat config (`eslint.config.js`) with TypeScript, React Hooks, React
 
 ## Performance and architecture
 
+- See the **Architecture documentation** section above for the parser, interpreter, and machine design docs before making non-trivial changes to `src/lib/`.
 - CPU-intensive work (e.g. the compiler) runs in a Web Worker (`src/compiler.worker.ts`) via Comlink. Prefer this pattern for any heavy computation.
 - `src/lib/` is platform-neutral — no DOM APIs. Keep it that way so the library build stays environment-agnostic.
 - The library build uses tree-shaking. Prefer avoiding side-effectful top-level code in `src/lib/`.
