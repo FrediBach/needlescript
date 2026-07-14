@@ -84,6 +84,7 @@ import billiardRaw from '../examples/billiard.ns?raw';
 import fermatRaw from '../examples/fermat.ns?raw';
 import kanthabandsRaw from '../examples/kantha-bands.ns?raw';
 import vortexRaw from '../examples/vortex.ns?raw';
+import triangleRaw from '../examples/triangle.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -204,6 +205,7 @@ export const EXAMPLES: Record<string, string> = {
   fermat: fermatRaw,
   'kantha bands': kanthabandsRaw,
   vortex: vortexRaw,
+  triangle: triangleRaw,
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -279,6 +281,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'coilsatin',
       'easing',
       'billiard',
+      'triangle'
     ],
   },
   {

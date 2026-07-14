@@ -1,0 +1,54 @@
+// --- Hidden-triangle spiral art ---------------------------------
+// One continuous spiral fills a disc; the line fattens (wider satin)
+// wherever it passes through an invisible triangle in the centre.
+
+seed 1
+density 0.4
+
+let rmax  = 38         // outer radius of the spiral disc
+let r0    = 0.4        // starting radius (avoids a dense knot at the centre)
+let turns = 24         // revolutions -> ~2 mm gap between rings
+let pace  = 0.8        // target arc length per segment (mm)
+let thin  = 0.2        // satin width outside the triangle
+let thick = 0.8        // satin width inside the triangle
+
+// hidden equilateral triangle (point up), circumradius 22 mm
+// heading convention: 0 deg = north, so x = r*sin(a), y = r*cos(a)
+let tri_r = 30
+let tri = [
+  [tri_r * sin(0),   tri_r * cos(0)],
+  [tri_r * sin(120), tri_r * cos(120)],
+  [tri_r * sin(240), tri_r * cos(240)]
+]
+
+// Archimedean spiral: r = r0 + b * theta   (theta in degrees)
+let theta_max = turns * 360
+let b = (rmax - r0) / theta_max
+
+// declare loop state ONCE, before the loop
+let theta  = 0
+let r      = r0
+let dtheta = 0
+
+moveto(0, r0)                  // spiral start: theta = 0 -> (0, r0)
+down
+
+while theta < theta_max [
+  // pick the line weight from where the needle is right now
+  if inpath(pos(), tri) [
+    satin thick
+  ] else [
+    satin thin
+  ]
+
+  // advance ~pace mm along the arc; cap the turn near the centre
+  dtheta = pace / r * 57.2958
+  if dtheta > 15 [ dtheta = 15 ]
+  theta += dtheta
+  r = r0 + b * theta
+
+  setxy(r * sin(theta), r * cos(theta))
+]
+
+satin 0                        // flush the last satin column
+trim
