@@ -477,6 +477,11 @@ describe('updatePointParameter', () => {
     expect(out).toBe('let p = [5, 10] // [xy: disc 20] extra note');
   });
 
+  it('updates a point list with whitespace inside its brackets', () => {
+    const src = 'let cut_a = [ 13.7, 37.6 ] // [xy]';
+    expect(updatePointParameter(src, 1, 'cut_a', 12, -5)).toBe('let cut_a = [12, -5] // [xy]');
+  });
+
   it('updates a make declaration', () => {
     const src = 'make "anchor [0, 18] // [xy]';
     expect(updatePointParameter(src, 1, 'anchor', 3, -7)).toBe('make "anchor [3, -7] // [xy]');

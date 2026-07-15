@@ -482,7 +482,7 @@ export function updatePointParameter(
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // Pattern matches the list literal after the variable name
   const numPat = '-?(?:\\d+\\.?\\d*|\\.\\d+)';
-  const listPat = `\\[${numPat}\\s*,\\s*${numPat}\\]`;
+  const listPat = `\\[\\s*${numPat}\\s*,\\s*${numPat}\\s*\\]`;
 
   // let name = [x, y]  or  name = [x, y]
   const letOrBare = new RegExp(`((?:let\\s+)?${escaped}\\s*=\\s*)${listPat}`, 'i');
