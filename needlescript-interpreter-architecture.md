@@ -30,9 +30,9 @@ surfaced from the library barrel `engine.ts:81`.
 `run` performs the full pipeline in one call:
 
 ```ts
-const tokens = tokenize(source);           // lex
+const tokens = tokenize(source); // lex
 const program = parse(tokens, parseNotes); // parse (+ prescan)
-const m = new Machine();                    // side-effect target
+const m = new Machine(); // side-effect target
 // … build RunContext, wire modules, execute, finalize …
 ```
 
@@ -74,27 +74,27 @@ The value model those modules operate on lives one level up in `list.ts`.
 ## 3. The `RunContext` pattern
 
 Rather than a class hierarchy, the interpreter uses a single plain object,
-`RunContext` (`context.ts:14-132`), that carries **all** mutable state *and* every
+`RunContext` (`context.ts:14-132`), that carries **all** mutable state _and_ every
 cross-module function as a property slot. Every module receives `ctx` and both reads
 state from it and installs its functions onto it.
 
 ### 3.1 Mutable state (`context.ts:15-33`)
 
-| Field            | Purpose |
-|------------------|---------|
-| `globals`        | top-level variable bindings (`Record<string, Val>`) |
-| `procs`          | procedure name → its `to` AST node (populated as `to` statements execute) |
-| `rng`            | main PRNG stream; reassigned by `seed` |
-| `noise`          | legacy coherent noise; reassigned by `seed` |
-| `snoise2/snoise3`| seeded simplex noise streams |
-| `ops`            | operation counter (the anti-infinite-loop budget) |
-| `cells`          | live list-cell counter |
-| `stringChars`    | cumulative string-char allocation counter |
-| `printed`        | accumulated `print`/`printloc` output |
-| `insideTrace`    | trace-sandbox nesting depth |
-| `traceNoted`     | one-time notes already emitted inside trace |
-| `structuralDepth`| structural block nesting (loop/if/transform/effect) — for directive placement guards |
-| `m`              | the `Machine` — the side-effect target |
+| Field             | Purpose                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| `globals`         | top-level variable bindings (`Record<string, Val>`)                                  |
+| `procs`           | procedure name → its `to` AST node (populated as `to` statements execute)            |
+| `rng`             | main PRNG stream; reassigned by `seed`                                               |
+| `noise`           | legacy coherent noise; reassigned by `seed`                                          |
+| `snoise2/snoise3` | seeded simplex noise streams                                                         |
+| `ops`             | operation counter (the anti-infinite-loop budget)                                    |
+| `cells`           | live list-cell counter                                                               |
+| `stringChars`     | cumulative string-char allocation counter                                            |
+| `printed`         | accumulated `print`/`printloc` output                                                |
+| `insideTrace`     | trace-sandbox nesting depth                                                          |
+| `traceNoted`      | one-time notes already emitted inside trace                                          |
+| `structuralDepth` | structural block nesting (loop/if/transform/effect) — for directive placement guards |
+| `m`               | the `Machine` — the side-effect target                                               |
 
 ### 3.2 Function slots and init ordering
 
@@ -110,14 +110,14 @@ initStringFunc(ctx);
 initListFunc(ctx);
 initGenFunc(ctx);
 initQueryFunc(ctx);
-initProcCall(ctx);  // needs evalExpr + execBlock at RUNTIME (lazy via ctx)
+initProcCall(ctx); // needs evalExpr + execBlock at RUNTIME (lazy via ctx)
 initReporters(ctx);
-initEvalExpr(ctx);  // needs callProc + execBlock at RUNTIME (lazy via ctx)
-initExecStmt(ctx);  // needs evalExpr + callProc at RUNTIME (lazy via ctx)
+initEvalExpr(ctx); // needs callProc + execBlock at RUNTIME (lazy via ctx)
+initExecStmt(ctx); // needs evalExpr + callProc at RUNTIME (lazy via ctx)
 ```
 
 **Order matters only for slot existence, not calls.** Each `init*` assigns closures
-that reference *other* `ctx.*` slots, but those references fire at execution time, not
+that reference _other_ `ctx.*` slots, but those references fire at execution time, not
 at init time — so the mutual recursion between `evalExpr`, `execStmt`, `callProc`, and
 the dispatchers is resolved through the shared `ctx` object. This is the same
 "function-slots-on-a-shared-object" technique the parser uses to break circular
@@ -153,15 +153,15 @@ Runtime values are the union `Val = number | string | NsList | FuncRef`
 `list.ts` also provides the shared value utilities the interpreter leans on
 everywhere:
 
-| Helper | Role |
-|--------|------|
-| `num(v, what, line, side)` | guard: value must be a number, else a named type error (`list.ts:115`) |
-| `isList` / `isFuncRef` / `isString` | type predicates |
-| `describeVal` | human phrasing for error messages ("a list (length 3)") |
-| `formatNum` / `formatVal` | canonical display for `print` and list rendering |
-| `deepEqual` | structural equality with a `1e-9` numeric tolerance (`list.ts:141`) |
-| `deepCopy` | deep clone with a per-cell callback for budget charging (`list.ts:173`) |
-| `valDepth` / `cellCount` | depth/size measures, all capped at `LIMITS.maxListDepth` |
+| Helper                              | Role                                                                    |
+| ----------------------------------- | ----------------------------------------------------------------------- |
+| `num(v, what, line, side)`          | guard: value must be a number, else a named type error (`list.ts:115`)  |
+| `isList` / `isFuncRef` / `isString` | type predicates                                                         |
+| `describeVal`                       | human phrasing for error messages ("a list (length 3)")                 |
+| `formatNum` / `formatVal`           | canonical display for `print` and list rendering                        |
+| `deepEqual`                         | structural equality with a `1e-9` numeric tolerance (`list.ts:141`)     |
+| `deepCopy`                          | deep clone with a per-cell callback for budget charging (`list.ts:173`) |
+| `valDepth` / `cellCount`            | depth/size measures, all capped at `LIMITS.maxListDepth`                |
 
 Every deep walk is depth-capped so a cycle created through mutation becomes a loud
 error rather than a hang — the project's "loud beats convenient" rule.
@@ -180,22 +180,22 @@ error rather than a hang — the project's "loud beats convenient" rule.
 
 `execStmt` charges one op via `ctx.tick(st.line)` on entry, then switches on `st.k`:
 
-| Node kind | Behavior |
-|-----------|----------|
-| `to` | registers the procedure into `ctx.procs` (definitions are hoisted at execution) |
-| `make` / `local` | assign a global / local binding |
-| `letlist` | destructuring assignment `let [x, y] = …` with arity checks |
-| `setindex` | lvalue index chains `xs[i] = v`, `grid[i][j] += v` (strings rejected) |
+| Node kind                            | Behavior                                                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `to`                                 | registers the procedure into `ctx.procs` (definitions are hoisted at execution)                                                 |
+| `make` / `local`                     | assign a global / local binding                                                                                                 |
+| `letlist`                            | destructuring assignment `let [x, y] = …` with arity checks                                                                     |
+| `setindex`                           | lvalue index chains `xs[i] = v`, `grid[i][j] += v` (strings rejected)                                                           |
 | `repeat` / `while` / `for` / `forin` | loops, each bumping `structuralDepth` and using `runLoopBody`; `for` and `forin` save/restore the loop variable's prior binding |
-| `if` | conditional with optional `elseBody` |
-| `transform` | composes a CTM matrix onto the machine's stack for the block's duration; `flushSatin` on both edges |
-| `effect` | `warp`/`humanize`/`snaptogrid`/`declump` — pushes an effect onto the machine's pen/warp stack for the block |
-| `output` | throws `ReturnSignal` (guarded: only inside a procedure, `depth > 0`) |
-| `break` / `continue` | throw `LoopSignal` |
-| `call` | invoke a user procedure for its side effects |
-| `fillarm` | arm a programmable fill (`fill dir @d shape @s`) for the next `beginfill…endfill` |
-| `listcmd` | list mutators (`append`, `insertat`, `setpos`, `sewpath`, …) |
-| `cmd` | delegates to the `execCmd` handler (below), with `assert` handled inline for lazy message evaluation |
+| `if`                                 | conditional with optional `elseBody`                                                                                            |
+| `transform`                          | composes a CTM matrix onto the machine's stack for the block's duration; `flushSatin` on both edges                             |
+| `effect`                             | `warp`/`humanize`/`snaptogrid`/`declump` — pushes an effect onto the machine's pen/warp stack for the block                     |
+| `output`                             | throws `ReturnSignal` (guarded: only inside a procedure, `depth > 0`)                                                           |
+| `break` / `continue`                 | throw `LoopSignal`                                                                                                              |
+| `call`                               | invoke a user procedure for its side effects                                                                                    |
+| `fillarm`                            | arm a programmable fill (`fill dir @d shape @s`) for the next `beginfill…endfill`                                               |
+| `listcmd`                            | list mutators (`append`, `insertat`, `setpos`, `sewpath`, …)                                                                    |
+| `cmd`                                | delegates to the `execCmd` handler (below), with `assert` handled inline for lazy message evaluation                            |
 
 Loops enforce `ctx.m.effectiveLimits.maxLoopIters` up front, and `while` calls
 `ctx.tick` each iteration so a non-terminating loop hits the op budget.
@@ -231,20 +231,20 @@ Most parameter commands emit a **trace note** via `ctx.traceNote` if used inside
 `initEvalExpr` installs `ctx.evalExpr(node, env, repcount, depth): Val`
 (`eval-expr.ts:12`). It ticks the op budget then switches on `node.k`:
 
-| Expr kind | Behavior |
-|-----------|----------|
-| `num` / `str` | literal (strings checked against `maxStringLength`) |
-| `var` | local (`env`) → global lookup; a missing `bare` var is "never assigned on this path" |
-| `neg` | numeric negation |
-| `list` | evaluate items, allocate an `NsList` (depth-capped) |
-| `index` | index into a list or string (`toIndex` handles negatives + bounds) |
-| `callval` | always an error (list/string values are not callable) |
-| `listfunc` | routes to `genFunc` / `queryFunc` / `listFunc` by name-table membership |
-| `bin` | binary operators |
-| `func` | scalar builtins, with `repcount` special-cased to the loop counter |
-| `callexpr` | call a user procedure *as a reporter*; error if it never `output`s |
-| `procref` | produce a `FuncRef` |
-| `trace` | the trace sandbox (below) |
+| Expr kind     | Behavior                                                                             |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `num` / `str` | literal (strings checked against `maxStringLength`)                                  |
+| `var`         | local (`env`) → global lookup; a missing `bare` var is "never assigned on this path" |
+| `neg`         | numeric negation                                                                     |
+| `list`        | evaluate items, allocate an `NsList` (depth-capped)                                  |
+| `index`       | index into a list or string (`toIndex` handles negatives + bounds)                   |
+| `callval`     | always an error (list/string values are not callable)                                |
+| `listfunc`    | routes to `genFunc` / `queryFunc` / `listFunc` by name-table membership              |
+| `bin`         | binary operators                                                                     |
+| `func`        | scalar builtins, with `repcount` special-cased to the loop counter                   |
+| `callexpr`    | call a user procedure _as a reporter_; error if it never `output`s                   |
+| `procref`     | produce a `FuncRef`                                                                  |
+| `trace`       | the trace sandbox (below)                                                            |
 
 Notable semantics:
 
@@ -318,14 +318,14 @@ every unbounded operation is metered.
 `ctx.m.effectiveLimits` (a mutable copy of `STOCK_LIMITS` that `override` can raise or
 lower, `machine/machine.ts:206`):
 
-| Function | Charges |
-|----------|---------|
-| `tick(line)` | +1 op; throws `overlongMsg()` past `maxOps` (`budget.ts:28`) |
-| `tickN(n, line)` | +n ops |
-| `charge(n, line)` | +n list cells (`maxListCells`) then +n ops |
-| `allocString(s, line)` | per-string `maxStringLength` + cumulative `maxStringChars` |
-| `allocList(items, line)` | `maxListLen` + charges cells |
-| `traceNote(kind, msg)` | one-time warning when a no-op command runs inside `trace` |
+| Function                 | Charges                                                      |
+| ------------------------ | ------------------------------------------------------------ |
+| `tick(line)`             | +1 op; throws `overlongMsg()` past `maxOps` (`budget.ts:28`) |
+| `tickN(n, line)`         | +n ops                                                       |
+| `charge(n, line)`        | +n list cells (`maxListCells`) then +n ops                   |
+| `allocString(s, line)`   | per-string `maxStringLength` + cumulative `maxStringChars`   |
+| `allocList(items, line)` | `maxListLen` + charges cells                                 |
+| `traceNote(kind, msg)`   | one-time warning when a no-op command runs inside `trace`    |
 
 `overlongMsg` (`budget.ts:15`) tailors the "ran too long" message — noting if the op
 limit was raised by `override`, and if stitch-history queries were used (a likely
@@ -374,18 +374,18 @@ Four modules install one dispatcher each; `evalExpr`'s `listfunc` branch and
 
 ## 11. Programmable reporters (`reporters.ts`)
 
-`initReporters` installs the machinery that runs *user code per emitted primitive* —
+`initReporters` installs the machinery that runs _user code per emitted primitive_ —
 the mechanism behind the language's programmable effects. Each reporter kind has a
 two-part contract: an **arity check** at the engage site and a **per-call validation**:
 
-| Reporter | Contract | Used by |
-|----------|----------|---------|
-| `applyReporter` | 1 param `[x, y]` → point | `warp @fn` (once per vertex) |
-| `applyShapeReporter` | 4 params `(t, s, i, u)` → `[advance, leftw, rightw, leftlag, rightlag]` | `satin @fn` |
-| `applyStitchLenReporter` | 4 params `(t, s, i, p)` → advance mm | `stitchlen @fn` |
-| `applyFillLenReporter` | 4 params `(t, s, i, p)` → advance mm | `filllen @fn` |
-| `applyFillDir` | 1 param `[x, y]` → heading | `fill dir @fn` |
-| `applyFillShape` | 3 params `(p, row, v)` → `[spacing, len, phase]` | `fill shape @fn` |
+| Reporter                 | Contract                                                                | Used by                      |
+| ------------------------ | ----------------------------------------------------------------------- | ---------------------------- |
+| `applyReporter`          | 1 param `[x, y]` → point                                                | `warp @fn` (once per vertex) |
+| `applyShapeReporter`     | 4 params `(t, s, i, u)` → `[advance, leftw, rightw, leftlag, rightlag]` | `satin @fn`                  |
+| `applyStitchLenReporter` | 4 params `(t, s, i, p)` → advance mm                                    | `stitchlen @fn`              |
+| `applyFillLenReporter`   | 4 params `(t, s, i, p)` → advance mm                                    | `filllen @fn`                |
+| `applyFillDir`           | 1 param `[x, y]` → heading                                              | `fill dir @fn`               |
+| `applyFillShape`         | 3 params `(p, row, v)` → `[spacing, len, phase]`                        | `fill shape @fn`             |
 
 Each validates that the reporter is defined, has the exact parameter count, reaches
 `output`, and returns the right shape — with errors that name exactly which slot went
@@ -458,25 +458,25 @@ The `RunResult` shape is defined in `types.ts:76-89`; downstream, the exporters
 
 ## 15. File reference
 
-| File | Responsibility |
-|------|----------------|
-| `interpreter.ts` | re-export shim → `interpreter/index.ts` |
-| `interpreter/index.ts` | `run()`: pipeline, context construction, module wiring, finalize |
-| `interpreter/context.ts` | `RunContext` interface (state + function slots) |
-| `interpreter/signals.ts` | `ReturnSignal`, `LoopSignal` |
-| `interpreter/budget.ts` | op/cell/string budget metering, trace notes |
-| `interpreter/guards.ts` | `truthy`, `toIndex`, `list`, `funcRef`, `checkDepth` |
-| `interpreter/eval-expr.ts` | expression evaluator + trace sandbox |
-| `interpreter/exec-stmt.ts` | statement/block/loop executor |
-| `interpreter/exec-cmd.ts` | `cmd` dispatcher (turtle + directives) |
-| `interpreter/proc-call.ts` | `callProc`, `callProcVals`, `scalarBuiltin`, `callRef` |
-| `interpreter/reporters.ts` | `@name` reporter contracts + effect clamps |
-| `interpreter/list-func.ts` | list library dispatcher |
-| `interpreter/gen-func.ts` | generative-math dispatcher |
-| `interpreter/query-func.ts` | stitch-history query dispatcher |
-| `interpreter/string-func.ts` | string library dispatcher |
-| `list.ts` | value model (`Val`, `NsList`, `FuncRef`) + value utilities |
-| `machine/` | the stitch machine (side-effect target, budgets, events) |
+| File                         | Responsibility                                                   |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `interpreter.ts`             | re-export shim → `interpreter/index.ts`                          |
+| `interpreter/index.ts`       | `run()`: pipeline, context construction, module wiring, finalize |
+| `interpreter/context.ts`     | `RunContext` interface (state + function slots)                  |
+| `interpreter/signals.ts`     | `ReturnSignal`, `LoopSignal`                                     |
+| `interpreter/budget.ts`      | op/cell/string budget metering, trace notes                      |
+| `interpreter/guards.ts`      | `truthy`, `toIndex`, `list`, `funcRef`, `checkDepth`             |
+| `interpreter/eval-expr.ts`   | expression evaluator + trace sandbox                             |
+| `interpreter/exec-stmt.ts`   | statement/block/loop executor                                    |
+| `interpreter/exec-cmd.ts`    | `cmd` dispatcher (turtle + directives)                           |
+| `interpreter/proc-call.ts`   | `callProc`, `callProcVals`, `scalarBuiltin`, `callRef`           |
+| `interpreter/reporters.ts`   | `@name` reporter contracts + effect clamps                       |
+| `interpreter/list-func.ts`   | list library dispatcher                                          |
+| `interpreter/gen-func.ts`    | generative-math dispatcher                                       |
+| `interpreter/query-func.ts`  | stitch-history query dispatcher                                  |
+| `interpreter/string-func.ts` | string library dispatcher                                        |
+| `list.ts`                    | value model (`Val`, `NsList`, `FuncRef`) + value utilities       |
+| `machine/`                   | the stitch machine (side-effect target, budgets, events)         |
 
 Interpreter behavior is exercised by tests in `src/lib/__tests__/` — notably
 `engine.test.ts`, `language.test.ts`, `loop-control.test.ts`, `lists.test.ts`,

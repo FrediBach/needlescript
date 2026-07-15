@@ -384,7 +384,10 @@ export const RESERVED = new Set<string>([
   'let',
   'def',
   'return',
-  'step',
+  // 'step' is intentionally NOT reserved. It is a positional keyword recognised
+  // only inside a modern `for` header (after the `to <expr>` position), exactly
+  // like `dir`/`shape` after `fill`.  Everywhere else — variable names,
+  // parameters, procedure definitions — `step` is an ordinary identifier.
   'true',
   'false',
   'in',

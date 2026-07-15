@@ -30,21 +30,22 @@ Reserved keywords — never use as a variable, parameter, or procedure name:
 The #1 trap is `step` (it is the for-loop keyword: `for i = 0 to 10 step 2`). In walker/particle code, name your increment `stride`, `pace`, `gap`, or `inc` — NEVER `step`.
 
 Built-in names come in two tiers:
+
 - **Core tier** (movement, stitching, control flow, transforms, effects, `fill`/`satin`, `@` references): redefining is a hard parse error. `circle`, `scale`, `rotate`, `translate`, `transform`, `warp`, `color`, `heading`, `pos`, `trace`, `random`, `distance` … are all off-limits.
 - **Library tier** (list / generative-math / string / stitch-history functions like `clamp`, `sort`, `vlen`, `str`): a user procedure technically shadows them with a console note, and variables may reuse them. **Do not do this anyway** — it confuses readers and downstream edits.
 
 Frequent collisions and safe alternatives:
 
-| Tempting name                                                                                         | Why it fails                  | Use instead                |
-| ----------------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------- |
-| `step`                                                                                                | for-loop keyword              | `stride`, `pace`, `inc`    |
-| `circle`                                                                                              | built-in command (`circle r`) | `ring`, `disc`, `blob`     |
-| `pos`                                                                                                 | built-in reporter             | `p`, `pt`, `here`          |
-| `color`                                                                                               | built-in command              | `hue`, `col`, `thread`     |
-| `heading`                                                                                             | built-in reporter             | `hdg`, `dir_deg`           |
-| `scale`, `rotate`, `translate`, `mirror`, `skew`, `transform`                                         | transform commands            | `sc`, `ang`, `dx`, …       |
-| `fill`, `satin`, `warp`, `humanize`, `declump`                                                        | Core commands                 | any other descriptive name |
-| `random`, `pick`, `sort`, `first`, `last`, `min`, `max`, `sum`, `range`, `trace`, `distance`, `str`, `num`, `upper`, `lower`, `strip`, `chars`, `split`, `clamp`, `mod` | built-ins | any other descriptive name |
+| Tempting name                                                                                                                                                           | Why it fails                  | Use instead                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------- |
+| `step`                                                                                                                                                                  | for-loop keyword              | `stride`, `pace`, `inc`    |
+| `circle`                                                                                                                                                                | built-in command (`circle r`) | `ring`, `disc`, `blob`     |
+| `pos`                                                                                                                                                                   | built-in reporter             | `p`, `pt`, `here`          |
+| `color`                                                                                                                                                                 | built-in command              | `hue`, `col`, `thread`     |
+| `heading`                                                                                                                                                               | built-in reporter             | `hdg`, `dir_deg`           |
+| `scale`, `rotate`, `translate`, `mirror`, `skew`, `transform`                                                                                                           | transform commands            | `sc`, `ang`, `dx`, …       |
+| `fill`, `satin`, `warp`, `humanize`, `declump`                                                                                                                          | Core commands                 | any other descriptive name |
+| `random`, `pick`, `sort`, `first`, `last`, `min`, `max`, `sum`, `range`, `trace`, `distance`, `str`, `num`, `upper`, `lower`, `strip`, `chars`, `split`, `clamp`, `mod` | built-ins                     | any other descriptive name |
 
 When in doubt, pick a name that is clearly yours: `petal_w`, `stride_mm`, `ring_r`. A variable and a procedure can never share a name, and parameters can't reuse a procedure or Core built-in name. (`dir` and `shape` are reserved only immediately after `fill` — as ordinary variables they're fine, but prefer other names.)
 
@@ -243,9 +244,9 @@ exit / return / return expr / output expr — leave the current procedure (only 
 ## Procedures
 
 def name(p1, p2) [
-  // body — can call itself recursively (depth limit 200)
-  // parameters are already local — never re-`let` them
-  return expr  // makes it a reporter (usable in expressions)
+// body — can call itself recursively (depth limit 200)
+// parameters are already local — never re-`let` them
+return expr // makes it a reporter (usable in expressions)
 ]
 // Classic form `to name :a :b … end` is equivalent. Call syntax: name(args) or name args.
 // Procedures can be forward-called (signatures are pre-scanned).
@@ -378,7 +379,7 @@ humanize amount [ block ] — coherent hand-stitch jitter (0–2 mm), AFTER spli
 snaptogrid cell [ block ] — snap penetrations to a FIXED HOOP-SPACE lattice (frame-invariant: stamped copies register on one shared grid). Overloads: snaptogrid cellx celly [ ] / + ox oy / + ang. Drawless. Skips satin columns (with a note).
 declump limit [ block ] / declump limit maxshift [ block ] — ease crowded penetrations ALONG the travel axis once local coverage exceeds `limit` layers; maxshift mm (default 1.5, clamp 0–5). Drawless — adding/removing never reshuffles randomness. Wrap the WHOLE motif, declump outermost: declump 2 [ humanize 0.3 [ … ] ]. Typical limit 1.5–2.5.
 // Pure data twins (map a point list instead of a block):
-warppath(path, @fn)  humanizepath(path, amount)  snappath(path, cell …)  declumppath(path, limit[, maxshift])
+warppath(path, @fn) humanizepath(path, amount) snappath(path, cell …) declumppath(path, limit[, maxshift])
 // Tip: resample first — sewpath(declumppath(resample(spine, 2.5), 2, 1.5))
 
 ## Trace (block expressions — capture turtle paths as data)
@@ -393,7 +394,7 @@ tracerings [ block ] — same, return a list of pen-down paths (one per run, dra
 // (use the *path twins on the result); machine commands (color/trim/lock) are inert.
 // No RNG fork: the block's random calls hit the main stream exactly as outside.
 // Example: let hex = trace [ repeat 6 [ fd 30 rt 60 ] ]
-//          for piece in clippaths(hex, trace [ arc 360 14 ], 'difference') [ sewpath(resample(piece, 2)) trim ]
+// for piece in clippaths(hex, trace [ arc 360 14 ], 'difference') [ sewpath(resample(piece, 2)) trim ]
 
 ## Fabric presets and professional physics (opt-in — without them, programs sew exactly as written)
 
@@ -443,12 +444,12 @@ mark / mark 'label' — drop a labelled pin on the preview at the needle (never 
 
 Annotate top-level `let` declarations with a trailing comment; the interpreter ignores them:
 
-let radius = 15  // [5:30] — integer slider
-let smooth = 0.5  // [0:1] — smooth slider
-let n = 4  // [0.5:0.5:8] — stepped slider [min:step:max]
-let wave = 1  // [switch] — toggle; // [switch:hypo,epi] — labelled toggle
-let name = 'Anna'  // [text]; let op = 'union'  // [text:union,difference,intersect] — dropdown
-let anchor = [0, 18]  // [xy] — draggable point handle; constraints: [xy: -40:0, 0:40] (rect), [xy: disc 12], [xy: disc 12 @ 5,-3], [xy: x 5:40], [xy: y -20:20], [xy: disc 25, snap 0.5]
+let radius = 15 // [5:30] — integer slider
+let smooth = 0.5 // [0:1] — smooth slider
+let n = 4 // [0.5:0.5:8] — stepped slider [min:step:max]
+let wave = 1 // [switch] — toggle; // [switch:hypo,epi] — labelled toggle
+let name = 'Anna' // [text]; let op = 'union' // [text:union,difference,intersect] — dropdown
+let anchor = [0, 18] // [xy] — draggable point handle; constraints: [xy: -40:0, 0:40] (rect), [xy: disc 12], [xy: disc 12 @ 5,-3], [xy: x 5:40], [xy: y -20:20], [xy: disc 25, snap 0.5]
 // --- Section --- — divider comment groups controls
 // @preset Classic : bigR=96, layers=8, anchor=[0,26] — named preset line (partial presets fine)
 

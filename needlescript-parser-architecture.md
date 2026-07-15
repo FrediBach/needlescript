@@ -36,7 +36,7 @@ source string
 The orchestration lives in `interpreter/index.ts:30` (`run()`):
 
 ```ts
-const tokens = tokenize(source);          // 1. lexing
+const tokens = tokenize(source); // 1. lexing
 const parseNotes: string[] = [];
 const program = parse(tokens, parseNotes); // 2. prescan (internal) + 3. parse
 // … program (ASTNode[]) is then executed by the interpreter
@@ -47,7 +47,7 @@ const program = parse(tokens, parseNotes); // 2. prescan (internal) + 3. parse
 `engine.ts:61-62`.
 
 Key design principle stated in `parser/index.ts:1-5`: the parser accepts **both**
-classic Logo syntax **and** a modern syntax (RFC-1). Every modern form *lowers* to
+classic Logo syntax **and** a modern syntax (RFC-1). Every modern form _lowers_ to
 an existing AST node, so the interpreter, stitch machine, and file exporters never
 need to know which surface syntax produced a node. Legacy programs keep working
 unchanged.
@@ -66,17 +66,16 @@ Defined in `types.ts:3-16`:
 
 ```ts
 type TokenType =
-  'num' | 'string' | 'var' | 'qword' | 'word' | 'pref' | 'op'
-  | '[' | ']' | '(' | ')' | ',';
+  'num' | 'string' | 'var' | 'qword' | 'word' | 'pref' | 'op' | '[' | ']' | '(' | ')' | ',';
 
 interface Token {
   t: TokenType;
-  v?: string | number;   // value (name, number, string contents…)
+  v?: string | number; // value (name, number, string contents…)
   line: number;
-  start: number;         // inclusive char offset
-  end: number;           // exclusive char offset
-  spBefore?: boolean;    // operator had whitespace before it
-  spAfter?: boolean;     // operator had whitespace after it
+  start: number; // inclusive char offset
+  end: number; // exclusive char offset
+  spBefore?: boolean; // operator had whitespace before it
+  spAfter?: boolean; // operator had whitespace after it
 }
 ```
 
@@ -87,16 +86,16 @@ expressions and block openers.
 
 ### 2.2 Token kinds produced
 
-| Kind      | Source form                    | Notes |
-|-----------|--------------------------------|-------|
-| `num`     | `42`, `3.14`, `.5`             | `true`/`false` fold to `1`/`0` (`tokenizer.ts:164`) |
-| `string`  | `'text'`                       | single-quoted, must close on the same line; escapes `\' \\ \n \t` only |
-| `var`     | `:name`                        | legacy Logo variable reference |
-| `qword`   | `"word` or `"word"`            | quoted word; closing quote optional (modern style) |
-| `word`    | `fd`, `myproc`, `and`          | bare identifier / keyword |
-| `pref`    | `@name`                        | procedure/function reference value (RFC effects §1) |
-| `op`      | `+ - * / < > = <= >= != % += …`| carries `spBefore`/`spAfter` |
-| brackets  | `[ ] ( ) ,`                    | structural |
+| Kind     | Source form                     | Notes                                                                  |
+| -------- | ------------------------------- | ---------------------------------------------------------------------- |
+| `num`    | `42`, `3.14`, `.5`              | `true`/`false` fold to `1`/`0` (`tokenizer.ts:164`)                    |
+| `string` | `'text'`                        | single-quoted, must close on the same line; escapes `\' \\ \n \t` only |
+| `var`    | `:name`                         | legacy Logo variable reference                                         |
+| `qword`  | `"word` or `"word"`             | quoted word; closing quote optional (modern style)                     |
+| `word`   | `fd`, `myproc`, `and`           | bare identifier / keyword                                              |
+| `pref`   | `@name`                         | procedure/function reference value (RFC effects §1)                    |
+| `op`     | `+ - * / < > = <= >= != % += …` | carries `spBefore`/`spAfter`                                           |
+| brackets | `[ ] ( ) ,`                     | structural                                                             |
 
 ### 2.3 Notable lexing rules
 
@@ -124,7 +123,7 @@ the pre-scan.
 
 ## 3. The pre-scan (`prescan.ts`)
 
-Recursive-descent needs to resolve bare identifiers *at parse time* — is `leaf` a
+Recursive-descent needs to resolve bare identifiers _at parse time_ — is `leaf` a
 procedure call, a variable read, or unknown? Because NeedleScript allows a procedure
 to be **called before it is defined** in source order, a single left-to-right parse
 cannot know every name. `prescan()` solves this with a preliminary pass family over
@@ -136,25 +135,26 @@ the token stream.
 
 ```ts
 interface PreScan {
-  procArity:   Record<string, number>;      // proc name → parameter count
-  procLine:    Record<string, number>;       // proc name → header line (for errors)
-  procLocals:  Record<string, Set<string>>;  // proc name → local variable names
-  globalNames: Set<string>;                  // names that may hold a global value
+  procArity: Record<string, number>; // proc name → parameter count
+  procLine: Record<string, number>; // proc name → header line (for errors)
+  procLocals: Record<string, Set<string>>; // proc name → local variable names
+  globalNames: Set<string>; // names that may hold a global value
 }
 ```
 
 Because NeedleScript has **no computed names** (every binding target is a literal
-token), the pre-scan is *exact* for name existence. Whether a registered name holds a
-*value* at read time is deferred to the interpreter (its "never assigned" runtime
+token), the pre-scan is _exact_ for name existence. Whether a registered name holds a
+_value_ at read time is deferred to the interpreter (its "never assigned" runtime
 error).
 
 ### 3.2 The `walk` helper and passes
 
 `walk()` (`prescan.ts:41-90`) streams tokens while tracking procedure context: which
 procedure body a token sits in (`to … end` versus `def … ( … ) [ … ]`) and whether
-the cursor is inside the bound expressions of a keyword-`for` (where `to`/`step` are
-contextual, not procedure headers). It invokes a visitor `(i, inProc, forBounds)` per
-token.
+the cursor is inside the bound expressions of a keyword-`for` (where `to` is
+contextual, not a procedure header — `step` is also contextual here but is not
+globally reserved, so no prescan guard is needed for it). It invokes a visitor
+`(i, inProc, forBounds)` per token.
 
 `prescan()` runs several passes:
 
@@ -166,7 +166,7 @@ token.
    `=`, and `for x in xs`).
 3. **Pass 2b — assignment targets** (`prescan.ts:200`): bare `x = …` / `x += …` in
    statement position. This heuristic may over-approximate (e.g. it also matches
-   `if x = 1`), but over-approximation only ever *adds* a candidate name — turning a
+   `if x = 1`), but over-approximation only ever _adds_ a candidate name — turning a
    would-be parse-time "unknown name" into at worst a runtime "never assigned". It can
    never cause a misparse, because reserved words and procedure names are excluded by
    `register()` (`prescan.ts:145-149`).
@@ -201,17 +201,17 @@ first argument.
 
 Mutable state includes:
 
-| Field           | Purpose |
-|-----------------|---------|
-| `pos`           | current token cursor |
-| `currentProc`   | name of the procedure being parsed, or `null` at top level |
-| `loopDepth`     | how many loop bodies enclose the cursor (RFC-4 `break`/`continue`); reset to 0 inside `to`/`def` bodies |
-| `declaredGlobal`| global names declared so far (double-`let` detection) |
-| `declaredLocal` | per-procedure declared names |
-| `headerCtx`     | true while parsing a `repeat`/`while`/`if`/`for` header expression |
-| `lastHeaderIndex` | last glued-index seen in a header, for `[` disambiguation errors |
-| `shadowNoted`   | library-tier names already noted as shadowed |
-| `ps`            | the full `PreScan` result |
+| Field             | Purpose                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| `pos`             | current token cursor                                                                                    |
+| `currentProc`     | name of the procedure being parsed, or `null` at top level                                              |
+| `loopDepth`       | how many loop bodies enclose the cursor (RFC-4 `break`/`continue`); reset to 0 inside `to`/`def` bodies |
+| `declaredGlobal`  | global names declared so far (double-`let` detection)                                                   |
+| `declaredLocal`   | per-procedure declared names                                                                            |
+| `headerCtx`       | true while parsing a `repeat`/`while`/`if`/`for` header expression                                      |
+| `lastHeaderIndex` | last glued-index seen in a header, for `[` disambiguation errors                                        |
+| `shadowNoted`     | library-tier names already noted as shadowed                                                            |
+| `ps`              | the full `PreScan` result                                                                               |
 
 Cross-module references (`parseExpr`, `parsePrimary`, `parseBracketBlock`,
 `parseParenArgs`, `parseParenArgsRange`) are stored as `ctx` properties and wired in
@@ -252,16 +252,16 @@ parseExpr → parseOr → parseAnd → parseCompare → parseAdd → parseMul
           → parseUnary → parsePrimary → parsePostfix
 ```
 
-| Level          | Operators / forms | Location |
-|----------------|-------------------|----------|
-| `parseOr`      | `or`              | `expressions.ts:128` |
-| `parseAnd`     | `and`             | `expressions.ts:137` |
-| `parseCompare` | `< > = <= >= !=`  | `expressions.ts:146` |
-| `parseAdd`     | `+ -`             | `expressions.ts:155` |
-| `parseMul`     | `* / %`           | `expressions.ts:170` |
-| `parseUnary`   | prefix `-`        | `expressions.ts:189` |
+| Level          | Operators / forms                                 | Location             |
+| -------------- | ------------------------------------------------- | -------------------- |
+| `parseOr`      | `or`                                              | `expressions.ts:128` |
+| `parseAnd`     | `and`                                             | `expressions.ts:137` |
+| `parseCompare` | `< > = <= >= !=`                                  | `expressions.ts:146` |
+| `parseAdd`     | `+ -`                                             | `expressions.ts:155` |
+| `parseMul`     | `* / %`                                           | `expressions.ts:170` |
+| `parseUnary`   | prefix `-`                                        | `expressions.ts:189` |
 | `parsePrimary` | literals, names, calls, `( … )`, `[ … ]`, `trace` | `expressions.ts:272` |
-| `parsePostfix` | index `[i]` and `paths[i](…)` chains | `expressions.ts:203` |
+| `parsePostfix` | index `[i]` and `paths[i](…)` chains              | `expressions.ts:203` |
 
 Notable lowerings and rules:
 
@@ -302,15 +302,17 @@ tailored error messages (e.g. the `push` vs `append` hint).
   `make`/`local`, and the modern `x = e` / `x += e` assignment (compound ops lower to
   `x = x + e`) (`statements.ts:218`, `438`, `513`).
 - **Control flow**: `repeat`, `while`, `if`/`else`/`else if`, and three `for` forms —
-  classic `for "i 0 10 1`, modern `for i = 1 to 10 [step 2]`, and `for x in xs`
-  (`forin`) (`statements.ts:314-398`).
+  classic `for "i 0 10 1`, modern `for i = 1 to 10 step 2`, and `for x in xs`
+  (`forin`) (`statements.ts:314-398`). `step` is recognised positionally in the
+  modern form (string comparison on the peeked token after `to <expr>`) and is not
+  globally reserved — `let step = 2` is valid everywhere outside a for header.
 - **Returns**: `return`/`output`/`op` and bare `return`/`exit` (both → `output` with
   `value: null`) (`statements.ts:288`, `449`).
 - **Loop control**: `break`/`continue`, guarded by `loopDepth` with a lexical error
   message when used inside a procedure whose loop is in the caller
   (`statements.ts:461`).
 - **Block commands**: `transform`-family (CTM stack) and `effect`-family
-  (`warp`/`humanize`/`snaptogrid`/`declump`), each taking args *then a block* in both
+  (`warp`/`humanize`/`snaptogrid`/`declump`), each taking args _then a block_ in both
   prefix and glued-call spellings (`statements.ts:409-436`, `566-590`).
 - **Special commands**: `print`/`printloc`, `assert`, `mark`, and the programmable
   `fill dir @d shape @s` arming form (`statements.ts:629-713`).
@@ -333,22 +335,22 @@ Block and header helpers:
 The parser is table-driven. `commands.ts` defines the name registries that the parser
 and pre-scan consult:
 
-| Table              | Meaning |
-|--------------------|---------|
-| `ALIASES`          | surface name → canonical (`forward`→`fd`) |
-| `BUILTIN_ARITY`    | Core builtin commands and their fixed arity |
-| `BUILTIN_ARITY_OPT`| commands taking one optional trailing arg (`stitchlen`, `filllen`) |
-| `TRANSFORM_ARITY`  | CTM block commands (`translate`, `rotate`, …) |
-| `EFFECT_ARITY`     | effect block commands with ranged arity |
-| `QWORD_BUILTINS`   | commands taking a single quoted word, with allowed words |
-| `FUNC_ARITY`       | value-returning math functions and arity |
-| `ZERO_FUNCS`       | zero-arg reporters (`xcor`, `heading`, …) |
-| `LIST_FUNCS` / `LIST_CMDS` | list library (RFC-2), glued-call only |
-| `GEN_FUNCS` / `GEN_CMDS`   | generative-math library (RFC-3) |
-| `QUERY_FUNCS`      | stitch-history query reporters |
-| `STRING_FUNCS`     | string library |
-| `LIBRARY_FUNCS`    | union of the shadowable "Library tier" names |
-| `RESERVED`         | "Core tier" words a user definition may **not** shadow |
+| Table                      | Meaning                                                            |
+| -------------------------- | ------------------------------------------------------------------ |
+| `ALIASES`                  | surface name → canonical (`forward`→`fd`)                          |
+| `BUILTIN_ARITY`            | Core builtin commands and their fixed arity                        |
+| `BUILTIN_ARITY_OPT`        | commands taking one optional trailing arg (`stitchlen`, `filllen`) |
+| `TRANSFORM_ARITY`          | CTM block commands (`translate`, `rotate`, …)                      |
+| `EFFECT_ARITY`             | effect block commands with ranged arity                            |
+| `QWORD_BUILTINS`           | commands taking a single quoted word, with allowed words           |
+| `FUNC_ARITY`               | value-returning math functions and arity                           |
+| `ZERO_FUNCS`               | zero-arg reporters (`xcor`, `heading`, …)                          |
+| `LIST_FUNCS` / `LIST_CMDS` | list library (RFC-2), glued-call only                              |
+| `GEN_FUNCS` / `GEN_CMDS`   | generative-math library (RFC-3)                                    |
+| `QUERY_FUNCS`              | stitch-history query reporters                                     |
+| `STRING_FUNCS`             | string library                                                     |
+| `LIBRARY_FUNCS`            | union of the shadowable "Library tier" names                       |
+| `RESERVED`                 | "Core tier" words a user definition may **not** shadow             |
 
 Two tiers govern name shadowing:
 
@@ -356,7 +358,7 @@ Two tiers govern name shadowing:
 - **Library tier** (`LIBRARY_FUNCS`, `commands.ts:357`): may be shadowed by a user
   procedure, emitting a one-time note via `noteLibraryShadow`.
 
-The Library-tier builtins use **soft reservation**: their names are *not* in
+The Library-tier builtins use **soft reservation**: their names are _not_ in
 `RESERVED`, so variables and parameters may reuse them freely (builtins are call-only,
 variables are never callable), and user procedures shadow them at call sites. They
 resolve only at glued-call position. This keeps every pre-RFC program running
@@ -435,19 +437,19 @@ here only to avoid confusion with the language front-end.
 
 ## 8. File reference
 
-| File | Responsibility |
-|------|----------------|
-| `tokenizer.ts` | `tokenize()` — source → `Token[]` |
-| `prescan.ts` | `prescan()` — token stream → `PreScan` (names, arity, scopes) |
-| `parser/index.ts` | `parse()` entry, `ParseContext` construction, top-level loop, reporter-path check |
-| `parser/context.ts` | `ParseContext` interface (shared state + helpers) |
-| `parser/expressions.ts` | precedence ladder, primaries, argument lists, postfix chains |
-| `parser/statements.ts` | statement dispatcher, blocks, headers |
-| `parser/analysis.ts` | static control-flow analysis for reporter paths |
-| `commands.ts` | name/arity/reservation tables driving parser dispatch |
-| `suggestions.ts` | bounded edit-distance "did you mean?" helper |
-| `errors.ts` | `NeedlescriptError` |
-| `types.ts` | `Token`, `TokenType`, `ASTNode`, `ExprNode` and related types |
+| File                    | Responsibility                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `tokenizer.ts`          | `tokenize()` — source → `Token[]`                                                 |
+| `prescan.ts`            | `prescan()` — token stream → `PreScan` (names, arity, scopes)                     |
+| `parser/index.ts`       | `parse()` entry, `ParseContext` construction, top-level loop, reporter-path check |
+| `parser/context.ts`     | `ParseContext` interface (shared state + helpers)                                 |
+| `parser/expressions.ts` | precedence ladder, primaries, argument lists, postfix chains                      |
+| `parser/statements.ts`  | statement dispatcher, blocks, headers                                             |
+| `parser/analysis.ts`    | static control-flow analysis for reporter paths                                   |
+| `commands.ts`           | name/arity/reservation tables driving parser dispatch                             |
+| `suggestions.ts`        | bounded edit-distance "did you mean?" helper                                      |
+| `errors.ts`             | `NeedlescriptError`                                                               |
+| `types.ts`              | `Token`, `TokenType`, `ASTNode`, `ExprNode` and related types                     |
 
 Tests covering the front-end live in `src/lib/__tests__/` — notably
 `tokenizer.test.ts`, `parser.test.ts`, `modern-syntax.test.ts`, and `language.test.ts`.

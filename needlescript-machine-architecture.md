@@ -31,8 +31,8 @@ The interpreter never emits stitches directly. It computes values and control fl
 then calls methods on its `ctx.m` (a `Machine` instance). The machine owns turtle
 state, the transform/effect stacks, satin/fill buffering and generation, the coverage
 grid, the run budgets, and the accumulating `events` array. This separation keeps the
-layers clean: the interpreter is *language semantics*, the machine is *embroidery
-physics and event accumulation*.
+layers clean: the interpreter is _language semantics_, the machine is _embroidery
+physics and event accumulation_.
 
 ---
 
@@ -67,16 +67,17 @@ The machine's product is `events: StitchEvent[]` (`types.ts:20-28`):
 ```ts
 interface StitchEvent {
   t: 'stitch' | 'jump' | 'color' | 'trim' | 'mark';
-  x: number; y: number;   // hoop-space coordinates (mm)
-  c: number;              // color index
-  line?: number;          // source line that produced it (debugging/preview)
-  u?: 1;                  // underlay stitch (drawn lighter in previews)
-  label?: string;         // mark events only
+  x: number;
+  y: number; // hoop-space coordinates (mm)
+  c: number; // color index
+  line?: number; // source line that produced it (debugging/preview)
+  u?: 1; // underlay stitch (drawn lighter in previews)
+  label?: string; // mark events only
 }
 ```
 
 Every event is in **hoop space** — the machine maps local turtle coordinates through
-the transform/warp stack *before* pushing. `line` carries the source line (or the
+the transform/warp stack _before_ pushing. `line` carries the source line (or the
 caller's line, when inside a procedure) so previews can highlight the responsible code.
 
 ---
@@ -86,19 +87,19 @@ caller's line, when inside a procedure) so previews can highlight the responsibl
 The `Machine` class (`machine/machine.ts:108`) is a large mutable object. Its state
 groups into:
 
-| Group | Fields | Notes |
-|-------|--------|-------|
-| Turtle | `x`, `y`, `heading`, `penDown` | always in **local** space |
-| Stitch config | `stitchLen`, `stitchLenList`/`Reporter`, `mode`, `beanRepeats` | one of numeric / list / reporter stitch-length forms active at a time |
-| Satin | `satinWidth`, `satinSpacing`, `satinSide`, `eWidth`, `satinReporter`, `satinPath` | buffered column |
-| Fill | `fillAngle`, `fillSpacing`, `fillLen`(+list/reporter), `fillArmed`, `fillDirReporter`, `fillShapeReporter` | tatami + programmable |
-| Physics | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity` | fabric-tunable |
-| Output | `events`, `warnings`, `colorIdx`, `lastEmit`, `started` | accumulation |
-| Transform stack | `ctm`, `outLayers`, `hasWarp`, `penLayers`, `declumpStack` | see §6 |
-| Hoop | `hoopInfo`, `hoopSet`, `fieldLocked`, `fieldOverflows` | see §9 |
-| Budgets | `effectiveLimits`, `activeOverrides` | see §10 |
-| Coverage | `density` (a `DensityGrid`), `usedQuery` | see §8 |
-| Trace | `traceRecording`, `traceRuns`, `noEmit` | see §11 |
+| Group           | Fields                                                                                                               | Notes                                                                 |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Turtle          | `x`, `y`, `heading`, `penDown`                                                                                       | always in **local** space                                             |
+| Stitch config   | `stitchLen`, `stitchLenList`/`Reporter`, `mode`, `beanRepeats`                                                       | one of numeric / list / reporter stitch-length forms active at a time |
+| Satin           | `satinWidth`, `satinSpacing`, `satinSide`, `eWidth`, `satinReporter`, `satinPath`                                    | buffered column                                                       |
+| Fill            | `fillAngle`, `fillSpacing`, `fillLen`(+list/reporter), `fillArmed`, `fillDirReporter`, `fillShapeReporter`           | tatami + programmable                                                 |
+| Physics         | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity` | fabric-tunable                                                        |
+| Output          | `events`, `warnings`, `colorIdx`, `lastEmit`, `started`                                                              | accumulation                                                          |
+| Transform stack | `ctm`, `outLayers`, `hasWarp`, `penLayers`, `declumpStack`                                                           | see §6                                                                |
+| Hoop            | `hoopInfo`, `hoopSet`, `fieldLocked`, `fieldOverflows`                                                               | see §9                                                                |
+| Budgets         | `effectiveLimits`, `activeOverrides`                                                                                 | see §10                                                               |
+| Coverage        | `density` (a `DensityGrid`), `usedQuery`                                                                             | see §8                                                                |
+| Trace           | `traceRecording`, `traceRuns`, `noEmit`                                                                              | see §11                                                               |
 
 `effectiveLimits` starts as a mutable copy of `STOCK_LIMITS`
 (`machine/machine.ts:206`) so `override` can raise/lower budgets per run without
@@ -130,8 +131,8 @@ dispatches, in order:
    - **Uniform numeric** (`957`) — split into equal `ceil(hlen / stitchLen)` steps.
 
 A crucial invariant, repeated in the comments: **transform the path, then stitch it.**
-Both endpoints are mapped to hoop space *first* (`mapOut`), and splitting is done on the
-*hoop-space* length, so physical stitch length stays correct under scaling. With no warp
+Both endpoints are mapped to hoop space _first_ (`mapOut`), and splitting is done on the
+_hoop-space_ length, so physical stitch length stays correct under scaling. With no warp
 active, `mapOut` is exactly `apply(ctm, …)` — the byte-identical fast path that keeps
 non-transformed output unchanged.
 
@@ -161,11 +162,11 @@ The machine maintains three separate stacks, all block-scoped by the interpreter
 
 - **Pre-split output stack** (`outLayers`, `ctm`, `hasWarp`) — the `translate`/`rotate`/
   `scale`/…​ CTM and nonlinear `warp` reporters. Pushed via `pushTransform`/`pushWarp`,
-  popped via `popOut` (`255-279`). Applied to geometry *before* stitch splitting.
+  popped via `popOut` (`255-279`). Applied to geometry _before_ stitch splitting.
   `ctm` is the collapsed affine of all transform layers (warps ignored); `mapOut`
   (`510`) applies the full stack inside-out when a warp is present.
 - **After-split penetration stack** (`penLayers`) — `humanize`/`snaptogrid` maps applied
-  to each *final* penetration point (`pushPen`/`popPen`, `282-287`).
+  to each _final_ penetration point (`pushPen`/`popPen`, `282-287`).
 - **Declump stack** (`declumpStack`) — stateful along-axis crowd-relief folds that need
   lookahead over the full split sequence, so they run on a pre-computed point list
   (`pushDeclump`/`popDeclump`, `290-295`).
@@ -173,7 +174,7 @@ The machine maintains three separate stacks, all block-scoped by the interpreter
 The affine math lives in `affine.ts`: `Mat` is a 2×3 matrix `[a,b,c,d,e,f]`; `compose`
 composes inside-out (OpenSCAD reading); `apply`/`linApply` map points/directions; and
 constructors (`mTranslate`, `mRotate`, `mScale`, `mMirror`, `mSkew`, `mRaw`) use turtle
-conventions. Because the transform *block commands* and the pure *path functions*
+conventions. Because the transform _block commands_ and the pure _path functions_
 (`xlate`/`xrotate`/…) call the same matrices, a transform block and its `x*` companion
 produce bit-identical geometry — a property the test suite pins (`affine.ts:1-12`).
 
@@ -235,7 +236,7 @@ the programmable generator so the per-row length function is honored (`2448`).
 The machine feeds every committed penetration to a live `DensityGrid`
 (`postprocess.ts:192`) in sewing order, via `_push`. The grid maintains:
 
-- a 1 mm **cell grid** accumulating penetration counts and thread *length* per cell
+- a 1 mm **cell grid** accumulating penetration counts and thread _length_ per cell
   (coverage in "layers" = length × thread width / cell area), with per-cell source-line
   attribution for hotspot warnings;
 - a **micro map** (0.15 mm) counting needle stacks in the same hole;
@@ -273,7 +274,7 @@ Two tables (`machine/limits.ts`):
 - **`LIMITS`** — physics/format constants: `minStitch` (0.4 mm), `maxStitch` (12 mm),
   `maxListDepth`, `maxTraceVertices`, the sewable radius, etc. These are not overridable
   (they protect the machine and fabric).
-- **`STOCK_LIMITS`** — the per-run *computational* budgets: `maxStitches`, `maxOps`,
+- **`STOCK_LIMITS`** — the per-run _computational_ budgets: `maxStitches`, `maxOps`,
   `maxCallDepth`, `maxLoopIters`, `maxListLen`/`maxListCells`, string budgets, and
   generator input caps. `BudgetKey` is the union of these keys.
 
@@ -292,7 +293,7 @@ sewing. The machine cooperates via:
 
 - **`snapshotForTrace`** (`306`) — captures every piece of sandboxed state (turtle,
   stitch config, satin/fill buffers, stacks, color, event length…). Warnings are
-  deliberately *not* snapshotted, so one-time notes escape the sandbox.
+  deliberately _not_ snapshotted, so one-time notes escape the sandbox.
 - **`setupTraceSandbox`** (`392`) — enters recording mode with a clean coordinate frame;
   `noEmit` makes `_push` a no-op.
 - **`travel`** (`730`) records the pre-split spine into `traceRuns` (capped at
@@ -332,7 +333,7 @@ After execution the interpreter runs the machine's `events` through pure passes 
 - **`designStats`** (`416`) — summary metrics (stitch/jump/trim counts, bounds, yarn
   length, max stitch length…).
 
-The interpreter orders these deliberately: density is analysed *before* locks (so
+The interpreter orders these deliberately: density is analysed _before_ locks (so
 tie-offs don't read as hotspots), then locks are applied. The results populate the final
 `RunResult` (`types.ts:76-89`), which the exporters consume.
 
@@ -358,18 +359,18 @@ tie-offs don't read as hotspots), then locks are applied. The results populate t
 
 ## 15. File reference
 
-| File | Responsibility |
-|------|----------------|
-| `machine.ts` | re-export shim → `machine/index.ts` |
-| `machine/index.ts` | barrel: `LIMITS`, `STOCK_LIMITS`, `OVERRIDE_*`, `BudgetKey`, `Machine` |
-| `machine/limits.ts` | physics constants + overridable per-run budgets |
-| `machine/machine.ts` | the `Machine` class: turtle, stacks, running/satin/e-stitch, fills, trace |
-| `machine/fill.ts` | standalone tatami scanline fill generator |
-| `affine.ts` | 2×3 affine matrix math shared by the transform stack |
-| `postprocess.ts` | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats` |
-| `effects.ts`, `declump.ts` | after-split effect maps and declump fold state |
-| `hoop-presets.ts` | hoop presets and sewable-field geometry |
-| `types.ts` | `StitchEvent`, `HoopInfo`, `RunResult`, `DesignStats`, density types |
+| File                       | Responsibility                                                            |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `machine.ts`               | re-export shim → `machine/index.ts`                                       |
+| `machine/index.ts`         | barrel: `LIMITS`, `STOCK_LIMITS`, `OVERRIDE_*`, `BudgetKey`, `Machine`    |
+| `machine/limits.ts`        | physics constants + overridable per-run budgets                           |
+| `machine/machine.ts`       | the `Machine` class: turtle, stacks, running/satin/e-stitch, fills, trace |
+| `machine/fill.ts`          | standalone tatami scanline fill generator                                 |
+| `affine.ts`                | 2×3 affine matrix math shared by the transform stack                      |
+| `postprocess.ts`           | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`            |
+| `effects.ts`, `declump.ts` | after-split effect maps and declump fold state                            |
+| `hoop-presets.ts`          | hoop presets and sewable-field geometry                                   |
+| `types.ts`                 | `StitchEvent`, `HoopInfo`, `RunResult`, `DesignStats`, density types      |
 
 Machine behavior is exercised by tests in `src/lib/__tests__/` — notably
 `engine.test.ts`, `satin-shape.test.ts`, `fill-shape.test.ts`, `transforms.test.ts`,

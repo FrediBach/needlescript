@@ -154,6 +154,19 @@ describe('keyword for', () => {
   it('the counter does not leak (test #5)', () => {
     expect(() => run('for i = 1 to 3 [ fd 1 ] print i')).toThrow(/never assigned on this path/);
   });
+
+  it('step is a contextual keyword — usable as a variable in the step position', () => {
+    // `step` as a plain variable whose value feeds the for-header step slot.
+    expect(printed('let step = 3  for i = 1 to 9 step step [ print i ]')).toEqual(['1', '4', '7']);
+  });
+
+  it('step usable as the loop counter name', () => {
+    expect(printed('for step = 1 to 4 [ print step ]')).toEqual(['1', '2', '3', '4']);
+  });
+
+  it('step usable as a let variable alongside a for loop', () => {
+    expect(printed('let step = 2  for i = 1 to 6 step step [ print i ]')).toEqual(['1', '3', '5']);
+  });
 });
 
 // ── 6: else if ──────────────────────────────────────────────────────────────
@@ -276,7 +289,8 @@ describe('definition-time collision errors (§4.3)', () => {
     expect(() => run('let repeat = 1')).toThrow(/"repeat" is a reserved word/);
     expect(() => run('let sin = 1')).toThrow(/"sin" is a built-in function/);
     expect(() => run('let fd = 1')).toThrow(/"fd" is a built-in command/);
-    expect(() => run('let step = 1')).toThrow(/"step" is a reserved word/);
+    // `step` is contextual (only special inside a for header), not globally reserved.
+    expect(printed('let step = 7 print step')).toEqual(['7']);
   });
 
   it('assigning to a procedure name errors (test #13)', () => {
@@ -304,9 +318,10 @@ describe('definition-time collision errors (§4.3)', () => {
     expect(() => run('to f :sin fd :sin end')).toThrow(/"sin" is a built-in function/);
   });
 
-  it('"step" is fully reserved as a definition name', () => {
-    expect(() => run('to step fd 1 end')).toThrow(/built-in word/);
-    expect(() => run('def step(x) [ fd x ]')).toThrow(/built-in word/);
+  it('"step" is a contextual keyword — usable as a procedure or parameter name', () => {
+    // `step` is only special in the for-header position; elsewhere it is an ordinary name.
+    expect(printed('to step output 99 end  print step')).toEqual(['99']);
+    expect(printed('def step(x) [ return x * 2 ]  print step(3)')).toEqual(['6']);
   });
 });
 

@@ -7,12 +7,12 @@ The repo contains two build targets: a Vite-based playground app and a publishab
 
 The language pipeline in `src/lib/` is documented in detail. Read the relevant document before making non-trivial changes to these areas — each explains the module layout, data flow, and design rationale, with `file:line` references.
 
-| Document                                    | Covers                                                                                             |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `needlescript-language-reference.md`        | Agent-oriented language reference |
-| `needlescript-parser-architecture.md`       | Front-end: tokenizer, pre-scan, recursive-descent parser, AST (`tokenizer.ts`, `prescan.ts`, `parser/`) |
-| `needlescript-interpreter-architecture.md`  | Evaluation: tree-walking interpreter, value model, budgets, reporters (`interpreter/`, `list.ts`)  |
-| `needlescript-machine-architecture.md`      | Stitch machine: turtle, transform stacks, satin/fill generation, coverage, output (`machine/`)     |
+| Document                                   | Covers                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `needlescript-language-reference.md`       | Agent-oriented language reference                                                                       |
+| `needlescript-parser-architecture.md`      | Front-end: tokenizer, pre-scan, recursive-descent parser, AST (`tokenizer.ts`, `prescan.ts`, `parser/`) |
+| `needlescript-interpreter-architecture.md` | Evaluation: tree-walking interpreter, value model, budgets, reporters (`interpreter/`, `list.ts`)       |
+| `needlescript-machine-architecture.md`     | Stitch machine: turtle, transform stacks, satin/fill generation, coverage, output (`machine/`)          |
 
 The end-to-end flow is: source → `tokenize` → `parse` → `run` (interpreter drives the `Machine`) → `RunResult` → exporters. Keep these docs updated when you change the corresponding modules.
 
