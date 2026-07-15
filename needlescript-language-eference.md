@@ -1,6 +1,6 @@
 # NeedleScript Language Reference
 
-Agent-oriented reference for NeedleScript — a Logo-inspired language for generative machine embroidery. Programs are turtle-graphics code compiled to machine stitches (running, satin, bean, blanket, tatami fills) and exported as Tajima `.DST`.
+Language reference for NeedleScript — a Logo-inspired language for generative machine embroidery. Programs are turtle-graphics code compiled to machine stitches (running, satin, bean, blanket, tatami fills) and exported as Tajima `.DST`.
 
 ---
 
