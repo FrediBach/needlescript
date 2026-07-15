@@ -35,13 +35,6 @@ def contour_fill(poly, gap) [
 // triangle with its centroid at the origin (vertices ~30 mm out, safely in-field)
 let tri = [[-26, -15], [26, -15], [0, 30]]
 
-// crisp outline first
-color 1
-bean 3
-sew_ring(tri)
-bean 1
-trim
-
 // then the contour fill, 0.8 mm between rings
 color 2
 contour_fill(tri, 0.8)
