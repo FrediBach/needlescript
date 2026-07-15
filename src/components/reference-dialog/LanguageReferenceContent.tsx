@@ -1,4 +1,4 @@
-import languageReference from '../../../needlescript-language-eference.md?raw';
+import languageReference from '../../../needlescript-language-reference.md?raw';
 import { MarkdownContent } from './MarkdownContent';
 
 interface LanguageReferenceContentProps {
