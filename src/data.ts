@@ -1,93 +1,5 @@
 // Shared constants for the NeedleScript playground UI
 
-import bloomRaw from '../examples/bloom.ns?raw';
-import pivotRaw from '../examples/pivot.ns?raw';
-import wreathRaw from '../examples/wreath.ns?raw';
-import wanderRaw from '../examples/wander.ns?raw';
-import starRaw from '../examples/star.ns?raw';
-import badgeRaw from '../examples/badge.ns?raw';
-import samplerRaw from '../examples/sampler.ns?raw';
-import wavesRaw from '../examples/waves.ns?raw';
-import treeRaw from '../examples/tree.ns?raw';
-import fernRaw from '../examples/fern.ns?raw';
-import flowRaw from '../examples/flow.ns?raw';
-import shellRaw from '../examples/shell.ns?raw';
-import patchRaw from '../examples/patch.ns?raw';
-import meadowRaw from '../examples/meadow.ns?raw';
-import echoRaw from '../examples/echo.ns?raw';
-import shatterRaw from '../examples/shatter.ns?raw';
-import lorenzRaw from '../examples/lorenz-attractor.ns?raw';
-import meanderRaw from '../examples/meandering-spiral.ns?raw';
-import snowflakeRaw from '../examples/snowflake.ns?raw';
-import orbitsRaw from '../examples/threaded-orbits.ns?raw';
-import waveformsRaw from '../examples/waveforms.ns?raw';
-import fillRaw from '../examples/fill.ns?raw';
-import linesRaw from '../examples/lines.ns?raw';
-import vennRaw from '../examples/venn.ns?raw';
-import contourRaw from '../examples/contour.ns?raw';
-import spirographRaw from '../examples/spirograph.ns?raw';
-import complexspirographRaw from '../examples/complex-spirograph.ns?raw';
-import disturbanceRaw from '../examples/disturbance.ns?raw';
-import lfowavesRaw from '../examples/lfowaves.ns?raw';
-import wavefrontRaw from '../examples/wavefront.ns?raw';
-import ngonRaw from '../examples/ngon.ns?raw';
-import ginghamRaw from '../examples/gingham.ns?raw';
-import boustrophedonRaw from '../examples/boustrophedon.ns?raw';
-import doublespiralRaw from '../examples/doublespiral.ns?raw';
-import ampmod1Raw from '../examples/ampmod1.ns?raw';
-import ampmod2Raw from '../examples/ampmod2.ns?raw';
-import flowerRaw from '../examples/flower.ns?raw';
-import spirolateralRaw from '../examples/spirolateral.ns?raw';
-import spiderwebRaw from '../examples/spiderweb.ns?raw';
-import japan1Raw from '../examples/japan1.ns?raw';
-import japan2Raw from '../examples/japan2.ns?raw';
-import hilbert1Raw from '../examples/hilbert1.ns?raw';
-import hilbert2Raw from '../examples/hilbert2.ns?raw';
-import lissajousRaw from '../examples/lissajous.ns?raw';
-import fishRaw from '../examples/fish.ns?raw';
-import turtleRaw from '../examples/turtle.ns?raw';
-import needlescript1Raw from '../examples/needlescript1.ns?raw';
-import needlescript2Raw from '../examples/needlescript2.ns?raw';
-import eclipseRaw from '../examples/eclipse.ns?raw';
-import transformsRaw from '../examples/transforms.ns?raw';
-import warpRaw from '../examples/warp.ns?raw';
-import humanizeRaw from '../examples/humanize.ns?raw';
-import snaptogridRaw from '../examples/snaptogrid.ns?raw';
-import stippleRaw from '../examples/stipple.ns?raw';
-import extrudeRaw from '../examples/extrude.ns?raw';
-import pixelatedRaw from '../examples/pixelated.ns?raw';
-import warpedlines1Raw from '../examples/warpedlines1.ns?raw';
-import warpedlines2Raw from '../examples/warpedlines2.ns?raw';
-import warpedlines3Raw from '../examples/warpedlines3.ns?raw';
-import sinewavesRaw from '../examples/sinewaves.ns?raw';
-import quantizedRaw from '../examples/quantized.ns?raw';
-import customsatinRaw from '../examples/customsatin.ns?raw';
-import customfillRaw from '../examples/customfill.ns?raw';
-import functionalRaw from '../examples/functional.ns?raw';
-import ornalineRaw from '../examples/ornaline.ns?raw';
-import runnerRaw from '../examples/runner.ns?raw';
-import trianglesRaw from '../examples/triangles.ns?raw';
-import snakeRaw from '../examples/snake.ns?raw';
-import crossingsRaw from '../examples/crossings.ns?raw';
-import distancebandsRaw from '../examples/distancebands.ns?raw';
-import snaptoguideRaw from '../examples/snaptoguide.ns?raw';
-import starburstRaw from '../examples/starburst.ns?raw';
-import composeRaw from '../examples/compose.ns?raw';
-import traceRegionsRaw from '../examples/trace-regions.ns?raw';
-import traceMotifsRaw from '../examples/trace-motifs.ns?raw';
-import tracemanRaw from '../examples/traceman.ns?raw';
-import coilsatinRaw from '../examples/coilsatin.ns?raw';
-import easingRaw from '../examples/easing.ns?raw';
-import bannerRaw from '../examples/banner.ns?raw';
-import barsRaw from '../examples/bars.ns?raw';
-import billiardRaw from '../examples/billiard.ns?raw';
-import fermatRaw from '../examples/fermat.ns?raw';
-import kanthabandsRaw from '../examples/kantha-bands.ns?raw';
-import vortexRaw from '../examples/vortex.ns?raw';
-import triangleRaw from '../examples/triangle.ns?raw';
-import echofillRaw from '../examples/echofill.ns?raw';
-import cutbarRaw from '../examples/cutbar.ns?raw';
-
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
   '#31604F', // 1 — forest
@@ -120,200 +32,55 @@ export const HOOPS: HoopConfig[] = [
 
 export const DEFAULT_HOOP: HoopConfig = HOOPS[0];
 
-// All examples loaded from .ns files in /examples.
-// Keys are the short display names used as labels and as lookup keys in App.tsx.
-export const EXAMPLES: Record<string, string> = {
-  bloom: bloomRaw,
-  pivot: pivotRaw,
-  wreath: wreathRaw,
-  wander: wanderRaw,
-  star: starRaw,
-  badge: badgeRaw,
-  sampler: samplerRaw,
-  waves: wavesRaw,
-  shell: shellRaw,
-  tree: treeRaw,
-  fern: fernRaw,
-  flow: flowRaw,
-  patch: patchRaw,
-  lorenz: lorenzRaw,
-  meander: meanderRaw,
-  snowflake: snowflakeRaw,
-  orbits: orbitsRaw,
-  waveforms: waveformsRaw,
-  venn: vennRaw,
-  'spirograph 1': spirographRaw,
-  'spirograph 2': complexspirographRaw,
-  disturbance: disturbanceRaw,
-  boustrophedon: boustrophedonRaw,
-  lfowaves: lfowavesRaw,
-  wavefront: wavefrontRaw,
-  echo: echoRaw,
-  shatter: shatterRaw,
-  meadow: meadowRaw,
-  contour: contourRaw,
-  lines: linesRaw,
-  fill: fillRaw,
-  ngon: ngonRaw,
-  gingham: ginghamRaw,
-  doublespiral: doublespiralRaw,
-  ampmod1: ampmod1Raw,
-  ampmod2: ampmod2Raw,
-  flower: flowerRaw,
-  spirolateral: spirolateralRaw,
-  spiderweb: spiderwebRaw,
-  japan1: japan1Raw,
-  japan2: japan2Raw,
-  hilbert1: hilbert1Raw,
-  hilbert2: hilbert2Raw,
-  lissajous: lissajousRaw,
-  fish: fishRaw,
-  turtle: turtleRaw,
-  needlescript1: needlescript1Raw,
-  needlescript2: needlescript2Raw,
-  eclipse: eclipseRaw,
-  transforms: transformsRaw,
-  warp: warpRaw,
-  humanize: humanizeRaw,
-  snaptogrid: snaptogridRaw,
-  stipple: stippleRaw,
-  extrude: extrudeRaw,
-  pixelated: pixelatedRaw,
-  warpedlines1: warpedlines1Raw,
-  warpedlines2: warpedlines2Raw,
-  warpedlines3: warpedlines3Raw,
-  sinewaves: sinewavesRaw,
-  quantized: quantizedRaw,
-  'custom satin': customsatinRaw,
-  'custom fill': customfillRaw,
-  functional: functionalRaw,
-  ornaline: ornalineRaw,
-  runner: runnerRaw,
-  triangles: trianglesRaw,
-  snake: snakeRaw,
-  crossings: crossingsRaw,
-  'distance bands': distancebandsRaw,
-  'snap to guide': snaptoguideRaw,
-  starburst: starburstRaw,
-  compose: composeRaw,
-  'trace regions': traceRegionsRaw,
-  'trace motifs': traceMotifsRaw,
-  traceman: tracemanRaw,
-  coilsatin: coilsatinRaw,
-  easing: easingRaw,
-  banner: bannerRaw,
-  bars: barsRaw,
-  billiard: billiardRaw,
-  fermat: fermatRaw,
-  'kantha bands': kanthabandsRaw,
-  vortex: vortexRaw,
-  triangle: triangleRaw,
-  echofill: echofillRaw,
-  'cut bar': cutbarRaw
-};
+export interface Example {
+  id: string;
+  label: string;
+  source: string;
+  tier: string;
+}
 
-// Complexity tiers — used to group examples in the UI picker.
-export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
-  {
-    label: 'intro',
-    keys: [
-      'bloom',
-      'wreath',
-      'wander',
-      'star',
-      'badge',
-      'sampler',
-      'waves',
-      'shell',
-      'boustrophedon',
-      'doublespiral',
-      'flower',
-      'spiderweb',
-      'japan1',
-      'japan2',
-      'hilbert1',
-      'hilbert2',
-      'lissajous',
-      'fish',
-      'eclipse',
-      'transforms',
-      'warp',
-      'humanize',
-      'snaptogrid',
-      'custom satin',
-      'pixelated',
-      'triangles',
-      'traceman',
-      'trace regions',
-      'bars',
-      'fermat',
-      'vortex',
-    ],
-  },
-  {
-    label: 'intermediate',
-    keys: [
-      'tree',
-      'fern',
-      'flow',
-      'patch',
-      'lorenz',
-      'meander',
-      'snowflake',
-      'orbits',
-      'waveforms',
-      'venn',
-      'spirograph 1',
-      'spirograph 2',
-      'spirolateral',
-      'disturbance',
-      'lfowaves',
-      'wavefront',
-      'ngon',
-      'gingham',
-      'ampmod1',
-      'ampmod2',
-      'sinewaves',
-      'quantized',
-      'runner',
-      'crossings',
-      'distance bands',
-      'snap to guide',
-      'starburst',
-      'compose',
-      'trace motifs',
-      'coilsatin',
-      'easing',
-      'billiard',
-      'triangle',
-      'cut bar'
-    ],
-  },
-  {
-    label: 'advanced',
-    keys: [
-      'echo',
-      'shatter',
-      'meadow',
-      'contour',
-      'lines',
-      'fill',
-      'custom fill',
-      'echofill',
-      'turtle',
-      'needlescript1',
-      'needlescript2',
-      'stipple',
-      'extrude',
-      'warpedlines1',
-      'warpedlines2',
-      'warpedlines3',
-      'functional',
-      'ornaline',
-      'snake',
-      'pivot',
-      'banner',
-      'kantha bands',
-    ],
-  },
-];
+export interface ExampleTier {
+  label: string;
+  examples: Example[];
+}
+
+const exampleFiles = import.meta.glob('../examples/*/*.ns', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+}) as Record<string, string>;
+
+function labelForExample(id: string): string {
+  return id
+    .replaceAll('-', ' ')
+    .replace(/([a-z])(\d)/g, '$1 $2')
+    .replace(/(\d)([a-z])/g, '$1 $2');
+}
+
+const examples = Object.entries(exampleFiles)
+  .map(([path, source]): Example => {
+    const match = path.match(/^\.\.\/examples\/([^/]+)\/([^/]+)\.ns$/);
+    if (!match) throw new Error(`Invalid example path: ${path}`);
+
+    const [, tier, id] = match;
+    return { id, label: labelForExample(id), source, tier };
+  })
+  .sort((a, b) => a.tier.localeCompare(b.tier) || a.label.localeCompare(b.label));
+
+// IDs are filename slugs. Adding a .ns file to a tier directory registers it automatically.
+export const EXAMPLES: Record<string, string> = Object.fromEntries(
+  examples.map(({ id, source }) => [id, source]),
+);
+
+const examplesByTier = examples.reduce<Record<string, Example[]>>((tiers, example) => {
+  (tiers[example.tier] ??= []).push(example);
+  return tiers;
+}, {});
+
+const EXAMPLE_TIER_ORDER = ['intro', 'intermediate', 'advanced'];
+
+export const EXAMPLE_TIERS: ExampleTier[] = Object.entries(examplesByTier)
+  .map(([label, tierExamples]) => ({ label, examples: tierExamples }))
+  .sort((a, b) => EXAMPLE_TIER_ORDER.indexOf(a.label) - EXAMPLE_TIER_ORDER.indexOf(b.label));
+
+export const DEFAULT_EXAMPLE_ID = 'bloom';

@@ -22,7 +22,7 @@ import { toDST } from './lib/dst.ts';
 import { toPES } from './lib/pes.ts';
 import { toEXP } from './lib/exp.ts';
 import { toSVG } from './lib/svg.ts';
-import { THREADS, EXAMPLES, DEFAULT_HOOP } from './data.ts';
+import { THREADS, EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP } from './data.ts';
 import type { HoopConfig } from './data.ts';
 import type { ExportFormat } from './components/Header.tsx';
 import { parseParameters, updatePointParameter } from './lib/parse-parameters.ts';
@@ -151,8 +151,7 @@ function DialogSpinner() {
 }
 
 export default function App() {
-  const firstKey = Object.keys(EXAMPLES)[0];
-  const [source, setSource] = useState(EXAMPLES[firstKey]);
+  const [source, setSource] = useState(EXAMPLES[DEFAULT_EXAMPLE_ID]);
   // Live ref that always holds the current source code.  Used by handleRun so
   // the Header's Run button never captures a stale closure value — same
   // principle as sourceRef in EditorPane.
@@ -394,8 +393,8 @@ export default function App() {
     setSource,
     runProgram,
     addMsg,
-    fallbackSrc: EXAMPLES[firstKey],
-    fallbackName: 'bloom',
+    fallbackSrc: EXAMPLES[DEFAULT_EXAMPLE_ID],
+    fallbackName: DEFAULT_EXAMPLE_ID,
     onLoad: clearActiveSnippet,
   });
 
@@ -550,7 +549,7 @@ export default function App() {
     const hasShare = new URLSearchParams(window.location.search).has('share');
     if (!hasShare) {
       // Run on first paint via a microtask so state is settled
-      Promise.resolve().then(() => runProgram(EXAMPLES[firstKey], 'bloom'));
+      Promise.resolve().then(() => runProgram(EXAMPLES[DEFAULT_EXAMPLE_ID], DEFAULT_EXAMPLE_ID));
     }
   }
 

@@ -149,9 +149,9 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
               <SelectLabel className="text-label tracking-[0.13em] uppercase text-faint">
                 {tier.label}
               </SelectLabel>
-              {tier.keys.map((k) => (
-                <SelectItem key={k} value={k}>
-                  {k}
+              {tier.examples.map((example) => (
+                <SelectItem key={example.id} value={example.id}>
+                  {example.label}
                 </SelectItem>
               ))}
             </SelectGroup>
@@ -292,9 +292,9 @@ function HamburgerMenu({
                   >
                     {tier.label}
                   </DropdownMenuLabel>
-                  {tier.keys.map((k) => (
-                    <DropdownMenuItem key={k} onClick={() => onExampleSelect(k)}>
-                      {k}
+                  {tier.examples.map((example) => (
+                    <DropdownMenuItem key={example.id} onClick={() => onExampleSelect(example.id)}>
+                      {example.label}
                     </DropdownMenuItem>
                   ))}
                 </>
