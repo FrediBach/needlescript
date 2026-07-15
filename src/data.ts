@@ -86,6 +86,7 @@ import kanthabandsRaw from '../examples/kantha-bands.ns?raw';
 import vortexRaw from '../examples/vortex.ns?raw';
 import triangleRaw from '../examples/triangle.ns?raw';
 import echofillRaw from '../examples/echofill.ns?raw';
+import cutbarRaw from '../examples/cutbar.ns?raw';
 
 export const THREADS: string[] = [
   '#C8472F', // 0 — red
@@ -207,7 +208,8 @@ export const EXAMPLES: Record<string, string> = {
   'kantha bands': kanthabandsRaw,
   vortex: vortexRaw,
   triangle: triangleRaw,
-  echofill: echofillRaw
+  echofill: echofillRaw,
+  'cut bar': cutbarRaw
 };
 
 // Complexity tiers — used to group examples in the UI picker.
@@ -284,6 +286,7 @@ export const EXAMPLE_TIERS: { label: string; keys: string[] }[] = [
       'easing',
       'billiard',
       'triangle',
+      'cut bar'
     ],
   },
   {

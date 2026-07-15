@@ -1,0 +1,79 @@
+// ============================================================
+// split bar — a horizontal bar cut by a virtual line between
+// two draggable control points. Each side sews in its own
+// thread, with its own fill style.
+// ============================================================
+
+seed 7
+fabric 'woven'
+
+// --- Cut line ---
+let cut_a = [ 13.7, 37.6 ]    // [xy]
+let cut_b = [ -13.7, -37.6 ]  // [xy]
+
+// --- Bar ---
+let bar_w = 75                // [30:90]
+let bar_h = 30                // [6:40]
+
+// @preset Classic 20 : cut_a=[13.7,37.6], cut_b=[-13.7,-37.6]
+// @preset Vertical   : cut_a=[0,40], cut_b=[0,-40]
+// @preset Slash      : cut_a=[32,20], cut_b=[-32,-20]
+
+// keep the line defined even if both handles land on one spot
+if vdist(cut_a, cut_b) < 1 [ cut_b = vadd(cut_a, [ 0, -2 ]) ]
+
+// the bar as a region (rectangle, closing segment implicit)
+let hw = bar_w / 2
+let hh = bar_h / 2
+let bar = [ [ -hw, -hh ], [ hw, -hh ], [ hw, hh ], [ -hw, hh ] ]
+
+// a big rectangle covering one side of the infinite line a->b:
+// stretch the segment 200 mm past each end, then sweep it
+// 200 mm sideways — plenty to swallow the whole field
+def halfmask(a, b) [
+  let d  = vnorm(vsub(b, a))          // along the line
+  let nv = vrot(d, 90)                // off to one side
+  let a2 = vsub(a, vscale(d, 200))
+  let b2 = vadd(b, vscale(d, 200))
+  return [ a2, b2, vadd(b2, vscale(nv, 200)), vadd(a2, vscale(nv, 200)) ]
+]
+
+let mask     = halfmask(cut_a, cut_b)
+let side_one = clippaths(bar, mask, 'intersect')     // list of regions
+let side_two = clippaths(bar, mask, 'difference')
+
+if len(side_one) == 0 or len(side_two) == 0 [
+  print('note: the cut line misses the bar — one side is empty')
+]
+
+// inset each piece 0.4 mm (so the two colours never overlap and a
+// thin fabric channel marks the cut), then tatami-fill it.
+// Park the needle ON the data before opening the fill.
+def sewside(pieces) [
+  for piece in pieces [
+    for ring in offsetpath(piece, -0.4) [
+      let rr = resample(ring, 1.5)
+      up setpos(rr[0]) down
+      beginfill sewpath(rr) endfill
+      trim
+    ]
+  ]
+]
+
+// both fills key off the cut direction, so the texture
+// follows the handles as you drag them
+let cut_deg = vheading(vsub(cut_a, cut_b))
+
+// side one: dense solid fill, rows parallel to the cut (thread 1)
+color 1
+fillangle cut_deg
+fillspacing 0.8
+filllen 0
+sewside(side_one)
+
+// side two: open hatch, rows across the cut (thread 2)
+color 4
+fillangle(cut_deg * -1)
+fillspacing 0.8
+filllen 3
+sewside(side_two)
