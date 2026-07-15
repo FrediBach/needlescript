@@ -8,8 +8,8 @@ seed 7
 fabric 'woven'
 
 // --- Cut line ---
-let cut_a = [ 13.7, 37.6 ]    // [xy]
-let cut_b = [ -13.7, -37.6 ]  // [xy]
+let cut_a = [13.7, 37.6]    // [xy]
+let cut_b = [-13.7, -37.6]  // [xy]
 
 // --- Bar ---
 let bar_w = 75                // [30:90]
