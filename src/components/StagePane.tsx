@@ -130,7 +130,7 @@ export default function StagePane({
           onMachineContextMenu={onMachineContextMenu}
         />
         <StatsChips design={design} machine={machine} />
-        <div className="absolute top-[10px] right-[10px] flex items-center gap-[10px]">
+        <div className={styles.canvasControls}>
           <CanvasSwitch
             checked={!hideJumps}
             onCheckedChange={() => onToggleHideJumps()}

@@ -5,6 +5,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  max-width: calc(100% - 90px); /* leave room for the density toggle */
+  max-width: calc(100% - 20px);
   pointer-events: none;
 }

@@ -58,7 +58,7 @@ function ZoomBadge({ zoomLevel }: { zoomLevel: number }) {
     <div
       style={{
         position: 'absolute',
-        bottom: 10,
+        bottom: 36,
         right: 10,
         padding: '2px 7px',
         borderRadius: 4,
