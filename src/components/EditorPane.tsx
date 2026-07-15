@@ -8,7 +8,11 @@ import type { WarningLocation } from '../lib/engine.ts';
 import type { AIModelInfo } from '../hooks/useAI.ts';
 import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
-import { updateParameter, updatePointParameter } from '../lib/parse-parameters.ts';
+import {
+  updateParameter,
+  updatePointParameter,
+  updateTextParameter,
+} from '../lib/parse-parameters.ts';
 import type { ParamChange } from './ParametersPanel.tsx';
 import Splitter from './Splitter.tsx';
 import ParametersPanel from './ParametersPanel.tsx';
@@ -172,8 +176,11 @@ export default function EditorPane({
   const runTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleParamChange = useCallback(
-    (name: string, line: number, value: number) => {
-      const updated = updateParameter(sourceRef.current, line, name, value);
+    (name: string, line: number, value: number | string) => {
+      const updated =
+        typeof value === 'string'
+          ? updateTextParameter(sourceRef.current, line, name, value)
+          : updateParameter(sourceRef.current, line, name, value);
       onSourceChange(updated);
 
       const now = Date.now();
@@ -208,6 +215,8 @@ export default function EditorPane({
       for (const { name, line, value } of changes) {
         if (Array.isArray(value)) {
           src = updatePointParameter(src, line, name, value[0], value[1]);
+        } else if (typeof value === 'string') {
+          src = updateTextParameter(src, line, name, value);
         } else {
           src = updateParameter(src, line, name, value);
         }

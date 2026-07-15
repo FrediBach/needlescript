@@ -232,6 +232,9 @@
   .switchWrap {
     grid-column: 1 / 3;
   }
+  .textInput {
+    grid-column: 1 / -1;
+  }
   .lockBtn {
     grid-column: 3;
   }
@@ -329,6 +332,37 @@
 .valueInput::-webkit-outer-spin-button,
 .valueInput::-webkit-inner-spin-button {
   -webkit-appearance: none;
+}
+
+/* ── Text input ─────────────────────────────────────────────────────────── */
+
+.textInput {
+  grid-column: 2 / -1;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 7px;
+  resize: vertical;
+  background: var(--bg-warm-deep);
+  border: 1px solid var(--border-warm-sub);
+  border-radius: 5px;
+  color: var(--text-warm);
+  font: inherit;
+  font-size: var(--fs-sub);
+  line-height: 1.35;
+}
+
+.textInput:hover {
+  border-color: var(--text-warm-muted);
+}
+
+.textInput:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-20);
+  outline: none;
+}
+
+.textParamName {
+  padding-top: 8px;
 }
 
 /* ── Switch row ─────────────────────────────────────────────────────────── */

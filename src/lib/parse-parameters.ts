@@ -11,6 +11,7 @@
 //   let n = 4         // [0.5:0.5:8]   stepped slider  (min:step:max)
 //   let wave = 1      // [switch]       0/1 toggle
 //   let mode = 0      // [switch:a,b]   0/1 toggle with labels
+//   let title = 'Hi'  // [text]         free text
 //   // --- Section ---               section header (standalone line)
 //
 //   let anchor = [0, 18]        // [xy]              free point — anywhere in the hoop
@@ -45,6 +46,17 @@ export interface ParamDef {
   line: number;
 }
 
+/** A string variable exposed as a free-text control. */
+export interface TextParamDef {
+  /** Variable name as it appears in source */
+  name: string;
+  /** Current string value, with NeedleScript escape sequences decoded */
+  value: string;
+  controlType: 'text';
+  /** 1-based line number in the source — used for precise source updates */
+  line: number;
+}
+
 // ── XY point parameter types ───────────────────────────────────────────────
 
 /** Constraint region for an [xy] point parameter. */
@@ -74,6 +86,7 @@ export interface PointParamDef {
 export type ParamItem =
   | { kind: 'section'; title: string }
   | { kind: 'param'; def: ParamDef }
+  | { kind: 'text'; def: TextParamDef }
   | { kind: 'point'; def: PointParamDef };
 
 // ── Preset type ────────────────────────────────────────────────────────────
@@ -99,6 +112,14 @@ export interface Preset {
 const DECL_RE =
   /^\s*(?:let\s+([A-Za-z_]\w*)\s*=|make\s+"([A-Za-z_]\w*)\s+|([A-Za-z_]\w*)\s*=)\s*(-?(?:\d+\.?\d*|\.\d+))/;
 
+// Matches a single-quoted NeedleScript string literal on a declaration RHS.
+// Only the tokenizer's supported escapes are accepted, so malformed source is
+// left to the language parser to diagnose rather than becoming a customizer control.
+const STRING_LITERAL_PATTERN = String.raw`'(?:\\['\\nt]|[^'\\\n])*'`;
+const TEXT_DECL_RE = new RegExp(
+  `^\\s*(?:let\\s+([A-Za-z_]\\w*)\\s*=|make\\s+"([A-Za-z_]\\w*)\\s+|([A-Za-z_]\\w*)\\s*=)\\s*(${STRING_LITERAL_PATTERN})`,
+);
+
 // Matches a two-element numeric-literal list on the declaration RHS:
 //   let name = [x, y]
 //   make "name [x, y]
@@ -113,6 +134,19 @@ const ANNOT_RE = /(?:\/\/|;|#)\s*\[([^\]]+)\]/;
 
 // Section header: // --- Title ---   (any comment style)
 const SECTION_RE = /^\s*(?:\/\/|;|#)\s*-{2,}\s*(.+?)\s*-{2,}\s*$/;
+
+function decodeStringLiteral(value: string): string {
+  return value.replace(/\\(['\\nt])/g, (_match, escape: string) => {
+    switch (escape) {
+      case 'n':
+        return '\n';
+      case 't':
+        return '\t';
+      default:
+        return escape;
+    }
+  });
+}
 
 // ── Annotation content parser (scalar) ────────────────────────────────────
 
@@ -368,6 +402,24 @@ export function parseParameters(source: string): ParamItem[] {
       continue;
     }
 
+    // ── Free-text string declaration ─────────────────────────────────────
+    if (/^text\s*$/i.test(annotContent)) {
+      const textDeclMatch = TEXT_DECL_RE.exec(line);
+      if (!textDeclMatch) continue;
+
+      const name = (textDeclMatch[1] ?? textDeclMatch[2] ?? textDeclMatch[3]).toLowerCase();
+      items.push({
+        kind: 'text',
+        def: {
+          name,
+          value: decodeStringLiteral(textDeclMatch[4].slice(1, -1)),
+          line: lineNo,
+          controlType: 'text',
+        },
+      });
+      continue;
+    }
+
     // ── Scalar variable declaration with annotation ───────────────────────
     const declMatch = DECL_RE.exec(line);
     if (!declMatch) continue;
@@ -443,6 +495,46 @@ export function updateParameter(
   }
 
   if (updated === original) return source; // no match — leave source untouched
+
+  lines[idx] = updated;
+  return lines.join('\n');
+}
+
+// ── Source updater (text) ─────────────────────────────────────────────────
+
+/**
+ * Return a new source string with the string literal on the given 1-based line
+ * replaced by `newValue`. Newlines and special characters are escaped using
+ * NeedleScript's string-literal syntax, leaving the annotation untouched.
+ */
+export function updateTextParameter(
+  source: string,
+  line: number,
+  name: string,
+  newValue: string,
+): string {
+  const lines = source.split('\n');
+  const idx = line - 1;
+  if (idx < 0 || idx >= lines.length) return source;
+
+  const original = lines[idx];
+  const literal = `'${newValue
+    .replace(/\r\n?/g, '\n')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t')}'`;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const letOrBare = new RegExp(`((?:let\\s+)?${escaped}\\s*=\\s*)${STRING_LITERAL_PATTERN}`, 'i');
+  const makeRe = new RegExp(`(make\\s+"${escaped}\\s+)${STRING_LITERAL_PATTERN}`, 'i');
+
+  let updated = original.replace(letOrBare, (_match, prefix: string) => `${prefix}${literal}`);
+  if (updated === original) {
+    updated = original.replace(makeRe, (_match, prefix: string) => `${prefix}${literal}`);
+  }
+
+  if (updated === original) return source;
 
   lines[idx] = updated;
   return lines.join('\n');

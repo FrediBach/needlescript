@@ -8,7 +8,13 @@ import {
   projectPoint,
   sampleRegion,
 } from '../lib/parse-parameters.ts';
-import type { ParamItem, ParamDef, PointParamDef, Preset } from '../lib/parse-parameters.ts';
+import type {
+  ParamItem,
+  ParamDef,
+  PointParamDef,
+  Preset,
+  TextParamDef,
+} from '../lib/parse-parameters.ts';
 import { Slider } from '@/components/ui/slider.tsx';
 import { Switch } from '@/components/ui/switch.tsx';
 import { Input } from '@/components/ui/input.tsx';
@@ -20,12 +26,12 @@ import styles from './ParametersPanel.module.css';
 export interface ParamChange {
   name: string;
   line: number;
-  value: number | [number, number];
+  value: number | string | [number, number];
 }
 
 interface Props {
   source: string;
-  onParamChange: (name: string, line: number, value: number) => void;
+  onParamChange: (name: string, line: number, value: number | string) => void;
   onAllParamsChange: (changes: ParamChange[]) => void;
   /** Lock state managed by parent (App.tsx) so stage can also show locked handles */
   lockedParams: Set<string>;
@@ -216,6 +222,37 @@ function SwitchRow({ def, onChange, isLocked, onToggleLock }: SwitchRowProps) {
   );
 }
 
+// ── Text row ─────────────────────────────────────────────────────────────────
+
+interface TextRowProps {
+  def: TextParamDef;
+  onChange: (name: string, line: number, value: string) => void;
+}
+
+function TextRow({ def, onChange }: TextRowProps) {
+  const { name, value, line } = def;
+
+  return (
+    <div className={styles.paramRow}>
+      <label
+        className={cn(styles.paramName, styles.textParamName)}
+        htmlFor={`param-${name}-${line}`}
+      >
+        {name}
+      </label>
+      <textarea
+        id={`param-${name}-${line}`}
+        value={value}
+        onChange={(event) => onChange(name, line, event.target.value)}
+        className={styles.textInput}
+        aria-label={`${name} text`}
+        rows={Math.min(4, Math.max(1, value.split('\n').length))}
+        spellCheck={false}
+      />
+    </div>
+  );
+}
+
 // ── Point row ─────────────────────────────────────────────────────────────────
 
 interface PointRowProps {
@@ -358,7 +395,9 @@ export default function ParametersPanel({
 }: Props) {
   const items = useMemo(() => parseParameters(source), [source]);
   const presets = useMemo(() => parsePresets(source), [source]);
-  const paramCount = items.filter((i) => i.kind === 'param' || i.kind === 'point').length;
+  const paramCount = items.filter(
+    (i) => i.kind === 'param' || i.kind === 'point' || i.kind === 'text',
+  ).length;
 
   const [open, setOpen] = useState(true);
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -386,7 +425,7 @@ export default function ParametersPanel({
 
   // ── Wrap onParamChange so any manual edit deselects the active preset ───
   const handleParamChange = useCallback(
-    (name: string, line: number, value: number) => {
+    (name: string, line: number, value: number | string) => {
       setActivePreset(null);
       onParamChange(name, line, value);
     },
@@ -607,6 +646,12 @@ export default function ParametersPanel({
                   onHoverEnter={(n) => onHighlightHandle?.(n)}
                   onHoverLeave={() => onHighlightHandle?.(null)}
                 />
+              );
+            }
+            if (item.kind === 'text') {
+              const { def } = item;
+              return (
+                <TextRow key={`${def.name}-${def.line}`} def={def} onChange={handleParamChange} />
               );
             }
             const { def } = item;

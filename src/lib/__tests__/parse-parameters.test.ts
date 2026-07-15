@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseParameters,
   updateParameter,
+  updateTextParameter,
   updatePointParameter,
   snapValue,
   projectPoint,
@@ -106,6 +107,26 @@ describe('parseParameters', () => {
       const def = (items[0] as { kind: 'param'; def: import('../parse-parameters.ts').ParamDef })
         .def;
       expect(def.labels).toEqual(['hypo', 'epi']);
+    });
+  });
+
+  describe('text', () => {
+    it('recognises a single-quoted string with a [text] annotation', () => {
+      const items = parseParameters("let word = 'NEEDLE\\nSCRIPT' // [text]");
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        kind: 'text',
+        def: { name: 'word', value: 'NEEDLE\nSCRIPT', controlType: 'text', line: 1 },
+      });
+    });
+
+    it('decodes supported string escapes', () => {
+      const items = parseParameters("let label = 'it\\'s\\tready\\\\now' // [text]");
+      expect(items[0]).toMatchObject({ kind: 'text', def: { value: "it's\tready\\now" } });
+    });
+
+    it('ignores [text] on a non-string declaration', () => {
+      expect(parseParameters('let count = 4 // [text]')).toHaveLength(0);
     });
   });
 
@@ -227,6 +248,31 @@ describe('updateParameter', () => {
     const src = 'let n = 3.5 // [0:10]';
     const out = updateParameter(src, 1, 'n', 5.0);
     expect(out).toBe('let n = 5 // [0:10]');
+  });
+});
+
+describe('updateTextParameter', () => {
+  it('updates a let declaration and preserves the annotation', () => {
+    const src = "let word = 'NEEDLE\\nSCRIPT' // [text]";
+    expect(updateTextParameter(src, 1, 'word', 'HELLO\nWORLD')).toBe(
+      "let word = 'HELLO\\nWORLD' // [text]",
+    );
+  });
+
+  it('escapes quotes, backslashes, tabs, and newlines', () => {
+    const src = "let label = 'old' // [text]";
+    expect(updateTextParameter(src, 1, 'label', "it's\\here\tnow\nnext")).toBe(
+      "let label = 'it\\'s\\\\here\\tnow\\nnext' // [text]",
+    );
+  });
+
+  it('updates classic make and bare assignment declarations', () => {
+    expect(updateTextParameter("make \"label 'old' // [text]", 1, 'label', 'new')).toBe(
+      "make \"label 'new' // [text]",
+    );
+    expect(updateTextParameter("label = 'old' // [text]", 1, 'label', 'new')).toBe(
+      "label = 'new' // [text]",
+    );
   });
 });
 
