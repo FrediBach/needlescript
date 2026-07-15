@@ -1,5 +1,7 @@
 import {
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   ClipboardIcon,
   CopyIcon,
   CpuIcon,
@@ -8,6 +10,7 @@ import {
   ScissorsIcon,
   Trash2Icon,
 } from 'lucide-react';
+import { useState } from 'react';
 import { MACHINES } from '../data.ts';
 import type { MachineHoop, MachinePreset } from '../data.ts';
 import {
@@ -136,18 +139,26 @@ export function MachineMenu(props: Actions) {
   );
 }
 
-/** A compact context-menu version. It is intentionally flat so it stays usable at any viewport edge. */
+/** A compact context menu that drills down by brand, then machine and hoop. */
 export function MachineContextMenu({
   x,
   y,
   onClose,
   ...props
 }: Actions & { x: number; y: number; onClose: () => void; editorActions?: EditorContextActions }) {
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+  const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
+  const selectedMachine = MACHINES.find((machine) => machine.id === selectedMachineId) ?? null;
+  const brands = [...new Set(MACHINES.map((machine) => machine.brand))];
+  const brandedMachines = selectedBrand
+    ? MACHINES.filter((machine) => machine.brand === selectedBrand)
+    : [];
+
   return (
     <div
       role="menu"
       aria-label="Machine settings"
-      className="fixed z-60 min-w-56 rounded-lg bg-popover p-1 font-mono text-ui shadow-lg ring-1 ring-foreground/10"
+      className="fixed z-60 max-h-[calc(100vh-16px)] min-w-56 overflow-y-auto rounded-lg bg-popover p-1 font-mono text-ui shadow-lg ring-1 ring-foreground/10"
       style={{ left: x, top: y }}
       onPointerDown={(event) => event.stopPropagation()}
     >
@@ -182,26 +193,99 @@ export function MachineContextMenu({
       <div className="px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
         Machine presets
       </div>
-      {MACHINES.map((machine) => (
-        <button
-          key={machine.id}
-          type="button"
-          role="menuitem"
-          className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left hover:bg-accent"
-          onClick={() => {
-            props.onApply(machine, machine.hoops[0]);
-            onClose();
-          }}
-        >
-          {props.active?.id === machine.id ? (
-            <CheckIcon className="size-3.5 text-gold" />
-          ) : (
-            <span className="w-3.5" />
-          )}
-          {machine.brand} {machine.model}{' '}
-          <span className="ml-auto text-muted-foreground">{machine.hoops[0].label}</span>
-        </button>
-      ))}
+      {selectedMachine ? (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left hover:bg-accent"
+            onClick={() => setSelectedMachineId(null)}
+          >
+            <ChevronLeftIcon className="size-3.5" />
+            {selectedBrand}
+          </button>
+          <div className="px-2 py-1 text-muted-foreground">
+            {selectedMachine.brand} {selectedMachine.model}
+          </div>
+          {selectedMachine.hoops.map((hoop) => (
+            <button
+              key={hoop.id}
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left hover:bg-accent"
+              onClick={() => {
+                props.onApply(selectedMachine, hoop);
+                onClose();
+              }}
+            >
+              {props.active?.id === selectedMachine.id && props.active.hoopId === hoop.id ? (
+                <CheckIcon className="size-3.5 text-gold" />
+              ) : (
+                <span className="w-3.5" />
+              )}
+              {hoop.label}
+            </button>
+          ))}
+        </>
+      ) : selectedBrand ? (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left hover:bg-accent"
+            onClick={() => setSelectedBrand(null)}
+          >
+            <ChevronLeftIcon className="size-3.5" />
+            All brands
+          </button>
+          <div className="px-2 py-1 text-muted-foreground">{selectedBrand}</div>
+          {brandedMachines.map((machine) => (
+            <button
+              key={machine.id}
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left hover:bg-accent"
+              onClick={() => setSelectedMachineId(machine.id)}
+            >
+              {props.active?.id === machine.id ? (
+                <CheckIcon className="size-3.5 text-gold" />
+              ) : (
+                <span className="w-3.5" />
+              )}
+              {machine.model}
+              <span className="ml-auto inline-flex items-center gap-1 text-muted-foreground">
+                {machine.hoops.length} hoops
+                <ChevronRightIcon className="size-3" />
+              </span>
+            </button>
+          ))}
+        </>
+      ) : (
+        brands.map((brand) => {
+          const machines = MACHINES.filter((machine) => machine.brand === brand);
+          const hasActiveMachine = machines.some((machine) => machine.id === props.active?.id);
+          return (
+            <button
+              key={brand}
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left hover:bg-accent"
+              onClick={() => setSelectedBrand(brand)}
+            >
+              {hasActiveMachine ? (
+                <CheckIcon className="size-3.5 text-gold" />
+              ) : (
+                <span className="w-3.5" />
+              )}
+              {brand}
+              <span className="ml-auto inline-flex items-center gap-1 text-muted-foreground">
+                {machines.length} {machines.length === 1 ? 'machine' : 'machines'}
+                <ChevronRightIcon className="size-3" />
+              </span>
+            </button>
+          );
+        })
+      )}
       <div className="my-1 border-t border-border" />
       <div className="flex flex-wrap gap-1 px-2 py-1">
         {['woven', 'knit', 'stretch', 'denim', 'fleece'].map((fabric) => (
