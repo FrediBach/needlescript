@@ -216,6 +216,21 @@ export const MACHINES: MachinePreset[] = [
     budgetStitches: 50000,
   },
   {
+    id: 'bernette-70-deco',
+    brand: 'bernette',
+    model: '70 DECO',
+    cls: 'home',
+    hoops: [
+      rect('50x70', 'Small (50×70)', 50, 70),
+      rect('120x180', 'Medium (120×180)', 120, 180),
+      rect('160x260', 'Large (160×260)', 160, 260),
+    ],
+    trimmer: 'jump',
+    nativeFormat: 'EXP',
+    maxSpm: 850,
+    budgetStitches: 40000,
+  },
+  {
     id: 'husqvarna-topaz-50',
     brand: 'Husqvarna',
     model: 'Designer Topaz 50',
