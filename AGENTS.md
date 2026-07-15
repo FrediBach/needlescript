@@ -9,6 +9,7 @@ The language pipeline in `src/lib/` is documented in detail. Read the relevant d
 
 | Document                                    | Covers                                                                                             |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `needlescript-language-reference.md`        | Agent-oriented language reference |
 | `needlescript-parser-architecture.md`       | Front-end: tokenizer, pre-scan, recursive-descent parser, AST (`tokenizer.ts`, `prescan.ts`, `parser/`) |
 | `needlescript-interpreter-architecture.md`  | Evaluation: tree-walking interpreter, value model, budgets, reporters (`interpreter/`, `list.ts`)  |
 | `needlescript-machine-architecture.md`      | Stitch machine: turtle, transform stacks, satin/fill generation, coverage, output (`machine/`)     |
