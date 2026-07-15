@@ -355,6 +355,7 @@ export const STRING_FUNCS: Record<string, { min: number; max: number }> = {
  * the Core tier (hard error, unchanged).
  */
 export const LIBRARY_FUNCS = new Set<string>([
+  ...ZERO_FUNCS,
   ...Object.keys(LIST_FUNCS),
   ...Object.keys(LIST_CMDS),
   ...Object.keys(GEN_FUNCS),
@@ -407,7 +408,6 @@ export const RESERVED = new Set<string>([
   ...Object.keys(EFFECT_ARITY),
   ...Object.keys(QWORD_BUILTINS),
   ...Object.keys(FUNC_ARITY),
-  ...ZERO_FUNCS,
   // Special-cased commands (not in BUILTIN_ARITY but still Core):
   'mark',
   'assert',

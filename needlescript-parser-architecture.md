@@ -169,7 +169,10 @@ globally reserved, so no prescan guard is needed for it). It invokes a visitor
    `if x = 1`), but over-approximation only ever _adds_ a candidate name — turning a
    would-be parse-time "unknown name" into at worst a runtime "never assigned". It can
    never cause a misparse, because reserved words and procedure names are excluded by
-   `register()` (`prescan.ts:145-149`).
+   `register()` (`prescan.ts:145-149`). Zero-argument Library reporters are excluded
+   from this heuristic because `if repcount = 3` is a common comparison; when one is
+   actually assigned at statement position, the parser records the name immediately
+   for subsequent reads.
 
 The distinction between locals and globals is enforced here: a name registered inside
 a procedure and either force-local (params, `let`, `local`, `for`) or already known
@@ -270,8 +273,9 @@ Notable lowerings and rules:
 - **Logo negative-literal rule**: `parseAdd` breaks on `-` when `spBefore && !spAfter`
   (`expressions.ts:163`).
 - **`parsePrimary`** is where the unified name resolution lives. For a bare `word` it
-  resolves in order (§4.2 of RFC-1): local/global variable → zero-arg reporter →
-  built-in function → user procedure used as reporter → error
+  resolves in order (§4.2 of RFC-1): local/global variable → zero-arg user reporter
+  → Library-tier zero-arg reporter → built-in function → user procedure used as
+  reporter → error
   (`expressions.ts:472-513`).
 - **Glued-call syntax**: `name(args)` is a call only when `(` is glued to the name
   (`ctx.gluedParenNext`); `f (10)` with a space is a grouped expression. This gate
@@ -359,10 +363,11 @@ Two tiers govern name shadowing:
   procedure, emitting a one-time note via `noteLibraryShadow`.
 
 The Library-tier builtins use **soft reservation**: their names are _not_ in
-`RESERVED`, so variables and parameters may reuse them freely (builtins are call-only,
-variables are never callable), and user procedures shadow them at call sites. They
-resolve only at glued-call position. This keeps every pre-RFC program running
-unchanged.
+`RESERVED`, so variables and parameters may reuse them freely. Most Library builtins
+are call-only; zero-argument reporters additionally resolve as bare values only when
+no same-named variable or zero-argument user reporter exists. User procedures shadow
+them at call sites, with the usual one-time note. This keeps every pre-RFC program
+running unchanged.
 
 ### 4.6 Static analysis (`analysis.ts`)
 

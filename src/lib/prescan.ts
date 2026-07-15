@@ -15,7 +15,7 @@
 
 import type { Token } from './types.ts';
 import { NeedlescriptError } from './errors.ts';
-import { RESERVED } from './commands.ts';
+import { RESERVED, ZERO_FUNCS } from './commands.ts';
 import { COMPOUND_ASSIGN_OPS } from './tokenizer.ts';
 
 export interface PreScan {
@@ -200,7 +200,12 @@ export function prescan(tokens: Token[]): PreScan {
   walk(tokens, (i, inProc) => {
     const tok = tokens[i];
     if (tok.t !== 'word') return;
-    if (isAssignOp(tokens[i + 1])) register(tok.v as string, inProc);
+    // A zero-arg reporter followed by `=` is commonly a comparison in a loop
+    // header (`if repcount = 3`), not an assignment. Explicit declarations are
+    // already exact in pass 2a; actual bare assignments are registered as the
+    // parser reaches statement position.
+    if (isAssignOp(tokens[i + 1]) && !ZERO_FUNCS.has(tok.v as string))
+      register(tok.v as string, inProc);
   });
 
   return { procArity, procLine, procLocals, globalNames };

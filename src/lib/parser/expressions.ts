@@ -381,14 +381,6 @@ export function parsePrimary(ctx: ParseContext): ExprNode {
           true,
         );
       }
-      if (ZERO_FUNCS.has(w)) {
-        ctx.next();
-        return parsePostfix(
-          ctx,
-          { k: 'func', name: w, args: parseParenArgs(ctx, w, 0, tok.line), line: tok.line },
-          true,
-        );
-      }
       if (ctx.procArity[w] !== undefined) {
         ctx.next();
         return parsePostfix(
@@ -399,6 +391,16 @@ export function parsePrimary(ctx: ParseContext): ExprNode {
             args: parseParenArgs(ctx, w, ctx.procArity[w], tok.line),
             line: tok.line,
           },
+          true,
+        );
+      }
+      // Zero-argument reporters are Library tier too: a user procedure wins
+      // at call sites, while a same-named variable remains non-callable.
+      if (ZERO_FUNCS.has(w)) {
+        ctx.next();
+        return parsePostfix(
+          ctx,
+          { k: 'func', name: w, args: parseParenArgs(ctx, w, 0, tok.line), line: tok.line },
           true,
         );
       }
@@ -468,19 +470,19 @@ export function parsePrimary(ctx: ParseContext): ExprNode {
     }
 
     // Bare name — unified resolution (§4.2):
-    // local → global → zero-arg reporter → prefix call → unknown.
+    // local → global → zero-arg user reporter → Library reporter → prefix call → unknown.
     if (ctx.isVariableName(w)) {
       ctx.next();
       // Glued `[` after a bare modern IDENT is an index chain (§3.1).
       return parsePostfix(ctx, { k: 'var', name: w, line: tok.line, bare: true }, true);
     }
-    if (ZERO_FUNCS.has(w)) {
-      ctx.next();
-      return { k: 'func', name: w, args: [], line: tok.line };
-    }
     if (ctx.procArity[w] === 0) {
       ctx.next();
       return { k: 'callexpr', name: w, args: [], line: tok.line };
+    }
+    if (ZERO_FUNCS.has(w)) {
+      ctx.next();
+      return { k: 'func', name: w, args: [], line: tok.line };
     }
     if (FUNC_ARITY[w] !== undefined) {
       ctx.next();

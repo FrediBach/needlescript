@@ -46,6 +46,8 @@ export interface ParseContext {
   declaredScope(): Set<string>;
   isLocalName(w: string): boolean;
   isVariableName(w: string): boolean;
+  /** Record a parsed bare assignment so later zero-reporter reads resolve as a variable. */
+  registerAssignmentName(w: string): void;
   isAssignTok(tok?: Token): boolean;
   /** Is the `(` immediately after the current token glued to it (call syntax)? */
   gluedParenNext(tok: Token): boolean;

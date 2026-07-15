@@ -515,6 +515,7 @@ export function parseStatement(ctx: ParseContext): ASTNode {
     ctx.checkBindable(name, 'assigned', tok.line);
     ctx.next(); // name
     const opTok = ctx.next(); // = or op=
+    ctx.registerAssignmentName(name);
     let value = ctx.parseExpr(); // cross-module
     if (opTok.v !== '=')
       value = {

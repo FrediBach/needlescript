@@ -121,6 +121,9 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     isVariableName(w) {
       return ctx.isLocalName(w) || ctx.ps.globalNames.has(w);
     },
+    registerAssignmentName(w) {
+      if (!ctx.isLocalName(w)) ctx.ps.globalNames.add(w);
+    },
     isAssignTok(tok?) {
       return !!tok && tok.t === 'op' && (tok.v === '=' || COMPOUND_ASSIGN_OPS.has(tok.v as string));
     },
@@ -149,7 +152,8 @@ export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
     },
     checkBindable(name, what, line) {
       const kind = ctx.builtinKind(name);
-      if (kind) throw new NeedlescriptError(`"${name}" is a ${kind} and can't be ${what}`, line);
+      if (kind && !LIBRARY_FUNCS.has(name))
+        throw new NeedlescriptError(`"${name}" is a ${kind} and can't be ${what}`, line);
       if (ctx.procArity[name] !== undefined)
         throw new NeedlescriptError(
           `"${name}" is already a procedure (line ${ctx.ps.procLine[name]})`,

@@ -438,6 +438,30 @@ describe('the soft-builtin tier (§3)', () => {
     expect(r.warnings.some((w) => w.includes('"len" shadows'))).toBe(true);
   });
 
+  it('zero-argument reporters are Library tier too', () => {
+    for (const name of ['xcor', 'ycor', 'heading', 'repcount']) {
+      const r = run(`def ${name}() [ return 42 ]\nprint ${name}\nprint ${name}()`);
+      expect(r.printed).toEqual(['42', '42']);
+      expect(r.warnings.filter((w) => w.includes(`"${name}" shadows`))).toHaveLength(1);
+    }
+  });
+
+  it('variables and parameters take precedence over zero-argument reporters', () => {
+    const reporterValues = new Map([
+      ['xcor', '0'],
+      ['ycor', '0'],
+      ['heading', '0'],
+      ['repcount', '0'],
+      ['pos', '[0, 0]'],
+    ]);
+    for (const [name, value] of reporterValues) {
+      const r = run(`let ${name} = 42\nprint ${name}\nprint ${name}()`);
+      expect(r.printed).toEqual(['42', value]);
+    }
+    expect(printed('def twice(heading) [ return heading * 2 ]\nprint twice(21)')).toEqual(['42']);
+    expect(printed('heading = 42\nprint heading\nprint heading()')).toEqual(['42', '0']);
+  });
+
   it('meadow.ns runs unmodified, with exactly one shadow note', () => {
     // the RFC-1 reference example defines clamp (now a library builtin)
     // and inside (not a builtin) — the policy exists so it keeps working
