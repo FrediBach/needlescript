@@ -42,7 +42,10 @@ physics and event accumulation_.
 machine/
 ├── index.ts    barrel: re-exports LIMITS, STOCK_LIMITS, OVERRIDE_*, BudgetKey, Machine
 ├── limits.ts   engine limits + overridable per-run budgets
-├── machine.ts  the Machine class (~2700 lines): turtle, stacks, stitch generation, fills
+├── machine.ts  public Machine facade: color/trim commands over the subsystem hierarchy
+├── machine-core.ts  turtle state, stacks, trace sandbox, emission, and travel()
+├── machine-satin.ts satin columns and buffered running-stitch generation
+├── machine-fill.ts  fill recording and built-in / programmable fill generation
 └── fill.ts     the standalone tatami scanline fill generator
 ```
 
@@ -84,8 +87,8 @@ caller's line, when inside a procedure) so previews can highlight the responsibl
 
 ## 4. Machine state
 
-The `Machine` class (`machine/machine.ts:108`) is a large mutable object. Its state
-groups into:
+The public `Machine` class is a small facade over `FillMachine`, `SatinMachine`, and
+`MachineCore`. Together they form one mutable machine object; its state groups into:
 
 | Group           | Fields                                                                                                               | Notes                                                                 |
 | --------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
@@ -102,14 +105,14 @@ groups into:
 | Trace           | `traceRecording`, `traceRuns`, `noEmit`                                                                              | see §11                                                               |
 
 `effectiveLimits` starts as a mutable copy of `STOCK_LIMITS`
-(`machine/machine.ts:206`) so `override` can raise/lower budgets per run without
+(`machine/machine-core.ts`) so `override` can raise/lower budgets per run without
 touching the shared constants.
 
 ---
 
 ## 5. The stitching pipeline: `travel()`
 
-Almost all sewing funnels through `travel(nx, ny)` (`machine/machine.ts:723`), reached
+Almost all sewing funnels through `travel(nx, ny)` (`machine/machine-core.ts`), reached
 via `setXY` (`643`), `forward` (`655`), and `arc` (`667`). `arc` decomposes a curve into
 half-turn / chord / half-turn steps so every stitch mode works on curves. `travel`
 dispatches, in order:
@@ -186,7 +189,7 @@ always mapped under one consistent transform, even if the block ends before the 
 
 ## 7. Satin columns and fills
 
-### 7.1 Satin (`flushSatin`, `machine/machine.ts:1121`)
+### 7.1 Satin (`flushSatin`, `machine/machine-satin.ts`)
 
 A satin column is buffered as a local-space centerline while in satin mode, then sewn
 when the column ends (a pen move up, mode change, transform boundary, color change, or
@@ -205,7 +208,7 @@ in to 60% width, and an over-wide-for-the-curve column raises a warning.
 After-split effects (humanize/snaptogrid/declump) deliberately **skip** satin rails —
 perturbing a precise rail wrecks the column — with a one-time warning.
 
-### 7.2 Fills (`beginFill`/`endFill`, `1781`/`2410`)
+### 7.2 Fills (`beginFill`/`endFill`, `machine/machine-fill.ts`)
 
 `beginFill` enters recording mode; `travel` then records the boundary rings.
 `endFill` closes the rings and generates stitches. Two engines exist:
@@ -359,18 +362,21 @@ tie-offs don't read as hotspots), then locks are applied. The results populate t
 
 ## 15. File reference
 
-| File                       | Responsibility                                                            |
-| -------------------------- | ------------------------------------------------------------------------- |
-| `machine.ts`               | re-export shim → `machine/index.ts`                                       |
-| `machine/index.ts`         | barrel: `LIMITS`, `STOCK_LIMITS`, `OVERRIDE_*`, `BudgetKey`, `Machine`    |
-| `machine/limits.ts`        | physics constants + overridable per-run budgets                           |
-| `machine/machine.ts`       | the `Machine` class: turtle, stacks, running/satin/e-stitch, fills, trace |
-| `machine/fill.ts`          | standalone tatami scanline fill generator                                 |
-| `affine.ts`                | 2×3 affine matrix math shared by the transform stack                      |
-| `postprocess.ts`           | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`            |
-| `effects.ts`, `declump.ts` | after-split effect maps and declump fold state                            |
-| `hoop-presets.ts`          | hoop presets and sewable-field geometry                                   |
-| `types.ts`                 | `StitchEvent`, `HoopInfo`, `RunResult`, `DesignStats`, density types      |
+| File                       | Responsibility                                                         |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `machine.ts`               | re-export shim → `machine/index.ts`                                    |
+| `machine/index.ts`         | barrel: `LIMITS`, `STOCK_LIMITS`, `OVERRIDE_*`, `BudgetKey`, `Machine` |
+| `machine/limits.ts`        | physics constants + overridable per-run budgets                        |
+| `machine/machine.ts`       | public `Machine` facade and color/trim commands                        |
+| `machine/machine-core.ts`  | shared state, turtle motion, stacks, emission, trace, and `travel`     |
+| `machine/machine-satin.ts` | satin columns and buffered running stitches                            |
+| `machine/machine-fill.ts`  | fill recording plus built-in and programmable fill generation          |
+| `machine/fill.ts`          | standalone tatami scanline fill generator                              |
+| `affine.ts`                | 2×3 affine matrix math shared by the transform stack                   |
+| `postprocess.ts`           | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`         |
+| `effects.ts`, `declump.ts` | after-split effect maps and declump fold state                         |
+| `hoop-presets.ts`          | hoop presets and sewable-field geometry                                |
+| `types.ts`                 | `StitchEvent`, `HoopInfo`, `RunResult`, `DesignStats`, density types   |
 
 Machine behavior is exercised by tests in `src/lib/__tests__/` — notably
 `engine.test.ts`, `satin-shape.test.ts`, `fill-shape.test.ts`, `transforms.test.ts`,
