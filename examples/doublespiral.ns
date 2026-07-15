@@ -25,6 +25,10 @@ def doublespiral(g, n) [
   ]
 ]
 
+// --- spiral ---
+let gap = 1       // [0.5:0.1:2] channel width, mm
+let turns = 24    // [8:1:36] inward and outward arm pairs
+
 stitchlen 2
-doublespiral(1, 24)
+doublespiral(gap, turns)
 trim

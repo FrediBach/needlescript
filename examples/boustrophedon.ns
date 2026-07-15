@@ -2,9 +2,10 @@
 // One continuous, non-crossing line: up to the top, step right,
 // down to the bottom, step right, repeat until the square is full.
 
-let side = 60       // height of each pass (mm)
-let gap = 1         // spacing between passes (mm) — also the step over
-let passes = 60     // how many vertical passes fill the square
+// --- fill ---
+let side = 60       // [20:1:84] square side, mm
+let gap = 1         // [0.5:0.1:3] line spacing, mm
+let passes = floor(side / gap) // derived from the exposed size and spacing
 
 stitchlen 2
 

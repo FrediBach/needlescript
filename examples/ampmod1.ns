@@ -5,12 +5,13 @@
 seed 42
 stitchlen 1.6
 
-let baseR    = 28      // mm: radius of the carrier circle
-let carrier  = 120      // carrier cycles per revolution (the fast wiggle)
-let modcycles = 3      // modulator cycles per revolution (the slow swell)
-let depth    = 0.8     // 0..1 modulation depth
-let amp      = 8       // mm: carrier amplitude at full envelope
-let res      = 720     // points around the circle (smoothness)
+// --- shape ---
+let baseR     = 28     // [22:1:38] carrier-circle radius, mm
+let carrier   = 120    // [20:5:180] fast wiggles per revolution
+let modcycles = 3      // [1:12] slow envelope lobes
+let depth     = 0.8    // [0:0.1:0.8] envelope depth
+let amp       = 8      // [1:0.5:10] carrier amplitude, mm
+let res       = 720    // sampling resolution; deliberately not exposed
 
 def amwave() [
   for i = 0 to res [

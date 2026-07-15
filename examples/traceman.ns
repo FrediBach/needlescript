@@ -1,9 +1,14 @@
 // Use trace to cut out a smaller circle from a bigger one
 // and than let the "Pac Man" eat another circle.
 
+// --- cut-out ---
+let disc_r = 30    // [14:1:38] outer-disc radius, mm
+let bite_r = 20    // [6:1:30] bite radius, mm
+let bite_x = -40   // [-44:1:0] bite centre X, mm
+
 moveto -10 0
-let disc = trace [ translate -20 0 [ circle 30 ] ]
-let bite = trace [ translate -40 0 [ circle 20 ] ]
+let disc = trace [ translate -20 0 [ circle disc_r ] ]
+let bite = trace [ translate bite_x 0 [ circle bite_r ] ]
 
 color 3
 

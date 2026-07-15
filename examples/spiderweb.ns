@@ -8,9 +8,10 @@
 seed 7
 stitchlen 2
 
-let spokes = 12
+// --- web ---
+let spokes = 12          // [5:1:20] radial spokes
 let span   = 360 / spokes        // degrees between adjacent spokes
-let reach  = 42                  // outer radius (inside the 47 mm field)
+let reach  = 42                  // [20:1:46] outer radius, mm
 
 // ---- precompute spoke tip directions & this run's jittered length ----
 let tips = []
@@ -31,8 +32,8 @@ for i = 0 to spokes - 1 [
 trim
 
 // ---- the capture spiral: ring by ring, sagging chords ----
-let rings = 7
-let inner = 8                    // innermost catch ring
+let rings = 7                     // [2:1:12] capture rings
+let inner = 8                     // [2:1:18] innermost catch-ring radius, mm
 
 for ring = 1 to rings [
   let t  = ring / rings

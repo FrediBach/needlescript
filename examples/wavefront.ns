@@ -14,21 +14,21 @@
 // ============================================================
 
 // --- the line field ---
-let nlines  = 20       // number of parallel lines
-let RF      = 44       // fill a disc of this radius, mm (sewable max ~47)
+let nlines  = 20       // [8:1:40] number of parallel lines
+let RF      = 44       // [20:1:46] fill-disc radius, mm
 
 // --- the wave ---
-let amp      = 3.8     // wave height, mm (the displacement of the crest)
-let wavelen  = 20       // wavelength inside the packet, mm (crest-to-crest)
-let packetW  = 18      // width of the travelling burst, mm (how many crests show)
-let startX   = -22     // where the packet sits on the FIRST line, mm
-let travel   = 60      // how far the packet advances from first line to last, mm
+let amp      = 3.8     // [0:0.2:8] wave height, mm
+let wavelen  = 20      // [8:1:36] wavelength, mm
+let packetW  = 18      // [8:1:30] wave-packet width, mm
+let startX   = -22     // [-38:1:0] first-line packet centre, mm
+let travel   = 60      // [0:2:80] packet travel across the field, mm
                        //   this is the propagation: bigger = steeper wavefront
 
 
 // --- look ---
-let samp    = 0.8      // sampling step along each line, mm (smaller = smoother)
-let stitch  = 1.9
+let samp    = 0.8      // [0.4:0.1:2] sampling step, mm
+let stitch  = 1.9      // [1:0.1:4] stitch length, mm
 
 seed 7
 stitchlen stitch

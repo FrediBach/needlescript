@@ -14,10 +14,10 @@ let word = 'NEEDLE\nSCRIPT'    // [text]
 
 let ox = 0
 let oy = 0
-let cw = 4          // cell width
-let ch = 8          // cell height
-let gap = 3         // space between letters
-let leading = 4     // space between lines
+let cw = 4          // [2:0.5:7] glyph width, mm
+let ch = 8          // [4:0.5:12] glyph height, mm
+let gap = 3         // [1:0.5:6] letter spacing, mm
+let leading = 4     // [1:0.5:8] line spacing, mm
 
 let glyphset = 'NEDLSCRIPT'    // every character we know how to sew
 

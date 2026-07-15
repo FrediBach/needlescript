@@ -1,6 +1,8 @@
 seed 30              ; reproducible glitch — change it, change the static
 
-let S = 6             // master radius of the ring, in mm
+// --- eclipse ---
+let S = 6             // [2:0.5:14] inner-ring radius, mm
+let ticks = 180       // [60:10:300] number of radial ticks
 let cx = 0
 let cy = 0
 
@@ -24,5 +26,5 @@ def static_ticks(r, n) [
 
 color 4
 stitchlen 1.6
-static_ticks(S, 180)
+static_ticks(S, ticks)
 trim

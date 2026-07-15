@@ -17,7 +17,10 @@
 
 seed 7
 fabric "woven
-stitchlen 1.8
+let stitch = 1.8       // [1:0.1:4] stitch length, mm
+let twist_deg = 10     // [-30:1:30] star-ring rotation, degrees
+let angle_step = 4     // [2:1:10] curve sampling step, degrees
+stitchlen stitch
 
 // ── atomic transforms ───────────────────────────────────────────────
 // Each takes one value and returns one value — ready for compose.
@@ -28,7 +31,7 @@ def small(p)   [ return vscale(p, 11) ]             // scale to inner ring
 def mid(p)     [ return vscale(p, 20) ]             // scale to middle ring
 def wide(p)    [ return vscale(p, 30) ]             // scale to outer ring
 
-def twist(p)   [ return vrot(p, 10) ]               // gentle rotation
+def twist(p)   [ return vrot(p, twist_deg) ]        // gentle rotation
 
 def ripple(p)  [                                     // six-fold sine wave
   let a = vheading(p)
@@ -53,7 +56,7 @@ let oval    = compose(@polar, @wide, @squash, @ripple)   // squashed + waved
 
 // ── generate geometry ───────────────────────────────────────────────
 
-let angles = steps(0, 356, 4)              // 90 angles around the sweep
+let angles = steps(0, 360 - angle_step, angle_step)
 
 let pts1 = map(angles, circ)
 let pts2 = map(angles, waves)

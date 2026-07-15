@@ -6,9 +6,10 @@
 
 let ox = 0
 let oy = 0
-let cw = 4          // cell width
-let ch = 8         // cell height
-let gap = 3         // space between letters
+// --- type ---
+let cw = 4          // [2:0.5:7] glyph width, mm
+let ch = 8          // [4:0.5:12] glyph height, mm
+let gap = 3         // [1:0.5:6] letter spacing, mm
 
 // move (pen up) to a cell-relative point, then drop the pen
 def go(x, y) [

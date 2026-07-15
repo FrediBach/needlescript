@@ -34,9 +34,7 @@ def ring(count, len, fat, turn) [
 // The whole flower. Outer layer first, then progressively smaller,
 // inner rings; every other ring is nudged half a slot so the petals
 // of one layer sit in the gaps of the one below.
-def flower(petals, layers) [
-  let baseLen = 42                   // outermost petal reach in mm (< 47 field)
-  let fat = 0.55                     // petal plumpness, 0..1
+def flower(petals, layers, baseLen, fat) [
   let half = (360 / petals) / 2      // half a petal-slot, for the offset
 
   for layer = 0 to layers - 1 [
@@ -54,4 +52,10 @@ def flower(petals, layers) [
 fabric "woven        // sensible underlay + pull compensation, free
 seed 7
 
-flower(7, 4)         // ← 8 petals per 360°, 3 layers. Change at will.
+// --- flower ---
+let petals = 7        // [3:12] petals per ring
+let layers = 4        // [1:5] nested petal rings
+let reach = 42        // [24:1:46] outer petal reach, mm
+let plumpness = 0.55  // [0:0.05:1] petal fullness
+
+flower(petals, layers, reach, plumpness)

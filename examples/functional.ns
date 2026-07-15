@@ -21,10 +21,11 @@ seed 7
 stitchlen 2
 
 // grid geometry: two rows, three columns of stations
+// --- sampler layout ---
 let colx = -30         // x of the left column
-let colstep = 24       // spacing between columns
-let rowy = 22          // y of the top row
-let rowstep = 28       // vertical spacing between rows
+let colstep = 24       // [18:1:30] spacing between columns, mm
+let rowy = 22          // [14:1:30] top-row height, mm
+let rowstep = 28       // [20:1:34] spacing between rows, mm
 
 // ---------------------------------------------------------------------
 //  helper: jump to a station centre without sewing a connector thread

@@ -9,6 +9,9 @@
 // =====================================================================
 
 seed 7
+let shell_w = 17       // [10:1:22] body half-width, mm
+let shell_h = 22       // [14:1:28] body half-height, mm
+let speckle_gap = 4    // [2:0.5:8] spacing between shell speckles, mm
 stitchlen 2
 fabric "woven          // free underlay + pull compensation, sews as previewed
 
@@ -47,7 +50,7 @@ def scute(size) [
 color 1
 fillangle 30
 fillspacing 0.45
-let body = oval(0, -2, 17, 22, 48)
+let body = oval(0, -2, shell_w, shell_h, 48)
 up setpos(body[0]) down
 beginfill
   sewpath(body)
@@ -145,7 +148,7 @@ for sy in sideY [
 // ---------------------------------------------------------------------
 
 color 4
-let dots = scatter(4, rim)      // Poisson-disc points, clipped to the shell
+let dots = scatter(speckle_gap, rim) // Poisson-disc points, clipped to the shell
 for d in dots [
   up setpos(d) down
   bean 3

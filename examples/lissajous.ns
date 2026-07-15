@@ -44,9 +44,14 @@ def lissajous(fx, fy, phase, ampx, ampy, samples, seg) [
 //  A scene: three classic figures, each in its own colour
 // =====================================================================
 seed 7
-stitchlen 2
+let stitch = 2     // [1:0.1:4] stitch length, mm
+let fx = 9         // [1:12] horizontal frequency
+let fy = 16        // [1:20] vertical frequency
+let phase = 90     // [0:15:180] phase offset, degrees
+let radius = 24    // [8:1:42] figure radius, mm
+stitchlen stitch
 
 // 3:2 ratio, quarter-turn phase  -> the open "pretzel"
 color 1
-lissajous(9, 16, 90, 24, 24, 400, 1)
+lissajous(fx, fy, phase, radius, radius, 400, stitch)
 trim

@@ -3,10 +3,11 @@
 
 fabric 'woven'
 
-let rib_dense  = 0.35    // advance (mm) at the tips  → close satin
-let rib_sparse = 1.6     // advance (mm) mid-column   → open, airy
-let rib_ramp   = 0.30    // fraction of the length spent ramping at each end
-let rib_halfw  = 1.6     // rail half-width → ~3.2 mm total column
+// --- ribbon ---
+let rib_dense  = 0.35    // [0.2:0.05:0.8] tip advance, mm
+let rib_sparse = 1.6     // [0.6:0.1:2.5] middle advance, mm
+let rib_ramp   = 0.30    // [0.1:0.05:0.5] tapered end fraction
+let rib_halfw  = 1.6     // [0.8:0.1:3] rail half-width, mm
 
 def ribbon(t, s, i, u) [
   let edge = min(s, 1 - s)                  // 0 at either tip, 0.5 at centre

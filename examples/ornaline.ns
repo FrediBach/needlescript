@@ -47,6 +47,8 @@ def ornaline(line, motif, arcLength, amp) [
 ]
 
 seed 3
+let cell_length = 6  // [2:0.5:12] ornament-cell length, mm
+let amplitude = 1    // [0.3:0.1:3] ornament height multiplier
 stitchlen 1.5
 
 // the spine to decorate
@@ -59,4 +61,4 @@ let wave = [[0, 0], [0.25, 1], [0.5, 0], [0.5, -1], [0.75, 0], [1, 2], [1, 0]]
 satin 1
 moveto -40 -10
 down
-ornaline(line, wave, 6, 1)        // stamp every 6 mm, full amplitude
+ornaline(line, wave, cell_length, amplitude)

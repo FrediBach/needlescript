@@ -12,12 +12,12 @@
 // ============================================================
 
 // ---- parameters ----
-let cells     = 7        // squares per side
-let csize     = 8       // square size in mm
-let bandevery = 2        // every Nth row/col is a coloured band
-let hatchgap  = 0.8      // spacing between hatch lines (smaller = denser blend)
-let warpcol   = 4        // colour of the vertical yarn  (e.g. blue)
-let weftcol   = 6        // colour of the horizontal yarn (e.g. red)
+let cells     = 7        // [3:11] squares per side
+let csize     = 8        // [4:1:12] square size, mm
+let bandevery = 2        // [1:5] coloured-band interval
+let hatchgap  = 0.8      // [0.5:0.1:1.5] hatch spacing, mm
+let warpcol   = 4        // [1:8] vertical-yarn thread
+let weftcol   = 6        // [1:8] horizontal-yarn thread
                          //   crossings of these two read as the blend
 let inset     = 0.4      // breathing room around each square
 

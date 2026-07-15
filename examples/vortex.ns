@@ -5,19 +5,22 @@
 seed 42
 fabric 'woven'
 
-let disc_r = 42                        // circle radius (mm)
+// --- vortex ---
+let disc_r = 42                        // [20:1:46] circle radius, mm
+let twist = 12                         // [0:1:40] outward tilt, degrees
+let row_gap = 1.2                      // [0.6:0.1:2.4] tatami row gap, mm
 
 // --- direction channel: rounded swirl grain ---
 // tangent-to-circles heading, tipped 25 deg outward so each row
 // spirals gently instead of closing on itself
 def swirl(p) [
   if vlen(p) < 1 [ return 90 ]         // dodge the singular centre
-  return vheading(vrot(p, 90)) + 12
+  return vheading(vrot(p, 90)) + twist
 ]
 
 // --- shape channel: big-gap tatami rows ---
 def airy(p, row, v) [
-  return tatamirow(1.2, 2)             // 1.8 mm row gap, 3 mm stitches
+  return tatamirow(row_gap, 2)          // open decorative rows
   // graded alternative — gaps widen toward one side:
   // return tatamirow(remap(v, 0, 1, 1.2, 2.4), 3)
 ]

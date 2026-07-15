@@ -74,7 +74,7 @@ for i = 1 to steps [
 //  2. AUTO-FIT  — centre on the bounding box, then scale so the
 //     single farthest point lands exactly on `fitradius`.
 // ------------------------------------------------------------
-let box = bbox(raw)                 // [minx, miny, maxx, maxy]
+let box = bbox(raw)
 let cx  = (box[0] + box[2]) / 2
 let cy  = (box[1] + box[3]) / 2
 

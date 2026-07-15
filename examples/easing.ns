@@ -35,11 +35,11 @@ def ease(mode, x) [
 // ── Eased-density ribbon ─────────────────────────────────────
 fabric 'woven'
 
-let rib_dense  = 0.35     // advance at the tips (mm)
-let rib_sparse = 1.7      // advance mid-column (mm)
-let rib_ramp   = 0.32     // fraction of length per ramp
-let rib_halfw  = 1.6      // rail half-width (~3.2 mm column)
-let rib_ease   = 'in_out_cubic'
+let rib_dense  = 0.35     // [0.2:0.05:0.8] tip advance, mm
+let rib_sparse = 1.7      // [0.6:0.1:2.5] middle advance, mm
+let rib_ramp   = 0.32     // [0.1:0.05:0.5] tapered end fraction
+let rib_halfw  = 1.6      // [0.8:0.1:3] rail half-width, mm
+let rib_ease   = 'in_out_cubic' // [text:linear,in_out_sine,in_out_cubic,out_quad,out_elastic]
 
 def ribbon(t, s, i, u) [
   let edge = min(s, 1 - s)                    // distance to nearest tip

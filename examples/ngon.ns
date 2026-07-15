@@ -18,10 +18,11 @@ def ngonpoint(rad, sides, h) [
   return [r * sin h, r * cos h]
 ]
 
-let rings = 40            // 14 rings: 3,4,5 ... up to 16 sides
-let startsides = 3
-let rmin = 20
-let rmax = 44
+// --- rings ---
+let rings = 40            // [8:1:48] number of rings
+let startsides = 3        // [3:8] sides on the inner ring
+let rmin = 20             // [4:1:30] inner radius, mm
+let rmax = 44             // [24:1:46] outer radius, mm
 
 color 1
 stitchlen 2

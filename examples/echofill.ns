@@ -33,9 +33,11 @@ def contour_fill(poly, gap) [
 // --- design ---------------------------------------------------------------
 
 // triangle with its centroid at the origin (vertices ~30 mm out, safely in-field)
-let tri = [[-26, -15], [26, -15], [0, 30]]
+let tri_size = 30 // [14:1:42] triangle radius, mm
+let gap = 0.8     // [0.4:0.1:2] contour spacing, mm
+let tri = [[0 - tri_size * 0.87, 0 - tri_size / 2], [tri_size * 0.87, 0 - tri_size / 2], [0, tri_size]]
 
 // then the contour fill, 0.8 mm between rings
 color 2
-contour_fill(tri, 0.8)
+contour_fill(tri, gap)
 trim

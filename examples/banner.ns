@@ -13,13 +13,17 @@ override 'stitches' 120000
 seed 12
 fabric 'denim'
 
-// 6 mm safety margin inside the 154 × 254 mm sewable field
-let margin = first(offsetpath(fieldpath(), -6))
-let pts = relax(scatter(5, margin), 2)
+// --- scatter ---
+let margin_mm = 6  // [3:1:16] safety margin inside the sewable field, mm
+let gap_mm = 5     // [3:1:16] minimum spacing between dots, mm
+let dot_r = 1.5    // [0.5:0.25:4] dot radius, mm
+
+let margin = first(offsetpath(fieldpath(), 0 - margin_mm))
+let pts = relax(scatter(gap_mm, margin), 2)
 
 color 1
 for p in pts [
   moveto p[0] p[1]
-  circle 1.5
+  circle dot_r
   trim
 ]

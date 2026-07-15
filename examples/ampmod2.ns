@@ -4,6 +4,8 @@
 seed 42
 stitchlen 1.6
 
+// --- shape ---
+let ring_scale = 1     // [0.5:0.1:1.1] scale all three rings together
 let res = 720          // points around each ring
 
 // each row: baseR, carrier, modcycles, depth, amp, color
@@ -18,7 +20,7 @@ def amwave(baseR, carrier, modcycles, depth, amp) [
     let theta = i / res * 360
     // envelope rides between (1-depth) and (1+depth)
     let env = 1 + depth * sin(theta * modcycles)
-    let r   = baseR + amp * env * sin(theta * carrier)
+    let r   = (baseR + amp * env * sin(theta * carrier)) * ring_scale
     // turtle degrees: 0 = north, clockwise -> (r*sin, r*cos)
     let x = r * sin(theta)
     let y = r * cos(theta)

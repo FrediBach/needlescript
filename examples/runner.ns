@@ -41,10 +41,11 @@ color 5
 home
 
 // --- Repeat horizontally, each copy dashier than the last ---
-let count = 20
+// --- runner field ---
+let count = 20            // [6:1:24] number of runners
 let startx = -38
-let gapx = 3.5
-let cell = 2              // dash+gap period stays constant; only the RATIO grows
+let gapx = 3.5            // [2:0.1:5] spacing between runners, mm
+let cell = 2              // [0.8:0.1:4] dash-and-gap period, mm
 
 repeat count [
   let i = repcount - 1                  // 0-based

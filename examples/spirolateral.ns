@@ -90,7 +90,10 @@ stitchlen 2
 bean 3               // bold line; try satin 2 for a ribbon, or drop for min density
 
 color 4
-spiro(6, 144) 
+// --- figure ---
+let sides = 6       // [3:12] segment count per cycle
+let turn = 144      // [30:6:180] turn angle, degrees
+spiro(sides, turn)
 trim
 
 // -- gallery: swap the call above for any of these (all vetted to close) --

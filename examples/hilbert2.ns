@@ -25,8 +25,9 @@ def hilbert(order, sign, side) [
 seed 42
 stitchlen 2
 
-let order = 5               // 3 → a 7×7 grid, fits the hoop cleanly
-let side = 2                // mm per segment
+// --- curve ---
+let order = 5               // [2:5] Hilbert recursion order
+let side = 2                // [0.8:0.2:2] segment length, mm
 let span = (pow(2, order) - 1) * side
 
 // walk the raw curve WITHOUT sewing, capturing every corner

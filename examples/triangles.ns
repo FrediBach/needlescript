@@ -2,10 +2,11 @@ seed 42
 
 fabric "woven
 
-let numTriangles = 40
-let startSize = 6
-let growFactor = 1.1
-let rotationStep = 13
+// --- triangle field ---
+let numTriangles = 40  // [8:1:50] number of triangles
+let startSize = 6      // [2:0.5:12] first triangle size, mm
+let growFactor = 1.1   // [1.02:0.01:1.2] size multiplier per triangle
+let rotationStep = 13  // [1:1:45] rotation step, degrees
 
 def drawTriangle(cx, cy, size, angle) [
   let x0 = cx + size * sin(angle)

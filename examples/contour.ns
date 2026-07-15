@@ -21,7 +21,7 @@ let freq    = 2.5       // [0.5:0.2:6] hills across the field (more = busier ter
 let octaves = 3         // [1:6] roughness / detail
 
 // --- contours ---
-let G        = 28       // [10:2:48] sampling grid resolution (G x G)
+let G        = 28       // sampling grid resolution; fixed to keep the preview responsive
 let levels   = 7        // [2:15] number of elevation contours
 let majorEvery = 2      // [1:5] every Nth contour is a solid "major" line
 

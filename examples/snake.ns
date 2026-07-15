@@ -3,8 +3,9 @@
 
 seed 90
 
-let cellSize = 1.5
-let gridR = 44.0
+// --- snake ---
+let cellSize = 1.5       // [0.8:0.1:3] grid-cell size, mm
+let gridR = 44.0         // [20:1:44] playable radius, mm
 let maxSteps = 5000
 
 let cols = floor(gridR * 2 / cellSize) + 1

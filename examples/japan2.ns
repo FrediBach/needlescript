@@ -3,11 +3,12 @@
 // on its own, from the true top (+radius) to the bottom (-radius),
 // so no cap is ever clipped.
 
-let half     = 30
-let rows     = 50
+// --- line field ---
+let half     = 30       // [18:1:32] half-width, mm
+let rows     = 50       // [12:1:80] base-line count
 let gap      = (half * 2) / rows
-let radius   = 22
-let infillsp = 0.6     // spacing between the dense infill chords (mm)
+let radius   = 22       // [6:1:36] dense-disc radius, mm
+let infillsp = 0.6      // [0.3:0.1:1.5] infill chord spacing, mm
 
 stitchlen 2
 seed 1

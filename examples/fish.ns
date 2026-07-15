@@ -2,11 +2,12 @@
 // More lines appear where the two curves are FURTHEST apart -- the
 // horizontal spacing between lines shrinks as the vertical gap widens.
 
-let amp      = 20     // sine amplitude (mm)
-let span     = 80     // total width: x runs -40 .. 40
-let cycles   = 0.61    // sine humps across the span
-let widest   = 2.9      // line spacing (mm) where the gap is widest -> sparse
-let tightest = 1    // line spacing where the curves nearly meet -> dense
+// --- shape & hatch ---
+let amp      = 20     // [8:1:28] sine amplitude, mm
+let span     = 80     // [40:1:88] total width, mm
+let cycles   = 0.61   // [0.2:0.05:2] sine humps across the span
+let widest   = 2.9    // [1:0.1:4] spacing at the widest gap, mm
+let tightest = 1      // [0.5:0.1:2] spacing at a pinch, mm
 
 // gap(x): half-height of the envelope at x. Floored so columns near the
 // zero-crossings still receive a line.

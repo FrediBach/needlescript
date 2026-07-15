@@ -5,16 +5,17 @@
 seed 1
 density 0.4
 
-let rmax  = 38         // outer radius of the spiral disc
-let r0    = 0.4        // starting radius (avoids a dense knot at the centre)
-let turns = 24         // revolutions -> ~2 mm gap between rings
-let pace  = 0.8        // target arc length per segment (mm)
-let thin  = 0.2        // satin width outside the triangle
-let thick = 0.8        // satin width inside the triangle
+// --- spiral ---
+let rmax  = 38         // [20:1:46] outer radius, mm
+let r0    = 0.4        // [0.2:0.1:2] starting radius, mm
+let turns = 24         // [6:1:40] revolutions
+let pace  = 0.8        // [0.4:0.1:2] target segment length, mm
+let thin  = 0.2        // [0.2:0.1:0.6] satin width outside
+let thick = 0.8        // [0.4:0.1:1.5] satin width inside
 
 // hidden equilateral triangle (point up), circumradius 22 mm
 // heading convention: 0 deg = north, so x = r*sin(a), y = r*cos(a)
-let tri_r = 30
+let tri_r = 30         // [8:1:38] hidden triangle radius, mm
 let tri = [
   [tri_r * sin(0),   tri_r * cos(0)],
   [tri_r * sin(120), tri_r * cos(120)],
