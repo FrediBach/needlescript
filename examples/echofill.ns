@@ -1,0 +1,48 @@
+// Contour ("echo") fill inside a triangle — simulated with offsetpath insets.
+// Sew the boundary, shrink by `gap`, sew again, until the shape vanishes.
+
+seed 11
+fabric 'woven'
+stitchlen 2
+
+// sew one closed ring: jump to its start (no sewn connector), then walk it
+def sew_ring(ring) [
+  let closed = concat(ring, [ring[0]])   // pure join: ring + repeated first point
+  moveto(closed[0][0], closed[0][1])
+  sewpath(closed)                        // stitchlen auto-splits, corners stay crisp
+]
+
+// concentric contour fill of any region
+def contour_fill(poly, gap) [
+  let frontier = [poly]      // rings still to sew (insetting can split a shape)
+  let nxt = []               // declared ONCE, reused every pass
+  let guard = 0
+  while len(frontier) > 0 and guard < 300 [
+    guard += 1
+    nxt = []                 // rebind to a fresh list (frontier keeps the old one)
+    for ring in frontier [
+      sew_ring(ring)
+      for sub in offsetpath(ring, 0 - gap) [   // shrink — may yield 0, 1, or more rings
+        append(nxt, sub)     // statement: mutates nxt in place
+      ]
+    ]
+    frontier = nxt           // empty list ends the loop naturally
+  ]
+]
+
+// --- design ---------------------------------------------------------------
+
+// triangle with its centroid at the origin (vertices ~30 mm out, safely in-field)
+let tri = [[-26, -15], [26, -15], [0, 30]]
+
+// crisp outline first
+color 1
+bean 3
+sew_ring(tri)
+bean 1
+trim
+
+// then the contour fill, 0.8 mm between rings
+color 2
+contour_fill(tri, 0.8)
+trim
