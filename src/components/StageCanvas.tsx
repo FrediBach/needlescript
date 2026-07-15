@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Copy } from 'lucide-react';
 import type { DesignState, LineStitchBounds } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import type { WarningLocation, HoopInfo } from '../lib/engine.ts';
@@ -28,6 +30,7 @@ import {
   gold,
   goldHi,
 } from '../theme.ts';
+import styles from './StagePane.module.css';
 
 interface Props {
   design: DesignState;
@@ -91,6 +94,13 @@ type DragState = {
   currentY: number;
 };
 
+type SampleContextMenu = {
+  clientX: number;
+  clientY: number;
+  mmX: number;
+  mmY: number;
+};
+
 /** State for an in-progress handle drag. */
 type HandleDragState = {
   name: string;
@@ -131,6 +141,7 @@ export default function StageCanvas({
 
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
+  const [sampleContextMenu, setSampleContextMenu] = useState<SampleContextMenu | null>(null);
 
   // ── Handle interaction state ─────────────────────────────────────────────
   /** Active handle drag — kept in a ref (not state) to avoid re-render thrash */
@@ -279,8 +290,24 @@ export default function StageCanvas({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [draggingHandleName]);
 
+  // ── sampled-coordinate context menu ─────────────────────────────────────
+  useEffect(() => {
+    if (!sampleContextMenu) return;
+    const close = () => setSampleContextMenu(null);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [sampleContextMenu]);
+
   // ── pointer handlers ─────────────────────────────────────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.button !== 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -448,6 +475,35 @@ export default function StageCanvas({
     }
   }, [viewport]);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    const t = transformRef.current;
+    if (!canvas || !t) return;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const cssX = e.clientX - rect.left;
+    const cssY = e.clientY - rect.top;
+    setSampleContextMenu({
+      clientX: e.clientX,
+      clientY: e.clientY,
+      mmX: t.viewCX + (cssX * dpr - t.cx) / t.scale,
+      mmY: t.viewCY - (cssY * dpr - t.cy) / t.scale,
+    });
+  }, []);
+
+  const handleCopySample = useCallback(async () => {
+    if (!sampleContextMenu) return;
+    const point = formatPointLiteral(sampleContextMenu.mmX, sampleContextMenu.mmY);
+    try {
+      await copyText(point);
+    } catch {
+      // The menu remains open so the user can retry if their browser blocks clipboard access.
+      return;
+    }
+    setSampleContextMenu(null);
+  }, [sampleContextMenu]);
+
   // ── click-to-pick (canvas → row linking) ─────────────────────────────────
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -507,6 +563,7 @@ export default function StageCanvas({
         onPointerUp={handlePointerUp}
         onDoubleClick={handleDoubleClick}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
         style={{
           position: 'absolute',
           inset: 0,
@@ -554,8 +611,51 @@ export default function StageCanvas({
           {zoomLevel.toFixed(1)}×
         </div>
       )}
+
+      {sampleContextMenu &&
+        createPortal(
+          <div
+            className={styles.sampleContextMenu}
+            style={{ left: sampleContextMenu.clientX, top: sampleContextMenu.clientY }}
+            role="menu"
+            aria-label="Sample position"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button
+              className={styles.sampleContextMenuItem}
+              type="button"
+              onClick={handleCopySample}
+            >
+              <Copy size={13} aria-hidden="true" />
+              Copy {formatPointLiteral(sampleContextMenu.mmX, sampleContextMenu.mmY)}
+            </button>
+          </div>,
+          document.body,
+        )}
     </>
   );
+}
+
+/** Format a sampled hoop-space coordinate as a NeedleScript point literal. */
+function formatPointLiteral(x: number, y: number): string {
+  return `[${x.toFixed(1)}, ${y.toFixed(1)}]`;
+}
+
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.append(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  textarea.remove();
+  if (!copied) throw new Error('Unable to copy sampled position');
 }
 
 // ── rendering ────────────────────────────────────────────────────────────────
