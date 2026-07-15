@@ -32,6 +32,192 @@ export const HOOPS: HoopConfig[] = [
 
 export const DEFAULT_HOOP: HoopConfig = HOOPS[0];
 
+// Machine presets belong to the playground rather than the language runtime: applying one
+// writes ordinary NeedleScript directives into the source file.
+export type MachineClass = 'home' | 'multi-needle' | 'commercial';
+export type TrimmerClass = 'jump' | 'colorchange' | 'none';
+export type MachineNativeFormat = 'DST' | 'PES' | 'EXP' | 'JEF' | 'VP3' | 'XXX';
+
+export interface MachineHoop {
+  id: string;
+  label: string;
+  /** Literal NeedleScript argument, deliberately not interpreted by the UI. */
+  hoopArg: string;
+}
+
+export interface MachinePreset {
+  id: string;
+  brand: string;
+  model: string;
+  cls: MachineClass;
+  hoops: MachineHoop[];
+  trimmer: TrimmerClass;
+  nativeFormat: MachineNativeFormat;
+  maxSpm?: number;
+  budgetStitches?: number;
+  notes?: string;
+}
+
+const rect = (id: string, label: string, width: number, height: number): MachineHoop => ({
+  id,
+  label,
+  hoopArg: `[${Math.min(width, height)}, ${Math.max(width, height)}]`,
+});
+
+/** Curated starter presets. Dimensions use the machine manuals' nominal hoop sizes. */
+export const MACHINES: MachinePreset[] = [
+  {
+    id: 'brother-pe800',
+    brand: 'Brother',
+    model: 'PE800',
+    cls: 'home',
+    hoops: [{ id: '5x7', label: '5×7 (130×180)', hoopArg: "'5x7'" }],
+    trimmer: 'jump',
+    nativeFormat: 'PES',
+    maxSpm: 650,
+    budgetStitches: 40000,
+  },
+  {
+    id: 'brother-se600',
+    brand: 'Brother',
+    model: 'SE600',
+    cls: 'home',
+    hoops: [{ id: '4x4', label: '4×4 (100×100)', hoopArg: "'4x4'" }],
+    trimmer: 'colorchange',
+    nativeFormat: 'PES',
+    maxSpm: 400,
+    budgetStitches: 25000,
+  },
+  {
+    id: 'brother-pe550d',
+    brand: 'Brother',
+    model: 'PE550D',
+    cls: 'home',
+    hoops: [{ id: '4x4', label: '4×4 (100×100)', hoopArg: "'4x4'" }],
+    trimmer: 'colorchange',
+    nativeFormat: 'PES',
+    maxSpm: 400,
+    budgetStitches: 25000,
+  },
+  {
+    id: 'babylock-flourish-ii',
+    brand: 'Baby Lock',
+    model: 'Flourish II',
+    cls: 'home',
+    hoops: [{ id: '5x7', label: '5×7 (130×180)', hoopArg: "'5x7'" }],
+    trimmer: 'jump',
+    nativeFormat: 'PES',
+    maxSpm: 650,
+    budgetStitches: 40000,
+  },
+  {
+    id: 'janome-mc500e',
+    brand: 'Janome',
+    model: 'MC500E',
+    cls: 'home',
+    hoops: [
+      rect('sq14', 'SQ14 (140×140)', 140, 140),
+      rect('re20', 'RE20 (170×200)', 170, 200),
+      rect('re28', 'RE28 (200×280)', 200, 280),
+    ],
+    trimmer: 'jump',
+    nativeFormat: 'JEF',
+    maxSpm: 860,
+    budgetStitches: 45000,
+  },
+  {
+    id: 'bernina-570-qe',
+    brand: 'Bernina',
+    model: '570 QE + module',
+    cls: 'home',
+    hoops: [rect('100x130', '100×130', 100, 130), rect('145x255', '145×255', 145, 255)],
+    trimmer: 'jump',
+    nativeFormat: 'EXP',
+    maxSpm: 680,
+    budgetStitches: 40000,
+  },
+  {
+    id: 'husqvarna-topaz-50',
+    brand: 'Husqvarna',
+    model: 'Designer Topaz 50',
+    cls: 'home',
+    hoops: [rect('120x120', '120×120', 120, 120), rect('200x260', '200×260', 200, 260)],
+    trimmer: 'jump',
+    nativeFormat: 'VP3',
+    maxSpm: 800,
+    budgetStitches: 40000,
+  },
+  {
+    id: 'pfaff-creative-45',
+    brand: 'Pfaff',
+    model: 'Creative 4.5',
+    cls: 'home',
+    hoops: [rect('120x120', '120×120', 120, 120), rect('200x260', '200×260', 200, 260)],
+    trimmer: 'jump',
+    nativeFormat: 'VP3',
+    maxSpm: 800,
+    budgetStitches: 40000,
+  },
+  {
+    id: 'singer-futura-xl580',
+    brand: 'Singer',
+    model: 'Futura XL-580',
+    cls: 'home',
+    hoops: [rect('120x120', '120×120', 120, 120), rect('171x260', '171×260', 171, 260)],
+    trimmer: 'none',
+    nativeFormat: 'XXX',
+    maxSpm: 700,
+    budgetStitches: 30000,
+  },
+  {
+    id: 'brother-pr680w',
+    brand: 'Brother',
+    model: 'PR680W',
+    cls: 'multi-needle',
+    hoops: [
+      rect('100x100', '100×100', 100, 100),
+      { id: '5x7', label: '5×7 (130×180)', hoopArg: "'5x7'" },
+      rect('200x300', '200×300', 200, 300),
+    ],
+    trimmer: 'jump',
+    nativeFormat: 'PES',
+    maxSpm: 1000,
+    budgetStitches: 60000,
+  },
+  {
+    id: 'ricoma-em1010',
+    brand: 'Ricoma',
+    model: 'EM-1010',
+    cls: 'commercial',
+    hoops: [
+      rect('120x120', '120×120', 120, 120),
+      rect('140x200', '140×200', 140, 200),
+      rect('290x290', '290×290', 290, 290),
+    ],
+    trimmer: 'jump',
+    nativeFormat: 'DST',
+    maxSpm: 1000,
+    budgetStitches: 70000,
+  },
+  {
+    id: 'melco-emt16x',
+    brand: 'Melco',
+    model: 'EMT16X',
+    cls: 'commercial',
+    hoops: [
+      { id: 'round150', label: '150 mm round', hoopArg: '150' },
+      rect('300x360', '300×360', 300, 360),
+    ],
+    trimmer: 'jump',
+    nativeFormat: 'EXP',
+    maxSpm: 1500,
+    budgetStitches: 80000,
+  },
+];
+
+export const SEW_TIME_TRIM_PENALTY_SECONDS = 12;
+export const SEW_TIME_COLOR_CHANGE_PENALTY_SECONDS = 25;
+
 export interface Example {
   id: string;
   label: string;

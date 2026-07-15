@@ -1,5 +1,6 @@
 import type { DesignState, LineSegment, LineStitchBounds } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
+import type { MachinePreset } from '../data.ts';
 import type { WarningLocation } from '../lib/engine.ts';
 import type { PointParamDef } from '../lib/parse-parameters.ts';
 import StageCanvas from './StageCanvas.tsx';
@@ -29,6 +30,8 @@ interface Props {
   lockedHandles?: Set<string>;
   onHandleDrag?: (name: string, line: number, x: number, y: number) => void;
   onHandleCommit?: (name: string, line: number, x: number, y: number) => void;
+  onMachineContextMenu?: (x: number, y: number) => void;
+  machine?: MachinePreset | null;
 }
 
 // ── Small pill switch sized for the canvas toolbar ────────────────────────────
@@ -100,6 +103,8 @@ export default function StagePane({
   lockedHandles,
   onHandleDrag,
   onHandleCommit,
+  onMachineContextMenu,
+  machine,
 }: Props) {
   // Only show the handles toggle when there are point params to show
   const hasHandles = (pointParams?.length ?? 0) > 0;
@@ -122,8 +127,9 @@ export default function StagePane({
           lockedHandles={lockedHandles}
           onHandleDrag={onHandleDrag}
           onHandleCommit={onHandleCommit}
+          onMachineContextMenu={onMachineContextMenu}
         />
-        <StatsChips design={design} />
+        <StatsChips design={design} machine={machine} />
         <div className="absolute top-[10px] right-[10px] flex items-center gap-[10px]">
           <CanvasSwitch
             checked={!hideJumps}

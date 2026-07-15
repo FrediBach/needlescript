@@ -32,6 +32,7 @@ export default function StageCanvas({
   lockedHandles,
   onHandleDrag,
   onHandleCommit,
+  onMachineContextMenu,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<RenderTransform | null>(null);
@@ -372,22 +373,29 @@ export default function StageCanvas({
     }
   }, [viewport]);
 
-  const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    const t = transformRef.current;
-    if (!canvas || !t) return;
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    const cssX = e.clientX - rect.left;
-    const cssY = e.clientY - rect.top;
-    setSampleContextMenu({
-      clientX: e.clientX,
-      clientY: e.clientY,
-      mmX: t.viewCX + (cssX * dpr - t.cx) / t.scale,
-      mmY: t.viewCY - (cssY * dpr - t.cy) / t.scale,
-    });
-  }, []);
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      if (onMachineContextMenu) {
+        onMachineContextMenu(e.clientX, e.clientY);
+        return;
+      }
+      const canvas = canvasRef.current;
+      const t = transformRef.current;
+      if (!canvas || !t) return;
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const cssX = e.clientX - rect.left;
+      const cssY = e.clientY - rect.top;
+      setSampleContextMenu({
+        clientX: e.clientX,
+        clientY: e.clientY,
+        mmX: t.viewCX + (cssX * dpr - t.cx) / t.scale,
+        mmY: t.viewCY - (cssY * dpr - t.cy) / t.scale,
+      });
+    },
+    [onMachineContextMenu],
+  );
 
   const handleCopySample = useCallback(async () => {
     if (!sampleContextMenu) return;

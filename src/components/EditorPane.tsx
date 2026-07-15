@@ -14,6 +14,7 @@ import Splitter from './Splitter.tsx';
 import ParametersPanel from './ParametersPanel.tsx';
 import styles from './EditorPane.module.css';
 import { Input } from '@/components/ui/input.tsx';
+import type { EditorContextActions } from './MachineMenu.tsx';
 
 interface Props {
   source: string;
@@ -58,6 +59,8 @@ interface Props {
   onHighlightHandle?: (name: string | null) => void;
   /** Which handle name the stage is currently highlighting */
   highlightedHandle?: string | null;
+  /** Opens the shared machine/fabric context menu. */
+  onMachineContextMenu?: (x: number, y: number, editorActions?: EditorContextActions) => void;
 }
 
 // Font settings — sourced from theme.ts to stay in sync with the design system
@@ -105,6 +108,7 @@ export default function EditorPane({
   onToggleLock,
   onHighlightHandle,
   highlightedHandle,
+  onMachineContextMenu,
 }: Props) {
   const [replValue, setReplValue] = useState('');
   const replHistoryRef = useRef<string[]>([]);
@@ -148,15 +152,18 @@ export default function EditorPane({
   // always read the latest props without re-registering Monaco listeners.
   const lineStitchMapRef = useRef(lineStitchMap);
   const onHoverLineRef = useRef(onHoverLine);
+  const onMachineContextMenuRef = useRef(onMachineContextMenu);
   useLayoutEffect(() => {
     lineStitchMapRef.current = lineStitchMap;
     onHoverLineRef.current = onHoverLine;
+    onMachineContextMenuRef.current = onMachineContextMenu;
   });
 
   // Disposables created in handleMount — cleaned up on unmount.
   const hoverProviderRef = useRef<IDisposable | null>(null);
   const mouseMoveRef = useRef<IDisposable | null>(null);
   const mouseLeaveRef = useRef<IDisposable | null>(null);
+  const contextMenuRef = useRef<IDisposable | null>(null);
 
   // ── Parameters panel throttle ───────────────────────────────────────
   // Leading + trailing throttle at 250 ms: fire immediately on first change,
@@ -267,6 +274,23 @@ export default function EditorPane({
     mouseLeaveRef.current = ed.onMouseLeave(() => {
       onHoverLineRef.current?.(null);
     });
+    contextMenuRef.current = ed.onContextMenu((event) => {
+      event.event.preventDefault();
+      event.event.stopPropagation();
+      // Menu buttons take browser focus. Monaco's Change All action is gated on
+      // editorTextFocus, so restore it before running any editor command.
+      const runEditorAction = (id: string) => {
+        ed.focus();
+        void ed.getAction(id)?.run();
+      };
+      onMachineContextMenuRef.current?.(event.event.posx, event.event.posy, {
+        cut: () => runEditorAction('editor.action.clipboardCutAction'),
+        copy: () => runEditorAction('editor.action.clipboardCopyAction'),
+        paste: () => runEditorAction('editor.action.clipboardPasteAction'),
+        goToDefinition: () => runEditorAction('editor.action.revealDefinition'),
+        changeAll: () => runEditorAction('editor.action.changeAll'),
+      });
+    });
   }, []);
 
   // Dispose Monaco listeners when the editor pane unmounts.
@@ -275,6 +299,7 @@ export default function EditorPane({
       hoverProviderRef.current?.dispose();
       mouseMoveRef.current?.dispose();
       mouseLeaveRef.current?.dispose();
+      contextMenuRef.current?.dispose();
     };
   }, []);
 
@@ -612,6 +637,9 @@ export default function EditorPane({
             wordBasedSuggestions: 'off',
             links: false,
             hover: { enabled: true },
+            // The playground owns right-click so the Machine/Fabric menu is the
+            // only menu shown at this location.
+            contextmenu: false,
           }}
         />
       </div>

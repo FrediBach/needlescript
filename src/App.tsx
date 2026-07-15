@@ -22,8 +22,8 @@ import { toDST } from './lib/dst.ts';
 import { toPES } from './lib/pes.ts';
 import { toEXP } from './lib/exp.ts';
 import { toSVG } from './lib/svg.ts';
-import { THREADS, EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP } from './data.ts';
-import type { HoopConfig } from './data.ts';
+import { THREADS, EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, MACHINES } from './data.ts';
+import type { HoopConfig, MachineHoop, MachinePreset } from './data.ts';
 import type { ExportFormat } from './components/Header.tsx';
 import { parseParameters, updatePointParameter } from './lib/parse-parameters.ts';
 import type { PointParamDef } from './lib/parse-parameters.ts';
@@ -42,6 +42,18 @@ const StagingDialog = lazy(() => import('./components/svg-staging/StagingDialog.
 import HoopDialog from './components/HoopDialog.tsx';
 import { Toaster } from '@/components/ui/sonner.tsx';
 import ImportChooser from './components/svg-staging/ImportChooser.tsx';
+import { MachineContextMenu } from './components/MachineMenu.tsx';
+import type { ActiveMachine, EditorContextActions } from './components/MachineMenu.tsx';
+import {
+  applyBlock,
+  applyFabric,
+  blockHasManualEdits,
+  findBlock,
+  findConflicts,
+  generateBlock,
+  removeBlock,
+} from './machineBlock.ts';
+import { toast } from 'sonner';
 
 export interface LineSegment {
   line: number;
@@ -162,6 +174,14 @@ export default function App() {
   const [showDensity, setShowDensity] = useState(false);
   const [hideJumps, setHideJumps] = useState(false);
   const [showReference, setShowReference] = useState(false);
+  const [machineContextMenu, setMachineContextMenu] = useState<{
+    x: number;
+    y: number;
+    editorActions?: EditorContextActions;
+  } | null>(null);
+  const [machineBudgetMode, setMachineBudgetMode] = useState(
+    () => localStorage.getItem('ns.machine.budgetMode') === 'true',
+  );
   // Compiler error markers fed into the editor as red squiggles.
   // Set after an explicit run that fails; cleared when a run succeeds.
   const [errorMarkers, setErrorMarkers] = useState<Array<{ message: string; line: number }>>([]);
@@ -178,6 +198,35 @@ export default function App() {
   useLayoutEffect(() => {
     activeSnippetNameRef.current = activeSnippetName;
   });
+
+  const activeMachine = useMemo((): ActiveMachine | null => {
+    const block = findBlock(source);
+    return block ? { id: block.id, hoopId: block.hoopId, budgetMode: block.budgetMode } : null;
+  }, [source]);
+
+  const defaultExportFormat = useMemo((): 'dst' | 'pes' | 'exp' => {
+    const machine = activeMachine && MACHINES.find((item) => item.id === activeMachine.id);
+    const fmt = machine?.nativeFormat.toLowerCase();
+    return fmt === 'pes' || fmt === 'exp' || fmt === 'dst' ? fmt : 'dst';
+  }, [activeMachine]);
+  const selectedMachine = useMemo(
+    () => (activeMachine ? (MACHINES.find((item) => item.id === activeMachine.id) ?? null) : null),
+    [activeMachine],
+  );
+
+  useEffect(() => {
+    if (!machineContextMenu) return;
+    const close = () => setMachineContextMenu(null);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [machineContextMenu]);
   const clearActiveSnippet = useCallback(() => setActiveSnippetName(null), []);
   // Location of the warning currently hovered in the console — drives the
   // preview marker and playback-bar part highlight. null = nothing hovered.
@@ -470,6 +519,74 @@ export default function App() {
     [runProgram, clearActiveSnippet],
   );
 
+  const applyMachinePreset = useCallback(
+    (machine: MachinePreset, hoop: MachineHoop) => {
+      const current = findBlock(sourceRef.current);
+      const currentMachine = current && MACHINES.find((item) => item.id === current.id);
+      const currentHoop = currentMachine?.hoops.find((item) => item.id === current?.hoopId);
+      if (
+        current &&
+        currentMachine &&
+        currentHoop &&
+        blockHasManualEdits(current, currentMachine, currentHoop)
+      ) {
+        if (
+          !window.confirm(
+            'Your machine block has manual edits. Replace it with the selected machine settings?',
+          )
+        )
+          return;
+      }
+
+      const conflicts = findConflicts(sourceRef.current);
+      const keepHoop =
+        conflicts.hoop &&
+        !window.confirm(
+          'A hoop directive exists outside the machine block. Replace it? Choose Cancel to keep your hoop.',
+        );
+      const keepBudget =
+        machineBudgetMode &&
+        conflicts.stitchesOverride &&
+        !window.confirm(
+          "An override 'stitches' directive exists outside the machine block. Replace it? Choose Cancel to keep yours.",
+        );
+      const block = generateBlock(machine, hoop, {
+        budgetMode: machineBudgetMode,
+        omitHoop: keepHoop,
+        omitBudget: keepBudget,
+      });
+      const next = applyBlock(sourceRef.current, block);
+      setSource(next);
+      runProgram(next, design.name);
+      localStorage.setItem('ns.machine.last', JSON.stringify({ id: machine.id, hoop: hoop.id }));
+      if (!current || current.hoopId !== hoop.id) {
+        toast('Hoop changed — scatter, voronoi, and relax layouts re-flow with the field.');
+      }
+    },
+    [design.name, machineBudgetMode, runProgram],
+  );
+
+  const handleApplyFabric = useCallback(
+    (fabric: string) => {
+      const next = applyFabric(sourceRef.current, fabric);
+      setSource(next);
+      runProgram(next, design.name);
+    },
+    [design.name, runProgram],
+  );
+
+  const handleMachineBudgetModeChange = useCallback((enabled: boolean) => {
+    setMachineBudgetMode(enabled);
+    localStorage.setItem('ns.machine.budgetMode', String(enabled));
+  }, []);
+
+  const handleRemoveMachine = useCallback(() => {
+    const next = removeBlock(sourceRef.current);
+    if (next === sourceRef.current) return;
+    setSource(next);
+    runProgram(next, design.name);
+  }, [design.name, runProgram]);
+
   // `@`-referenceable reporters defined in the current editor program, for the
   // staging workspace's directional-fill field picker.
   const svgReporters = useMemo(() => {
@@ -617,6 +734,13 @@ export default function App() {
         onDownload={handleDownload}
         onShare={handleShare}
         onOpenReference={() => setShowReference(true)}
+        activeMachine={activeMachine}
+        machineBudgetMode={machineBudgetMode}
+        onApplyMachine={applyMachinePreset}
+        onApplyFabric={handleApplyFabric}
+        onMachineBudgetModeChange={handleMachineBudgetModeChange}
+        onRemoveMachine={handleRemoveMachine}
+        defaultExportFormat={defaultExportFormat}
       />
 
       <main className={styles.main} ref={mainRef}>
@@ -644,6 +768,9 @@ export default function App() {
           onToggleLock={toggleLock}
           onHighlightHandle={handleHighlightHandle}
           highlightedHandle={highlightedHandle}
+          onMachineContextMenu={(x, y, editorActions) =>
+            setMachineContextMenu({ x, y, editorActions })
+          }
         />
         {!isMobile && (
           <Splitter orientation="horizontal" onDrag={handleHorizDrag} onReset={handleHorizReset} />
@@ -668,8 +795,25 @@ export default function App() {
           lockedHandles={lockedParams}
           onHandleDrag={handleXYHandleDrag}
           onHandleCommit={handleXYHandleCommit}
+          onMachineContextMenu={(x, y) => setMachineContextMenu({ x, y })}
+          machine={selectedMachine}
         />
       </main>
+
+      {machineContextMenu && (
+        <MachineContextMenu
+          x={machineContextMenu.x}
+          y={machineContextMenu.y}
+          editorActions={machineContextMenu.editorActions}
+          active={activeMachine}
+          budgetMode={machineBudgetMode}
+          onApply={applyMachinePreset}
+          onFabric={handleApplyFabric}
+          onBudgetModeChange={handleMachineBudgetModeChange}
+          onRemove={handleRemoveMachine}
+          onClose={() => setMachineContextMenu(null)}
+        />
+      )}
 
       <Suspense fallback={showReference ? <DialogSpinner /> : null}>
         <ReferenceDialog open={showReference} onClose={() => setShowReference(false)} />

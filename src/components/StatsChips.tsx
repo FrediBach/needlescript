@@ -1,10 +1,13 @@
 import type { DesignState } from '../App.tsx';
+import { SEW_TIME_COLOR_CHANGE_PENALTY_SECONDS, SEW_TIME_TRIM_PENALTY_SECONDS } from '../data.ts';
+import type { MachinePreset } from '../data.ts';
 import { Badge } from '@/components/ui/badge.tsx';
 import { cn } from '@/lib/utils.ts';
 import styles from './StatsChips.module.css';
 
 interface Props {
   design: DesignState;
+  machine?: MachinePreset | null;
 }
 
 function formatHoopChip(design: DesignState): string | null {
@@ -18,7 +21,7 @@ function formatHoopChip(design: DesignState): string | null {
   return `${hoopStr} · ${fieldStr} mm`;
 }
 
-export default function StatsChips({ design }: Props) {
+export default function StatsChips({ design, machine }: Props) {
   if (!design.stats) return null;
 
   const s = design.stats;
@@ -33,6 +36,15 @@ export default function StatsChips({ design }: Props) {
       text: yarnM >= 1 ? `${yarnM.toFixed(1)} m yarn` : `${Math.round(s.yarnLength)} mm yarn`,
     });
     if (s.jumps) chips.push({ text: `${s.jumps} jump${s.jumps > 1 ? 's' : ''}` });
+    if (machine?.maxSpm) {
+      const seconds =
+        (s.stitches / machine.maxSpm) * 60 +
+        s.trims * SEW_TIME_TRIM_PENALTY_SECONDS +
+        s.colorChanges * SEW_TIME_COLOR_CHANGE_PENALTY_SECONDS;
+      chips.push({
+        text: `≈ ${Math.max(1, Math.round(seconds / 60))} min @ ${machine.maxSpm} spm`,
+      });
+    }
     chips.push({ text: `${s.colorsUsed} colour${s.colorsUsed > 1 ? 's' : ''}` });
     chips.push({ text: `${s.width.toFixed(1)} × ${s.height.toFixed(1)} mm` });
     if (design.density && design.density.peak > 0.5)
@@ -49,6 +61,14 @@ export default function StatsChips({ design }: Props) {
         const title = raised.map(([k, v]) => `${k}: ${(v as number).toLocaleString()}`).join(', ');
         chips.push({ text: 'limits ⚠', type: 'warn', title });
       }
+    }
+    if (machine && machine.trimmer !== 'jump' && s.trims > 12) {
+      const action = machine.trimmer === 'none' ? 'manual snips' : 'limited trimming';
+      chips.push({
+        text: `${machine.model}: ${s.trims} trims → ${action}`,
+        type: 'warn',
+        title: 'Sorting motif order usually reduces travel trims.',
+      });
     }
   }
 

@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { EXAMPLE_TIERS } from '../data.ts';
-import type { HoopConfig } from '../data.ts';
+import type { HoopConfig, MachineHoop, MachinePreset } from '../data.ts';
+import { MachineMenu } from './MachineMenu.tsx';
+import type { ActiveMachine } from './MachineMenu.tsx';
 import { HoopIcon } from './HoopDialog.tsx';
 import styles from './Header.module.css';
 import { buttonVariants } from '@/components/ui/button.tsx';
@@ -41,6 +43,13 @@ interface Props {
   onDownload: (format: ExportFormat) => void;
   onShare: () => Promise<void>;
   onOpenReference: () => void;
+  activeMachine: ActiveMachine | null;
+  machineBudgetMode: boolean;
+  onApplyMachine: (machine: MachinePreset, hoop: MachineHoop) => void;
+  onApplyFabric: (fabric: string) => void;
+  onMachineBudgetModeChange: (enabled: boolean) => void;
+  onRemoveMachine: () => void;
+  defaultExportFormat: Exclude<ExportFormat, 'svg'>;
 }
 
 // ── Inline logo SVG ────────────────────────────────────────────────────────────
@@ -163,11 +172,18 @@ function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) =>
 }
 
 // ── Export dropdown (visible at lg+, also in hamburger) ───────────────────────
-function ExportDropdown({ onDownload }: { onDownload: (fmt: ExportFormat) => void }) {
+function ExportDropdown({
+  onDownload,
+  defaultFormat,
+}: {
+  onDownload: (fmt: ExportFormat) => void;
+  defaultFormat: Exclude<ExportFormat, 'svg'>;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className={cn(redBtn, 'gap-1')} aria-label="Export embroidery file">
-        Export <ChevronDownIcon className="size-[11px] opacity-75 -ml-0.5" />
+        Download .{defaultFormat.toUpperCase()}{' '}
+        <ChevronDownIcon className="size-[11px] opacity-75 -ml-0.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[176px] font-mono text-ui">
         {(['dst', 'pes', 'exp'] as ExportFormat[]).map((fmt) => (
@@ -363,6 +379,13 @@ export default function Header({
   onDownload,
   onShare,
   onOpenReference,
+  activeMachine,
+  machineBudgetMode,
+  onApplyMachine,
+  onApplyFabric,
+  onMachineBudgetModeChange,
+  onRemoveMachine,
+  defaultExportFormat,
 }: Props) {
   return (
     <header className={styles.header}>
@@ -391,6 +414,18 @@ export default function Header({
         </Tooltip>
 
         <ExamplesSelect onExampleSelect={onExampleSelect} />
+        {/* Kept mounted in code for an easy return, but hidden while the compact
+            header is prioritised. Machine settings remain available on right-click. */}
+        <div className="hidden">
+          <MachineMenu
+            active={activeMachine}
+            budgetMode={machineBudgetMode}
+            onApply={onApplyMachine}
+            onFabric={onApplyFabric}
+            onBudgetModeChange={onMachineBudgetModeChange}
+            onRemove={onRemoveMachine}
+          />
+        </div>
       </div>
 
       {/* ══ IMPORT SVG (lg+ only) ═════════════════════════════════════════════ */}
@@ -423,7 +458,7 @@ export default function Header({
       </button>
 
       <div className="hidden lg:flex items-center gap-1.5">
-        <ExportDropdown onDownload={onDownload} />
+        <ExportDropdown onDownload={onDownload} defaultFormat={defaultExportFormat} />
         <ShareButton onShare={onShare} />
       </div>
 

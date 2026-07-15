@@ -30,6 +30,8 @@ export interface StageCanvasProps {
   onHandleDrag?: (name: string, line: number, x: number, y: number) => void;
   /** Fired on pointer-up (or Esc-cancel with restored start values). */
   onHandleCommit?: (name: string, line: number, x: number, y: number) => void;
+  /** Opens the shared machine/fabric context menu. */
+  onMachineContextMenu?: (x: number, y: number) => void;
 }
 
 /** A set of rings drawn over the stitches for the staging workspace. */
