@@ -1,0 +1,85 @@
+import type { DesignState, LineStitchBounds } from '../../App.tsx';
+import type { HoopConfig } from '../../data.ts';
+import type { HoopInfo, WarningLocation } from '../../lib/engine.ts';
+import type { PointParamDef, XYRegion } from '../../lib/parse-parameters.ts';
+
+export interface StageCanvasProps {
+  design: DesignState;
+  hoop: HoopConfig;
+  /** Active hoop from the `hoop` language directive, if any. Overrides `hoop` dimensions when present. */
+  activeHoop?: HoopInfo;
+  scrubPos: number;
+  showDensity: boolean;
+  hideJumps: boolean;
+  warningLoc: WarningLocation | null;
+  /** Bounding box of the source line currently hovered in the editor. */
+  hoveredLineBounds?: LineStitchBounds | null;
+  /** SVG-import staging overlays drawn above the stitches (optional). */
+  overlays?: CanvasOverlay[];
+  /** Click-to-pick handler in mm space, for canvas → row linking (optional). */
+  onPick?: (mm: { x: number; y: number }) => void;
+  /** Point parameters to render as draggable handles on the stage. */
+  pointParams?: PointParamDef[];
+  /** Whether to show handles (can be toggled with the "handles" chip). */
+  showHandles?: boolean;
+  /** Name of the handle currently highlighted (from panel row hover / Locate). */
+  highlightedHandle?: string | null;
+  /** Names of locked params — locks render as gold-filled handles. */
+  lockedHandles?: Set<string>;
+  /** Fired while the user is dragging a handle (throttled by caller). */
+  onHandleDrag?: (name: string, line: number, x: number, y: number) => void;
+  /** Fired on pointer-up (or Esc-cancel with restored start values). */
+  onHandleCommit?: (name: string, line: number, x: number, y: number) => void;
+}
+
+/** A set of rings drawn over the stitches for the staging workspace. */
+export interface CanvasOverlay {
+  rings: [number, number][][];
+  /** ghost = faint excluded outline · overlay = source artwork · highlight = selection */
+  kind: 'ghost' | 'overlay' | 'highlight';
+}
+
+/** Viewport in mm-space. When null the view auto-fits the hoop. */
+export type Viewport = {
+  centerX: number;
+  centerY: number;
+  halfW: number;
+  halfH: number;
+};
+
+/** Cached rendering transform so pointer handlers can convert CSS px → mm. */
+export type RenderTransform = {
+  scale: number;
+  cx: number;
+  cy: number;
+  viewCX: number;
+  viewCY: number;
+};
+
+export type DragState = {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+};
+
+export type SampleContextMenu = {
+  clientX: number;
+  clientY: number;
+  mmX: number;
+  mmY: number;
+};
+
+/** State for an in-progress handle drag. */
+export type HandleDragState = {
+  name: string;
+  line: number;
+  region: XYRegion;
+  snap?: number;
+  startMmX: number;
+  startMmY: number;
+  startPointerMmX: number;
+  startPointerMmY: number;
+  currentMmX: number;
+  currentMmY: number;
+};
