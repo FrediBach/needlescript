@@ -12,6 +12,7 @@ import {
   canvasNeedleMarker,
   canvasDebugPinFill,
   canvasDebugPinStroke,
+  canvasAnnotationText,
   canvasDensityHot,
   canvasDensityWarm,
   canvasWarnMarkerFill,
@@ -443,7 +444,7 @@ function drawDebugMarks(
     ctx.strokeStyle = canvasDebugPinStroke;
     ctx.lineWidth = 1.2 * dpr;
     ctx.stroke();
-    ctx.fillStyle = canvasDebugPinStroke;
+    ctx.fillStyle = canvasAnnotationText;
     ctx.fillText(String(index + 1), x, y + 0.5 * dpr);
   });
 }
@@ -582,7 +583,7 @@ function drawHandles(
     // Label
     ctx.save();
     ctx.globalAlpha = isActive ? 0.9 : 0.55;
-    ctx.fillStyle = 'rgba(255,245,230,0.95)';
+    ctx.fillStyle = canvasAnnotationText;
     ctx.textAlign = 'left';
     ctx.fillText(p.name, px + ringR + 3 * dpr, py);
     ctx.restore();

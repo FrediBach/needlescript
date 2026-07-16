@@ -135,6 +135,7 @@ export const canvasGridCm = 'rgba(120,100,70,0.075)'; // 1 cm grid — slightly 
 export const canvasNeedleMarker = bgApp; // '#1B2030'
 export const canvasDebugPinFill = 'rgba(255,253,247,0.92)';
 export const canvasDebugPinStroke = run; // '#C8472F'
+export const canvasAnnotationText = '#333333';
 export const canvasDragRectBorder = 'rgba(255,255,255,0.80)';
 export const canvasDragRectFill = 'rgba(255,255,255,0.07)';
 export const canvasZoomBadgeBg = 'rgba(20,15,10,0.55)';
