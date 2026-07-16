@@ -112,6 +112,7 @@ Any numeric stitchlen disengages the list/reporter: stitchlen 2.5
 
 satin n — satin column n mm wide (n=0 for off). Width 2–8 mm recommended (>8 mm snag warning). The column is buffered while drawn and flushes (underlay first, then zigzag) on pen up, mode/colour change, trim, fill, or end of program.
 satin @fn — programmable column: see Programmable satin below.
+satinbetween(railA, railB) — immediate satin between two path rails; call syntax only. Optional third argument: ordered checkpoints or @shape; four-arg form accepts both. Rails map through transform/warp before physical spacing/physics. Both rails must both be open or both closed. Drawless; preserves heading/pen/modes; history is immediate; forbidden inside trace/fill recording.
 density n — satin penetration spacing (0.25–5 mm, default 0.4)
 bean n — bean stitch: each stitch sewn n times (forced odd, max 9; 1=off)
 estitch n — blanket stitch prongs n mm on the left of travel, spaced by stitchlen (0=off)
@@ -180,6 +181,10 @@ satin 0            // numeric form disengages, flushing the column
 Inputs: t = arc-length mm from column start, s = 0..1 normalised (column fully buffered, total known — use for tapers/tips), i = 0-based pair index (alternate behaviour without state), u = local spine heading. Return: advance MUST be > 0 (floored at 0.1 with a warning); leftw/rightw are per-rail half-widths (asymmetric columns fall out for free); leftlag/rightlag offset each rail endpoint along the spine — opposite-sign lags rake stitches diagonal, alternating by i gives woven/crosshatch satin. Everything is spine-local; the engine maps to the hoop afterward, so custom columns compose with transforms and warp, and pullcomp/underlay/snag checks still apply.
 
 Helpers (pure, call-syntax): satinpair(advance, width) — symmetric bite; satinasym(advance, leftw, rightw); satinrake(advance, width, lag) → [advance, width, width, -lag, lag].
+
+### Rail-pair satin — satinbetween(...)
+
+`satinbetween(a, b, checkpoints?, @shape?)` pairs independently authored rails by arc length. Checkpoints are `[[pointOnA, pointOnB], …]`, strictly increasing after orientation fixing (max 64). Closed rails get a deterministic seam. The reporter takes `(t,s,i,u)` and returns `[advance, insetA, insetB, lagA, lagB]`; advance replaces density. Use `railinset(advance,inset)` or `railrake(advance,lag)`. `railspine(a,b)` returns the shared derived midpoint path. Do not use satinpair/satinrake tuples here: their width slots become insets.
 
 ```text
 def crosshatch(t, s, i, u) [
@@ -273,7 +278,7 @@ shuffle(list) — new shuffled list (forks: 1 main-stream draw)
 // Legacy noise(x) / noise2(x,y) return 0..1 — prefer snoise2/snoise3.
 // Determinism contract: same source + same seed + same hoop → same stitches.
 // Fork convention: scatter, shuffle, and humanize each take exactly ONE main-stream draw and fork a
-// child RNG, so editing their contents never reshuffles the rest. voronoi/relax/trace/declump/snaptogrid/routesort/plan draw nothing.
+// child RNG, so editing their contents never reshuffles the rest. voronoi/relax/trace/declump/snaptogrid/routesort/plan/satinbetween/railspine draw nothing.
 // TIP: sample noise slowly — divide coordinates by 10–20 for smooth fields.
 
 ## Lists (call-syntax only for functions)
@@ -318,6 +323,7 @@ bezier(p0,c0,c1,p1,mm) — cubic Bézier, resampled
 pathlen(path) centroid(path) bbox(path) → [minx,miny,maxx,maxy]
 xlate(path,dx,dy) xrotate(path,deg) xrotate(path,deg,cx,cy) xscale(path,s) xscale(path,sx,sy) xmirror(path,deg) — pure transformed copies
 sewpath(path) — COMMAND: walk path as stitches, exactly `for p in path [ setpos(p) ]` (pen/stitch mode/transforms apply)
+railspine(railA,railB) — derived midpoint path using satinbetween's orientation, seam, and arc-length pairing
 
 ## Generators (all seeded + call-syntax)
 

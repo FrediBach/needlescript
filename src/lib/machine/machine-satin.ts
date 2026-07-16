@@ -5,6 +5,9 @@ import { NeedlescriptError } from '../errors.ts';
 import { IDENTITY, apply, isIdentity, linApply } from '../affine.ts';
 import type { Mat } from '../affine.ts';
 import { MachineCore } from './machine-core.ts';
+import type { Pt } from '../genmath.ts';
+import { prepareRailPair } from '../rail-pair.ts';
+import type { RailCheckpoint, RailPairGeometry, RailPairSample } from '../rail-pair.ts';
 
 export class SatinMachine extends MachineCore {
   // ---- Satin column: underlay + zigzag, sewn when the column ends ----
@@ -111,6 +114,354 @@ export class SatinMachine extends MachineCore {
       prevUx = ux;
       prevUy = uy;
     }
+  }
+
+  /** Sew an immediate satin column between two authored rails. */
+  sewSatinBetween(
+    localRailA: readonly Pt[],
+    localRailB: readonly Pt[],
+    localCheckpoints: readonly RailCheckpoint[],
+    reporter:
+      | ((t: number, s: number, i: number, u: number) => [number, number, number, number, number])
+      | null,
+    chargeOps?: (count: number) => void,
+  ) {
+    const forcedFlush = !!(this.satinPath && this.satinPath.length >= 2);
+    this.flushSatin();
+    if (forcedFlush)
+      this.warnings.push(
+        'note: satinbetween flushed the active spine satin column first; the satin mode remains active',
+      );
+    if (this.recording)
+      throw new NeedlescriptError(
+        'satinbetween cannot run inside beginfill…endfill — capture the rails and sew afterward',
+        this.currentLine,
+      );
+    if ((this.penLayers.length || this.declumpStack.length) && !this._warnedSatinEffect) {
+      this.warnings.push(
+        'humanize/snaptogrid/declump skips satin columns — perturbing satin rails wrecks the column; it sews unaffected',
+      );
+      this._warnedSatinEffect = true;
+    }
+
+    // Rails are mapped before pairing: all lengths below are physical hoop millimetres.
+    const railA = localRailA.map(([x, y]) => this.mapOut(x, y));
+    const railB = localRailB.map(([x, y]) => this.mapOut(x, y));
+    const checkpoints = localCheckpoints.map((cp) => ({
+      a: this.mapOut(cp.a[0], cp.a[1]),
+      b: this.mapOut(cp.b[0], cp.b[1]),
+    }));
+    const geometry = prepareRailPair(railA, railB, checkpoints, this.currentLine, chargeOps);
+    if (geometry.railBReversed)
+      this.warnings.push(
+        geometry.closed
+          ? 'note: rail B winding reversed to match rail A'
+          : "note: rail B reversed to match rail A's direction",
+      );
+    if (geometry.closed && geometry.seamChosen)
+      this.warnings.push('note: satinbetween chose a deterministic closed-rail seam');
+    if (geometry.samples.every((sample) => this._railWidth(sample) < 0.05))
+      throw new NeedlescriptError(
+        'satinbetween rails coincide everywhere; the column has no width',
+        this.currentLine,
+      );
+
+    const topping: { x: number; y: number; side: number; sample: RailPairSample }[] = [];
+    let side = this.satinSide;
+    let insetWarned = false;
+    let advanceWarned = false;
+    const place = (
+      sample: RailPairSample,
+      which: number,
+      inset: number,
+      lag: number,
+      arc: number,
+    ) => {
+      const width = this._railWidth(sample);
+      let safeInset = inset;
+      if (safeInset > width / 2) {
+        safeInset = width / 2;
+        if (!insetWarned) {
+          this.warnings.push(
+            'satinbetween reporter insets crossed the rung midpoint — clamped so the penetrations meet',
+          );
+          insetWarned = true;
+        }
+      }
+      const basePoint = which > 0 ? sample.a : sample.b;
+      const other = which > 0 ? sample.b : sample.a;
+      const before = geometry.atArc(arc - 0.05);
+      const after = geometry.atArc(arc + 0.05);
+      const beforeRail = which > 0 ? before.a : before.b;
+      const afterRail = which > 0 ? after.a : after.b;
+      const tdx = afterRail[0] - beforeRail[0];
+      const tdy = afterRail[1] - beforeRail[1];
+      const tangentLength = Math.hypot(tdx, tdy) || 1;
+      const base: Pt = [
+        basePoint[0] + (tdx / tangentLength) * lag,
+        basePoint[1] + (tdy / tangentLength) * lag,
+      ];
+      const dx = other[0] - basePoint[0];
+      const dy = other[1] - basePoint[1];
+      const len = Math.hypot(dx, dy);
+      const ux = len > 1e-9 ? dx / len : 0;
+      const uy = len > 1e-9 ? dy / len : 0;
+      // Positive inset moves inward; pull compensation widens by the same
+      // total amount as existing satin (half on each edge).
+      const move = safeInset - this.pullComp / 2;
+      return { x: base[0] + ux * move, y: base[1] + uy * move };
+    };
+
+    if (reporter) {
+      let cursor = 0;
+      let pair = 0;
+      const guardMax = this.effectiveLimits.maxStitches + 10;
+      while (cursor < geometry.spineLength - 1e-9 && pair < guardMax) {
+        const base = geometry.atArc(cursor);
+        const ret = reporter(cursor, cursor / geometry.spineLength, pair, base.heading);
+        let advance = ret[0];
+        if (!(advance > 0)) {
+          advance = 0.1;
+          if (!advanceWarned) {
+            this.warnings.push(
+              'satinbetween reporter advance must be greater than 0 — clamped to 0.1 mm',
+            );
+            advanceWarned = true;
+          }
+        }
+        for (let k = 1; k <= 2; k++) {
+          const arc = cursor + advance * k;
+          if (arc > geometry.spineLength + 1e-9) break;
+          side = -side;
+          const sample = geometry.atArc(arc);
+          const point = place(
+            sample,
+            side,
+            side > 0 ? ret[1] : ret[2],
+            side > 0 ? ret[3] : ret[4],
+            arc,
+          );
+          topping.push({ ...point, side, sample });
+        }
+        cursor += advance * 2;
+        pair++;
+      }
+    } else {
+      const steps = Math.max(1, Math.ceil(geometry.spineLength / this.satinSpacing));
+      for (let step = 1; step <= steps; step++) {
+        const arc = (geometry.spineLength * step) / steps;
+        side = -side;
+        const sample = geometry.linearSpine
+          ? geometry.atProgress(step / steps)
+          : geometry.atArc(arc);
+        const point = place(sample, side, 0, 0, arc);
+        topping.push({ ...point, side, sample });
+      }
+    }
+    this.satinSide = side;
+
+    this._shortenRailPairCrowding(topping);
+    this._warnRailPairCrossings(geometry, chargeOps);
+    this._warnRailPairCurvature(geometry);
+    this._emitRailPairColumn(geometry, topping);
+
+    // The turtle remains in local space. Keep heading/pen/mode untouched and
+    // place it at the authored endpoint corresponding to the final rail side.
+    const localEnd =
+      side > 0 ? localRailA[localRailA.length - 1] : localRailB[localRailB.length - 1];
+    this.x = localEnd[0];
+    this.y = localEnd[1];
+  }
+
+  _railWidth(sample: RailPairSample): number {
+    return Math.hypot(sample.b[0] - sample.a[0], sample.b[1] - sample.a[1]);
+  }
+
+  _shortenRailPairCrowding(
+    topping: { x: number; y: number; side: number; sample: RailPairSample }[],
+  ) {
+    if (!this.shortStitch) return;
+    let shortened = 0;
+    for (let i = 2; i < topping.length; i++) {
+      const point = topping[i];
+      const previous = topping[i - 2];
+      if (
+        point.side !== previous.side ||
+        Math.hypot(point.x - previous.x, point.y - previous.y) >= 0.3
+      )
+        continue;
+      if (shortened++ % 2 !== 0) continue;
+      point.x = point.sample.mid[0] + (point.x - point.sample.mid[0]) * 0.6;
+      point.y = point.sample.mid[1] + (point.y - point.sample.mid[1]) * 0.6;
+    }
+  }
+
+  _warnRailPairCrossings(geometry: RailPairGeometry, chargeOps?: (count: number) => void) {
+    let count = 0;
+    let first: Pt | null = null;
+    const intersects = (a: Pt, b: Pt, c: Pt, d: Pt) => {
+      const cross = (p: Pt, q: Pt, r: Pt) =>
+        (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+      const abC = cross(a, b, c);
+      const abD = cross(a, b, d);
+      const cdA = cross(c, d, a);
+      const cdB = cross(c, d, b);
+      return abC * abD < -1e-12 && cdA * cdB < -1e-12;
+    };
+    for (let i = 1; i < geometry.samples.length; i++) {
+      chargeOps?.(1);
+      const a = geometry.samples[i - 1];
+      const b = geometry.samples[i];
+      if (intersects(a.a, a.b, b.a, b.b)) {
+        count++;
+        first ??= b.mid;
+      }
+    }
+    if (first)
+      this.warnings.push(
+        `rail-pair rungs cross near (${first[0].toFixed(1)}, ${first[1].toFixed(1)}); ${count} crossing${count === 1 ? '' : 's'} found — add checkpoints or split the column`,
+      );
+  }
+
+  _warnRailPairCurvature(geometry: RailPairGeometry) {
+    for (const rail of ['a', 'b'] as const) {
+      for (let i = 1; i < geometry.samples.length - 1; i++) {
+        const p0 = geometry.samples[i - 1][rail];
+        const p1 = geometry.samples[i][rail];
+        const p2 = geometry.samples[i + 1][rail];
+        const ax = p1[0] - p0[0];
+        const ay = p1[1] - p0[1];
+        const bx = p2[0] - p1[0];
+        const by = p2[1] - p1[1];
+        const la = Math.hypot(ax, ay);
+        const lb = Math.hypot(bx, by);
+        if (la < 1e-9 || lb < 1e-9) continue;
+        const theta = Math.acos(Math.max(-1, Math.min(1, (ax * bx + ay * by) / (la * lb))));
+        if (theta > 1e-3 && theta < 2.1 && lb / theta < this._railWidth(geometry.samples[i])) {
+          this.warnings.push(
+            `satinbetween column is wider than the curve it follows near (${p1[0].toFixed(1)}, ${p1[1].toFixed(1)}) — split the column or widen the curve`,
+          );
+          return;
+        }
+      }
+    }
+  }
+
+  _emitRailPairColumn(
+    geometry: RailPairGeometry,
+    topping: { x: number; y: number; side: number; sample: RailPairSample }[],
+  ) {
+    const start = geometry.samples[0].mid;
+    const from = this.lastEmit ?? { x: 0, y: 0 };
+    if (Math.hypot(start[0] - from.x, start[1] - from.y) > 0.05)
+      this._push('jump', start[0], start[1]);
+    if (!this.started) {
+      this.started = true;
+      this._push('stitch', start[0], start[1]);
+    }
+    this._railPairUnderlay(geometry);
+
+    let previous = this.lastEmit;
+    let tipNoted = false;
+    let ceilingWarned = false;
+    let snagWarned = false;
+    for (const point of topping) {
+      const d = previous ? Math.hypot(point.x - previous.x, point.y - previous.y) : 0;
+      if (d > 8 && !snagWarned) {
+        this.warnings.push(
+          `satinbetween: a realized stitch spans ${d.toFixed(1)} mm — stitches over ~8 mm tend to snag`,
+        );
+        snagWarned = true;
+      }
+      if (d > 12.1 && previous) {
+        if (!ceilingWarned) {
+          this.warnings.push(
+            `rail gap exceeds the 12 mm stitch ceiling near (${point.x.toFixed(1)}, ${point.y.toFixed(1)}); mid-span penetrations inserted`,
+          );
+          ceilingWarned = true;
+        }
+        const pieces = Math.ceil(d / LIMITS.maxStitch);
+        for (let i = 1; i < pieces; i++)
+          this._push(
+            'stitch',
+            previous.x + ((point.x - previous.x) * i) / pieces,
+            previous.y + ((point.y - previous.y) * i) / pieces,
+          );
+      }
+      if (previous && d < LIMITS.minStitch * 0.5 && this._railWidth(point.sample) < 0.05) {
+        if (!tipNoted) {
+          this.warnings.push('note: satinbetween merged coincident penetrations at a tapered tip');
+          tipNoted = true;
+        }
+        continue;
+      }
+      this._push('stitch', point.x, point.y);
+      previous = point;
+    }
+  }
+
+  _railPairUnderlay(geometry: RailPairGeometry) {
+    const width = geometry.meanWidth + this.pullComp;
+    const mode: 'off' | 'center' | 'edge' | 'zigzag' =
+      this.underlayMode === 'auto'
+        ? width < 1.5
+          ? 'off'
+          : width < 4
+            ? 'center'
+            : 'zigzag'
+        : this.underlayMode;
+    if (mode === 'off') return;
+    const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
+    const underlaySteps = Math.max(1, Math.ceil(geometry.spineLength / uLen));
+    const underlaySamples: RailPairSample[] = [];
+    for (let i = 0; i <= underlaySteps; i++)
+      underlaySamples.push(geometry.atArc((geometry.spineLength * i) / underlaySteps));
+    const spine = underlaySamples.map(({ mid }) => ({ x: mid[0], y: mid[1] }));
+    const reverseSpine = spine.slice().reverse();
+    const runCenter = () => {
+      this._runAlong(spine, uLen, true);
+      this._runAlong(reverseSpine, uLen, true);
+    };
+    if (this.doubleUnderlay && mode !== 'center') runCenter();
+    if (mode === 'center') {
+      runCenter();
+      return;
+    }
+    if (mode === 'edge') {
+      const left = underlaySamples.map((sample) => {
+        const f = this._railWidth(sample) < 1 ? 0 : 0.3;
+        return {
+          x: sample.a[0] + (sample.b[0] - sample.a[0]) * f,
+          y: sample.a[1] + (sample.b[1] - sample.a[1]) * f,
+        };
+      });
+      const right = underlaySamples.map((sample) => {
+        const f = this._railWidth(sample) < 1 ? 0 : 0.3;
+        return {
+          x: sample.b[0] + (sample.a[0] - sample.b[0]) * f,
+          y: sample.b[1] + (sample.a[1] - sample.b[1]) * f,
+        };
+      });
+      this._runAlong(left, uLen, true);
+      this._runAlong(right.reverse(), uLen, true);
+      return;
+    }
+    const steps = Math.max(1, Math.ceil(geometry.spineLength / 2));
+    const zigzag: { x: number; y: number }[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const sample = geometry.atArc((geometry.spineLength * i) / steps);
+      const edge = i % 2 === 0 ? sample.a : sample.b;
+      zigzag.push({
+        x: sample.mid[0] + (edge[0] - sample.mid[0]) * 0.6,
+        y: sample.mid[1] + (edge[1] - sample.mid[1]) * 0.6,
+      });
+    }
+    for (const point of zigzag) {
+      const previous = this.lastEmit;
+      if (previous && Math.hypot(point.x - previous.x, point.y - previous.y) < 0.1) continue;
+      this._push('stitch', point.x, point.y, true);
+    }
+    this._runAlong(reverseSpine, uLen, true);
   }
 
   /** Sew the buffered satin column: underlay passes first, then the zigzag. */

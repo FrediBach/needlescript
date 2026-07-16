@@ -1,0 +1,24 @@
+// Rail-pair satin: independently authored leaf edges
+
+hoop 'round100'
+fabric 'woven'
+underlay 'auto'
+density 0.42
+lock 0.6
+
+let leafBase = [0, -20]  // [xy: disc 24]
+let leafTip = [0, 22]    // [xy: disc 24]
+let edgeLeft = bezier(leafBase, [-3.5, -10], [-3, 14], leafTip, 1.2)
+let edgeRight = bezier(leafBase, [3.5, -10], [3, 14], leafTip, 1.2)
+
+color 0
+satinbetween(edgeLeft, edgeRight)
+trim
+
+// railspine shares satinbetween's exact arc-length pairing.
+let vein = railspine(edgeLeft, edgeRight)
+color 1
+up setpos(vein[0]) down
+stitchlen 2
+sewpath(vein)
+trim

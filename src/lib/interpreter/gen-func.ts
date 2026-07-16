@@ -26,6 +26,7 @@ import { closePath, contourPaths, fillRows, spiralPaths } from '../fill-paths.ts
 import type { RunContext } from './context.ts';
 import { routeItems, ROUTESORT_MODES } from '../routing.ts';
 import type { RoutePoint } from '../routing.ts';
+import { prepareRailPair } from '../rail-pair.ts';
 
 export function initGenFunc(ctx: RunContext): void {
   ctx.genFunc = (name: string, args: Val[], line: number | undefined): Val => {
@@ -513,6 +514,36 @@ export function initGenFunc(ctx: RunContext): void {
           leftw = sc(1),
           rightw = sc(2);
         return ctx.allocList([advance, leftw, rightw, 0, 0], line);
+      }
+      case 'railinset': {
+        const advance = sc(0),
+          inset = sc(1);
+        return ctx.allocList([advance, inset, inset, 0, 0], line);
+      }
+      case 'railrake': {
+        const advance = sc(0),
+          lag = sc(1);
+        return ctx.allocList([advance, 0, 0, -lag, lag], line);
+      }
+      case 'railspine': {
+        const railA = pathArg(0);
+        const railB = pathArg(1);
+        const inputCount = railA.length + railB.length;
+        if (inputCount > ctx.m.effectiveLimits.maxDelaunayPoints)
+          throw new NeedlescriptError(
+            `railspine: too many input vertices (${inputCount.toLocaleString('en-US')}, limit ${ctx.m.effectiveLimits.maxDelaunayPoints.toLocaleString('en-US')})`,
+            line,
+          );
+        ctx.tickN(inputCount, line);
+        const geometry = prepareRailPair(
+          railA,
+          railB,
+          [],
+          line,
+          (n) => ctx.tickN(n, line),
+          'railspine',
+        );
+        return path(geometry.samples.map((sample) => sample.mid));
       }
 
       // ---- DX: fill-shaper helper ----

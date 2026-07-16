@@ -350,7 +350,7 @@ and pre-scan consult:
 | `FUNC_ARITY`               | value-returning math functions and arity                           |
 | `ZERO_FUNCS`               | zero-arg reporters (`xcor`, `heading`, …)                          |
 | `LIST_FUNCS` / `LIST_CMDS` | list library (RFC-2), glued-call only                              |
-| `GEN_FUNCS` / `GEN_CMDS`   | generative-math library (RFC-3)                                    |
+| `GEN_FUNCS` / `GEN_CMDS`   | generative math plus call-only path commands                       |
 | `QUERY_FUNCS`              | stitch-history query reporters                                     |
 | `STRING_FUNCS`             | string library                                                     |
 | `LIBRARY_FUNCS`            | union of the shadowable "Library tier" names                       |
@@ -368,6 +368,8 @@ are call-only; zero-argument reporters additionally resolve as bare values only 
 no same-named variable or zero-argument user reporter exists. User procedures shadow
 them at call sites, with the usual one-time note. This keeps every pre-RFC program
 running unchanged.
+
+`satinbetween` is the one Core call-only entry in `GEN_CMDS`: that table supplies its ranged call arity (2–4), while its explicit `RESERVED` entry keeps bindings and definitions illegal. Like every statement-only command, `@satinbetween` is rejected.
 
 ### 4.6 Static analysis (`analysis.ts`)
 

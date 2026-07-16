@@ -1,6 +1,6 @@
 import { NeedlescriptError } from '../errors.ts';
 import { isFuncRef, isList, describeVal, num, formatNum, formatVal } from '../list.ts';
-import type { Val } from '../list.ts';
+import type { Val, FuncRef } from '../list.ts';
 import type { ASTNode } from '../types.ts';
 import {
   mTranslate,
@@ -16,6 +16,7 @@ import type { Mat } from '../affine.ts';
 import { humanizeMap, snapMapFromSpec } from '../effects.ts';
 import { makeDeclumpState } from '../declump.ts';
 import * as gm from '../genmath.ts';
+import type { Pt } from '../genmath.ts';
 import { ReturnSignal, LoopSignal } from './signals.ts';
 import { initExecCmdHandler } from './exec-cmd.ts';
 import type { RunContext, Env } from './context.ts';
@@ -589,6 +590,83 @@ export function initExecStmt(ctx: RunContext): void {
             const pts = gm.toPath(a[0], 'sewpath', st.line);
             ctx.tickN(pts.length, st.line);
             for (const [x, y] of pts) ctx.m.setXY(x, y);
+            return;
+          }
+          case 'satinbetween': {
+            if (ctx.insideTrace > 0)
+              throw new NeedlescriptError(
+                'satinbetween cannot run inside trace/tracerings — capture the rails, sew afterward',
+                st.line,
+              );
+            if (ctx.m.recording)
+              throw new NeedlescriptError(
+                'satinbetween cannot run inside beginfill…endfill — capture the rails, sew afterward',
+                st.line,
+              );
+            const railA = gm.toPath(a[0], 'satinbetween rail A', st.line);
+            const railB = gm.toPath(a[1], 'satinbetween rail B', st.line);
+            let checkpointValue: Val | null = null;
+            let reporterRef: FuncRef | null = null;
+            if (a.length === 3) {
+              if (isFuncRef(a[2])) reporterRef = a[2];
+              else checkpointValue = a[2];
+            } else if (a.length === 4) {
+              checkpointValue = a[2];
+              if (!isFuncRef(a[3]))
+                throw new NeedlescriptError(
+                  'satinbetween fourth argument must be a reporter reference (@name)',
+                  st.line,
+                );
+              reporterRef = a[3];
+            }
+            const checkpoints: { a: Pt; b: Pt }[] = [];
+            if (checkpointValue !== null) {
+              if (!isList(checkpointValue))
+                throw new NeedlescriptError(
+                  'satinbetween checkpoints must be a list of [[pointA], [pointB]] pairs',
+                  st.line,
+                );
+              if (checkpointValue.items.length > 64)
+                throw new NeedlescriptError('satinbetween accepts at most 64 checkpoints', st.line);
+              for (let i = 0; i < checkpointValue.items.length; i++) {
+                const pair = checkpointValue.items[i];
+                if (!isList(pair) || pair.items.length !== 2)
+                  throw new NeedlescriptError(
+                    `satinbetween checkpoint ${i + 1} must be [pointA, pointB]`,
+                    st.line,
+                  );
+                checkpoints.push({
+                  a: gm.toPoint(pair.items[0], `satinbetween checkpoint ${i + 1} rail A`, st.line),
+                  b: gm.toPoint(pair.items[1], `satinbetween checkpoint ${i + 1} rail B`, st.line),
+                });
+              }
+            }
+            const inputCount = railA.length + railB.length + checkpoints.length * 2;
+            if (inputCount > ctx.m.effectiveLimits.maxDelaunayPoints)
+              throw new NeedlescriptError(
+                `satinbetween: too many geometry input vertices (${inputCount.toLocaleString('en-US')}, limit ${ctx.m.effectiveLimits.maxDelaunayPoints.toLocaleString('en-US')})`,
+                st.line,
+              );
+            ctx.tickN(inputCount, st.line);
+            if (reporterRef) {
+              ctx.applyRailShapeReporterArity(reporterRef, st.line);
+              if (ctx.m.satinSpacing !== 0.4)
+                if (!ctx.m.satinDensityNoted) {
+                  ctx.m.warnings.push(
+                    `density is ignored by satinbetween while @${reporterRef.name} controls advance`,
+                  );
+                  ctx.m.satinDensityNoted = true;
+                }
+            }
+            ctx.m.sewSatinBetween(
+              railA,
+              railB,
+              checkpoints,
+              reporterRef
+                ? (t, s, i, u) => ctx.applyRailShapeReporter(reporterRef, t, s, i, u, st.line)
+                : null,
+              (count) => ctx.tickN(count, st.line),
+            );
             return;
           }
         }

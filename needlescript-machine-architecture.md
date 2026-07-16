@@ -56,6 +56,7 @@ machine/
 Tightly-coupled collaborators live one level up:
 
 - `affine.ts` — the 2×3 matrix math shared by the transform stack.
+- `rail-pair.ts` — pure rail orientation, seam/checkpoint projection, arc-length pairing, and derived-spine interpolation shared by `satinbetween` and `railspine`.
 - `postprocess.ts` — `DensityGrid` (the live coverage index the machine feeds), plus
   the post-run `applyLocks`, `applyAutoTrim`, and `designStats` passes.
 - `routing.ts` / `travel-planner.ts` — shared route algorithms and the optional
@@ -209,6 +210,8 @@ in to 60% width, and an over-wide-for-the-curve column raises a warning.
 
 After-split effects (humanize/snaptogrid/declump) deliberately **skip** satin rails —
 perturbing a precise rail wrecks the column — with a one-time warning.
+
+`sewSatinBetween` is the immediate rail-pair sibling. It flushes a buffered spine column without changing the sticky mode, maps both rails and checkpoints through the active output stack first, then pairs them in physical hoop space. Its realized endpoints reuse satin underlay, pull compensation, short-stitch relief, tip merging, snag/ceiling checks, density accounting, and effect-skip conventions; history is committed before the call returns. Orientation, closed seams, checkpoints, and crossing diagnostics are deterministic and drawless.
 
 ### 7.2 Fills (`beginFill`/`endFill`, `machine/machine-fill.ts`)
 
@@ -385,6 +388,7 @@ analysed _before_ locks (so tie-offs don't read as hotspots), then locks are app
 | `machine/machine-fill.ts`  | fill recording plus built-in and programmable fill generation          |
 | `machine/fill.ts`          | standalone tatami scanline fill generator                              |
 | `affine.ts`                | 2×3 affine matrix math shared by the transform stack                   |
+| `rail-pair.ts`             | shared rail orientation, checkpoints, pairing, and derived spine       |
 | `postprocess.ts`           | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`         |
 | `routing.ts`               | generic deterministic route algorithms and endpoint model              |
 | `travel-planner.ts`        | thread-run partitioning, plan modes, and connector reconstruction      |

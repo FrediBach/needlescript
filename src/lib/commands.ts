@@ -304,6 +304,9 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   spiralpath: { min: 2, max: 2 },
   fillrows: { min: 3, max: 3 },
   closepath: { min: 1, max: 1 },
+  railinset: { min: 2, max: 2 },
+  railrake: { min: 2, max: 2 },
+  railspine: { min: 2, max: 2 },
 };
 
 /** GEN_FUNCS whose given argument is a quoted word, with the allowed words. */
@@ -314,6 +317,7 @@ export const GEN_QWORD_ARG: Record<string, { index: number; allowed: readonly st
 /** Generative-math commands usable as statements (RFC-3 §4.4). */
 export const GEN_CMDS: Record<string, { min: number; max: number }> = {
   sewpath: { min: 1, max: 1 },
+  satinbetween: { min: 2, max: 4 },
 };
 
 // ---------- Stitch-history queries (closed-loop generation) ----------
@@ -365,7 +369,7 @@ export const LIBRARY_FUNCS = new Set<string>([
   ...Object.keys(LIST_FUNCS),
   ...Object.keys(LIST_CMDS),
   ...Object.keys(GEN_FUNCS),
-  ...Object.keys(GEN_CMDS),
+  ...Object.keys(GEN_CMDS).filter((name) => name !== 'satinbetween'),
   ...Object.keys(QUERY_FUNCS),
   ...Object.keys(STRING_FUNCS),
 ]);
@@ -408,6 +412,7 @@ export const RESERVED = new Set<string>([
   // Trace (RFC-trace): block expressions that capture turtle paths as data.
   'trace',
   'tracerings',
+  'satinbetween',
   ...Object.keys(ALIASES),
   ...Object.keys(BUILTIN_ARITY),
   ...Object.keys(TRANSFORM_ARITY),

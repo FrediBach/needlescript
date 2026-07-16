@@ -102,6 +102,15 @@ export interface RunContext {
     u: number,
     line?: number,
   ) => [number, number, number, number, number];
+  applyRailShapeReporterArity: (ref: FuncRef, line?: number) => void;
+  applyRailShapeReporter: (
+    ref: FuncRef,
+    t: number,
+    s: number,
+    i: number,
+    u: number,
+    line?: number,
+  ) => [number, number, number, number, number];
   applyStitchLenReporterArity: (ref: FuncRef, line?: number) => void;
   applyStitchLenReporter: (
     ref: FuncRef,

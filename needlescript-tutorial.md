@@ -1558,6 +1558,35 @@ satin 0
 
 Because `satin @fn` **is** the generator — not an after-split effect — it sits upstream of the whole physics layer. The reporter works in spine-local space and the engine maps its output to the hoop afterward, so a custom column composes with transforms and `warp` exactly like the built-in one (`scale 1.5` sews 1.5× the extent at physical spacing, not stretched stitches), and `pullcomp`, `underlay`, the snag check and the density heatmap all still apply. Like `warp`, the generator draws no randomness of its own — it's reproducible unless your reporter calls `random`/`snoise2`. A reporter that may finish without returning a value on some control-flow path is caught at **parse time**, not at runtime — you'll see the error immediately and can add the missing `else` branch before waiting for an unlucky seed. A reporter with the wrong number of parameters, or one that doesn't return five numbers, is a separate, line-numbered error. (See the bundled **custom satin** example.)
 
+### Rail-pair satin — `satinbetween`
+
+Sometimes you already have the two edges: a leaf outline, a tapered serif, or the inner and outer contours of a ring. `satinbetween` consumes those paths directly instead of asking you to derive a centreline and widths:
+
+```text
+let base = [0, -2]
+let tip = [0, 38]
+let leftEdge = bezier(base, [-5, 8], [-4, 30], tip, 1.5)
+let rightEdge = bezier(base, [5, 8], [4, 30], tip, 1.5)
+
+underlay 'auto'
+satinbetween(leftEdge, rightEdge)
+```
+
+Both rails go through the active transform and warp first; then the engine pairs them by normalized arc length and applies density, underlay, pull compensation, short-stitch relief, coverage, and machine-ceiling checks in physical millimetres. Open rail B is reversed when that clearly matches the endpoints better. If both paths are explicitly closed, the engine matches their winding and chooses a deterministic seam.
+
+For edges whose features fall out of step, add ordered checkpoint pairs:
+
+```text
+satinbetween(topEdge, bottomEdge, [
+  [[-8, 26], [-6, 14]],
+  [[14, 18], [16, 10]]
+])
+```
+
+A shape reporter uses the same `(t, s, i, u)` cursor but returns `[advance, insetA, insetB, lagA, lagB]`. Insets move inward from the authored edges; lags rake along them. `railinset(advance, inset)` and `railrake(advance, lag)` build those tuples, while `railspine(a, b)` returns the exact derived midpoint path for a vein or manual centre run. The older `satinpair` helpers describe half-widths around a spine, so do not reuse them for rail-pair columns.
+
+`satinbetween` is immediate: committed history queries see it as soon as the call returns. It ignores and preserves pen state, leaves heading and the ambient satin mode unchanged, and draws no random values unless its reporter explicitly does. It cannot run inside `trace` or `beginfill…endfill`; capture/build the rails there, then sew afterward.
+
 ### Programmable fills — `fill @fn`
 
 `satin @fn` lets you draw a column; `fill @fn` lets you drive a _fill_. It arms the **next** `beginfill … endfill` with up to two reporters — a **direction field** and a **stitch shaper** — and the engine does the hard part: placing rows that follow your field while keeping them an even distance apart, clipping to holes, and running the whole physics pipeline. The marquee result is the **directional fill**, where the rows curve to follow the work instead of running in straight parallel lines:

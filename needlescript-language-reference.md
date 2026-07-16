@@ -60,7 +60,7 @@ break continue return exit output true false and or not
 | `shape` | `fill … shape @proc` — immediately after `fill` | ordinary name                       |
 | `paths` | `fill paths @proc                               | expr`— immediately after`fill`      | ordinary name |
 
-**Core tier** (hard error if redefined): all movement, stitching, thread, fill, control-flow, transform and effect commands, `@name` references, and the zero-arg reporters — e.g. `fd`, `rt`, `circle`, `color`, `satin`, `scale`, `rotate`, `translate`, `transform`, `warp`, `humanize`, `snaptogrid`, `declump`, `pos`, `heading`, `xcor`, `ycor`, `repcount`, `random`, `trace`, `tracerings`. Cannot be used as variable, parameter, or procedure names.
+**Core tier** (hard error if redefined): all movement, stitching, thread, fill, control-flow, transform and effect commands, `@name` references, and the zero-arg reporters — e.g. `fd`, `rt`, `circle`, `color`, `satin`, `satinbetween`, `scale`, `rotate`, `translate`, `transform`, `warp`, `humanize`, `snaptogrid`, `declump`, `pos`, `heading`, `xcor`, `ycor`, `repcount`, `random`, `trace`, `tracerings`. Cannot be used as variable, parameter, or procedure names.
 
 **Library tier** (soft reservation): every list, string, generative-math, and stitch-history function (`len`, `clamp`, `scatter`, `str`, `upper`, `coverat`, `satinpair`, `tatamirow`, …). Variables and parameters **may** reuse these names (builtins resolve only at glued-call position); a user `def` of the same name shadows the builtin for the whole program with a one-time console note. **Best practice for generated code: avoid reusing any builtin name.** Safe alternatives:
 
@@ -281,6 +281,7 @@ Modes are sticky: they apply to every move until changed.
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `stitchlen mm` (`stitchlength`) | running-stitch length, clamped 0.4–12 mm (default **2.5**). Three forms: `stitchlen 2.5` (uniform) · `stitchlen [4, 1.5]` (cycling pattern, optional phase arg) · `stitchlen @fn` (per-stitch reporter) — §16.3 |
 | `satin mm`                      | zigzag column of this width; spacing set by `density`. `satin 0` returns to running stitch. Recommended 2–8 mm; >~8 mm warns (snag risk). `satin @fn` = programmable column — §16.1                             |
+| `satinbetween(railA, railB, …)` | immediate satin column between authored path rails; optional checkpoints/reporter — §16.2. Call syntax only                                                                                                     |
 | `density mm`                    | satin penetration spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                          |
 | `bean n`                        | each stitch sewn n times (forced odd, max 9); `bean 1` off                                                                                                                                                      |
 | `estitch mm`                    | blanket stitch: prongs of this length on the left of travel, spaced by `stitchlen`; `estitch 0` off                                                                                                             |
@@ -565,7 +566,32 @@ Helpers (Library tier, pure, zero draws):
 | `satinasym(advance, leftw, rightw)` | `[advance, leftw, rightw, 0, 0]`     |
 | `satinrake(advance, width, lag)`    | `[advance, width, width, -lag, lag]` |
 
-### 16.2 Programmable fills — `fill …`
+### 16.2 Rail-pair satin — `satinbetween(railA, railB)`
+
+Sews an immediate satin column between two data paths. Unlike `satin`, the rails are the authored edges rather than offsets around a turtle spine.
+
+| Form                                              | Meaning                                                                |
+| ------------------------------------------------- | ---------------------------------------------------------------------- |
+| `satinbetween(railA, railB)`                      | pair by normalized arc length                                          |
+| `satinbetween(railA, railB, checkpoints)`         | pin correspondence with ordered `[[pointA, pointB], …]` pairs (max 64) |
+| `satinbetween(railA, railB, @shape)`              | reporter-shaped rail column                                            |
+| `satinbetween(railA, railB, checkpoints, @shape)` | checkpoints plus reporter                                              |
+
+Rails must each contain at least two points, have positive path length, and both be open or both closed. Open rail B auto-reverses only when its reversed endpoint pairing is strictly cheaper. Closed rails match winding and choose a deterministic seam. Checkpoints project to their rails and must increase strictly along both. Rails are mapped through the active transform/warp **before** pairing, so density, underlay, pull compensation, snag checks, and the 12 mm ceiling all operate in physical hoop millimetres. The command is atomic, ignores pen state, preserves heading and sticky stitch modes, commits history immediately, and draws no RNG values. It errors inside `trace`/`tracerings` and `beginfill…endfill`.
+
+Reporter signature `(t, s, i, u)` returns `[advance, insetA, insetB, lagA, lagB]`. Inputs are hoop-space spine distance, normalized position, pair index, and hoop-space heading. Insets move inward from each rail; lags move along rail travel. Reporter advance replaces `density`; non-positive advance floors to 0.1 mm with a warning, and crossing insets clamp at the midpoint.
+
+Helpers (Library tier, pure, zero draws):
+
+| Helper                      | Expands to                      |
+| --------------------------- | ------------------------------- |
+| `railinset(advance, inset)` | `[advance, inset, inset, 0, 0]` |
+| `railrake(advance, lag)`    | `[advance, 0, 0, -lag, lag]`    |
+| `railspine(railA, railB)`   | shared derived midpoint path    |
+
+The `satinpair`/`satinasym`/`satinrake` tuples describe half-widths and are not rail-pair helpers; use `railinset`/`railrake` here.
+
+### 16.3 Programmable fills — `fill …`
 
 Arms the **next** `beginfill … endfill`, replacing the tatami generator; the engine keeps coverage, hole clipping, pullcomp, underlay and physics.
 
@@ -582,7 +608,7 @@ Shaper inputs: `p` local penetration position (usable with `coverat(p)`), `row` 
 
 Helper: `tatamirow(spacing, len[, phase])` → `[spacing, len, phase-or-0.5]`.
 
-### 16.3 Programmable stitch splitting — `stitchlen @fn` / `stitchlen [list]`
+### 16.4 Programmable stitch splitting — `stitchlen @fn` / `stitchlen [list]`
 
 Replaces the running-stitch splitter. Sticky mode command; the numeric form disengages.
 
@@ -610,14 +636,14 @@ All randomness is seeded and deterministic; default seed 42. `seed n` reseeds (t
 
 Draw accounting (the **fork convention** — edits stay local):
 
-| Call                                                                          | Main-stream draws                            |
-| ----------------------------------------------------------------------------- | -------------------------------------------- |
-| `random(n)`                                                                   | 1                                            |
-| `pick(xs)`                                                                    | 1                                            |
-| `gauss(mu, sigma)`                                                            | 2                                            |
-| `scatter(…)`, `shuffle(xs)`, `humanize` block / `humanizepath`                | 1 each (forks a child RNG for internal work) |
-| `snoise2/3`, `fbm2`, `noise`, `noise2`                                        | 0 (seeded fields, no stream consumption)     |
-| `voronoi`, `relax`, `snaptogrid`, `declump`, `trace`, field/history reporters | 0                                            |
+| Call                                                                                                       | Main-stream draws                            |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `random(n)`                                                                                                | 1                                            |
+| `pick(xs)`                                                                                                 | 1                                            |
+| `gauss(mu, sigma)`                                                                                         | 2                                            |
+| `scatter(…)`, `shuffle(xs)`, `humanize` block / `humanizepath`                                             | 1 each (forks a child RNG for internal work) |
+| `snoise2/3`, `fbm2`, `noise`, `noise2`                                                                     | 0 (seeded fields, no stream consumption)     |
+| `voronoi`, `relax`, `snaptogrid`, `declump`, `trace`, `satinbetween`, `railspine`, field/history reporters | 0                                            |
 
 Inserting a `scatter(6)` shifts a later `random 10` by exactly one draw.
 

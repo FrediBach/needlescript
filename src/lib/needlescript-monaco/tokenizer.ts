@@ -100,6 +100,7 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'stitchlen',
       'stitchlength',
       'satin',
+      'satinbetween',
       'density',
       'bean',
       'estitch',
@@ -243,10 +244,13 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'humanizepath',
       'snappath',
       'declumppath',
+      'railspine',
       // satin-tuple helpers
       'satinpair',
       'satinrake',
       'satinasym',
+      'railinset',
+      'railrake',
       // fill-shaper helper
       'tatamirow',
       // stitch-history queries (closed-loop generation)

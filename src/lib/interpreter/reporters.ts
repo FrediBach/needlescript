@@ -92,6 +92,45 @@ export function initReporters(ctx: RunContext): void {
     return [r[0], r[1], r[2], r[3], r[4]];
   };
 
+  ctx.applyRailShapeReporterArity = (ref: FuncRef, line?: number) => {
+    const proc = ctx.procs[ref.name];
+    if (!proc)
+      throw new NeedlescriptError(`the satinbetween reporter @${ref.name} is not defined`, line);
+    if (proc.params.length !== 4)
+      throw new NeedlescriptError(
+        `the satinbetween reporter @${ref.name} must take exactly 4 parameters (t, s, i, u), but takes ${proc.params.length}`,
+        line,
+      );
+  };
+
+  ctx.applyRailShapeReporter = (ref, t, s, i, u, line) => {
+    const proc = ctx.procs[ref.name];
+    if (!proc)
+      throw new NeedlescriptError(`the satinbetween reporter @${ref.name} is not defined`, line);
+    const out = ctx.callProcVals(ref.name, [t, s, i, u], 0, line);
+    const contract = '[advance, insetA, insetB, lagA, lagB]';
+    if (out === undefined)
+      throw new NeedlescriptError(
+        `the satinbetween reporter @${ref.name} never reached output/return — it must return ${contract}`,
+        line,
+      );
+    if (!isList(out) || out.items.length !== 5)
+      throw new NeedlescriptError(
+        `the satinbetween reporter @${ref.name} must return exactly 5 numbers ${contract}, got ${describeVal(out)}`,
+        line,
+      );
+    const names = ['advance', 'insetA', 'insetB', 'lagA', 'lagB'];
+    const values = out.items.map((value, index) => {
+      if (typeof value !== 'number' || !Number.isFinite(value))
+        throw new NeedlescriptError(
+          `the satinbetween reporter @${ref.name} returned ${describeVal(value)} for ${names[index]} (slot ${index + 1} of 5) — it must be a finite number`,
+          line,
+        );
+      return value;
+    });
+    return [values[0], values[1], values[2], values[3], values[4]];
+  };
+
   // ---- Programmable stitchlen reporter (`stitchlen @fn`, §5) ----------
 
   ctx.applyStitchLenReporterArity = (ref: FuncRef, line?: number) => {

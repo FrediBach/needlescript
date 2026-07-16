@@ -627,6 +627,21 @@ export const NS_ITEMS: NSItem[] = [
     params: [['width']],
   },
   {
+    label: 'satinbetween',
+    kindName: 'function',
+    detail: 'satin column between two path rails',
+    documentation:
+      'Sews an immediate satin column between two independently authored path rails. Rails are mapped through the active transform/warp before arc-length pairing, so `density`, underlay, pull compensation, short-stitch relief, coverage, and ceiling checks use physical millimetres. Both rails must both be open or both be explicitly closed.\n\nForms:\n- `satinbetween(a, b)`\n- `satinbetween(a, b, checkpoints)` where checkpoints are ordered `[[pointA, pointB], …]`\n- `satinbetween(a, b, @shape)`\n- `satinbetween(a, b, checkpoints, @shape)`\n\nA shape reporter takes `(t, s, i, u)` and returns `[advance, insetA, insetB, lagA, lagB]`. Use `railinset` and `railrake` to build tuples. Drawless unless the reporter draws. Call syntax only; statement-only.',
+    insertText: 'satinbetween(${1:railA}, ${2:railB})',
+    isSnippet: true,
+    params: [
+      ['railA', 'railB'],
+      ['railA', 'railB', 'checkpoints'],
+      ['railA', 'railB', '@shape'],
+      ['railA', 'railB', 'checkpoints', '@shape'],
+    ],
+  },
+  {
     label: 'density',
     kindName: 'function',
     detail: 'satin penetration spacing (mm)',
@@ -2048,6 +2063,36 @@ export const NS_ITEMS: NSItem[] = [
     insertText: 'satinasym(${1:advance}, ${2:leftw}, ${3:rightw})',
     isSnippet: true,
     params: [['advance', 'leftw', 'rightw']],
+  },
+  {
+    label: 'railinset',
+    kindName: 'function',
+    detail: 'rail-pair tuple: [adv, inset, inset, 0, 0]',
+    documentation:
+      '`railinset(advance, inset)` builds `[advance, inset, inset, 0, 0]` for a `satinbetween` shape reporter. Insets move inward from both authored rails. Pure, drawless, Library tier.',
+    insertText: 'railinset(${1:advance}, ${2:inset})',
+    isSnippet: true,
+    params: [['advance', 'inset']],
+  },
+  {
+    label: 'railrake',
+    kindName: 'function',
+    detail: 'rail-pair tuple: [adv, 0, 0, -lag, lag]',
+    documentation:
+      '`railrake(advance, lag)` builds `[advance, 0, 0, -lag, lag]` for a full-width raked `satinbetween` stitch. Pure, drawless, Library tier.',
+    insertText: 'railrake(${1:advance}, ${2:lag})',
+    isSnippet: true,
+    params: [['advance', 'lag']],
+  },
+  {
+    label: 'railspine',
+    kindName: 'function',
+    detail: 'derived midpoint path between two rails',
+    documentation:
+      'Returns the same derived midpoint path used by `satinbetween`, including orientation and deterministic closed-rail seam handling. Useful for a centre vein or manual run. Pure and drawless.',
+    insertText: 'railspine(${1:railA}, ${2:railB})',
+    isSnippet: true,
+    params: [['railA', 'railB']],
   },
 
   // ── Fill-shaper helper (library tier) ────────────────────────────────────

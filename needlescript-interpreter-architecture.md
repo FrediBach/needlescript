@@ -202,7 +202,7 @@ error rather than a hang — the project's "loud beats convenient" rule.
 | `break` / `continue`                 | throw `LoopSignal`                                                                                                                                                 |
 | `call`                               | invoke a user procedure for its side effects                                                                                                                       |
 | `fillarm`                            | arm a programmable field fill or custom reporter/static path fill for the next `beginfill…endfill`; validate/freeze path data and install the no-emission callback |
-| `listcmd`                            | list mutators (`append`, `insertat`, `setpos`, `sewpath`, …)                                                                                                       |
+| `listcmd`                            | list/path commands (`append`, `insertat`, `setpos`, `sewpath`, `satinbetween`, …)                                                                                  |
 | `cmd`                                | delegates to the `execCmd` handler (below), with `assert` handled inline for lazy message evaluation                                                               |
 
 Loops enforce `ctx.m.effectiveLimits.maxLoopIters` up front, and `while` calls
@@ -370,6 +370,7 @@ Four modules install one dispatcher each; `evalExpr`'s `listfunc` branch and
   bridges to `affine.ts`, `genmath.ts`, `geometry.ts`, `generators.ts`, and
   `hoop-presets.ts`. When a generator uses the implicit hoop field it sets
   `ctx.m.fieldLocked` so a later `hoop` directive errors clearly.
+- **Rail-pair surface** — `satinbetween` runs from the `listcmd` branch because its operands are runtime lists. The interpreter validates paths, checkpoints, reporter contracts, and the geometry-input budget before one atomic machine call. `railinset`, `railrake`, and `railspine` live in `gen-func.ts`; `railspine` shares the pure builder in `rail-pair.ts`.
 - **`query-func.ts`** — closed-loop stitch-history reporters (`coverat`, `countat`,
   `nearestsewn`, `sewnwithin`, `stitchedpoints`). They set `ctx.m.usedQuery`, map local
   points through the CTM to hoop space, and read the machine's coverage grid. Costs are
