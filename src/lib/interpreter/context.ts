@@ -28,6 +28,7 @@ export interface RunContext {
   stringChars: number;
   printed: string[];
   insideTrace: number;
+  insideFillGenerator: number;
   traceNoted: Set<string>;
   structuralDepth: number;
   m: Machine;

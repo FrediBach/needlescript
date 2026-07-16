@@ -15,6 +15,84 @@ export interface FillPoint {
   jump: boolean;
 }
 
+/** Routed, unsplit tatami row spines. Pull compensation and brick subdivision are omitted. */
+export function generateFillRows(
+  rings: [number, number][][],
+  spacingArg: number,
+  angleDeg: number,
+): [number, number][][] {
+  const angle = (angleDeg || 0) * (Math.PI / 180);
+  const ca = Math.cos(angle),
+    sa = Math.sin(angle);
+  const rot = (p: [number, number]): [number, number] => [
+    p[0] * ca + p[1] * sa,
+    -p[0] * sa + p[1] * ca,
+  ];
+  const unrot = (p: [number, number]): [number, number] => [
+    p[0] * ca - p[1] * sa,
+    p[0] * sa + p[1] * ca,
+  ];
+  const rr = rings.map((ring) => ring.map(rot));
+  const spacing = Math.min(Math.max(spacingArg || 0.4, 0.25), 5);
+  let minY = Infinity,
+    maxY = -Infinity;
+  for (const ring of rr)
+    for (const p of ring) {
+      minY = Math.min(minY, p[1]);
+      maxY = Math.max(maxY, p[1]);
+    }
+  if (!(maxY - minY > spacing * 0.6)) return [];
+  const rows: { a: [number, number]; b: [number, number] }[][] = [];
+  for (let y = minY + spacing * 0.5; y < maxY; y += spacing) {
+    const xs: number[] = [];
+    for (const ring of rr)
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i],
+          b = ring[(i + 1) % ring.length];
+        if ((a[1] <= y && b[1] > y) || (b[1] <= y && a[1] > y))
+          xs.push(a[0] + ((y - a[1]) / (b[1] - a[1])) * (b[0] - a[0]));
+      }
+    xs.sort((a, b) => a - b);
+    const row: { a: [number, number]; b: [number, number] }[] = [];
+    for (let i = 0; i + 1 < xs.length; i += 2)
+      if (xs[i + 1] - xs[i] >= 0.5) row.push({ a: [xs[i], y], b: [xs[i + 1], y] });
+    if (row.length) rows.push(row);
+  }
+  if (!rows.length) return [];
+  const end = rings[0]?.[0] ? rot(rings[0][0]) : null;
+  const orderedRows =
+    end && Math.abs(end[1] - rows[0][0].a[1]) < Math.abs(end[1] - rows[rows.length - 1][0].a[1])
+      ? rows.slice().reverse()
+      : rows;
+  const segs = orderedRows.flat();
+  const out: [number, number][][] = [];
+  let cur: [number, number] | null = null;
+  while (segs.length) {
+    let best = 0,
+      reverse = false,
+      dist = Infinity;
+    for (let i = 0; i < segs.length; i++) {
+      const da = cur ? Math.hypot(segs[i].a[0] - cur[0], segs[i].a[1] - cur[1]) : i;
+      const db = cur ? Math.hypot(segs[i].b[0] - cur[0], segs[i].b[1] - cur[1]) : i + 0.5;
+      if (da < dist) {
+        best = i;
+        reverse = false;
+        dist = da;
+      }
+      if (db < dist) {
+        best = i;
+        reverse = true;
+        dist = db;
+      }
+    }
+    const seg = segs.splice(best, 1)[0];
+    const path = reverse ? [seg.b, seg.a] : [seg.a, seg.b];
+    out.push(path.map(unrot));
+    cur = path[1];
+  }
+  return out;
+}
+
 export function evenOddInside(rings: [number, number][][], px: number, py: number): boolean {
   let inside = false;
   for (const ring of rings) {

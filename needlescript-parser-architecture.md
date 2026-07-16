@@ -319,7 +319,7 @@ tailored error messages (e.g. the `push` vs `append` hint).
   (`warp`/`humanize`/`snaptogrid`/`declump`), each taking args _then a block_ in both
   prefix and glued-call spellings (`statements.ts:409-436`, `566-590`).
 - **Special commands**: `print`/`printloc`, `assert`, `mark`, and the programmable
-  `fill dir @d shape @s` arming form (`statements.ts:629-713`).
+  `fill dir @d shape @s` and exclusive `fill paths @gen|expr` arming forms (`statements.ts`). Static path expressions remain AST expressions; reporter references participate in the all-paths-return analysis.
 - **Index assignment**: `xs[i] = e`, `grid[i][j] += e` → `setindex`
   (`statements.ts:474-511`).
 - Generic **builtin commands** (`BUILTIN_ARITY`), **list/gen commands**, and **user

@@ -22,6 +22,7 @@ import { makeDeclumpState, declumpFoldPoint } from '../declump.ts';
 import { hoopFieldDomain, hoopFieldPolygon } from '../hoop-presets.ts';
 import { GEN_QWORD_ARG } from '../commands.ts';
 import { didYouMean } from '../suggestions.ts';
+import { closePath, contourPaths, fillRows, spiralPaths } from '../fill-paths.ts';
 import type { RunContext } from './context.ts';
 
 export function initGenFunc(ctx: RunContext): void {
@@ -30,6 +31,19 @@ export function initGenFunc(ctx: RunContext): void {
     const pointArg = (i: number) => gm.toPoint(args[i], name, line);
     const pathArg = (i: number, min = 2) => gm.toPath(args[i], name, line, min);
     const regionArg = (i: number) => gm.toRegion(args[i], name, line);
+    const compoundRegionArg = (i: number): Pt[][] => {
+      const value = args[i];
+      if (!isList(value) || value.items.length === 0)
+        throw new NeedlescriptError(`${name}: expected a region (a ring or a list of rings)`, line);
+      const first = value.items[0];
+      if (
+        isList(first) &&
+        first.items.length === 2 &&
+        first.items.every((v) => typeof v === 'number')
+      )
+        return [gm.toRegion(value, name, line)];
+      return value.items.map((ring) => gm.toRegion(ring, name, line));
+    };
     const point = (p: Pt) => ctx.allocList([p[0], p[1]], line);
     const path = (pts: Pt[]) => gm.fromPoints(pts, (items) => ctx.allocList(items, line));
     const regions = (rs: Pt[][]) =>
@@ -280,6 +294,18 @@ export function initGenFunc(ctx: RunContext): void {
       }
       case 'inpath':
         return gm.pointInRegion(pointArg(0), regionArg(1)) ? 1 : 0;
+      case 'closepath':
+        return path(closePath(pathArg(0, 3), line));
+      case 'contourpaths':
+        return regions(
+          contourPaths(compoundRegionArg(0), sc(1), ctx.m.effectiveLimits.maxClipVerts, line),
+        );
+      case 'spiralpath':
+        return regions(
+          spiralPaths(compoundRegionArg(0), sc(1), ctx.m.effectiveLimits.maxClipVerts, line),
+        );
+      case 'fillrows':
+        return regions(fillRows(compoundRegionArg(0), sc(1), sc(2)));
 
       // ----- §hoop: field reporters -----
       case 'infield': {

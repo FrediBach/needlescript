@@ -298,6 +298,10 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   satinasym: { min: 3, max: 3 }, // (advance, leftw, rightw) ≡ [advance, leftw, rightw, 0, 0]
   // DX: fill-shaper helper — build the 3-number contract list for a standard tatami row
   tatamirow: { min: 2, max: 3 }, // (spacing, len) or (spacing, len, phase) ≡ [spacing, len, phase]
+  contourpaths: { min: 2, max: 2 },
+  spiralpath: { min: 2, max: 2 },
+  fillrows: { min: 3, max: 3 },
+  closepath: { min: 1, max: 1 },
 };
 
 /** GEN_FUNCS whose given argument is a quoted word, with the allowed words. */

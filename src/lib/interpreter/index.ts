@@ -57,6 +57,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     printed: [] as string[],
     // Trace sandbox state (RFC-trace §4)
     insideTrace: 0,
+    insideFillGenerator: 0,
     traceNoted: new Set<string>(),
     // Structural block depth: incremented inside repeat/for/while/forin/if/transform/effect
     // so that the `hoop` and `override` placement guards can detect nested placement.
@@ -93,6 +94,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     m.warnings.push('beginfill was never closed — endfill added at the end of the program');
     m.endFill();
   }
+  if (m.fillArmed && m.fillArmLine !== undefined)
+    m.warnings.push(`a fill arming on line ${m.fillArmLine} was never used`);
   if (m.tinyDropped > 0) {
     const spots = m.tinyDroppedSpots;
     if (spots.length) {

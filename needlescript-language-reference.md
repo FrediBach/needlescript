@@ -58,6 +58,7 @@ break continue return exit output true false and or not
 | `step`  | `for i = a to b step s` — after the `to <expr>` | ordinary name: `let step = 2` works |
 | `dir`   | `fill dir @proc` — immediately after `fill`     | ordinary name                       |
 | `shape` | `fill … shape @proc` — immediately after `fill` | ordinary name                       |
+| `paths` | `fill paths @proc                               | expr`— immediately after`fill`      | ordinary name |
 
 **Core tier** (hard error if redefined): all movement, stitching, thread, fill, control-flow, transform and effect commands, `@name` references, and the zero-arg reporters — e.g. `fd`, `rt`, `circle`, `color`, `satin`, `scale`, `rotate`, `translate`, `transform`, `warp`, `humanize`, `snaptogrid`, `declump`, `pos`, `heading`, `xcor`, `ycor`, `repcount`, `random`, `trace`, `tracerings`. Cannot be used as variable, parameter, or procedure names.
 
@@ -567,6 +568,8 @@ Arms the **next** `beginfill … endfill`, replacing the tatami generator; the e
 | `fill dir @field`      | direction field: `def field(p) [ return heading ]` — turtle heading at local point p. The engine integrates evenly-spaced **streamlines** (Jobard–Lefer) and lays a row along each. Contour/grain/flow fills                        |
 | `fill shape @texture`  | stitch shaper: `def texture(p, row, v) [ return [spacing, len, phase] ]` — spacing (mm, > 0, sampled once **per row**), stitch length (mm, clamped 1–7, per penetration), brick phase (0..1, per penetration; 0.5 = standard brick) |
 | `fill dir @d shape @s` | both channels                                                                                                                                                                                                                       |
+| `fill paths @gen`      | custom path generator: `def gen(rings) [ return paths ]`. The reporter receives the compound region in local coordinates; the engine clips, underlays, pull-compensates open ends, subdivides, connects, and accounts for coverage  |
+| `fill paths pathsExpr` | static custom paths, evaluated, validated, and frozen when armed                                                                                                                                                                    |
 | `fill @name`           | shorthand: `@name` is the direction field                                                                                                                                                                                           |
 
 Shaper inputs: `p` local penetration position (usable with `coverat(p)`), `row` 0-based streamline index, `v` 0..1 cross-field position. A constant field reduces byte-identically to plain tatami. Termination is guaranteed by streamline-length and seeding budgets (pathological fields → finite fill with warnings, never a hang). Reporters see local space; the CTM maps afterwards (physical stitch spacing preserved under `scale`). Draws nothing from the seeded stream. `dir`/`shape` are reserved only right after `fill`.
@@ -638,6 +641,19 @@ Presets (case-insensitive): `'round100'` (default), `'4x4'` 100×100, `'5x7'` 13
 | `fieldpath()`   | field boundary as a closed CCW region (round fields polygonised at ≤ 2 mm chords) — feed to `clippaths`/`offsetpath`/`scatter` |
 
 Hoop-agnostic margin idiom: `let margin = first(offsetpath(fieldpath(), -6))`.
+
+### 16.3 Custom fill-path helpers
+
+These Library-tier functions are pure and call-syntax only. Region arguments accept one ring or a list of rings under the even-odd rule.
+
+| Function                           | Result                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| `contourpaths(region, gap)`        | closed inset contours, outside-in, beginning `gap / 2` inside the boundary     |
+| `spiralpath(region, gap)`          | the contours spliced into one open spiral per disconnected fragment            |
+| `fillrows(region, spacing, angle)` | routed, unsplit tatami row paths without pull compensation                     |
+| `closepath(ring)`                  | explicit closed path with the first point repeated; requires at least 3 points |
+
+`fill paths` is exclusive with `dir`/`shape`, applies to one `endfill`, and may be armed inside procedures and loops. A later arm replaces an unused arm with a note. Generator machine commands are discarded in a no-emission sandbox; deliberate RNG draws consume the main seeded stream. Returned paths must contain at least two finite `[x, y]` points. Closed paths are recognized when their endpoints are within 0.001 mm. Path order is preserved.
 
 ### `override 'key' N`
 
@@ -790,7 +806,7 @@ Annotate `let`/`make`/bare declarations to expose live controls in the playgroun
 ## 24. Pre-flight checklist — verify every program before returning it
 
 1. **Brackets:** every block opens `[` and closes `]`; the characters `{` and `}` appear nowhere.
-2. **Names:** no variable, parameter, or procedure named `to`, `end`, `in`, or any reserved keyword; nothing reuses a Core builtin (`circle`, `pos`, `color`, `heading`, `random`, `scale`, `trace`, …); avoid Library names (`str`, `num`, `upper`, `lower`, `strip`, `chars`, `split`, `len`, `clamp`, …) too. (`step`, `dir`, and `shape` are contextual keywords — safe to use as ordinary names outside their one special position.)
+2. **Names:** no variable, parameter, or procedure named `to`, `end`, `in`, or any reserved keyword; nothing reuses a Core builtin (`circle`, `pos`, `color`, `heading`, `random`, `scale`, `trace`, …); avoid Library names (`str`, `num`, `upper`, `lower`, `strip`, `chars`, `split`, `len`, `clamp`, …) too. (`step`, `dir`, `shape`, and `paths` are contextual keywords — safe to use as ordinary names outside their one special position.)
 3. **Declarations:** each variable has exactly one `let`, placed before any loop/branch that updates it; all later writes are bare assignments; no `let` on parameters; no shadowing; conditionally-assigned variables have a default.
 4. **Placement:** `return`/`output`/`exit` only inside `def`/`to` bodies; `break`/`continue` only inside loop bodies of the same procedure; every reporter returns on every path (add `else`); `hoop`/`override`/`seed` at the top; `trace` only in expression position, never containing `beginfill` or `seed`.
 5. **Negative literals:** ` -5` (space before, glued after) is a negative argument; `10 - 5` is subtraction — check argument counts around minus signs, or use glued-paren calls.

@@ -13,6 +13,8 @@ import {
   union,
   difference,
   xor,
+  Clipper64,
+  ClipType,
 } from 'clipper2-ts';
 import type { Path64, Paths64 } from 'clipper2-ts';
 import { NeedlescriptError } from './errors.ts';
@@ -63,6 +65,57 @@ export function offsetRegion(
     ARC_TOLERANCE,
   );
   return fromPaths64(out);
+}
+
+/** Offset a compound even-odd region in one operation, preserving islands and holes. */
+export function offsetCompoundRegion(
+  rings: Pt[][],
+  delta: number,
+  line?: number,
+  maxVerts: number = MAX_CLIP_VERTICES,
+): Pt[][] {
+  const count = rings.reduce((n, ring) => n + ring.length, 0);
+  checkVertexBudget('contourpaths', count, maxVerts, line);
+  return fromPaths64(
+    inflatePaths(
+      union(rings.map(toPath64), FillRule.EvenOdd),
+      delta * SCALE,
+      JoinType.Round,
+      EndType.Polygon,
+      2,
+      ARC_TOLERANCE,
+    ),
+  );
+}
+
+/** Intersect open paths with a compound even-odd region. */
+export function clipOpenPaths(
+  paths: Pt[][],
+  rings: Pt[][],
+  line?: number,
+  maxVerts: number = MAX_CLIP_VERTICES,
+): Pt[][] {
+  const count = [...paths, ...rings].reduce((n, path) => n + path.length, 0);
+  checkVertexBudget('fill paths', count, maxVerts, line);
+  const clipper = new Clipper64();
+  clipper.addOpenSubject(paths.map(toPath64));
+  clipper.addClip(rings.map(toPath64));
+  const closed: Paths64 = [];
+  const open: Paths64 = [];
+  clipper.execute(ClipType.Intersection, FillRule.EvenOdd, closed, open);
+  return open.map((path) => path.map((p) => [p.x / SCALE, p.y / SCALE] as Pt));
+}
+
+/** Intersect closed paths with a compound even-odd region. */
+export function clipClosedPaths(
+  paths: Pt[][],
+  rings: Pt[][],
+  line?: number,
+  maxVerts: number = MAX_CLIP_VERTICES,
+): Pt[][] {
+  const count = [...paths, ...rings].reduce((n, path) => n + path.length, 0);
+  checkVertexBudget('fill paths', count, maxVerts, line);
+  return fromPaths64(intersect(paths.map(toPath64), rings.map(toPath64), FillRule.EvenOdd));
 }
 
 /** Boolean of two regions; even-odd fill rule (consistent with inpath). */

@@ -23,6 +23,50 @@ import type { RunContext, Env } from './context.ts';
 export function initExecStmt(ctx: RunContext): void {
   const execCmd = initExecCmdHandler(ctx);
 
+  const validateFillPaths = (
+    value: Val | undefined,
+    label: string,
+    line: number,
+    chargeCopy = false,
+  ) => {
+    if (value === undefined || !isList(value))
+      throw new NeedlescriptError(
+        `${label} must return a list of paths — got ${value === undefined ? 'nothing' : describeVal(value as Val)}`,
+        line,
+      );
+    const paths: [number, number][][] = [];
+    if (chargeCopy) ctx.charge(value.items.length, line);
+    for (let pi = 0; pi < value.items.length; pi++) {
+      const path = value.items[pi];
+      if (!isList(path) || path.items.length < 2)
+        throw new NeedlescriptError(
+          `${label}: path ${pi + 1} must be a list of at least 2 points`,
+          line,
+        );
+      const points: [number, number][] = [];
+      if (chargeCopy) ctx.charge(path.items.length, line);
+      for (let vi = 0; vi < path.items.length; vi++) {
+        const point = path.items[vi];
+        if (
+          !isList(point) ||
+          point.items.length !== 2 ||
+          typeof point.items[0] !== 'number' ||
+          typeof point.items[1] !== 'number' ||
+          !Number.isFinite(point.items[0]) ||
+          !Number.isFinite(point.items[1])
+        )
+          throw new NeedlescriptError(
+            `${label}: path ${pi + 1}, point ${vi + 1} must be a list of two finite numbers`,
+            line,
+          );
+        points.push([point.items[0], point.items[1]]);
+        if (chargeCopy) ctx.charge(2, line);
+      }
+      paths.push(points);
+    }
+    return paths;
+  };
+
   ctx.execBlock = (
     stmts: ASTNode[],
     env: Env,
@@ -385,6 +429,66 @@ export function initExecStmt(ctx: RunContext): void {
             'fill armed while a beginfill is open — close it with endfill before arming a new fill',
             st.line,
           );
+        if (ctx.insideTrace > 0)
+          throw new NeedlescriptError('fill paths is not allowed inside trace', st.line);
+        if (ctx.m.fillArmed && ctx.m.fillArmLine !== undefined)
+          ctx.m.warnings.push(
+            `note: a previous fill arming was replaced before use (line ${ctx.m.fillArmLine})`,
+          );
+        ctx.m.fillPathsReporter = null;
+        ctx.m.fillPathsStatic = null;
+        ctx.m.fillPathsName = null;
+        if (st.pathsRef) {
+          const proc = ctx.procs[st.pathsRef];
+          if (!proc || proc.params.length !== 1)
+            throw new NeedlescriptError(
+              `custom fill generator "${st.pathsRef}" takes 1 input (the region rings) — it is defined with ${proc?.params.length ?? 0}`,
+              st.line,
+            );
+          const ref = st.pathsRef;
+          ctx.m.fillPathsName = ref;
+          ctx.m.fillPathsReporter = (rings) => {
+            const machineSnap = ctx.m.snapshotForTrace();
+            const rng = ctx.rng;
+            const noise = ctx.noise;
+            const snoise2 = ctx.snoise2;
+            const snoise3 = ctx.snoise3;
+            ctx.m.noEmit = true;
+            ctx.insideTrace++;
+            ctx.insideFillGenerator++;
+            try {
+              const region = ctx.allocList(
+                rings.map((ring) =>
+                  ctx.allocList(
+                    ring.map((p) => ctx.allocList([p[0], p[1]], st.line)),
+                    st.line,
+                  ),
+                ),
+                st.line,
+              );
+              return validateFillPaths(
+                ctx.callProcVals(ref, [region], 0, st.line),
+                `custom fill generator "${ref}"`,
+                st.line,
+              );
+            } finally {
+              ctx.m.restoreFromTrace(machineSnap);
+              ctx.insideFillGenerator--;
+              ctx.insideTrace--;
+              if (ctx.rng !== rng) ctx.rng = rng;
+              if (ctx.noise !== noise) ctx.noise = noise;
+              if (ctx.snoise2 !== snoise2) ctx.snoise2 = snoise2;
+              if (ctx.snoise3 !== snoise3) ctx.snoise3 = snoise3;
+            }
+          };
+        } else if (st.pathsExpr) {
+          ctx.m.fillPathsStatic = validateFillPaths(
+            ctx.evalExpr(st.pathsExpr, env, repcount, depth),
+            'fill paths list',
+            st.line,
+            true,
+          ).map((path) => path.map((p) => [p[0], p[1]]));
+        }
         if (st.dirRef) {
           ctx.applyFillDirArity(st.dirRef, st.line);
           const ref = st.dirRef;
@@ -401,6 +505,7 @@ export function initExecStmt(ctx: RunContext): void {
           ctx.m.fillShapeReporter = null;
         }
         ctx.m.fillArmed = true;
+        ctx.m.fillArmLine = st.line;
         if (ctx.m.fillDirReporter && ctx.m.fillAngle !== 0)
           ctx.m.warnings.push(
             `fillangle is ignored while fill dir @${st.dirRef} is engaged — the direction field supersedes it`,

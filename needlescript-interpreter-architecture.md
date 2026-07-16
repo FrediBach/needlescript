@@ -180,22 +180,22 @@ error rather than a hang — the project's "loud beats convenient" rule.
 
 `execStmt` charges one op via `ctx.tick(st.line)` on entry, then switches on `st.k`:
 
-| Node kind                            | Behavior                                                                                                                        |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `to`                                 | registers the procedure into `ctx.procs` (definitions are hoisted at execution)                                                 |
-| `make` / `local`                     | assign a global / local binding                                                                                                 |
-| `letlist`                            | destructuring assignment `let [x, y] = …` with arity checks                                                                     |
-| `setindex`                           | lvalue index chains `xs[i] = v`, `grid[i][j] += v` (strings rejected)                                                           |
-| `repeat` / `while` / `for` / `forin` | loops, each bumping `structuralDepth` and using `runLoopBody`; `for` and `forin` save/restore the loop variable's prior binding |
-| `if`                                 | conditional with optional `elseBody`                                                                                            |
-| `transform`                          | composes a CTM matrix onto the machine's stack for the block's duration; `flushSatin` on both edges                             |
-| `effect`                             | `warp`/`humanize`/`snaptogrid`/`declump` — pushes an effect onto the machine's pen/warp stack for the block                     |
-| `output`                             | throws `ReturnSignal` (guarded: only inside a procedure, `depth > 0`)                                                           |
-| `break` / `continue`                 | throw `LoopSignal`                                                                                                              |
-| `call`                               | invoke a user procedure for its side effects                                                                                    |
-| `fillarm`                            | arm a programmable fill (`fill dir @d shape @s`) for the next `beginfill…endfill`                                               |
-| `listcmd`                            | list mutators (`append`, `insertat`, `setpos`, `sewpath`, …)                                                                    |
-| `cmd`                                | delegates to the `execCmd` handler (below), with `assert` handled inline for lazy message evaluation                            |
+| Node kind                            | Behavior                                                                                                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `to`                                 | registers the procedure into `ctx.procs` (definitions are hoisted at execution)                                                                                    |
+| `make` / `local`                     | assign a global / local binding                                                                                                                                    |
+| `letlist`                            | destructuring assignment `let [x, y] = …` with arity checks                                                                                                        |
+| `setindex`                           | lvalue index chains `xs[i] = v`, `grid[i][j] += v` (strings rejected)                                                                                              |
+| `repeat` / `while` / `for` / `forin` | loops, each bumping `structuralDepth` and using `runLoopBody`; `for` and `forin` save/restore the loop variable's prior binding                                    |
+| `if`                                 | conditional with optional `elseBody`                                                                                                                               |
+| `transform`                          | composes a CTM matrix onto the machine's stack for the block's duration; `flushSatin` on both edges                                                                |
+| `effect`                             | `warp`/`humanize`/`snaptogrid`/`declump` — pushes an effect onto the machine's pen/warp stack for the block                                                        |
+| `output`                             | throws `ReturnSignal` (guarded: only inside a procedure, `depth > 0`)                                                                                              |
+| `break` / `continue`                 | throw `LoopSignal`                                                                                                                                                 |
+| `call`                               | invoke a user procedure for its side effects                                                                                                                       |
+| `fillarm`                            | arm a programmable field fill or custom reporter/static path fill for the next `beginfill…endfill`; validate/freeze path data and install the no-emission callback |
+| `listcmd`                            | list mutators (`append`, `insertat`, `setpos`, `sewpath`, …)                                                                                                       |
+| `cmd`                                | delegates to the `execCmd` handler (below), with `assert` handled inline for lazy message evaluation                                                               |
 
 Loops enforce `ctx.m.effectiveLimits.maxLoopIters` up front, and `while` calls
 `ctx.tick` each iteration so a non-terminating loop hits the op budget.

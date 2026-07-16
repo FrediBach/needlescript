@@ -1,0 +1,22 @@
+// Custom contour fill with an even-odd hole.
+seed 11
+fabric 'woven'
+stitchlen 2
+
+let gap = 0.8 // [0.4:0.1:2]
+
+def echo(rings) [
+  return contourpaths(rings, gap)
+]
+
+color 2
+fill paths @echo
+beginfill
+  moveto -26 -15
+  sewpath(closepath([[-26, -15], [26, -15], [0, 30]]))
+  up
+  moveto 0 4
+  down
+  circle 6
+endfill
+trim

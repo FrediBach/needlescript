@@ -78,6 +78,10 @@ interface MachineSnapshot {
   fillDirReporter: ((px: number, py: number) => number) | null;
   fillShapeReporter:
     ((px: number, py: number, row: number, v: number) => [number, number, number]) | null;
+  fillPathsReporter: ((rings: [number, number][][]) => [number, number][][]) | null;
+  fillPathsStatic: [number, number][][] | null;
+  fillArmLine: number | undefined;
+  fillPathsName: string | null;
   fillCTM: Mat;
   fillLayers: OutLayer[];
   fillHasWarp: boolean;
@@ -162,6 +166,10 @@ export abstract class MachineCore {
   fillDirReporter: ((px: number, py: number) => number) | null = null;
   fillShapeReporter:
     ((px: number, py: number, row: number, v: number) => [number, number, number]) | null = null;
+  fillPathsReporter: ((rings: [number, number][][]) => [number, number][][]) | null = null;
+  fillPathsStatic: [number, number][][] | null = null;
+  fillArmLine: number | undefined = undefined;
+  fillPathsName: string | null = null;
   // Snapshot of the output stack captured at beginfill while armed, so the
   // region/field compose with transforms (reporters see local; placement maps
   // through this affine CTM; warp deforms emitted penetrations downstream).
@@ -361,6 +369,10 @@ export abstract class MachineCore {
       fillArmed: this.fillArmed,
       fillDirReporter: this.fillDirReporter,
       fillShapeReporter: this.fillShapeReporter,
+      fillPathsReporter: this.fillPathsReporter,
+      fillPathsStatic: this.fillPathsStatic?.map((path) => path.map((p) => [p[0], p[1]])) ?? null,
+      fillArmLine: this.fillArmLine,
+      fillPathsName: this.fillPathsName,
       fillCTM: this.fillCTM,
       fillLayers: this.fillLayers.slice(),
       fillHasWarp: this.fillHasWarp,
@@ -476,6 +488,11 @@ export abstract class MachineCore {
     this.fillArmed = snap.fillArmed;
     this.fillDirReporter = snap.fillDirReporter;
     this.fillShapeReporter = snap.fillShapeReporter;
+    this.fillPathsReporter = snap.fillPathsReporter;
+    this.fillPathsStatic =
+      snap.fillPathsStatic?.map((path) => path.map((p) => [p[0], p[1]])) ?? null;
+    this.fillArmLine = snap.fillArmLine;
+    this.fillPathsName = snap.fillPathsName;
     this.fillCTM = snap.fillCTM;
     this.fillLayers = snap.fillLayers.slice();
     this.fillHasWarp = snap.fillHasWarp;

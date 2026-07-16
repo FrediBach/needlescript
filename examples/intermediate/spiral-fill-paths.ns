@@ -1,0 +1,14 @@
+// One continuous custom spiral fill.
+seed 4
+fabric 'woven'
+stitchlen 2
+
+def whirl(rings) [
+  return spiralpath(rings, 0.8)
+]
+
+fill paths @whirl
+beginfill
+  circle 18
+endfill
+trim

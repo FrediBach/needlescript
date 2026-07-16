@@ -76,6 +76,8 @@ function collectValueUsesStmt(st: ASTNode, out: Set<string>): void {
       // dirRef and shapeRef are stored as strings (not ExprNode), so collect them directly
       if (st.dirRef) out.add(st.dirRef);
       if (st.shapeRef) out.add(st.shapeRef);
+      if (st.pathsRef) out.add(st.pathsRef);
+      if (st.pathsExpr) collectValueUsesExpr(st.pathsExpr, out);
       break;
   }
 }

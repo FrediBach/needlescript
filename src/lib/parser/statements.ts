@@ -688,19 +688,48 @@ export function parseStatement(ctx: ParseContext): ASTNode {
         );
       return e.name;
     };
-    const isKw = (w: string) => !ctx.atEnd() && ctx.peek()!.t === 'word' && ctx.peek()!.v === w;
+    const isKw = (w: string) =>
+      !ctx.atEnd() &&
+      (ctx.peek()!.t === 'word' || ctx.peek()!.t === 'qword') &&
+      ctx.peek()!.v === w;
     let dirRef: string | null = null;
     let shapeRef: string | null = null;
-    if (isKw('dir')) {
+    let pathsRef: string | null = null;
+    let pathsExpr: ExprNode | null = null;
+    if (isKw('paths')) {
+      ctx.next();
+      if (ctx.atEnd())
+        throw new NeedlescriptError(
+          'fill paths expects a procedure reference (@name) or a list of paths',
+          tok.line,
+        );
+      if (ctx.peek()!.t === 'pref') pathsRef = readRef('paths');
+      else pathsExpr = ctx.parseExpr();
+      if (isKw('dir') || isKw('shape'))
+        throw new NeedlescriptError(
+          'fill paths cannot be combined with dir/shape — they both define the fill geometry',
+          tok.line,
+        );
+    } else if (isKw('dir')) {
       ctx.next();
       dirRef = readRef('dir');
       if (isKw('shape')) {
         ctx.next();
         shapeRef = readRef('shape');
       }
+      if (isKw('paths'))
+        throw new NeedlescriptError(
+          'fill paths cannot be combined with dir/shape — they both define the fill geometry',
+          tok.line,
+        );
     } else if (isKw('shape')) {
       ctx.next();
       shapeRef = readRef('shape');
+      if (isKw('paths'))
+        throw new NeedlescriptError(
+          'fill paths cannot be combined with dir/shape — they both define the fill geometry',
+          tok.line,
+        );
     } else {
       // Bare `fill @name` — the shorthand: @name is the DIRECTION field (§2).
       if (ctx.atEnd() || ctx.peek()!.t !== 'pref')
@@ -710,7 +739,7 @@ export function parseStatement(ctx: ParseContext): ASTNode {
         );
       dirRef = readRef('dir');
     }
-    return { k: 'fillarm', dirRef, shapeRef, line: tok.line };
+    return { k: 'fillarm', dirRef, shapeRef, pathsRef, pathsExpr, line: tok.line };
   }
   if (BUILTIN_ARITY[canonical] !== undefined) {
     ctx.next();

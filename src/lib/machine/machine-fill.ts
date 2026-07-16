@@ -1,9 +1,12 @@
 // ---------- Fill recording and generation ----------
 
-import { type FillPoint, evenOddInside, generateFill } from './fill.ts';
+import { type FillPoint, evenOddInside, generateFill, generateFillRows } from './fill.ts';
 import { NeedlescriptError } from '../errors.ts';
 import { IDENTITY, apply, invert, linApply } from '../affine.ts';
 import { vfromheading, vheading } from '../genmath.ts';
+import { pathlen, segdist, segisect } from '../genmath.ts';
+import { clipClosedPaths, clipOpenPaths } from '../geometry.ts';
+import { LIMITS } from './limits.ts';
 import { SatinMachine } from './machine-satin.ts';
 
 export class FillMachine extends SatinMachine {
@@ -642,6 +645,15 @@ export class FillMachine extends SatinMachine {
     this.recording = false;
     if (!this.rings.length) {
       this.warnings.push('fill skipped — the boundary needs at least 3 pen-down points');
+      if (this.fillArmed) {
+        this.fillArmed = false;
+        this.fillDirReporter = null;
+        this.fillShapeReporter = null;
+        this.fillPathsReporter = null;
+        this.fillPathsStatic = null;
+        this.fillPathsName = null;
+        this.fillArmLine = undefined;
+      }
       return;
     }
     const rings = this.rings;
@@ -649,6 +661,276 @@ export class FillMachine extends SatinMachine {
     // Rings are recorded in hoop space, so the "end near" hint must be too.
     const [hx, hy] = this.mapOut(this.x, this.y);
     const endNear = { x: hx, y: hy };
+
+    if (this.fillArmed && (this.fillPathsReporter || this.fillPathsStatic)) {
+      const reporter = this.fillPathsReporter;
+      const staticPaths = this.fillPathsStatic;
+      const armLine = this.fillArmLine;
+      const inv = invert(this.fillCTM);
+      if (!inv)
+        throw new NeedlescriptError(
+          'fill paths cannot run under a singular transform (scale 0 has no local inverse)',
+          armLine,
+        );
+      const localRegion = rings.map((ring) => {
+        const mapped = ring.map((p) => apply(inv, p[0], p[1]) as [number, number]);
+        if (
+          mapped.length > 1 &&
+          Math.hypot(
+            mapped[0][0] - mapped[mapped.length - 1][0],
+            mapped[0][1] - mapped[mapped.length - 1][1],
+          ) < 1e-6
+        )
+          mapped.pop();
+        return mapped;
+      });
+      let paths: [number, number][][];
+      try {
+        paths = reporter ? reporter(localRegion) : staticPaths!.map((p) => p.map((q) => [...q]));
+      } finally {
+        this.fillArmed = false;
+        this.fillDirReporter = null;
+        this.fillShapeReporter = null;
+        this.fillPathsReporter = null;
+        this.fillPathsStatic = null;
+        this.fillPathsName = null;
+        this.fillArmLine = undefined;
+      }
+      const totalVertices = paths.reduce((n, path) => n + path.length, 0);
+      if (
+        totalVertices + localRegion.reduce((n, ring) => n + ring.length, 0) >
+        this.effectiveLimits.maxClipVerts
+      )
+        throw new NeedlescriptError(
+          `fill paths: too many vertices (over ${this.effectiveLimits.maxClipVerts.toLocaleString('en-US')})`,
+          armLine,
+        );
+      const canonicalRows = generateFillRows(localRegion, this.fillSpacing, this.fillAngle);
+      const sameRows =
+        paths.length === canonicalRows.length &&
+        paths.every(
+          (path, i) =>
+            path.length === canonicalRows[i].length &&
+            path.every(
+              (point, j) =>
+                Math.hypot(point[0] - canonicalRows[i][j][0], point[1] - canonicalRows[i][j][1]) <
+                1e-9,
+            ),
+        );
+      if (
+        sameRows &&
+        (this.fillLenList !== null ||
+          this.fillLenReporter !== null ||
+          this.stitchLenList !== null ||
+          this.stitchLenReporter !== null)
+      ) {
+        const savedLocalRings = this.localRings;
+        this.localRings = rings.map((ring) =>
+          ring.map((point) => apply(inv, point[0], point[1]) as [number, number]),
+        );
+        try {
+          this._generateProgrammableFill({
+            dir: null,
+            shape: null,
+            constAngle: this.fillAngle,
+            rotate90: false,
+            coarse: false,
+            underlay: false,
+          });
+        } finally {
+          this.localRings = savedLocalRings;
+        }
+        const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
+        if (back > 0.6) this._push('jump', hx, hy);
+        return;
+      }
+      if (
+        sameRows &&
+        this.fillLenList === null &&
+        this.fillLenReporter === null &&
+        this.stitchLenList === null &&
+        this.stitchLenReporter === null
+      ) {
+        const stitchLen = this.fillLen ?? Math.min(Math.max(this.stitchLen, 1), 7);
+        const areaOf = (ring: [number, number][]) => {
+          let value = 0;
+          for (let i = 0; i < ring.length; i++) {
+            const a = ring[i],
+              b = ring[(i + 1) % ring.length];
+            value += a[0] * b[1] - b[0] * a[1];
+          }
+          return Math.abs(value / 2);
+        };
+        const area = Math.max(...rings.map(areaOf));
+        let mode: 'off' | 'tatami' | 'edge' | 'both' = 'off';
+        if (this.fillUnderlayMode === 'auto') mode = area > 100 ? 'both' : 'tatami';
+        else if (this.fillUnderlayMode === 'tatami') mode = 'tatami';
+        else if (this.fillUnderlayMode === 'edge') mode = 'edge';
+        if ((mode === 'edge' || mode === 'both') && area >= 30)
+          for (const ring of rings) {
+            const inset = this._insetRing(ring, rings, 0.5);
+            if (inset.length) this._emitFillPts(this._subdividePts(inset, 2.5), true);
+          }
+        if (mode === 'tatami' || mode === 'both') {
+          const underlayOptions = {
+            spacing: Math.min(this.fillSpacing * 4, 5),
+            stitchLen: 4,
+            endNear,
+            comp: -0.6,
+          };
+          if (this.doubleUnderlay)
+            this._emitFillPts(
+              generateFill(rings, { ...underlayOptions, angle: this.fillAngle }),
+              true,
+            );
+          this._emitFillPts(
+            generateFill(rings, { ...underlayOptions, angle: this.fillAngle + 90 }),
+            true,
+          );
+        }
+        const points = generateFill(rings, {
+          angle: this.fillAngle,
+          spacing: this.fillSpacing,
+          stitchLen,
+          endNear,
+          comp: this.pullComp,
+        });
+        this._emitFillPts(points, false);
+        const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
+        if (back > 0.6) this._push('jump', hx, hy);
+        return;
+      }
+      const clipped: { path: [number, number][]; closed: boolean }[] = [];
+      let dropped = 0;
+      for (const path of paths) {
+        const closed =
+          Math.hypot(path[0][0] - path[path.length - 1][0], path[0][1] - path[path.length - 1][1]) <
+          0.001;
+        const pieces = closed
+          ? clipClosedPaths(
+              [path.slice(0, -1)],
+              localRegion,
+              armLine,
+              this.effectiveLimits.maxClipVerts,
+            )
+          : clipOpenPaths([path], localRegion, armLine, this.effectiveLimits.maxClipVerts);
+        for (const piece of pieces) {
+          const candidate = closed ? [...piece, piece[0]] : piece;
+          if (pathlen(candidate) < LIMITS.minStitch * 2) dropped++;
+          else clipped.push({ path: candidate, closed });
+        }
+      }
+      if (dropped)
+        this.warnings.push(
+          `${dropped} path fragment${dropped === 1 ? '' : 's'} shorter than 0.8 mm ${dropped === 1 ? 'was' : 'were'} dropped after clipping`,
+        );
+      if (!clipped.length) {
+        this.warnings.push(`custom path fill produced no paths — nothing sewn (line ${armLine})`);
+        return;
+      }
+      if (this.pullComp > 0 && clipped.some((p) => p.closed))
+        this.warnings.push('pullcomp does not widen closed contour rings — open row ends only');
+
+      // Region-based underlay remains identical to a plain fill.
+      const ringArea = (ring: [number, number][]) => {
+        let area = 0;
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i],
+            b = ring[(i + 1) % ring.length];
+          area += a[0] * b[1] - b[0] * a[1];
+        }
+        return Math.abs(area / 2);
+      };
+      const area = Math.max(...rings.map(ringArea));
+      let underlayMode: 'off' | 'tatami' | 'edge' | 'both' = 'off';
+      if (this.fillUnderlayMode === 'auto') underlayMode = area > 100 ? 'both' : 'tatami';
+      else if (this.fillUnderlayMode === 'tatami') underlayMode = 'tatami';
+      else if (this.fillUnderlayMode === 'edge') underlayMode = 'edge';
+      if ((underlayMode === 'edge' || underlayMode === 'both') && area >= 30) {
+        for (const ring of rings) {
+          const inset = this._insetRing(ring, rings, 0.5);
+          if (inset.length) this._emitFillPts(this._subdividePts(inset, 2.5), true);
+        }
+      }
+      if (underlayMode === 'tatami' || underlayMode === 'both') {
+        const underlay = generateFill(rings, {
+          angle: this.fillAngle + 90,
+          spacing: Math.min(this.fillSpacing * 4, 5),
+          stitchLen: 4,
+          endNear,
+          comp: -0.6,
+        });
+        if (this.doubleUnderlay) {
+          const cross = generateFill(rings, {
+            angle: this.fillAngle,
+            spacing: Math.min(this.fillSpacing * 4, 5),
+            stitchLen: 4,
+            endNear,
+            comp: -0.6,
+          });
+          this._emitFillPts(cross, true);
+        }
+        this._emitFillPts(underlay, true);
+      }
+
+      const lengthAt = (si: number, p: [number, number]) => {
+        if (this.fillLenReporter) return this.fillLenReporter(0, 0, si, this._mapFill(p[0], p[1]));
+        if (this.fillLenList)
+          return this.fillLenList[(si + this.fillLenListPhase) % this.fillLenList.length];
+        if (this.fillLen !== null) return this.fillLen;
+        if (this.stitchLenList)
+          return this.stitchLenList[(si + this.stitchLenListPhase) % this.stitchLenList.length];
+        return this.stitchLen;
+      };
+      const all: FillPoint[] = [];
+      let previousLocal: [number, number] | null = null;
+      const connectorInside = (a: [number, number], b: [number, number]) => {
+        if (Math.hypot(b[0] - a[0], b[1] - a[1]) > LIMITS.fillConnectMax) return false;
+        const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        if (
+          !evenOddInside(localRegion, a[0], a[1]) ||
+          !evenOddInside(localRegion, b[0], b[1]) ||
+          !evenOddInside(localRegion, mid[0], mid[1])
+        )
+          return false;
+        for (const ring of localRegion)
+          for (let i = 0; i < ring.length; i++) {
+            const c = ring[i],
+              d = ring[(i + 1) % ring.length];
+            const hit = segisect(a, b, c, d);
+            if (
+              hit &&
+              Math.hypot(hit[0] - a[0], hit[1] - a[1]) > 0.001 &&
+              Math.hypot(hit[0] - b[0], hit[1] - b[1]) > 0.001
+            )
+              return false;
+            if (segdist(mid, c, d) < 0.1) return false;
+          }
+        return true;
+      };
+      for (let row = 0; row < clipped.length; row++) {
+        const local = clipped[row].closed
+          ? clipped[row].path
+          : this._extendForPullComp(clipped[row].path);
+        const hoop = local.map((p) => this._mapFill(p[0], p[1]));
+        const subdivided = this._walkStreamline(
+          hoop,
+          row,
+          0,
+          0,
+          (_x, _y, _r, _v, si) => lengthAt(si, local[Math.min(si, local.length - 1)]),
+          (x, y) => apply(inv, x, y),
+        );
+        const sewConnector = previousLocal ? connectorInside(previousLocal, local[0]) : true;
+        for (let i = 0; i < subdivided.length; i++)
+          all.push({ x: subdivided[i][0], y: subdivided[i][1], jump: i === 0 && !sewConnector });
+        previousLocal = local[local.length - 1];
+      }
+      this._emitFillPts(all, false);
+      const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
+      if (back > 0.6) this._push('jump', hx, hy);
+      return;
+    }
     // effLen: effective fixed stitch length for the built-in tatami path.
     // When fillLenList / fillLenReporter is active the programmable path is
     // used instead (see below), so effLen is only needed for the flat path.
@@ -712,6 +994,7 @@ export class FillMachine extends SatinMachine {
         this.fillArmed = false;
         this.fillDirReporter = null;
         this.fillShapeReporter = null;
+        this.fillArmLine = undefined;
         this.localRings = [];
         this.curLocalRing = null;
       };

@@ -228,6 +228,11 @@ perturbing a precise rail wrecks the column — with a one-time warning.
   programmable fills stay byte-identical to the built-in. Reporters always see **local**
   coordinates (engine-chosen hoop sample points are mapped back through
   `invert(fillCTM)`), while placement runs in physical hoop space.
+- **Custom path fill** — `fill paths @gen|expr` supplies ordered path geometry. At
+  `endFill`, the machine maps the recorded compound region into the fill frame,
+  invokes or reads the frozen generator, clips open/closed paths by even-odd parity,
+  extends open ends for pull compensation, lays normal region underlay, subdivides
+  through the active fill-length form, and sews only short safe connectors.
 
 Extended `filllen`/`stitchlen` list and reporter forms also route a plain fill through
 the programmable generator so the per-row length function is honored (`2448`).

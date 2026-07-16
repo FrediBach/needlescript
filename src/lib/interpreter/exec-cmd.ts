@@ -354,6 +354,30 @@ export function initExecCmdHandler(
     }
     // Every other command is scalar — a string or list argument is a type error.
     const a = vals.map((v) => num(v, st.name, st.line));
+    if (
+      ctx.insideFillGenerator > 0 &&
+      [
+        'fd',
+        'bk',
+        'rt',
+        'lt',
+        'up',
+        'down',
+        'home',
+        'setxy',
+        'setx',
+        'sety',
+        'seth',
+        'arc',
+        'moveto',
+        'gohome',
+        'circle',
+      ].includes(st.name)
+    )
+      ctx.traceNote(
+        'fill-generator-motion',
+        'note: machine commands inside a fill path generator are discarded',
+      );
     switch (st.name) {
       case 'fd':
         ctx.m.forward(a[0]);
@@ -595,6 +619,10 @@ export function initExecCmdHandler(
         ctx.m.trimThread();
         return;
       case 'seed': {
+        if (ctx.insideFillGenerator > 0) {
+          ctx.traceNote('seed', 'note: seed inside a fill path generator has no effect');
+          return;
+        }
         if (ctx.insideTrace > 0)
           throw new NeedlescriptError(
             'reseed outside trace — the random stream escapes the sandbox',

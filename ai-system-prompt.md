@@ -146,6 +146,11 @@ Arms the NEXT beginfill…endfill, replacing the built-in tatami generator; the 
 fill dir @field — direction field: the reporter takes a local point p=[x,y] and returns a turtle heading; the engine integrates evenly-spaced streamlines through the field (contour / grain / flow fills)
 fill shape @texture — stitch shaper: def texture(p, row, v) [ return [spacing, len, phase] ] — spacing mm (>0, sampled once per row), len mm (clamped 1–7, per penetration), brick phase 0..1 (0.5 = standard brick). row = 0-based streamline index, v = 0..1 cross-field position
 fill dir @d shape @s — both channels
+
+fill paths @gen — custom path fill. `gen(rings)` returns a list of paths in the same local frame. The engine preserves path order and owns hole clipping, short in-region connectors, pull compensation of open ends, underlay, subdivision, effects, coverage, and budgets. Exclusive with dir/shape.
+fill paths pathsExpr — static paths, frozen when armed.
+
+Pure helpers: `contourpaths(region, gap)` (closed echo rings), `spiralpath(region, gap)` (open spiral paths), `fillrows(region, spacing, angle)` (tatami row spines), and `closepath(ring)` (repeat first point). A region may be one ring or a list of rings with holes.
 fill @name — shorthand: @name is the direction field
 
 Helper (pure, call-syntax): tatamirow(spacing, len) → [spacing, len, 0.5]; tatamirow(spacing, len, phase)

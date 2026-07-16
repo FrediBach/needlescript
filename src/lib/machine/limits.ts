@@ -18,6 +18,7 @@ export const LIMITS = {
   maxScatterPoints: 20000,
   maxDelaunayPoints: 10000, // voronoi / triangulate / hull / relax input
   maxTraceVertices: 50000, // trace/tracerings vertex cap
+  fillConnectMax: 2.0,
 };
 
 // ---------- Overridable budget limits ----------
