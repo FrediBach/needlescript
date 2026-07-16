@@ -61,6 +61,7 @@ src/
 │   ├── genmath.ts        scalars, vectors, paths & curves (RFC-3, hand-rolled)
 │   ├── generators.ts     Poisson-disc scatter, Voronoi, hull, Lloyd's relax
 │   ├── geometry.ts       Clipper2-backed offset & boolean ops (µm integer coords)
+│   ├── fill-paths.ts     contour, spiral and tatami-row path generators
 │   ├── machine.ts        stitch machine: satin, fills, underlay, limits
 │   ├── postprocess.ts    locks, autotrim, density analysis, stats
 │   ├── dst.ts            Tajima .DST binary encoder
@@ -728,13 +729,14 @@ beginfill
 endfill
 ```
 
-| Command                                   | Effect                                                                                                                                                                                                                                                                                                  |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `beginfill … endfill`                     | moves between them trace a **boundary** instead of sewing; `endfill` sews a tatami fill of the enclosed area. A pen-up move (`up … down`) starts a new ring — inner rings become **holes** (even-odd rule)                                                                                              |
-| `fillangle deg`                           | direction of the fill rows (default 0)                                                                                                                                                                                                                                                                  |
-| `fillspacing mm`                          | row spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                                                                                                                                |
-| `filllen mm`                              | fill stitch length, 1–7 mm. By default the fill follows `stitchlen`; set `filllen` to override, `filllen 0` to follow again. Rows are brick-offset so penetrations don't line up. **Three forms:** `filllen 3` (numeric), `filllen [3, 1.5]` (list, repeating rhythm per row), `filllen @fn` (reporter) |
-| `fill dir @field` / `fill shape @texture` | arms a **programmable fill** for the next `beginfill … endfill`: a reporter drives the row direction (a contour / grain / flow fill) and/or the per-row spacing, length and brick — see _Programmable fills_ below                                                                                      |
+| Command                                     | Effect                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `beginfill … endfill`                       | moves between them trace a **boundary** instead of sewing; `endfill` sews a tatami fill of the enclosed area. A pen-up move (`up … down`) starts a new ring — inner rings become **holes** (even-odd rule)                                                                                              |
+| `fillangle deg`                             | direction of the fill rows (default 0)                                                                                                                                                                                                                                                                  |
+| `fillspacing mm`                            | row spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                                                                                                                                |
+| `filllen mm`                                | fill stitch length, 1–7 mm. By default the fill follows `stitchlen`; set `filllen` to override, `filllen 0` to follow again. Rows are brick-offset so penetrations don't line up. **Three forms:** `filllen 3` (numeric), `filllen [3, 1.5]` (list, repeating rhythm per row), `filllen @fn` (reporter) |
+| `fill dir @field` / `fill shape @texture`   | arms a **programmable fill** for the next `beginfill … endfill`: a reporter drives the row direction (a contour / grain / flow fill) and/or the per-row spacing, length and brick — see _Programmable fills_ below                                                                                      |
+| `fill paths @generator` / `fill paths list` | arms a **custom path fill**: user code supplies ordered path geometry while the engine retains clipping, underlay, pull compensation, stitch subdivision, travel policy, coverage accounting and budgets — see _Custom fill paths_ below                                                                |
 
 ## Generative math
 
@@ -1397,6 +1399,49 @@ beginfill repeat 4 [ fd 50 rt 90 ] endfill
 ```
 
 (See the bundled **custom fill** example — a contour swirl, a noise flow field, a graded-density fill, an adaptive fill that thins where it's already covered, and a curved grain with both channels, side by side.)
+
+### Custom fill paths — `fill paths`
+
+Direction and shape reporters still ask the fill engine to generate rows. `fill paths` goes one level deeper: it lets a reporter return the actual paths to sew while the engine continues to own the structural and physical work around them. This makes contour, spiral, motif and other non-row fills possible without giving up hole clipping, underlay, pull compensation, stitch-length modes, effects, travel handling, coverage accounting or run budgets.
+
+```text
+let gap = 0.8 // [0.4:0.1:2]
+
+def echo(rings) [
+  return contourpaths(rings, gap)
+]
+
+fill paths @echo
+beginfill
+  circle 18
+endfill
+```
+
+The generator runs once at `endfill`. It takes exactly one parameter: the recorded region as a list of implicitly closed rings in the fill's local coordinate frame. It returns a list of paths, each containing at least two finite `[x, y]` points. Paths whose first and last points coincide are closed; use `closepath(ring)` when closure is intended. Returned order is sewing order and is never rearranged.
+
+Two arming forms are available:
+
+| Form                    | Meaning                                                                                                                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fill paths @generator` | call `generator(rings)` at `endfill` in a no-emission sandbox. Deliberate random draws consume the main seeded stream, but turtle, colour and stitch settings are restored |
+| `fill paths pathsExpr`  | evaluate, validate and deep-copy a static list of paths immediately. Later mutation of the source list cannot change the armed fill                                        |
+
+The path channel is exclusive with `fill dir` and `fill shape`, applies to exactly one `endfill`, and can be armed inside loops or procedures. A later arm replaces an unused arm with a note; an arm left unused at program end produces a warning.
+
+Before sewing, every returned path is clipped against the compound region using the even-odd rule, so paths crossing holes are split automatically. Open endpoints receive `pullcomp`; closed contours remain unchanged. The normal region-based `fillunderlay` is sewn first. Short connectors up to 2 mm are sewn only when they stay safely inside the region; other connectors are jumps and continue through normal `autotrim` processing. `fillspacing` does not affect custom geometry, while scalar, list and reporter forms of `filllen`/`stitchlen` still control subdivision.
+
+Four pure Library-tier helpers make common generators concise and can also be used with `sewpath` outside fills:
+
+| Helper                             | Result                                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `contourpaths(region, gap)`        | closed concentric contours, outside-in, beginning half a gap inside the boundary        |
+| `spiralpath(region, gap)`          | those contours spliced into one open inward path per disconnected fragment              |
+| `fillrows(region, spacing, angle)` | the built-in tatami row spines as ordered, unsplit path data, without pull compensation |
+| `closepath(ring)`                  | a copy of the ring with its first point repeated; requires at least three points        |
+
+Region-taking helpers accept either one ring or a list of rings with holes. `fill paths @rows` using `fillrows` is byte-identical to the corresponding built-in tatami fill, including pull compensation and programmable fill-length modes.
+
+See the bundled [`contour fill paths`](examples/intermediate/contour-fill-paths.ns) and [`spiral fill paths`](examples/intermediate/spiral-fill-paths.ns) examples.
 
 ### Programmable stitch splitting — `stitchlen @fn` and `stitchlen [list]`
 
