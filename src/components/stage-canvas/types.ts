@@ -11,6 +11,9 @@ export interface StageCanvasProps {
   scrubPos: number;
   showDensity: boolean;
   hideJumps: boolean;
+  showChalk: boolean;
+  hoveredDataVar?: string | null;
+  pinnedDataVars?: Set<string>;
   warningLoc: WarningLocation | null;
   /** Bounding box of the source line currently hovered in the editor. */
   hoveredLineBounds?: LineStitchBounds | null;
@@ -37,8 +40,8 @@ export interface StageCanvasProps {
 /** A set of rings drawn over the stitches for the staging workspace. */
 export interface CanvasOverlay {
   rings: [number, number][][];
-  /** ghost = faint excluded outline · overlay = source artwork · highlight = selection */
-  kind: 'ghost' | 'overlay' | 'highlight';
+  /** excluded = faint excluded outline · overlay = source artwork · highlight = selection */
+  kind: 'excluded' | 'overlay' | 'highlight';
 }
 
 /** Viewport in mm-space. When null the view auto-fits the hoop. */

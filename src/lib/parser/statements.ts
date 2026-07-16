@@ -542,6 +542,11 @@ export function parseStatement(ctx: ParseContext): ASTNode {
       const args = ctx.parseParenArgsRange('assert', 1, 2, tok.line); // cross-module
       return { k: 'cmd', name: 'assert', args, line: tok.line };
     }
+    if (canonical === 'chalk') {
+      ctx.next();
+      const args = ctx.parseParenArgsRange('chalk', 1, 3, tok.line); // cross-module
+      return { k: 'cmd', name: 'chalk', args, line: tok.line };
+    }
     // trim(x) — fast-reject: trim takes no arguments.
     if (canonical === 'trim') {
       throw new NeedlescriptError(
@@ -664,6 +669,28 @@ export function parseStatement(ctx: ParseContext): ASTNode {
         (nxt.t === 'word' && (ctx.isVariableName(nxt.v as string) || ctx.gluedParenNext(nxt))));
     const args: ExprNode[] = hasLabel ? [ctx.parseExpr()] : []; // cross-module
     return { k: 'cmd', name: 'mark', args, line: tok.line };
+  }
+  // chalk value [label [style]] — trailing arguments must begin
+  // unambiguously so the following statement is never swallowed.
+  if (canonical === 'chalk') {
+    ctx.next();
+    const args: ExprNode[] = [ctx.parseExpr()]; // cross-module
+    const canStartOptional = () => {
+      const nxt = ctx.peek();
+      return (
+        !!nxt &&
+        (nxt.t === 'string' ||
+          nxt.t === 'qword' ||
+          nxt.t === 'var' ||
+          nxt.t === 'num' ||
+          nxt.t === 'pref' ||
+          nxt.t === '(' ||
+          nxt.t === '[' ||
+          (nxt.t === 'word' && (ctx.isVariableName(nxt.v as string) || ctx.gluedParenNext(nxt))))
+      );
+    };
+    while (args.length < 3 && canStartOptional()) args.push(ctx.parseExpr());
+    return { k: 'cmd', name: 'chalk', args, line: tok.line };
   }
   // `fill` arms programmable fill for the next beginfill…endfill (§2). Four
   // surface forms:  fill @d  |  fill dir @d  |  fill shape @s  |

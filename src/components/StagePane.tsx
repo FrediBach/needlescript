@@ -20,8 +20,11 @@ interface Props {
   hoveredLineBounds: LineStitchBounds | null;
   showDensity: boolean;
   onToggleDensity: () => void;
+  chalkControl: { visible: boolean; toggle: () => void };
   hideJumps: boolean;
   onToggleHideJumps: () => void;
+  hoveredDataVar?: string | null;
+  pinnedDataVars?: Set<string>;
   // ── XY handle props ───────────────────────────────────────────────────────
   pointParams?: PointParamDef[];
   showHandles?: boolean;
@@ -94,8 +97,11 @@ export default function StagePane({
   hoveredLineBounds,
   showDensity,
   onToggleDensity,
+  chalkControl,
   hideJumps,
   onToggleHideJumps,
+  hoveredDataVar,
+  pinnedDataVars,
   pointParams,
   showHandles = true,
   onToggleHandles,
@@ -119,6 +125,9 @@ export default function StagePane({
           scrubPos={scrubPos}
           showDensity={showDensity}
           hideJumps={hideJumps}
+          showChalk={chalkControl.visible}
+          hoveredDataVar={hoveredDataVar}
+          pinnedDataVars={pinnedDataVars}
           warningLoc={warningLoc}
           hoveredLineBounds={hoveredLineBounds}
           pointParams={pointParams}
@@ -137,6 +146,14 @@ export default function StagePane({
             label="jumps"
             title="Hide jump threads for a cleaner preview"
           />
+          {(design.chalk.length > 0 || design.dataVars.length > 0) && (
+            <CanvasSwitch
+              checked={chalkControl.visible}
+              onCheckedChange={chalkControl.toggle}
+              label={`chalk · ${design.chalk.length}`}
+              title="Toggle removable chalk guides"
+            />
+          )}
           <CanvasSwitch
             checked={showDensity}
             onCheckedChange={onToggleDensity}

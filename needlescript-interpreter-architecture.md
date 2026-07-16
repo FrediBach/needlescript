@@ -90,6 +90,9 @@ state from it and installs its functions onto it.
 | Field               | Purpose                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------ |
 | `globals`           | top-level variable bindings (`Record<string, Val>`)                                  |
+| `globalLines`       | first assignment/declaration line for each global, used by the Data inspector        |
+| `chalk`             | preview-only affine-mapped snapshots plus their raw event-stream anchors             |
+| `chalkVertices`     | run-total vertex counter for the dedicated preview budget                            |
 | `procs`             | procedure name → its `to` AST node (populated as `to` statements execute)            |
 | `rng`               | main PRNG stream; reassigned by `seed`                                               |
 | `noise`             | legacy coherent noise; reassigned by `seed`                                          |
@@ -223,6 +226,8 @@ and turtle commands:
   not inside `trace`, and before the first stitch. `override` mutates
   `ctx.m.effectiveLimits[budgetKey]` within `OVERRIDE_FLOORS`/`OVERRIDE_CEILINGS`.
 - **`mark`** — records a labelled position marker.
+- **`chalk`** — validates point/path/group data through `chalk.ts`, snapshots and
+  affine-maps it without touching machine output, RNG, turtle, satin, or history.
 - **Scalar turtle/machine commands** — the final `switch` after
   `vals.map(v => num(...))`: `fd`, `bk`, `rt`, `lt`, `up`, `down`, `home`, `setxy`,
   `arc`, `moveto`, `circle`, `push`/`pop`, plus the embroidery-parameter setters
@@ -440,17 +445,22 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    (`index.ts:163-203`).
 6. **Override-raise warnings** — one per raised budget, emitted every run
    (`index.ts:206-241`).
-7. **Assemble `RunResult`** (`index.ts:250-260`): `events`, `warnings`,
+7. **Finalize preview data**: translate each chalk command's raw event-stream offset
+   to the stitch/jump playback index, and classify/snapshot chalkable final globals.
+8. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
    `warningLocations`, `printed`, `locks`, `density`, `activeHoop`, `activeOverrides`,
-   `globals` (the top-level variable bindings), and optional `plan` statistics.
+   `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional
+   `plan` statistics.
 
 The load-bearing finalize order is `flush → plan → autotrim → density → locks`.
 Planning therefore prevents unnecessary automatic cuts, while locks see only final
 run boundaries. The live density grid and history queries intentionally remain in
 program order; density accumulation is order-independent.
 
-The `RunResult` shape is defined in `types.ts:76-89`; downstream, the exporters
+The `RunResult` shape is defined in `types.ts`; downstream, the exporters
 (`svg.ts`, `dst.ts`, `pes.ts`, `exp.ts`) consume `events` to produce files.
+Because chalk never enters `events`, machine-export inertness is structural rather
+than an exporter filtering rule.
 
 ---
 

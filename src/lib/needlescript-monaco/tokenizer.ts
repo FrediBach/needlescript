@@ -131,6 +131,7 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'print',
       'printloc',
       'mark',
+      'chalk',
       'assert',
     ],
 

@@ -237,7 +237,7 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
   //   • [ … ]  blocks — for repeat/if/while/for/def/transform bodies
   //   • to … end  blocks — classic Logo procedure definitions
   // Comments are stripped from each line before scanning, so brackets
-  // inside // # ; comments do not produce ghost fold regions.
+  // inside // # ; comments do not produce stray fold regions.
   monaco.languages.registerFoldingRangeProvider('needlescript', {
     provideFoldingRanges(model: MonacoEditor.ITextModel) {
       const lineCount = model.getLineCount();

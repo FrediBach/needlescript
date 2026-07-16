@@ -1,6 +1,17 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronUp, Shuffle, Lock, LockOpen, Copy, Crosshair } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Shuffle,
+  Lock,
+  LockOpen,
+  Copy,
+  Crosshair,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
+import type { ChalkDataVar } from '../lib/engine.ts';
 import {
   parseParameters,
   parsePresets,
@@ -40,6 +51,11 @@ interface Props {
   onHighlightHandle?: (name: string | null) => void;
   /** Which handle the stage is currently highlighting (from stage hover → back to panel) */
   highlightedHandle?: string | null;
+  dataVars: ChalkDataVar[];
+  pinnedDataVars: Set<string>;
+  onTogglePinnedDataVar: (name: string) => void;
+  onHoverDataVar: (name: string | null) => void;
+  onRevealLine: (line: number) => void;
 }
 
 // ── Section separator ────────────────────────────────────────────────────────
@@ -50,6 +66,74 @@ function SectionHeader({ title }: { title: string }) {
       <span className={styles.sectionLine} />
       <span className={styles.sectionTitle}>{title}</span>
       <span className={styles.sectionLine} />
+    </div>
+  );
+}
+
+function dataSummary(value: ChalkDataVar): string {
+  if (value.kind === 'point') {
+    const [x, y] = value.strokes[0].vertices[0];
+    return `point · [${formatPointCoord(x)}, ${formatPointCoord(y)}]`;
+  }
+  if (value.kind === 'path')
+    return `path · ${value.vertexCount.toLocaleString()} pts · ${(value.pathLength ?? 0).toFixed(1)} mm`;
+  const noun = value.pathCount === 1 ? 'path' : 'paths';
+  return `${value.kind} · ${value.pathCount} ${noun} · ${value.vertexCount.toLocaleString()} pts`;
+}
+
+function DataRow({
+  value,
+  pinned,
+  onTogglePin,
+  onHover,
+  onLocate,
+  onRevealLine,
+}: {
+  value: ChalkDataVar;
+  pinned: boolean;
+  onTogglePin: () => void;
+  onHover: (name: string | null) => void;
+  onLocate: (name: string) => void;
+  onRevealLine: (line: number) => void;
+}) {
+  return (
+    <div
+      className={cn(styles.dataRow, pinned && styles.dataRowPinned)}
+      onMouseEnter={() => onHover(value.name)}
+      onMouseLeave={() => onHover(null)}
+    >
+      <button
+        className={styles.dataIdentity}
+        type="button"
+        onClick={() => value.declarationLine && onRevealLine(value.declarationLine)}
+        title={
+          value.declarationLine
+            ? `Show ${value.name} declaration on line ${value.declarationLine}`
+            : value.name
+        }
+      >
+        <span className={styles.dataName}>{value.name}</span>
+        <span className={styles.dataSummary}>{dataSummary(value)}</span>
+      </button>
+      <button
+        className={styles.dataAction}
+        type="button"
+        onClick={() => onLocate(value.name)}
+        title={`Flash ${value.name} on the stage`}
+        aria-label={`Locate ${value.name}`}
+      >
+        <Crosshair size={12} aria-hidden="true" />
+      </button>
+      <button
+        className={cn(styles.dataAction, pinned && styles.dataActionPinned)}
+        type="button"
+        onClick={onTogglePin}
+        title={pinned ? `Unpin ${value.name}` : `Keep ${value.name} on the stage`}
+        aria-label={pinned ? `Unpin ${value.name}` : `Pin ${value.name}`}
+        aria-pressed={pinned}
+      >
+        {pinned ? <Eye size={12} aria-hidden="true" /> : <EyeOff size={12} aria-hidden="true" />}
+      </button>
     </div>
   );
 }
@@ -392,12 +476,25 @@ export default function ParametersPanel({
   onToggleLock,
   onHighlightHandle,
   highlightedHandle,
+  dataVars,
+  pinnedDataVars,
+  onTogglePinnedDataVar,
+  onHoverDataVar,
+  onRevealLine,
 }: Props) {
   const items = useMemo(() => parseParameters(source), [source]);
   const presets = useMemo(() => parsePresets(source), [source]);
   const paramCount = items.filter(
     (i) => i.kind === 'param' || i.kind === 'point' || i.kind === 'text',
   ).length;
+  const pointParamNames = new Set(
+    items
+      .filter((item): item is Extract<ParamItem, { kind: 'point' }> => item.kind === 'point')
+      .map((item) => item.def.name),
+  );
+  const inspectableData = dataVars.filter(
+    (value) => !(value.kind === 'point' && pointParamNames.has(value.name)),
+  );
 
   const [open, setOpen] = useState(true);
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -415,6 +512,18 @@ export default function ParametersPanel({
       }, 1500);
     },
     [onHighlightHandle],
+  );
+
+  const handleLocateData = useCallback(
+    (name: string) => {
+      if (locateTimerRef.current) clearTimeout(locateTimerRef.current);
+      onHoverDataVar(name);
+      locateTimerRef.current = setTimeout(() => {
+        onHoverDataVar(null);
+        locateTimerRef.current = null;
+      }, 1500);
+    },
+    [onHoverDataVar],
   );
 
   useEffect(() => {
@@ -528,10 +637,13 @@ export default function ParametersPanel({
   // ── Header context menu (right-click → "Copy as preset") ────────────────
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY });
-  }, []);
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setContextMenu({ x: e.clientX, y: e.clientY });
+    },
+    [setContextMenu],
+  );
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -558,7 +670,7 @@ export default function ParametersPanel({
     if (paramCount === 0) hadParamsRef.current = false;
   }, [paramCount]);
 
-  if (paramCount === 0) return null;
+  if (paramCount === 0 && inspectableData.length === 0) return null;
 
   return (
     <div className={styles.panel} role="region" aria-label="Parameters">
@@ -570,8 +682,8 @@ export default function ParametersPanel({
           aria-expanded={open}
           type="button"
         >
-          <span className={styles.headerLabel}>Parameters</span>
-          <span className={styles.paramCount}>{paramCount}</span>
+          <span className={styles.headerLabel}>Parameters &amp; Data</span>
+          <span className={styles.paramCount}>{paramCount + inspectableData.length}</span>
           <span className={styles.headerSpacer} />
           {open ? (
             <ChevronUp size={12} aria-hidden="true" />
@@ -579,15 +691,17 @@ export default function ParametersPanel({
             <ChevronDown size={12} aria-hidden="true" />
           )}
         </button>
-        <button
-          className={styles.randomizeBtn}
-          onClick={handleRandomize}
-          type="button"
-          title="Randomize all parameters"
-          aria-label="Randomize all parameters"
-        >
-          <Shuffle size={11} aria-hidden="true" />
-        </button>
+        {paramCount > 0 && (
+          <button
+            className={styles.randomizeBtn}
+            onClick={handleRandomize}
+            type="button"
+            title="Randomize all parameters"
+            aria-label="Randomize all parameters"
+          >
+            <Shuffle size={11} aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {/* ── Preset bar ──────────────────────────────────────────────── */}
@@ -676,6 +790,28 @@ export default function ParametersPanel({
               />
             );
           })}
+          {inspectableData.length > 0 && (
+            <>
+              <SectionHeader title="Data · final values" />
+              <div
+                className={styles.dataHint}
+                title="These are end-of-run snapshots. Use chalk in code to inspect an earlier value."
+              >
+                Hover to chalk · pin to keep
+              </div>
+              {inspectableData.map((value) => (
+                <DataRow
+                  key={value.name}
+                  value={value}
+                  pinned={pinnedDataVars.has(value.name)}
+                  onTogglePin={() => onTogglePinnedDataVar(value.name)}
+                  onHover={onHoverDataVar}
+                  onLocate={handleLocateData}
+                  onRevealLine={onRevealLine}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
 

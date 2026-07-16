@@ -37,6 +37,10 @@ export type {
   HoopInfo,
   OverrideKey,
   TravelPlanStats,
+  ChalkStyle,
+  ChalkStroke,
+  ChalkEvent,
+  ChalkDataVar,
 } from './types.ts';
 export { NeedlescriptError } from './errors.ts';
 export { makeRNG, makeNoise, fork, gauss } from './prng.ts';

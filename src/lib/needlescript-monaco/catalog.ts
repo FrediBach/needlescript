@@ -810,9 +810,9 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'raise or lower a run-envelope budget',
     documentation:
-      "Raise (with a warning) or lower (with an info note) a run-envelope budget.\n\n**Keys and stock values:**\n| Key | Stock | Ceiling |\n|---|---|---|\n| `'stitches'` | 100,000 | 250,000 |\n| `'ops'` | 10,000,000 | 50,000,000 |\n| `'calldepth'` | 200 | 2,000 |\n| `'loopiters'` | 200,000 | 5,000,000 |\n| `'listlen'` | 100,000 | 1,000,000 |\n| `'listcells'` | 1,000,000 | 8,000,000 |\n| `'stringlen'` | 10,000 | 1,000,000 |\n| `'stringtotal'` | 1,000,000 | 20,000,000 |\n| `'scatterpoints'` | 20,000 | 100,000 |\n| `'geoinput'` | 10,000 | 50,000 |\n| `'clipverts'` | 50,000 | 250,000 |\n\nMust be at the top of the program, before any stitches.\n\n```\nhoop '6x10'\noverride 'stitches' 120000\n```",
+      "Raise (with a warning) or lower (with an info note) a run-envelope budget.\n\n**Keys and stock values:**\n| Key | Stock | Ceiling |\n|---|---|---|\n| `'stitches'` | 100,000 | 250,000 |\n| `'ops'` | 10,000,000 | 50,000,000 |\n| `'calldepth'` | 200 | 2,000 |\n| `'loopiters'` | 200,000 | 5,000,000 |\n| `'listlen'` | 100,000 | 1,000,000 |\n| `'listcells'` | 1,000,000 | 8,000,000 |\n| `'stringlen'` | 10,000 | 1,000,000 |\n| `'stringtotal'` | 1,000,000 | 20,000,000 |\n| `'scatterpoints'` | 20,000 | 100,000 |\n| `'geoinput'` | 10,000 | 50,000 |\n| `'clipverts'` | 50,000 | 250,000 |\n| `'chalks'` | 2,000 | 20,000 |\n| `'chalkverts'` | 200,000 | 2,000,000 |\n\nMust be at the top of the program, before any stitches.\n\n```\nhoop '6x10'\noverride 'stitches' 120000\n```",
     insertText:
-      "override '${1|stitches,ops,calldepth,loopiters,listlen,listcells,stringlen,stringtotal,scatterpoints,geoinput,clipverts|}' ${2:value}",
+      "override '${1|stitches,ops,calldepth,loopiters,listlen,listcells,stringlen,stringtotal,scatterpoints,geoinput,clipverts,chalks,chalkverts|}' ${2:value}",
     isSnippet: true,
   },
   {
@@ -886,6 +886,16 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       "Drop a numbered pin on the preview at the needle position. Optional string label shown instead of the pin number.\n\n```\nmark         // numbered pin\nmark 'rose'  // labelled pin\n```\n\nNever exported to the machine or counted in stats.",
     insertText: 'mark',
+  },
+  {
+    label: 'chalk',
+    kindName: 'function',
+    detail: 'preview path data without sewing',
+    documentation:
+      "Draw a point, path, or group of paths as a removable tailor's-chalk guide on the preview. It does not sew, move the needle, consume random draws, affect coverage, or enter machine exports.\n\n```\nchalk points\nchalk spine 'satin guide'\nchalk seeds 'layout' 'dots'\n```\n\nStyles: `'auto'`, `'dots'`, `'line'`.",
+    insertText: "chalk ${1:value} '${2:label}'",
+    isSnippet: true,
+    params: [['value', 'label', 'style']],
   },
   {
     label: 'assert',

@@ -2000,7 +2000,7 @@ The last family of gotchas has nothing to do with topology — the geometry is r
 
 **Too much.** Coverage is measured in layers, and past roughly 2.5–3.5 the patch stops behaving like fabric. Parity mistakes from §25.3 (a hole filled solid, then filled again) show up here first — the density heatmap is your parity debugger as much as your physics one. Some constructions legitimately run hot (a satin border over a fill edge is ~4 layers); the right move is raising `maxdensity` _knowingly_, not silencing warnings you don't understand.
 
-**Out of order.** A satin column is buffered while you draw it and sewn — underlay first — when it _ends_ (pen up, mode change, colour change, trim, or end of program). If a colour change or a coverage query (`coverat`) seems to ignore the column you "just sewed", it hasn't flushed yet: end it (`satin 0`) and the world catches up. Relatedly, `humanize` and `snaptogrid` deliberately skip satin columns — jittering a precise rail wrecks it — so don't chase a "why isn't my satin jittered" ghost.
+**Out of order.** A satin column is buffered while you draw it and sewn — underlay first — when it _ends_ (pen up, mode change, colour change, trim, or end of program). If a colour change or a coverage query (`coverat`) seems to ignore the column you "just sewed", it hasn't flushed yet: end it (`satin 0`) and the world catches up. Relatedly, `humanize` and `snaptogrid` deliberately skip satin columns — jittering a precise rail wrecks it — so don't chase a nonexistent satin-jitter bug.
 
 ### A pre-flight checklist
 

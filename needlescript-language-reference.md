@@ -712,6 +712,8 @@ Adjusts a run-envelope budget. Top of program (with `hoop`), before any stitch, 
 | `'scatterpoints'` | 20,000     | 100,000    | Poisson-disc blowup                          |
 | `'geoinput'`      | 10,000     | 50,000     | `voronoi`/`triangulate`/`hull`/`relax` input |
 | `'clipverts'`     | 50,000     | 250,000    | `offsetpath`/`clippaths` input               |
+| `'chalks'`        | 2,000      | 20,000     | runaway preview-overlay calls                |
+| `'chalkverts'`    | 200,000    | 2,000,000  | preview-overlay memory and rendering work    |
 
 ### Fixed physics/format limits (never overridable)
 
@@ -798,10 +800,25 @@ Contract: zero RNG draws, zero emission — branching on them keeps determinism.
 | `print(v1, v2, …)`             | variadic; concatenates renderings with no separator                                      |
 | `printloc` / `printloc "label` | log the needle's local-frame position (what `pos()` returns)                             |
 | `mark` / `mark 'label'`        | drop a (optionally labelled) pin on the preview at the needle; never exported or counted |
+| `chalk value [label [style]]`  | preview point/path data as removable tailor's-chalk marks; never sewn or exported        |
 | `assert cond`                  | stop with a line-numbered error if false                                                 |
 | `assert(cond, message)`        | with a message string, evaluated only on failure                                         |
 
 Parse-time checks and diagnostics: reporter-path check (a `@name` / expression-position procedure that may miss `return` is rejected at parse time, naming the procedure), did-you-mean suggestions across all namespaces, glued-bracket hints, kind-aware rejections. Non-fatal issues (clamps, merged tiny stitches, unclosed fills, hoop overflow, density) surface as warnings.
+
+`chalk` accepts a point `[x, y]`, an ordered path, or a mixed list of points and paths.
+The optional styles are `'auto'` (line plus vertices), `'dots'`, and `'line'`.
+It snapshots at the call, maps through the current affine transform, and records the
+current playback position. It never enters the stitch stream, advances the turtle,
+flushes satin, consumes RNG draws, affects stitch history/density/planning, or appears
+in a machine export. Argument expressions still evaluate normally. Nonlinear `warp`
+and penetration effects are not applied; preview their pure path counterparts instead.
+Inside `trace` and fill/reporting callbacks, `chalk` remains active.
+
+The playground's Data section lists final chalkable top-level values (except points
+already represented by `[xy]` handles). Hovering draws a transient chalk guide;
+pinning keeps it across recompiles. This inspector is an end-of-run snapshot—use an
+in-code `chalk` statement for intermediate mutation states or local transform frames.
 
 ---
 

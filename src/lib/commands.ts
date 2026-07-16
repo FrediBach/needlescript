@@ -74,6 +74,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
   print: 1,
   printloc: 0,
   // mark, assert handled specially in the parser (optional/variadic args)
+  // chalk is also special-cased (one required + two optional arguments)
   // fabric, underlay, fillunderlay handled specially (string mode args)
   fabric: 1,
   underlay: 1,
@@ -421,5 +422,6 @@ export const RESERVED = new Set<string>([
   ...Object.keys(FUNC_ARITY),
   // Special-cased commands (not in BUILTIN_ARITY but still Core):
   'mark',
+  'chalk',
   'assert',
 ]);

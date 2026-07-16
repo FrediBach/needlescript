@@ -18,9 +18,11 @@ describe('override key validation', () => {
     'scatterpoints',
     'geoinput',
     'clipverts',
+    'chalks',
+    'chalkverts',
   ] as const;
 
-  it('accepts all 11 valid keys without error', () => {
+  it('accepts all 13 valid keys without error', () => {
     for (const key of VALID_KEYS) {
       const stock = (STOCK_LIMITS as Record<string, number>)[
         (
@@ -36,6 +38,8 @@ describe('override key validation', () => {
             scatterpoints: 'maxScatterPoints',
             geoinput: 'maxDelaunayPoints',
             clipverts: 'maxClipVerts',
+            chalks: 'maxChalks',
+            chalkverts: 'maxChalkVerts',
           } as Record<string, string>
         )[key]
       ];

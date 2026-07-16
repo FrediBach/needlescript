@@ -466,7 +466,7 @@ _Goal: fluency in the data world and its two-way border with sewing. Existing §
 - 33.3 Safety story: hoop/density/long-stitch checks run on the _warped_ result
 - 33.4 **`humanize amount`:** coherent (not per-stitch) jitter; forks — costs one draw; same seed, same imperfections
 - 33.5 **`snaptogrid cell …`:** frame-invariance (the lattice belongs to the fabric); rectangular/offset/rotated arities; cross-stitch aesthetics; merge warnings on coarse grids
-- 33.6 Satin exemptions: humanize/snaptogrid skip satin columns (and warn once) — don't chase that ghost
+- 33.6 Satin exemptions: humanize/snaptogrid skip satin columns (and warn once) — don't chase a nonexistent bug
 - 33.7 Path twins: `warppath`/`humanizepath`/`snappath` — effects as pure functions in pipelines
 - **Interactive:** shader gallery `<Param>` (pick a warp, tune its coefficients); cross-stitch converter cell.
 - **Checkpoint:** write a custom warp reporter passing a "stays in hoop" assertion battery.

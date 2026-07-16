@@ -31,7 +31,7 @@ The #1 trap is `step` (it is the for-loop keyword: `for i = 0 to 10 step 2`). In
 
 Built-in names come in two tiers:
 
-- **Core tier** (movement, stitching, control flow, transforms, effects, `fill`/`satin`, `@` references): redefining is a hard parse error. `circle`, `scale`, `rotate`, `translate`, `transform`, `warp`, `color`, `heading`, `pos`, `trace`, `random`, `distance` … are all off-limits.
+- **Core tier** (movement, stitching, control flow, transforms, effects, `fill`/`satin`, `chalk`, `@` references): redefining is a hard parse error. `circle`, `scale`, `rotate`, `translate`, `transform`, `warp`, `color`, `heading`, `pos`, `trace`, `random`, `distance` … are all off-limits.
 - **Library tier** (list / generative-math / string / stitch-history functions like `clamp`, `sort`, `vlen`, `str`): a user procedure technically shadows them with a console note, and variables may reuse them. **Do not do this anyway** — it confuses readers and downstream edits.
 
 Frequent collisions and safe alternatives:
@@ -375,6 +375,7 @@ override 'key' N — raise (warns every run) or lower (info note) a budget. Keys
 'loopiters' (200k→5M) 'listlen' (100k→1M) 'listcells' (1M→8M)
 'stringlen' (10k→1M) 'stringtotal' (1M→20M)
 'scatterpoints' (20k→100k) 'geoinput' (10k→50k) 'clipverts' (50k→250k)
+'chalks' (2k→20k) 'chalkverts' (200k→2M)
 // A large hoop does NOT auto-raise 'stitches'. Override only when the user explicitly asks for
 // scale — prefer reducing fill density/coverage first.
 
@@ -461,6 +462,8 @@ print expr / print "label expr / print('part: ', i, ' of ', total) — variadic 
 printloc / printloc "label — log the needle's local-frame position: loc: [12.5, -3.0]
 assert cond / assert(cond, 'message') — stop with a line-numbered error; message evaluated only on failure
 mark / mark 'label' — drop a labelled pin on the preview at the needle (never exported or counted)
+chalk value / chalk value 'label' / chalk value 'label' 'dots' — preview a point, path, or point/path group as removable tailor's-chalk marks. Styles: 'auto', 'dots', 'line'. Snapshots now, maps through the current affine transform, and records playback position. Never sews, moves, consumes RNG draws, flushes satin, affects history/density/planning, or enters machine exports. Argument expressions still evaluate normally. Active inside trace/fill reporters. For warped/effected geometry, chalk the pure *path result.
+// The playground Data inspector also exposes final top-level chalkable values on hover/pin.
 
 ## Parameter annotations (optional — expose variables as live UI controls)
 
@@ -490,6 +493,7 @@ Overflow warning fires when a stitch lands outside the field.
 // Computational budgets — adjustable with `override` (see Hoop section):
 Max stitches: 100,000 (ceiling 250k) · Max ops: 10,000,000 · Max call depth: 200
 Max loop iterations: 200,000 · Max scatter output: 20,000 points
+Max chalk overlays: 2,000 · Max chalk vertices: 200,000
 
 ## Embroidery best practices
 

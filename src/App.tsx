@@ -16,6 +16,8 @@ import type {
   WarningLocation,
   HoopInfo,
   OverrideKey,
+  ChalkEvent,
+  ChalkDataVar,
 } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
 import { toDST } from './lib/dst.ts';
@@ -90,6 +92,8 @@ export interface DesignState {
   activeHoop?: HoopInfo;
   /** Set by any `override` directive; undefined = all stock limits. */
   activeOverrides?: Partial<Record<OverrideKey, number>>;
+  chalk: ChalkEvent[];
+  dataVars: ChalkDataVar[];
 }
 
 export interface ConsoleMessage {
@@ -106,6 +110,8 @@ const INITIAL_DESIGN: DesignState = {
   density: null,
   stats: null,
   warnings: [],
+  chalk: [],
+  dataVars: [],
   name: 'bloom',
   ok: false,
 };
@@ -174,6 +180,7 @@ export default function App() {
   const [selectedHoop, setSelectedHoop] = useState<HoopConfig>(DEFAULT_HOOP);
   const [showHoopDialog, setShowHoopDialog] = useState(false);
   const [showDensity, setShowDensity] = useState(false);
+  const [showChalk, setShowChalk] = useState(true);
   const [hideJumps, setHideJumps] = useState(false);
   const [showReference, setShowReference] = useState(false);
   const [machineContextMenu, setMachineContextMenu] = useState<{
@@ -256,6 +263,8 @@ export default function App() {
 
   // ── Highlighted handle (panel hover ↔ stage) ─────────────────────────────
   const [highlightedHandle, setHighlightedHandle] = useState<string | null>(null);
+  const [hoveredDataVar, setHoveredDataVar] = useState<string | null>(null);
+  const [pinnedDataVars, setPinnedDataVars] = useState<Set<string>>(() => new Set());
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleHighlightHandle = useCallback((name: string | null) => {
@@ -264,6 +273,15 @@ export default function App() {
       highlightTimerRef.current = null;
     }
     setHighlightedHandle(name);
+  }, []);
+
+  const togglePinnedDataVar = useCallback((name: string) => {
+    setPinnedDataVars((previous) => {
+      const next = new Set(previous);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
   }, []);
 
   // ── Point params derived from source (for stage handles) ─────────────────
@@ -371,6 +389,8 @@ export default function App() {
         ok: true,
         activeHoop: result.activeHoop,
         activeOverrides: result.activeOverrides,
+        chalk: result.chalk ?? [],
+        dataVars: result.dataVars ?? [],
       };
       setErrorMarkers([]);
       lastErrorRef.current = null;
@@ -791,6 +811,10 @@ export default function App() {
           onToggleLock={toggleLock}
           onHighlightHandle={handleHighlightHandle}
           highlightedHandle={highlightedHandle}
+          dataVars={design.dataVars}
+          pinnedDataVars={pinnedDataVars}
+          onTogglePinnedDataVar={togglePinnedDataVar}
+          onHoverDataVar={setHoveredDataVar}
           onMachineContextMenu={(x, y, editorActions) =>
             setMachineContextMenu({ x, y, editorActions })
           }
@@ -812,6 +836,12 @@ export default function App() {
           hideJumps={hideJumps}
           onToggleHideJumps={() => setHideJumps((v) => !v)}
           pointParams={pointParamDefs}
+          chalkControl={{
+            visible: showChalk,
+            toggle: () => setShowChalk((value) => !value),
+          }}
+          hoveredDataVar={hoveredDataVar}
+          pinnedDataVars={pinnedDataVars}
           showHandles={showHandles}
           onToggleHandles={() => setShowHandles((v) => !v)}
           highlightedHandle={highlightedHandle}

@@ -49,7 +49,7 @@ export default function PreviewPane({
     if (showSkipped) {
       for (const el of doc.elements) {
         if ((!el.include || el.strategy.kind === 'skip') && el.rings.length)
-          out.push({ rings: el.rings, kind: 'ghost' });
+          out.push({ rings: el.rings, kind: 'excluded' });
       }
     }
     for (const el of doc.elements) {
@@ -76,6 +76,7 @@ export default function PreviewPane({
         scrubPos={design.pts.length}
         showDensity={showDensity}
         hideJumps={hideJumps}
+        showChalk={false}
         warningLoc={null}
         overlays={overlays}
         onPick={handlePick}
@@ -91,7 +92,7 @@ export default function PreviewPane({
           label="skipped"
           pressed={showSkipped}
           onPressed={onToggleSkipped}
-          tip="Ghost excluded elements as faint outlines"
+          tip="Show excluded elements as faint outlines"
         />
         <ToggleBtn
           label="source"

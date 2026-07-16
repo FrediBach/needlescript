@@ -1,4 +1,4 @@
-import type { ASTNode, ExprNode } from '../types.ts';
+import type { ASTNode, ChalkEvent, ExprNode } from '../types.ts';
 import type { PlanMode } from '../travel-planner.ts';
 import type { Machine } from '../machine.ts';
 import type { Val, NsList, FuncRef, ComposedRef } from '../list.ts';
@@ -15,6 +15,9 @@ export type Env = Record<string, Val> | null;
 export interface RunContext {
   // ---- mutable closure state ----
   globals: Record<string, Val>;
+  globalLines: Record<string, number>;
+  chalk: Array<ChalkEvent & { eventIndexAtEmit: number }>;
+  chalkVertices: number;
   procs: Record<string, ASTNode & { k: 'to' }>;
   /** Main PRNG stream — reassigned by `seed`. */
   rng: () => number;

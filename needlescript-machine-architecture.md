@@ -289,7 +289,8 @@ Two tables (`machine/limits.ts`):
   (they protect the machine and fabric).
 - **`STOCK_LIMITS`** — the per-run _computational_ budgets: `maxStitches`, `maxOps`,
   `maxCallDepth`, `maxLoopIters`, `maxListLen`/`maxListCells`, string budgets, and
-  generator input caps. `BudgetKey` is the union of these keys.
+  generator input caps, plus `maxChalks`/`maxChalkVerts` for the interpreter-owned
+  preview side channel. `BudgetKey` is the union of these keys.
 
 The `override` directive can move any budget within `OVERRIDE_FLOORS[key]` …
 `OVERRIDE_CEILINGS[key]`, mutating the machine's `effectiveLimits`. Stitch-count

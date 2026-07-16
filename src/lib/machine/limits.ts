@@ -39,6 +39,8 @@ export const STOCK_LIMITS = {
   maxScatterPoints: LIMITS.maxScatterPoints,
   maxDelaunayPoints: LIMITS.maxDelaunayPoints,
   maxClipVerts: 50000, // offsetpath / clippaths (separate from maxTraceVertices)
+  maxChalks: 2000,
+  maxChalkVerts: 200000,
 } as const;
 
 export type BudgetKey = keyof typeof STOCK_LIMITS;
@@ -56,6 +58,8 @@ export const OVERRIDE_CEILINGS: Record<BudgetKey, number> = {
   maxScatterPoints: 100000,
   maxDelaunayPoints: 50000,
   maxClipVerts: 250000,
+  maxChalks: 20000,
+  maxChalkVerts: 2000000,
 };
 
 /** Minimum each budget limit may be lowered to via `override`. */
@@ -71,4 +75,6 @@ export const OVERRIDE_FLOORS: Record<BudgetKey, number> = {
   maxScatterPoints: 100,
   maxDelaunayPoints: 100,
   maxClipVerts: 1000,
+  maxChalks: 10,
+  maxChalkVerts: 1000,
 };

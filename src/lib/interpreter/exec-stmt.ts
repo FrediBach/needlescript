@@ -107,7 +107,10 @@ export function initExecStmt(ctx: RunContext): void {
       case 'make': {
         const v = ctx.evalExpr(st.value, env, repcount, depth);
         if (env && st.name in env) env[st.name] = v;
-        else ctx.globals[st.name] = v;
+        else {
+          ctx.globals[st.name] = v;
+          ctx.globalLines[st.name] ??= st.line;
+        }
         return;
       }
       case 'local': {
@@ -135,6 +138,7 @@ export function initExecStmt(ctx: RunContext): void {
         const scope = st.isLocal && env ? env : ctx.globals;
         st.names.forEach((n, i) => {
           scope[n] = v.items[i];
+          if (scope === ctx.globals) ctx.globalLines[n] ??= st.line;
         });
         return;
       }

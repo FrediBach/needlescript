@@ -1,6 +1,6 @@
 // ---------- Interpreter ----------
 
-import type { RunOptions, RunResult, WarningLocation } from '../types.ts';
+import type { ChalkEvent, RunOptions, RunResult, WarningLocation } from '../types.ts';
 import type { OverrideKey } from '../types.ts';
 import { Machine, STOCK_LIMITS } from '../machine.ts';
 import type { BudgetKey } from '../machine.ts';
@@ -28,6 +28,7 @@ import { initEvalExpr } from './eval-expr.ts';
 import { initProcCall } from './proc-call.ts';
 import { initReporters } from './reporters.ts';
 import { initExecStmt } from './exec-stmt.ts';
+import { inspectChalkValue } from '../chalk.ts';
 
 export function run(source: string, opts: RunOptions = {}): RunResult {
   const tokens = tokenize(source);
@@ -41,6 +42,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   // Build the shared context object. All modules close over this.
   const ctx = {
     globals: Object.create(null) as Record<string, Val>,
+    globalLines: Object.create(null) as Record<string, number>,
+    chalk: [] as RunContext['chalk'],
+    chalkVertices: 0,
     procs: Object.create(null) as Record<string, ASTNode & { k: 'to' }>,
     rng: makeRNG(seed0),
     noise: makeNoise(seed0),
@@ -93,6 +97,28 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   }
 
   m.flushSatin();
+  // Convert source-stream event offsets to the stitch/jump index used by playback
+  // before planning or post-processing can reorder or insert events.
+  const chalk: ChalkEvent[] = [];
+  let previewPoints = 0;
+  let chalkIndex = 0;
+  for (let eventIndex = 0; eventIndex <= m.events.length; eventIndex++) {
+    while (ctx.chalk[chalkIndex]?.eventIndexAtEmit === eventIndex) {
+      const event = ctx.chalk[chalkIndex++];
+      chalk.push({
+        strokes: event.strokes,
+        kind: event.kind,
+        label: event.label,
+        style: event.style,
+        sourceLine: event.sourceLine,
+        sequence: event.sequence,
+        stitchIndexAtEmit: previewPoints,
+        vertexCount: event.vertexCount,
+      });
+    }
+    const event = m.events[eventIndex];
+    if (event?.t === 'stitch' || event?.t === 'jump') previewPoints++;
+  }
   const warningLocations: WarningLocation[] = [];
   if (m.recording) {
     m.warnings.push('beginfill was never closed — endfill added at the end of the program');
@@ -246,6 +272,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         scatterpoints: 'maxScatterPoints',
         geoinput: 'maxDelaunayPoints',
         clipverts: 'maxClipVerts',
+        chalks: 'maxChalks',
+        chalkverts: 'maxChalkVerts',
       } as Record<string, BudgetKey>
     )[keyStr];
     if (!budgetKey) continue;
@@ -263,6 +291,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       scatterpoints: 'Poisson-disc at high density may be slow.',
       geoinput: 'Voronoi/triangulate with many points may be slow.',
       clipverts: 'Clip operations with many vertices may be slow.',
+      chalks: 'Many preview overlays may reduce playground frame rate.',
+      chalkverts: 'Large preview overlays may use significant browser memory.',
     };
     m.warnings.push(
       `⚠ override: ${keyStr} raised ${stock.toLocaleString('en-US')} → ${value.toLocaleString('en-US')} (line ${overrideLine}). ${tailored[keyStr] ?? ''} You are outside the tested envelope.`,
@@ -275,6 +305,17 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     m.activeOverrides.size > 0
       ? Object.fromEntries([...m.activeOverrides.entries()].map(([k, v]) => [k, v.value]))
       : undefined;
+  const dataVars = Object.entries(ctx.globals).flatMap(([name, value]) => {
+    const inspected = inspectChalkValue(value, { mode: 'silent' });
+    if (!inspected) return [];
+    return [
+      {
+        name,
+        declarationLine: ctx.globalLines[name],
+        ...inspected,
+      },
+    ];
+  });
 
   return {
     events: m.events,
@@ -286,6 +327,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     activeHoop,
     activeOverrides,
     globals: ctx.globals,
+    chalk,
+    dataVars,
     plan: planStats,
   };
 }

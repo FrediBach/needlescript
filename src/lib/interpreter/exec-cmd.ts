@@ -14,6 +14,9 @@ import { didYouMean } from '../suggestions.ts';
 import type { RunContext } from './context.ts';
 import { PLAN_STRATEGIES } from '../travel-planner.ts';
 import type { PlanMode } from '../travel-planner.ts';
+import { apply } from '../affine.ts';
+import { inspectChalkValue } from '../chalk.ts';
+import type { ChalkStyle } from '../types.ts';
 
 /**
  * Handler for the `'cmd'` statement branch of execStmt. Returns a function
@@ -43,6 +46,61 @@ export function initExecCmdHandler(
       ctx.printed.push(
         (st.label ?? 'loc') + ': [' + formatNum(ctx.m.x) + ', ' + formatNum(ctx.m.y) + ']',
       );
+      return;
+    }
+    if (st.name === 'chalk') {
+      const labelValue = vals[1];
+      if (labelValue !== undefined && typeof labelValue !== 'string')
+        throw new NeedlescriptError(
+          `chalk label must be a string, got ${describeVal(labelValue)}`,
+          st.line,
+        );
+      const styleValue = vals[2];
+      if (styleValue !== undefined && typeof styleValue !== 'string')
+        throw new NeedlescriptError(
+          `chalk style must be a string, got ${describeVal(styleValue)}`,
+          st.line,
+        );
+      const style = (styleValue ?? 'auto').toLowerCase();
+      const styles: ChalkStyle[] = ['auto', 'dots', 'line'];
+      if (!styles.includes(style as ChalkStyle))
+        throw new NeedlescriptError(
+          `chalk doesn't know style '${style}'${didYouMean(style, styles)} — expected 'auto', 'dots', or 'line'`,
+          st.line,
+        );
+      const inspected = inspectChalkValue(vals[0], { mode: 'loud', line: st.line });
+      if (!inspected) {
+        ctx.m.warnings.push('chalk ignored an empty list');
+        return;
+      }
+      if (ctx.chalk.length >= ctx.m.effectiveLimits.maxChalks)
+        throw new NeedlescriptError(
+          `chalks budget reached — ${ctx.m.effectiveLimits.maxChalks.toLocaleString('en-US')} overlays (use override 'chalks' N)`,
+          st.line,
+        );
+      if (ctx.chalkVertices + inspected.vertexCount > ctx.m.effectiveLimits.maxChalkVerts)
+        throw new NeedlescriptError(
+          `chalkverts budget reached — ${ctx.m.effectiveLimits.maxChalkVerts.toLocaleString('en-US')} vertices (use override 'chalkverts' N)`,
+          st.line,
+        );
+      ctx.tickN(inspected.vertexCount, st.line);
+      ctx.chalkVertices += inspected.vertexCount;
+      // Chalk follows only the affine CTM. Nonlinear warps and penetration
+      // effects are deliberately excluded so this command remains drawless.
+      const strokes = inspected.strokes.map((stroke) => ({
+        ...stroke,
+        vertices: stroke.vertices.map(([x, y]) => apply(ctx.m.ctm, x, y)),
+      }));
+      ctx.chalk.push({
+        ...inspected,
+        strokes,
+        label: labelValue,
+        style: style as ChalkStyle,
+        sourceLine: st.line,
+        sequence: ctx.chalk.length,
+        stitchIndexAtEmit: 0,
+        eventIndexAtEmit: ctx.m.events.length,
+      });
       return;
     }
     // `satin @fn` — engage programmable satin reporter
@@ -324,6 +382,8 @@ export function initExecCmdHandler(
         scatterpoints: 'maxScatterPoints',
         geoinput: 'maxDelaunayPoints',
         clipverts: 'maxClipVerts',
+        chalks: 'maxChalks',
+        chalkverts: 'maxChalkVerts',
       };
       const PHYSICS_KEYS: Record<string, string> = {
         stitchlen: 'stitch length bounds protect the machine and fabric',

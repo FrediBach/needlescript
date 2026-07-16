@@ -71,7 +71,41 @@ export type OverrideKey =
   | 'stringtotal'
   | 'scatterpoints'
   | 'geoinput'
-  | 'clipverts';
+  | 'clipverts'
+  | 'chalks'
+  | 'chalkverts';
+
+export type ChalkStyle = 'auto' | 'dots' | 'line';
+
+export interface ChalkStroke {
+  vertices: [number, number][];
+  /** Points are single markers; paths retain their data order as a polyline. */
+  kind: 'point' | 'path';
+}
+
+/** A preview-only data snapshot produced by a `chalk` statement. */
+export interface ChalkEvent {
+  strokes: ChalkStroke[];
+  kind: 'point' | 'path' | 'group' | 'mixed';
+  label?: string;
+  style: ChalkStyle;
+  sourceLine: number;
+  sequence: number;
+  /** Number of stitch/jump preview points that existed when the chalk was made. */
+  stitchIndexAtEmit: number;
+  vertexCount: number;
+}
+
+/** End-of-run snapshot of a top-level value that the playground can inspect. */
+export interface ChalkDataVar {
+  name: string;
+  declarationLine?: number;
+  strokes: ChalkStroke[];
+  kind: 'point' | 'path' | 'group' | 'mixed';
+  vertexCount: number;
+  pathCount: number;
+  pathLength?: number;
+}
 
 export interface RunResult {
   events: StitchEvent[];
@@ -86,6 +120,10 @@ export interface RunResult {
   activeOverrides?: Partial<Record<OverrideKey, number>>;
   /** Top-level variables defined by `let` statements in the script. */
   globals?: Record<string, unknown>;
+  /** Preview-only snapshots emitted by `chalk`; never part of the stitch stream. */
+  chalk?: ChalkEvent[];
+  /** Inspectable final top-level data snapshots. */
+  dataVars?: ChalkDataVar[];
   /** Whole-design travel planning metadata, present only when `plan` is active. */
   plan?: TravelPlanStats;
 }

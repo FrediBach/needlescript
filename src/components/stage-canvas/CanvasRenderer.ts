@@ -1,7 +1,7 @@
 import type { DesignState, LineStitchBounds } from '../../App.tsx';
 import type { HoopConfig } from '../../data.ts';
 import { THREADS } from '../../data.ts';
-import type { HoopInfo, WarningLocation } from '../../lib/engine.ts';
+import type { ChalkStroke, HoopInfo, WarningLocation } from '../../lib/engine.ts';
 import type { PointParamDef, XYRegion } from '../../lib/parse-parameters.ts';
 import {
   canvasJumpThread,
@@ -35,6 +35,9 @@ export function draw(
   dpr: number,
   showDensity: boolean,
   hideJumps: boolean,
+  showChalk: boolean,
+  hoveredDataVar: string | null,
+  pinnedDataVars: Set<string>,
   viewport: Viewport | null,
   warningLoc: WarningLocation | null,
   hoveredLineBounds: LineStitchBounds | null,
@@ -86,6 +89,7 @@ export function draw(
   const pts = design.pts;
   const upto = Math.min(pts.length, scrubPos || 0);
   if (pts.length === 0) {
+    drawChalkLayer(ctx, design, upto, showChalk, hoveredDataVar, pinnedDataVars, X, Y, dpr);
     if (showHandles && pointParams.length > 0) {
       drawHandles(
         ctx,
@@ -107,6 +111,7 @@ export function draw(
   drawStitches(ctx, pts, upto, X, Y, scale, dpr, hideJumps);
 
   drawDensity(ctx, design, X, Y, scale, showDensity);
+  drawChalkLayer(ctx, design, upto, showChalk, hoveredDataVar, pinnedDataVars, X, Y, dpr);
   drawScrubNeedle(ctx, pts, upto, X, Y, dpr);
   drawDebugMarks(ctx, design, upto, X, Y, dpr);
   drawHoveredLineBounds(ctx, hoveredLineBounds, X, Y, scale, dpr);
@@ -133,6 +138,180 @@ export function draw(
   }
 
   return { scale, cx, cy, viewCX, viewCY };
+}
+
+const CHALK_PALETTE = ['#f4df9a', '#a8dfd1', '#e8b3c7', '#b7c9ed', '#e3c0a0', '#c9d99a'];
+const CHALK_VERTEX_CAP = 5000;
+
+function drawChalkLayer(
+  ctx: CanvasRenderingContext2D,
+  design: DesignState,
+  upto: number,
+  showChalk: boolean,
+  hoveredDataVar: string | null,
+  pinnedDataVars: Set<string>,
+  X: (mm: number) => number,
+  Y: (mm: number) => number,
+  dpr: number,
+) {
+  if (!showChalk) return;
+
+  const codeGuides: Array<{
+    strokes: ChalkStroke[];
+    style: 'auto' | 'dots' | 'line';
+    label?: string;
+    seed: number;
+    emphasis: boolean;
+  }> = [];
+  for (const event of design.chalk) {
+    if (event.stitchIndexAtEmit > upto) continue;
+    codeGuides.push({
+      strokes: event.strokes,
+      style: event.style,
+      label: event.label,
+      seed: event.sourceLine * 37,
+      emphasis: false,
+    });
+  }
+  const dataGuides: typeof codeGuides = [];
+  for (const value of design.dataVars) {
+    if (value.name !== hoveredDataVar && !pinnedDataVars.has(value.name)) continue;
+    dataGuides.push({
+      strokes: value.strokes,
+      style: 'auto' as const,
+      label: value.name,
+      seed: (value.declarationLine ?? value.name.length) * 53,
+      emphasis: value.name === hoveredDataVar,
+    });
+  }
+
+  for (const guide of [...codeGuides, ...dataGuides]) {
+    const color = CHALK_PALETTE[Math.abs(guide.seed) % CHALK_PALETTE.length];
+    drawChalkGuide(
+      ctx,
+      guide.strokes,
+      guide.style,
+      guide.label,
+      guide.seed,
+      color,
+      guide.emphasis,
+      X,
+      Y,
+      dpr,
+    );
+  }
+}
+
+function drawChalkGuide(
+  ctx: CanvasRenderingContext2D,
+  strokes: ChalkStroke[],
+  style: 'auto' | 'dots' | 'line',
+  label: string | undefined,
+  seed: number,
+  color: string,
+  emphasis: boolean,
+  X: (mm: number) => number,
+  Y: (mm: number) => number,
+  dpr: number,
+) {
+  const totalVertices = strokes.reduce((sum, stroke) => sum + stroke.vertices.length, 0);
+  const stride = Math.max(1, Math.ceil(totalVertices / CHALK_VERTEX_CAP));
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = emphasis ? 0.92 : 0.48;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash([5 * dpr, 3.2 * dpr, 1.2 * dpr, 2.6 * dpr]);
+
+  strokes.forEach((stroke, strokeIndex) => {
+    const vertices = stroke.vertices.filter(
+      (_, vertexIndex) => vertexIndex % stride === 0 || vertexIndex === stroke.vertices.length - 1,
+    );
+    if (vertices.length === 0) return;
+    const connect = style !== 'dots' && stroke.kind === 'path' && vertices.length > 1;
+    const dots = style !== 'line' || stroke.kind === 'point';
+    if (connect) {
+      // Two slightly misregistered passes mimic a dry, uneven tailor's-chalk edge.
+      for (let pass = 0; pass < 2; pass++) {
+        const phase = seed * 0.73 + strokeIndex * 2.1 + pass * 1.7;
+        const ox = Math.sin(phase) * 0.55 * dpr;
+        const oy = Math.cos(phase * 1.31) * 0.45 * dpr;
+        ctx.beginPath();
+        ctx.moveTo(X(vertices[0][0]) + ox, Y(vertices[0][1]) + oy);
+        for (let i = 1; i < vertices.length; i++)
+          ctx.lineTo(X(vertices[i][0]) + ox, Y(vertices[i][1]) + oy);
+        ctx.lineWidth = (pass === 0 ? 1.15 : 0.55) * dpr;
+        ctx.globalAlpha = (emphasis ? 0.92 : 0.48) * (pass === 0 ? 0.72 : 0.42);
+        ctx.stroke();
+      }
+      drawChalkDirection(ctx, vertices, color, emphasis, X, Y, dpr);
+    }
+    if (dots) {
+      ctx.globalAlpha = emphasis ? 0.88 : 0.55;
+      for (let i = 0; i < vertices.length; i++) {
+        const radius = (i === 0 ? 2.2 : 1.35) * dpr;
+        const phase = seed + strokeIndex * 11 + i * 0.91;
+        ctx.beginPath();
+        ctx.ellipse(
+          X(vertices[i][0]) + Math.sin(phase) * 0.35 * dpr,
+          Y(vertices[i][1]) + Math.cos(phase * 1.7) * 0.3 * dpr,
+          radius,
+          radius * 0.72,
+          phase,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+    }
+  });
+
+  const first = strokes[0]?.vertices[0];
+  if (label && first) {
+    ctx.setLineDash([]);
+    ctx.globalAlpha = emphasis ? 0.9 : 0.64;
+    ctx.font = `${10 * dpr}px ${fontMono}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(label, X(first[0]) + 6 * dpr, Y(first[1]) - 5 * dpr);
+  }
+  ctx.restore();
+}
+
+function drawChalkDirection(
+  ctx: CanvasRenderingContext2D,
+  vertices: [number, number][],
+  color: string,
+  emphasis: boolean,
+  X: (mm: number) => number,
+  Y: (mm: number) => number,
+  dpr: number,
+) {
+  const index = Math.max(1, Math.floor(vertices.length / 2));
+  const before = vertices[index - 1];
+  const at = vertices[index];
+  const dx = X(at[0]) - X(before[0]);
+  const dy = Y(at[1]) - Y(before[1]);
+  const length = Math.hypot(dx, dy);
+  if (length < 5 * dpr) return;
+  const ux = dx / length;
+  const uy = dy / length;
+  const px = -uy;
+  const py = ux;
+  const x = X(at[0]);
+  const y = Y(at[1]);
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = emphasis ? 0.85 : 0.5;
+  ctx.lineWidth = dpr;
+  ctx.beginPath();
+  ctx.moveTo(x - ux * 5 * dpr + px * 3 * dpr, y - uy * 5 * dpr + py * 3 * dpr);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x - ux * 5 * dpr - px * 3 * dpr, y - uy * 5 * dpr - py * 3 * dpr);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** Draw jumps, thread runs, and penetration points in their layering order. */
@@ -500,7 +679,7 @@ function drawRegionShape(
   }
 }
 
-/** Draw staging overlays (ghost outlines, source artwork, selection highlight). */
+/** Draw staging overlays (excluded outlines, source artwork, selection highlight). */
 function drawOverlays(
   ctx: CanvasRenderingContext2D,
   overlays: CanvasOverlay[],
@@ -515,7 +694,7 @@ function drawOverlays(
   ctx.lineCap = 'round';
   for (const ov of overlays) {
     if (only && ov.kind !== only) continue;
-    if (ov.kind === 'ghost') {
+    if (ov.kind === 'excluded') {
       ctx.strokeStyle = 'rgba(120,110,90,0.45)';
       ctx.setLineDash([3 * dpr, 3 * dpr]);
       ctx.lineWidth = 1 * dpr;

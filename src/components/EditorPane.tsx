@@ -4,7 +4,7 @@ import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { editor, IDisposable } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
 import type { LineStitchBounds } from '../App.tsx';
-import type { WarningLocation } from '../lib/engine.ts';
+import type { ChalkDataVar, WarningLocation } from '../lib/engine.ts';
 import type { AIModelInfo } from '../hooks/useAI.ts';
 import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
@@ -63,6 +63,10 @@ interface Props {
   onHighlightHandle?: (name: string | null) => void;
   /** Which handle name the stage is currently highlighting */
   highlightedHandle?: string | null;
+  dataVars: ChalkDataVar[];
+  pinnedDataVars: Set<string>;
+  onTogglePinnedDataVar: (name: string) => void;
+  onHoverDataVar: (name: string | null) => void;
   /** Opens the shared machine/fabric context menu. */
   onMachineContextMenu?: (x: number, y: number, editorActions?: EditorContextActions) => void;
 }
@@ -112,6 +116,10 @@ export default function EditorPane({
   onToggleLock,
   onHighlightHandle,
   highlightedHandle,
+  dataVars,
+  pinnedDataVars,
+  onTogglePinnedDataVar,
+  onHoverDataVar,
   onMachineContextMenu,
 }: Props) {
   const [replValue, setReplValue] = useState('');
@@ -661,6 +669,17 @@ export default function EditorPane({
         onToggleLock={onToggleLock}
         onHighlightHandle={onHighlightHandle}
         highlightedHandle={highlightedHandle}
+        dataVars={dataVars}
+        pinnedDataVars={pinnedDataVars}
+        onTogglePinnedDataVar={onTogglePinnedDataVar}
+        onHoverDataVar={onHoverDataVar}
+        onRevealLine={(line) => {
+          const ed = editorRef.current;
+          if (!ed) return;
+          ed.revealLineInCenter(line, 0);
+          ed.setPosition({ lineNumber: line, column: 1 });
+          ed.focus();
+        }}
       />
 
       <Splitter

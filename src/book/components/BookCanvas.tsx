@@ -28,6 +28,8 @@ const EMPTY_DESIGN: DesignState = {
   density: null,
   stats: null,
   warnings: [],
+  chalk: [],
+  dataVars: [],
   name: '',
   ok: false,
 };
@@ -51,6 +53,8 @@ function buildDesign(result: RunResult, stats: DesignStats): DesignState {
     warnings: result.warnings,
     name: '',
     ok: true,
+    chalk: result.chalk ?? [],
+    dataVars: result.dataVars ?? [],
   };
 }
 
@@ -80,6 +84,7 @@ export default function BookCanvas({ result, stats, scrubPos = 0, height = 280 }
         scrubPos={resolvedScrubPos}
         showDensity={false}
         hideJumps={false}
+        showChalk={true}
         warningLoc={null}
       />
     </div>
