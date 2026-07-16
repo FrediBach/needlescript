@@ -1,0 +1,90 @@
+// ── BITMAP SATIN TRIANGLE ───────────────────────────────────────────
+// A spiral becomes a variable-width satin line. Each segment samples the
+// bitmap at its next position: dark pixels make a broad ribbon, bare fabric
+// keeps it hairline-thin. Replace `triangle` with rows emitted
+// by Import → Import bitmap data… to draw from your own image.
+
+// ── imported-style bitmap data ──────────────────────────────────────
+let triangle_mm = 70 // [30:90] size of the sampled bitmap in mm
+let triangle = [
+  '000000000000000000000000',
+  '000000000000000000000000',
+  '00000000000ff00000000000',
+  '00000000000ff00000000000',
+  '0000000000faaf0000000000',
+  '0000000000faaf0000000000',
+  '000000000f8aa8f000000000',
+  '000000000f9aa9f000000000',
+  '00000000f79aa97f00000000',
+  '00000000f89aa98f00000000',
+  '0000000f789aa987f0000000',
+  '0000000f789aa987f0000000',
+  '000000f6789aa9876f000000',
+  '000000f6789aa9876f000000',
+  '00000f677899998776f00000',
+  '00000f677899998776f00000',
+  '0000f56778999987765f0000',
+  '000055677889988776550000',
+  '000f5567788998877655f000',
+  '000ffffffffffffffffff000',
+  '000000000000000000000000',
+  '000000000000000000000000',
+  '000000000000000000000000',
+  '000000000000000000000000',
+]
+let triangle_w = len(triangle[0])
+let triangle_h = len(triangle)
+
+// The generic helpers emitted by the bitmap importer. Keep one copy in a
+// program, then pass any imported array into bmsample().
+def bmpixel(rows, w, h, col, rowi) [
+  let cc = clamp(col, 0, w - 1)
+  let rr = clamp(rowi, 0, h - 1)
+  let rowstr = rows[rr]
+  return indexof('0123456789abcdef', rowstr[cc]) / 15
+]
+
+def bmsample(rows, w, h, mm, px, py) [
+  let fx = remap(px, 0 - mm / 2, mm / 2, 0, w) - 0.5
+  let fy = remap(py, mm / 2, 0 - mm / 2, 0, h) - 0.5
+  let ci = floor(fx)
+  let ri = floor(fy)
+  let ta = lerp(bmpixel(rows, w, h, ci, ri), bmpixel(rows, w, h, ci + 1, ri), fx - ci)
+  let tb = lerp(bmpixel(rows, w, h, ci, ri + 1), bmpixel(rows, w, h, ci + 1, ri + 1), fx - ci)
+  return lerp(ta, tb, fy - ri)
+]
+
+// ── controls ────────────────────────────────────────────────────────
+let rmax = 38     // [20:1:44] spiral radius, mm
+let turns = 13    // [6:1:24] revolutions
+let pace = 0.8    // [0.4:0.1:1.4] path segment length, mm
+let thin = 0.22   // [0.1:0.05:0.6] ribbon width outside the bitmap
+let thick = 1.8   // [0.6:0.1:3] ribbon width at black pixels
+
+fabric 'woven'
+density 0.5
+color 4
+
+// Archimedean spiral: r = r0 + b * theta.
+let r0 = 0.5
+let theta_max = turns * 360
+let b = (rmax - r0) / theta_max
+let theta = 0
+let r = r0
+let dtheta = 0
+let ink = 0
+
+up moveto(0, r0) down
+while theta < theta_max [
+  dtheta = pace / r * 57.2958
+  if dtheta > 15 [ dtheta = 15 ]
+  theta += dtheta
+  r = r0 + b * theta
+  // The bitmap sampler sees the same hoop coordinates as the next spiral point.
+  // Changing thin/thick therefore changes this segment's actual satin width.
+  ink = bmsample(triangle, triangle_w, triangle_h, triangle_mm, r * sin(theta), r * cos(theta))
+  satin lerp(thin, thick, ink)
+  setxy(r * sin(theta), r * cos(theta))
+]
+satin 0
+trim
