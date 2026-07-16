@@ -86,6 +86,97 @@ function NumberField({
   );
 }
 
+function RangeField({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <div className="flex items-baseline justify-between gap-3 text-[11px]">
+        <Label className="text-[11px] text-muted-foreground">{label}</Label>
+        <output className="font-mono text-foreground">
+          {value.toLocaleString()} px
+          <span className="ml-1.5 text-muted-foreground">
+            ({min.toLocaleString()}–{max.toLocaleString()})
+          </span>
+        </output>
+      </div>
+      <Slider
+        value={[value]}
+        min={min}
+        max={max}
+        step={1}
+        disabled={min === max}
+        aria-label={label}
+        onValueChange={(next) => onChange(Array.isArray(next) ? next[0] : next)}
+      />
+    </div>
+  );
+}
+
+function CropPreview({
+  source,
+  crop,
+}: {
+  source: BitmapImportSource;
+  crop: BitmapSettings['crop'];
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const longestSide = 560;
+    const scale = longestSide / Math.max(source.width, source.height);
+    canvas.width = Math.max(1, Math.round(source.width * scale));
+    canvas.height = Math.max(1, Math.round(source.height * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const pixels = new ImageData(new Uint8ClampedArray(source.data), source.width, source.height);
+    const imageCanvas = document.createElement('canvas');
+    imageCanvas.width = source.width;
+    imageCanvas.height = source.height;
+    const imageCtx = imageCanvas.getContext('2d');
+    if (!imageCtx) return;
+    imageCtx.putImageData(pixels, 0, 0);
+    ctx.drawImage(imageCanvas, 0, 0, canvas.width, canvas.height);
+
+    const x = crop.x * scale;
+    const y = crop.y * scale;
+    const width = crop.width * scale;
+    const height = crop.height * scale;
+    ctx.fillStyle = 'rgba(8, 10, 12, 0.56)';
+    ctx.fillRect(0, 0, canvas.width, y);
+    ctx.fillRect(0, y + height, canvas.width, canvas.height - y - height);
+    ctx.fillRect(0, y, x, height);
+    ctx.fillRect(x + width, y, canvas.width - x - width, height);
+    ctx.strokeStyle = '#f6c558';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, Math.max(0, width - 2), Math.max(0, height - 2));
+  }, [crop, source]);
+
+  return (
+    <figure className="grid gap-1.5">
+      <figcaption className="text-[11px] text-muted-foreground">
+        Original image · crop highlighted
+      </figcaption>
+      <canvas
+        ref={canvasRef}
+        className="max-h-44 w-full rounded-md border border-foreground/10 bg-muted object-contain"
+      />
+    </figure>
+  );
+}
+
 function BitmapPreview({
   source,
   settings,
@@ -298,46 +389,58 @@ export default function BitmapImportDialog({ source, programSource, onClose, onI
             {section === 'region' && (
               <div className="grid gap-4">
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Crop is expressed in source pixels. The preview always shows the exact region that
-                  will become cells.
+                  Pan and size the crop with sliders. Each range updates to keep the selected area
+                  inside the source image.
                 </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <NumberField
-                    label="Left"
+                <div className="grid gap-3">
+                  <RangeField
+                    label="Horizontal position"
                     value={settings.crop.x}
                     min={0}
-                    max={source.width - 1}
+                    max={source.width - settings.crop.width}
                     onChange={(x) => setCrop({ x })}
                   />
-                  <NumberField
-                    label="Top"
+                  <RangeField
+                    label="Vertical position"
                     value={settings.crop.y}
                     min={0}
-                    max={source.height - 1}
+                    max={source.height - settings.crop.height}
                     onChange={(y) => setCrop({ y })}
                   />
-                  <NumberField
-                    label="Width"
+                  <RangeField
+                    label="Crop width"
                     value={settings.crop.width}
                     min={1}
                     max={source.width - settings.crop.x}
                     onChange={(width) => setCrop({ width })}
                   />
-                  <NumberField
-                    label="Height"
+                  <RangeField
+                    label="Crop height"
                     value={settings.crop.height}
                     min={1}
                     max={source.height - settings.crop.y}
                     onChange={(height) => setCrop({ height })}
                   />
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => update({ crop: initialSettings(source).crop })}
-                >
-                  Center square crop
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => update({ crop: initialSettings(source).crop })}
+                  >
+                    Center square
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      update({ crop: { x: 0, y: 0, width: source.width, height: source.height } })
+                    }
+                  >
+                    Full image
+                  </Button>
+                </div>
+                <CropPreview source={source} crop={settings.crop} />
               </div>
             )}
 
