@@ -140,7 +140,7 @@ export function draw(
   return { scale, cx, cy, viewCX, viewCY };
 }
 
-const CHALK_PALETTE = ['#f4df9a', '#a8dfd1', '#e8b3c7', '#b7c9ed', '#e3c0a0', '#c9d99a'];
+const CHALK_PALETTE = ['#333333', '#30443f', '#49363e', '#354052', '#4b3c31', '#3e4631'];
 const CHALK_VERTEX_CAP = 5000;
 
 function drawChalkLayer(
