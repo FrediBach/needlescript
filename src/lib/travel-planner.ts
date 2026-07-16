@@ -50,6 +50,7 @@ function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
   const prefix: StitchEvent[] = [];
   const runs: ThreadRun[] = [];
   let current: StitchEvent[] = [];
+  let currentEntry: StitchEvent | null = null;
   let gap: StitchEvent[] = [];
   let lastPosition: StitchEvent | null = null;
   let cutPending = false;
@@ -59,7 +60,7 @@ function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
     if (positional.length === 0) {
       prefix.push(...current);
     } else {
-      const first = positional[0];
+      const first = currentEntry ?? positional[0];
       const last = positional[positional.length - 1];
       runs.push({
         events: current,
@@ -69,6 +70,7 @@ function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
       });
     }
     current = [];
+    currentEntry = null;
   };
 
   const flushGap = (nextIsStitch: boolean) => {
@@ -86,6 +88,10 @@ function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
       // after ordering and are therefore intentionally not retained.
       current.push(...gap.filter((event) => event.t === 'mark'));
       if (current.length > 0) finish();
+      // The last jump is the physical approach point for the next run. Keep it
+      // out of the atomic run, but retain its coordinates for routing and for
+      // the rebuilt connector so the later lock pass has a tie-in direction.
+      currentEntry = point;
       cutPending = false;
     } else {
       current.push(...gap);
@@ -135,7 +141,14 @@ function planBlock(
     const run = routed.item.value;
     if (previous) {
       const first = run.events.find((event) => event.t === 'stitch' || event.t === 'jump');
-      if (first) out.push({ t: 'jump', x: first.x, y: first.y, c: first.c, line: first.line });
+      if (first)
+        out.push({
+          t: 'jump',
+          x: run.entry[0],
+          y: run.entry[1],
+          c: first.c,
+          line: first.line,
+        });
     }
     out.push(...run.events);
     previous = run;

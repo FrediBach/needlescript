@@ -335,7 +335,8 @@ After execution the interpreter runs the machine's `events` through pure passes 
 
 - **`applyTravelPlan`** (`travel-planner.ts`) — partition color blocks into atomic
   runs and reorder them through the generic strategy registry. Connector jumps are
-  rebuilt; stitch/run contents and explicit trims are retained.
+  rebuilt to each run's original approach point so the later lock pass retains its
+  tie-in direction; stitch/run contents and explicit trims are retained.
 - **`applyLocks`** (`17`) — insert tie-in/tie-off "lock" stitches at the start/end of
   each stitch run that borders a cut (color/trim) or a jump gap ≥ 4 mm, securing the
   thread. Returns the augmented events and a lock count.

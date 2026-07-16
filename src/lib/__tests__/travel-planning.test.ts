@@ -107,6 +107,23 @@ describe('plan directive', () => {
     expect(result.events.filter((event) => event.t === 'trim')).toHaveLength(1);
   });
 
+  it('preserves the approach point used to tie in planned runs', () => {
+    const source = `
+      lock 0.7
+      autotrim 7
+      stitchlen 2
+      up setxy 0 -10 down setxy 0 10
+      up setxy 10 -10 down setxy 10 10
+    `;
+    const plain = run(source);
+    const planned = run(`plan 'nearest' ${source}`);
+    const bottomAtX = (events: StitchEvent[], x: number) =>
+      Math.min(...events.filter((event) => event.t === 'stitch' && event.x === x).map((e) => e.y));
+
+    expect(bottomAtX(planned.events, 10)).toBe(bottomAtX(plain.events, 10));
+    expect(bottomAtX(planned.events, 10)).toBe(-10);
+  });
+
   it('never reorders across colors and preserves each block first run', () => {
     const result = run(`
       plan 'nearest' lock 0 autotrim 0 stitchlen 12
