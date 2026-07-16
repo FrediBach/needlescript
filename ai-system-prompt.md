@@ -344,9 +344,9 @@ routesort(items) — new nearest-neighbor order, anchored at items[0]
 routesort(items, start) — begin nearest [x,y]; points and paths may be mixed
 routesort(items, start, 'both') — path elements may be returned as reversed copies to enter the nearer endpoint
 // Pure, drawless, input untouched. Use when placements/strands exist as data.
-plan 'nearest' — top-level whole-program directive for emergent/imported order; plan 'off' is default
+plan 'nearest' — top-level whole-program directive for emergent/imported order; plan 'reversing-nearest' may also reverse eligible runs to enter their nearer endpoint; plan 'off' is default
 // Reorders atomic thread runs within each color after execution, before autotrim/locks.
-// Never reverses a run, crosses colors, changes stitch geometry, or deletes explicit trim.
+// nearest never reverses; reversing-nearest only reverses eligible stitch-only runs. Neither crosses colors, changes stitch geometry, or deletes explicit trim.
 // Same-color overlap stacking can change. History queries still observe program order.
 
 ## Hoop and field directives (top of program, before any stitch, at most once each)

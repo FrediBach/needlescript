@@ -805,8 +805,8 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'reorder independent thread runs to shorten travel',
     documentation:
-      "Top-level travel-planning directive. `plan 'nearest'` greedily reorders whole thread runs within each color block after execution and before autotrim/locks. It never reverses a run, crosses a color change, changes stitch geometry, or removes an explicit `trim`. Use `plan 'off'` for an explicit no-op. Must appear before the first stitch and at most once.",
-    insertText: "plan '${1|nearest,off|}'",
+      "Top-level travel-planning directive. `plan 'nearest'` greedily reorders whole thread runs within each color block after execution and before autotrim/locks. `plan 'reversing-nearest'` may also enter eligible stitch-only runs from their nearer endpoint. Planning never crosses a color change, changes stitch geometry, or removes an explicit `trim`. Use `plan 'off'` for an explicit no-op. Must appear before the first stitch and at most once.",
+    insertText: "plan '${1|nearest,reversing-nearest,off|}'",
     isSnippet: true,
   },
   {

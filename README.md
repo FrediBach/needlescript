@@ -946,7 +946,7 @@ for p in pts [ moveto p[0] p[1]  circle 1.5 ]
 plan 'nearest'
 ```
 
-`plan` is the whole-program alternative for emergent, recursive, or imported designs. It runs after execution but before autotrim and locks, partitions each color block into atomic thread runs at trims and autotrim-length travels, keeps each color's first run anchored, and greedily reorders the rest. It never reverses a run, crosses colors, changes stitch geometry, or removes a user-authored `trim`. Same-color overlaps can change stacking order; use a color/stop boundary or leave planning off when that layering is intentional.
+`plan` is the whole-program alternative for emergent, recursive, or imported designs. It runs after execution but before autotrim and locks, partitions each color block into atomic thread runs at trims and autotrim-length travels, keeps each color's first run anchored, and greedily reorders the rest. `plan 'reversing-nearest'` may additionally reverse eligible stitch-only runs, such as straight running-stitch lines, to enter from the nearer endpoint. Planning never crosses colors, changes stitch geometry, or removes a user-authored `trim`. Same-color overlaps can change stacking order; use a color/stop boundary or leave planning off when that layering is intentional.
 
 `plan` follows the `hoop` placement contract: top-level, before the first stitch, at most once. `plan 'off'` is identical to omitting it. Active planning prints before/after travel and autotrim counts and exposes them in `RunResult.plan` / `DesignStats`.
 

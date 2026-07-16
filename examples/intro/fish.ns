@@ -2,6 +2,8 @@
 // More lines appear where the two curves are FURTHEST apart -- the
 // horizontal spacing between lines shrinks as the vertical gap widens.
 
+plan 'reversing-nearest'
+
 // --- shape & hatch ---
 let amp      = 20     // [8:1:28] sine amplitude, mm
 let span     = 80     // [40:1:88] total width, mm

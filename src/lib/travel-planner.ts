@@ -16,6 +16,7 @@ interface ThreadRun {
   entry: readonly [number, number];
   exit: readonly [number, number];
   index: number;
+  reversible: boolean;
 }
 
 interface ColorBlock {
@@ -25,11 +26,13 @@ interface ColorBlock {
 
 export interface PlanStrategy {
   algorithm: keyof typeof ROUTE_ALGORITHMS;
+  reverseRuns: boolean;
 }
 
 /** Public mode registry: future plan modes are additive configuration. */
 export const PLAN_STRATEGIES = {
-  nearest: { algorithm: 'nearest' },
+  nearest: { algorithm: 'nearest', reverseRuns: false },
+  'reversing-nearest': { algorithm: 'nearest', reverseRuns: true },
 } as const satisfies Record<string, PlanStrategy>;
 
 export type PlanMode = keyof typeof PLAN_STRATEGIES;
@@ -67,6 +70,7 @@ function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
         entry: [first.x, first.y],
         exit: [last.x, last.y],
         index: runs.length,
+        reversible: isReversible(current),
       });
     }
     current = [];
@@ -119,6 +123,43 @@ function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
   return { prefix, runs };
 }
 
+function isReversible(events: StitchEvent[]): boolean {
+  const positional = events.filter((event) => event.t === 'stitch' || event.t === 'jump');
+  if (positional.length === 0 || positional.some((event) => event.t !== 'stitch')) return false;
+
+  // Reversing mixed underlay/top-stitch output would sew the decorative layer
+  // before its foundation. Runs containing only one of those layers are safe.
+  const hasUnderlay = positional.some((event) => event.u === 1);
+  const hasTopStitch = positional.some((event) => event.u !== 1);
+  if (hasUnderlay && hasTopStitch) return false;
+
+  // Marks may occur between stitches and describe authored sequence points.
+  // A trailing trim/mark suffix, on the other hand, remains meaningful at the
+  // end of the reversed run.
+  const lastPositional = events.findLastIndex(
+    (event) => event.t === 'stitch' || event.t === 'jump',
+  );
+  return events.slice(0, lastPositional).every((event) => event.t === 'stitch');
+}
+
+function reverseRun(run: ThreadRun): StitchEvent[] {
+  const stitches = run.events.filter((event) => event.t === 'stitch');
+  const suffix = run.events.slice(stitches.length);
+  const points: (readonly [number, number])[] = [run.entry];
+  for (const stitch of stitches) points.push([stitch.x, stitch.y]);
+
+  const reversed = stitches.toReversed().map((stitch, index) => ({
+    ...stitch,
+    x: points[points.length - 2 - index][0],
+    y: points[points.length - 2 - index][1],
+  }));
+  const end = run.entry;
+  return [
+    ...reversed,
+    ...suffix.map((event) => (event.t === 'trim' ? { ...event, x: end[0], y: end[1] } : event)),
+  ];
+}
+
 function planBlock(
   block: ColorBlock,
   strategy: PlanStrategy,
@@ -132,25 +173,29 @@ function planBlock(
       index: run.index,
       entry: run.entry,
       exit: run.exit,
+      reverseEntry: run.reversible ? run.exit : undefined,
+      reverseExit: run.reversible ? run.entry : undefined,
     })),
-    { anchorFirst: true, examine },
+    { anchorFirst: true, allowReverse: strategy.reverseRuns, examine },
   );
   const out = [...block.prefix];
   let previous: ThreadRun | null = null;
   for (const routed of ordered) {
     const run = routed.item.value;
+    const runEvents = routed.reversed ? reverseRun(run) : run.events;
+    const entry = routed.reversed ? run.exit : run.entry;
     if (previous) {
-      const first = run.events.find((event) => event.t === 'stitch' || event.t === 'jump');
+      const first = runEvents.find((event) => event.t === 'stitch' || event.t === 'jump');
       if (first)
         out.push({
           t: 'jump',
-          x: run.entry[0],
-          y: run.entry[1],
+          x: entry[0],
+          y: entry[1],
           c: first.c,
           line: first.line,
         });
     }
-    out.push(...run.events);
+    out.push(...runEvents);
     previous = run;
   }
   return out;

@@ -650,9 +650,9 @@ Hoop-agnostic margin idiom: `let margin = first(offsetpath(fieldpath(), -6))`.
 
 ### `plan` directive
 
-`plan 'nearest'` enables whole-design travel planning; `plan 'off'` is the default and a byte-identical no-op. Like `hoop`, it is top-level only, before any committed stitch, forbidden in `trace`, and allowed at most once.
+`plan 'nearest'` enables whole-design travel planning. `plan 'reversing-nearest'` uses the same route but may reverse eligible runs when their exit is the nearer entry point. `plan 'off'` is the default and a byte-identical no-op. Like `hoop`, it is top-level only, before any committed stitch, forbidden in `trace`, and allowed at most once.
 
-After execution, planning partitions every color block into atomic thread runs at explicit trims and at jumps that active autotrim would cut. Each color's first run stays first; remaining runs are chained by nearest entry point, with deterministic original-index ties. Runs are never reversed or internally edited, explicit trims remain, and color boundaries are never crossed. Connector jumps are rebuilt for the new adjacency at each run's original approach point, preserving the direction needed by tie-in locks. The pass runs before autotrim, density finalization, and locks, so automatic trims and locks see the shortened route.
+After execution, planning partitions every color block into atomic thread runs at explicit trims and at jumps that active autotrim would cut. Each color's first run stays first and keeps its authored direction; remaining runs are chained by nearest entry point, with deterministic original-index ties. `nearest` never reverses runs. `reversing-nearest` may reverse stitch-only runs without internal jumps, mixed underlay/top-stitch ordering, or mid-run marks; this includes ordinary straight running-stitch lines and preserves their stitch geometry. Explicit trims remain, and color boundaries are never crossed. Connector jumps are rebuilt for the new adjacency and direction so the later lock pass retains a valid tie-in direction. The pass runs before autotrim, density finalization, and locks, so automatic trims and locks see the shortened route.
 
 Planning can change which overlapping same-color run lies on top. History queries still see program order because they execute before this final pass; density is unchanged. Active planning prints before/after travel and autotrim counts and exposes `planMode`, `travelBeforeMm`, and `travelAfterMm` through result statistics.
 
@@ -803,7 +803,7 @@ Annotate `let`/`make`/bare declarations to expose live controls in the playgroun
 
 1. Keep designs within ~44 mm radius (default hoop) to avoid overflow warnings; for other hoops, guard with `infield(pos())` or inset `fieldpath()`.
 2. Use `moveto` (not `setxy`) for repositioning — it jump-stitches correctly. Never use `home` for navigation (it sews when the pen is down).
-3. Sort motif travel with `routesort`, or use `plan 'nearest'` for emergent/imported order. Prefer autotrim for long connectors; explicit `trim` remains useful where a cut is mandatory.
+3. Sort motif travel with `routesort`, or use `plan 'nearest'` / `plan 'reversing-nearest'` for emergent/imported order. Prefer autotrim for long connectors; explicit `trim` remains useful where a cut is mandatory.
 4. Satin columns: 2–8 mm width; `density 0.35–0.5` typical; avoid > 8 mm (snag).
 5. Fills: `fillspacing 0.35–0.5` for most work; smaller = denser = higher stitch count.
 6. Put `seed N` at the top for reproducibility; `hoop`/`override`/`plan` at the very top, before any stitch.

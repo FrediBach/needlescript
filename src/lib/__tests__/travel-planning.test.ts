@@ -92,6 +92,48 @@ describe('plan directive', () => {
     expect(result.printed.at(-1)).toMatch(/plan 'nearest': travel .*\(runs: 3, colors: 1\)/);
   });
 
+  it('reverses an eligible run when its exit is the nearer endpoint', () => {
+    const result = run(`
+      plan 'reversing-nearest' lock 0 autotrim 0 stitchlen 20
+      down setxy 0 1 trim
+      up setxy 10 0 down setxy 2 0
+    `);
+    const stitches = result.events
+      .filter((event) => event.t === 'stitch')
+      .map((event) => [event.x, event.y]);
+    expect(stitches).toEqual([
+      [0, 0],
+      [0, 1],
+      [10, 0],
+    ]);
+    expect(result.events.find((event) => event.t === 'jump')).toMatchObject({ x: 2, y: 0 });
+    expect(result.plan?.travelAfterMm).toBeLessThan(result.plan?.travelBeforeMm ?? 0);
+  });
+
+  it('does not reverse runs with internal jumps or mixed underlay ordering', () => {
+    const mixedLayers: StitchEvent[] = [
+      { t: 'stitch', x: 0, y: 0, c: 0 },
+      { t: 'trim', x: 0, y: 0, c: 0 },
+      { t: 'jump', x: 10, y: 0, c: 0 },
+      { t: 'stitch', x: 10, y: 1, c: 0, u: 1 },
+      { t: 'stitch', x: 2, y: 1, c: 0 },
+    ];
+    const internalJump: StitchEvent[] = [
+      { t: 'stitch', x: 0, y: 0, c: 0 },
+      { t: 'trim', x: 0, y: 0, c: 0 },
+      { t: 'jump', x: 10, y: 0, c: 0 },
+      { t: 'stitch', x: 10, y: 1, c: 0 },
+      { t: 'jump', x: 2, y: 1, c: 0 },
+      { t: 'stitch', x: 2, y: 2, c: 0 },
+    ];
+    expect(applyTravelPlan(mixedLayers, 'reversing-nearest', 0).events).toEqual(
+      applyTravelPlan(mixedLayers, 'nearest', 0).events,
+    );
+    expect(applyTravelPlan(internalJump, 'reversing-nearest', 0).events).toEqual(
+      applyTravelPlan(internalJump, 'nearest', 0).events,
+    );
+  });
+
   it('runs before autotrim and lowers automatic trim count', () => {
     const source = `
       plan 'nearest'
