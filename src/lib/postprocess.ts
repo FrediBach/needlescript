@@ -7,6 +7,7 @@ import type {
   DensityCell,
   DensityHotspot,
   DensityResult,
+  TravelPlanStats,
 } from './types.ts';
 
 interface LockResult {
@@ -413,7 +414,7 @@ export function densityMap(events: StitchEvent[], cellMM = 1, threshold = 3): De
 
 // ---------- Design stats ----------
 
-export function designStats(events: StitchEvent[]): DesignStats {
+export function designStats(events: StitchEvent[], plan?: TravelPlanStats): DesignStats {
   let minX = Infinity,
     maxX = -Infinity,
     minY = Infinity,
@@ -478,5 +479,12 @@ export function designStats(events: StitchEvent[]): DesignStats {
     maxStitchLen: maxLen,
     maxRadius: maxR,
     yarnLength,
+    ...(plan
+      ? {
+          planMode: plan.planMode,
+          travelBeforeMm: plan.travelBeforeMm,
+          travelAfterMm: plan.travelAfterMm,
+        }
+      : {}),
   };
 }

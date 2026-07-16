@@ -84,6 +84,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
   // in interpreter.ts — but still registered here for arity and RESERVED.
   hoop: 1,
   override: 2,
+  plan: 1,
 };
 
 /**
@@ -268,6 +269,7 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   bezier: { min: 5, max: 5 },
   centroid: { min: 1, max: 1 },
   bbox: { min: 1, max: 1 },
+  routesort: { min: 1, max: 3 },
   // §4.5 generators
   scatter: { min: 1, max: 2 },
   voronoi: { min: 1, max: 2 },

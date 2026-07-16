@@ -36,6 +36,18 @@ export default function StatsChips({ design, machine }: Props) {
       text: yarnM >= 1 ? `${yarnM.toFixed(1)} m yarn` : `${Math.round(s.yarnLength)} mm yarn`,
     });
     if (s.jumps) chips.push({ text: `${s.jumps} jump${s.jumps > 1 ? 's' : ''}` });
+    if (
+      s.planMode &&
+      s.travelBeforeMm !== undefined &&
+      s.travelAfterMm !== undefined &&
+      s.travelBeforeMm > 0
+    ) {
+      const saved = Math.max(0, s.travelBeforeMm - s.travelAfterMm);
+      chips.push({
+        text: `plan saved ${saved.toFixed(1)} mm travel`,
+        title: `${s.planMode}: ${s.travelBeforeMm.toFixed(1)} → ${s.travelAfterMm.toFixed(1)} mm`,
+      });
+    }
     if (machine?.maxSpm) {
       const seconds =
         (s.stitches / machine.maxSpm) * 60 +

@@ -24,6 +24,8 @@ import { GEN_QWORD_ARG } from '../commands.ts';
 import { didYouMean } from '../suggestions.ts';
 import { closePath, contourPaths, fillRows, spiralPaths } from '../fill-paths.ts';
 import type { RunContext } from './context.ts';
+import { routeItems, ROUTESORT_MODES } from '../routing.ts';
+import type { RoutePoint } from '../routing.ts';
 
 export function initGenFunc(ctx: RunContext): void {
   ctx.genFunc = (name: string, args: Val[], line: number | undefined): Val => {
@@ -220,6 +222,98 @@ export function initGenFunc(ctx: RunContext): void {
       case 'bbox': {
         const [minx, miny, maxx, maxy] = gm.bbox(pathArg(0));
         return ctx.allocList([minx, miny, maxx, maxy], line);
+      }
+      case 'routesort': {
+        const source = args[0];
+        if (!isList(source))
+          throw new NeedlescriptError(
+            `routesort: expected a list of points or paths, got ${describeVal(source)}`,
+            line,
+          );
+        if (source.items.length > ctx.m.effectiveLimits.maxDelaunayPoints)
+          throw new NeedlescriptError(
+            `routesort: too many items (${source.items.length.toLocaleString('en-US')}, limit ${ctx.m.effectiveLimits.maxDelaunayPoints.toLocaleString('en-US')})`,
+            line,
+          );
+
+        let start: RoutePoint | undefined;
+        let modeName = 'chain';
+        const readMode = (value: Val) => {
+          if (typeof value !== 'string')
+            throw new NeedlescriptError(
+              `routesort: mode must be a string, got ${describeVal(value)} — expected 'chain' or 'both'`,
+              line,
+            );
+          modeName = value.toLowerCase();
+        };
+        if (args.length >= 2) {
+          if (typeof args[1] === 'string') readMode(args[1]);
+          else start = gm.toPoint(args[1], 'routesort start', line);
+        }
+        if (args.length >= 3) {
+          if (start === undefined)
+            throw new NeedlescriptError(
+              'routesort: the three-argument form is routesort(items, start, mode)',
+              line,
+            );
+          readMode(args[2]);
+        }
+        const mode = ROUTESORT_MODES[modeName];
+        if (!mode)
+          throw new NeedlescriptError(
+            `routesort doesn't know '${modeName}'${didYouMean(modeName, Object.keys(ROUTESORT_MODES))} — choices: ${Object.keys(ROUTESORT_MODES).join(', ')}`,
+            line,
+          );
+
+        const routeValues = source.items.map((value, index) => {
+          if (!isList(value) || value.items.length === 0)
+            throw new NeedlescriptError(
+              `routesort: element ${index} must be a point [x, y] or a non-empty path — got ${describeVal(value)}`,
+              line,
+            );
+          const isPoint =
+            value.items.length === 2 && value.items.every((item) => typeof item === 'number');
+          if (isPoint) {
+            const x = value.items[0] as number;
+            const y = value.items[1] as number;
+            return { value, index, entry: [x, y] as RoutePoint, exit: [x, y] as RoutePoint };
+          }
+          const points = value.items.map((vertex, vertexIndex) => {
+            if (
+              !isList(vertex) ||
+              vertex.items.length !== 2 ||
+              !vertex.items.every((coordinate) => typeof coordinate === 'number')
+            )
+              throw new NeedlescriptError(
+                `routesort: element ${index}, vertex ${vertexIndex} isn't a point [x, y] — got ${describeVal(vertex)}`,
+                line,
+              );
+            return [vertex.items[0] as number, vertex.items[1] as number] as RoutePoint;
+          });
+          return {
+            value,
+            index,
+            entry: points[0],
+            exit: points[points.length - 1],
+            reverseEntry: points[points.length - 1],
+            reverseExit: points[0],
+          };
+        });
+        ctx.tickN(routeValues.length, line);
+        const routed = routeItems(mode.algorithm, routeValues, {
+          start,
+          anchorFirst: start === undefined,
+          allowReverse: mode.reversePaths,
+          examine: (count) => ctx.tickN(count, line),
+        });
+        return ctx.allocList(
+          routed.map(({ item, reversed }) =>
+            reversed && isList(item.value)
+              ? ctx.allocList([...item.value.items].reverse(), line)
+              : item.value,
+          ),
+          line,
+        );
       }
 
       // ----- §4.5 generators -----

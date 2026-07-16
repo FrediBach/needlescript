@@ -801,6 +801,15 @@ export const NS_ITEMS: NSItem[] = [
     isSnippet: true,
   },
   {
+    label: 'plan',
+    kindName: 'function',
+    detail: 'reorder independent thread runs to shorten travel',
+    documentation:
+      "Top-level travel-planning directive. `plan 'nearest'` greedily reorders whole thread runs within each color block after execution and before autotrim/locks. It never reverses a run, crosses a color change, changes stitch geometry, or removes an explicit `trim`. Use `plan 'off'` for an explicit no-op. Must appear before the first stitch and at most once.",
+    insertText: "plan '${1|nearest,off|}'",
+    isSnippet: true,
+  },
+  {
     label: 'fabric',
     kindName: 'function',
     detail: 'fabric preset',
@@ -1748,6 +1757,16 @@ export const NS_ITEMS: NSItem[] = [
     insertText: 'bbox(${1:path})',
     isSnippet: true,
     params: [['path']],
+  },
+  {
+    label: 'routesort',
+    kindName: 'function',
+    detail: 'order points or paths by nearest travel',
+    documentation:
+      "Returns a new greedily routed list. `routesort(items)` anchors the first item; `routesort(items, start)` starts nearest `[x,y]`. Mode `'both'` may return reversed copies of path elements so their nearer endpoint is entered first; `'chain'` is the default. Pure, deterministic, and drawless.",
+    insertText: "routesort(${1:items}, ${2:start}, '${3|chain,both|}')",
+    isSnippet: true,
+    params: [['items'], ['items', 'start'], ['items', 'mode'], ['items', 'start', 'mode']],
   },
   {
     label: 'sewpath',

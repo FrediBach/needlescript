@@ -36,6 +36,7 @@ export type {
   RunOptions,
   HoopInfo,
   OverrideKey,
+  TravelPlanStats,
 } from './types.ts';
 export { NeedlescriptError } from './errors.ts';
 export { makeRNG, makeNoise, fork, gauss } from './prng.ts';
@@ -78,6 +79,17 @@ export {
   hoopDescription,
 } from './hoop-presets.ts';
 export { applyLocks, applyAutoTrim, densityMap, designStats, DensityGrid } from './postprocess.ts';
+export { applyTravelPlan, PLAN_STRATEGIES } from './travel-planner.ts';
+export type { PlanMode, PlanStrategy, TravelPlanResult } from './travel-planner.ts';
+export { routeItems, ROUTE_ALGORITHMS, ROUTESORT_MODES } from './routing.ts';
+export type {
+  RouteAlgorithm,
+  RouteItem,
+  RouteOptions,
+  RoutePoint,
+  RoutedItem,
+  RouteSortMode,
+} from './routing.ts';
 export { run } from './interpreter.ts';
 export { toSVG } from './svg.ts';
 export { toDST } from './dst.ts';

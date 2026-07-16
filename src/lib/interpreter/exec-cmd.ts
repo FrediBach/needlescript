@@ -12,6 +12,8 @@ import { makeRNG, makeNoise } from '../prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { didYouMean } from '../suggestions.ts';
 import type { RunContext } from './context.ts';
+import { PLAN_STRATEGIES } from '../travel-planner.ts';
+import type { PlanMode } from '../travel-planner.ts';
 
 /**
  * Handler for the `'cmd'` statement branch of execStmt. Returns a function
@@ -166,6 +168,45 @@ export function initExecCmdHandler(
           ctx.m.satinSpacing = f.densityFloor;
         if (f.note && !ctx.m.warnings.includes(f.note)) ctx.m.warnings.push(f.note);
       }
+      return;
+    }
+    // ---------- plan — configure the post-run travel strategy ----------
+    if (st.name === 'plan') {
+      if (ctx.insideTrace > 0)
+        throw new NeedlescriptError(
+          'plan is a program directive — add it to the top of the editor and re-run',
+          st.line,
+        );
+      if (ctx.structuralDepth > 0 || depth > 0)
+        throw new NeedlescriptError(
+          'plan must be at the top level — not inside a loop, if branch, or procedure; put it near the top of the program',
+          st.line,
+        );
+      if (ctx.m.started)
+        throw new NeedlescriptError(
+          'plan must run before the first stitch; move it to the top of the program',
+          st.line,
+        );
+      if (ctx.planMode !== null)
+        throw new NeedlescriptError(
+          `plan already set${ctx.planLine !== undefined ? ` on line ${ctx.planLine}` : ''} — only one plan directive is allowed per program`,
+          st.line,
+        );
+      const modeValue = vals[0];
+      if (typeof modeValue !== 'string')
+        throw new NeedlescriptError(
+          `plan expects a string mode, got ${describeVal(modeValue)} — e.g. plan 'nearest'`,
+          st.line,
+        );
+      const mode = modeValue.toLowerCase();
+      const allowed = ['off', ...Object.keys(PLAN_STRATEGIES)];
+      if (!allowed.includes(mode))
+        throw new NeedlescriptError(
+          `Unknown plan '${mode}'${didYouMean(mode, allowed)} — expected ${allowed.map((word) => `'${word}'`).join(', ')}`,
+          st.line,
+        );
+      ctx.planMode = mode as PlanMode | 'off';
+      ctx.planLine = st.line;
       return;
     }
     // ---------- hoop — configure the sewable field (§hoop) ----------

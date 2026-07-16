@@ -86,6 +86,16 @@ export interface RunResult {
   activeOverrides?: Partial<Record<OverrideKey, number>>;
   /** Top-level variables defined by `let` statements in the script. */
   globals?: Record<string, unknown>;
+  /** Whole-design travel planning metadata, present only when `plan` is active. */
+  plan?: TravelPlanStats;
+}
+
+export interface TravelPlanStats {
+  planMode: string;
+  travelBeforeMm: number;
+  travelAfterMm: number;
+  runs: number;
+  colors: number;
 }
 
 export interface DesignStats {
@@ -103,6 +113,9 @@ export interface DesignStats {
   maxStitchLen: number;
   maxRadius: number;
   yarnLength: number; // total sewn thread length in mm (stitches only, not jumps)
+  planMode?: string;
+  travelBeforeMm?: number;
+  travelAfterMm?: number;
 }
 
 // ---------- AST node types ----------

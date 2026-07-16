@@ -24,7 +24,7 @@ interpreter (exec-cmd.ts, exec-stmt.ts, reporters.ts)
         ▼
    ┌──────────┐   StitchEvent[]        ┌──────────────┐
    │  Machine │──────────────────────► │  postprocess │──► RunResult.events
-   └──────────┘   + warnings, density  └──────────────┘   (locks, autotrim, density)
+   └──────────┘   + warnings, density  └──────────────┘   (plan, autotrim, density, locks)
 ```
 
 The interpreter never emits stitches directly. It computes values and control flow,
@@ -58,6 +58,8 @@ Tightly-coupled collaborators live one level up:
 - `affine.ts` — the 2×3 matrix math shared by the transform stack.
 - `postprocess.ts` — `DensityGrid` (the live coverage index the machine feeds), plus
   the post-run `applyLocks`, `applyAutoTrim`, and `designStats` passes.
+- `routing.ts` / `travel-planner.ts` — shared route algorithms and the optional
+  event-level planner. They consume completed events and never mutate machine state.
 - `effects.ts`, `declump.ts`, `genmath.ts`, `hoop-presets.ts` — effect maps, declump
   state, geometry helpers, and hoop field definitions.
 
@@ -331,6 +333,9 @@ list of `[x, y]` points (or a list of paths for `tracerings`).
 After execution the interpreter runs the machine's `events` through pure passes in
 `postprocess.ts`:
 
+- **`applyTravelPlan`** (`travel-planner.ts`) — partition color blocks into atomic
+  runs and reorder them through the generic strategy registry. Connector jumps are
+  rebuilt; stitch/run contents and explicit trims are retained.
 - **`applyLocks`** (`17`) — insert tie-in/tie-off "lock" stitches at the start/end of
   each stitch run that borders a cut (color/trim) or a jump gap ≥ 4 mm, securing the
   thread. Returns the augmented events and a lock count.
@@ -341,8 +346,8 @@ After execution the interpreter runs the machine's `events` through pure passes 
 - **`designStats`** (`416`) — summary metrics (stitch/jump/trim counts, bounds, yarn
   length, max stitch length…).
 
-The interpreter orders these deliberately: density is analysed _before_ locks (so
-tie-offs don't read as hotspots), then locks are applied. The results populate the final
+The interpreter orders these deliberately: planning runs before autotrim, density is
+analysed _before_ locks (so tie-offs don't read as hotspots), then locks are applied. The results populate the final
 `RunResult` (`types.ts:76-89`), which the exporters consume.
 
 ---
@@ -379,6 +384,8 @@ tie-offs don't read as hotspots), then locks are applied. The results populate t
 | `machine/fill.ts`          | standalone tatami scanline fill generator                              |
 | `affine.ts`                | 2×3 affine matrix math shared by the transform stack                   |
 | `postprocess.ts`           | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`         |
+| `routing.ts`               | generic deterministic route algorithms and endpoint model              |
+| `travel-planner.ts`        | thread-run partitioning, plan modes, and connector reconstruction      |
 | `effects.ts`, `declump.ts` | after-split effect maps and declump fold state                         |
 | `hoop-presets.ts`          | hoop presets and sewable-field geometry                                |
 | `types.ts`                 | `StitchEvent`, `HoopInfo`, `RunResult`, `DesignStats`, density types   |

@@ -829,6 +829,7 @@ for h in hlines [
 | `catmull(points, mm)`                               | Catmull-Rom spline through the control points, resampled                                                                                                                                                                                                                                                                                                                                                                 |
 | `bezier(p0, c0, c1, p1, mm)`                        | cubic Bézier, resampled                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `centroid(path)` · `bbox(path)`                     | point · `[minx, miny, maxx, maxy]`                                                                                                                                                                                                                                                                                                                                                                                       |
+| `routesort(items[, start[, mode]])`                 | new greedy nearest-neighbor ordering of points/paths; mode `'both'` may reverse path copies                                                                                                                                                                                                                                                                                                                              |
 | `xlate(path, dx, dy)`                               | new path, translated — the functional twin of `translate`                                                                                                                                                                                                                                                                                                                                                                |
 | `xrotate(path, deg)` · `xrotate(path, deg, cx, cy)` | new path, rotated clockwise (optional pivot) — twin of `rotate`/`rotateabout`                                                                                                                                                                                                                                                                                                                                            |
 | `xscale(path, s)` · `xscale(path, sx, sy)`          | new path, scaled uniformly or per-axis — twin of `scale`/`scalexy`                                                                                                                                                                                                                                                                                                                                                       |
@@ -930,6 +931,25 @@ override 'stitches' 8000     // lower it: self-imposed budget guard
 | `'geoinput'`      | 10,000     | 50,000     | `voronoi`/`triangulate`/`hull`/`relax` input |
 | `'clipverts'`     | 50,000     | 250,000    | `offsetpath`/`clippaths` input               |
 
+## Travel planning
+
+NeedleScript offers travel planning in both the data world and the finished thread stream:
+
+```text
+let pts = routesort(scatter(6), [0, 0])
+for p in pts [ moveto p[0] p[1]  circle 1.5 ]
+```
+
+`routesort(items)` returns a new greedy nearest-neighbor ordering, anchored at the first item. Pass a start point to choose the first item nearest that position. Items may be points or paths; `routesort(paths, pos(), 'both')` may return a reversed copy of a path when its far endpoint is the nearer entry. Input lists are never mutated. The function is deterministic, drawless, Library-tier, and charged to the `'geoinput'` and ordinary list budgets.
+
+```text
+plan 'nearest'
+```
+
+`plan` is the whole-program alternative for emergent, recursive, or imported designs. It runs after execution but before autotrim and locks, partitions each color block into atomic thread runs at trims and autotrim-length travels, keeps each color's first run anchored, and greedily reorders the rest. It never reverses a run, crosses colors, changes stitch geometry, or removes a user-authored `trim`. Same-color overlaps can change stacking order; use a color/stop boundary or leave planning off when that layering is intentional.
+
+`plan` follows the `hoop` placement contract: top-level, before the first stitch, at most once. `plan 'off'` is identical to omitting it. Active planning prints before/after travel and autotrim counts and exposes them in `RunResult.plan` / `DesignStats`.
+
 ### Library names may be shadowed
 
 Built-in words come in two tiers. **Core** — movement, stitching, control flow, everything that predates the generative-math release — can't be redefined (hard error, unchanged). **Library** — every list, generative-math and stitch-history function — can: your own `def clamp(v, lo, hi) [ … ]` wins for the whole program, with a one-time console note (`note: "clamp" shadows a built-in library function (since v3) — rename to silence`). This is what lets the language keep growing a standard library without breaking existing programs that innocently used the same names.
@@ -949,7 +969,7 @@ The full determinism contract is: **same source + same seed + same hoop → same
 Draw accounting follows the **fork convention**, so editing one part of a design doesn't reshuffle the rest:
 
 - **Fixed-cost functions draw from the main stream:** `random` 1 draw, `pick` 1, `gauss` 2.
-- **Variable-cost generators fork:** `scatter` and `shuffle` draw exactly **one** value from the main stream and use it to seed a child RNG for all internal work. (`voronoi` and `relax` draw nothing.)
+- **Variable-cost generators fork:** `scatter` and `shuffle` draw exactly **one** value from the main stream and use it to seed a child RNG for all internal work. (`voronoi`, `relax`, `routesort`, and `plan` draw nothing.)
 
 Result: inserting a `scatter(6)` shifts a later `random 10` by exactly one draw — the same as inserting a `random`. Draw costs are part of each function's contract and are pinned by tests, as are golden output values per seed: same seed + same engine version ⇒ identical output, and an algorithm change that alters output is a major-version event.
 

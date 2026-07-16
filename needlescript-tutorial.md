@@ -1111,7 +1111,7 @@ For anything else: `hoop 150` (round ⌀150 mm) or `hoop [180, 130]` (landscape 
 
 **Determinism note:** The field is an input like the seed — same source + same seed + same hoop → same design. Swapping `hoop '5x7'` for `hoop '6x10'` (with the same seed) changes the design, because `scatter` now fills a different domain.
 
-**Rules:** `hoop` is top-level only (not inside loops, `if`, or procedures), before any stitch, at most once per program.
+**Rules:** `hoop`, `override`, and the travel-planning `plan` directive are top-level only (not inside loops, `if`, or procedures), before any stitch. `hoop` and `plan` may each appear at most once per program.
 
 ### Field reporters
 
@@ -1935,7 +1935,31 @@ Finally, parity explains why boundary self-touching misbehaves: a spur (a path t
 
 In the data world, two shapes are simply two list entries. On fabric, moving between them strings a physical connector thread across the hoop — the dashed lines in the preview are not decoration, they are thread that will dangle, snag, and shadow through light fabric.
 
-The tools: `trim` cuts at the current point, `autotrim` (on by default at 7 mm) cuts before long travels automatically, and `lock` (on by default) ties thread ends so cut runs can't unravel. What they can't do is _plan_ for you. Travel order is a design input: a loop that sews motifs in scattered order produces a web of jumps and a forest of trims (each trim stops the machine); the same motifs sewn in a swept order — sorted by position, or walked cell-by-cell — produce a handful. When you generate placements, spend a line sorting them.
+The tools: `trim` cuts at the current point, `autotrim` (on by default at 7 mm) cuts before long travels automatically, and `lock` (on by default) ties thread ends so cut runs can't unravel. Travel order is a design input: scattered motif order produces a web of jumps and a forest of trims, while a short route produces a handful.
+
+When placements exist as data, sort at the source:
+
+```text
+seed 7
+let pts = routesort(relax(scatter(6), 2), [0, 0])
+for p in pts [
+  moveto p[0] p[1]
+  circle 1.5
+]
+trim
+```
+
+`routesort` chains points or paths greedily by nearest entry. For strands, `routesort(strands, pos(), 'both')` may return reversed path copies so each is entered from its nearer endpoint. It is pure and drawless.
+
+When order emerges from loops, recursion, composed procedures, or imported SVG code, declare the whole-program alternative at the top:
+
+```text
+plan 'nearest'
+seed 7
+// any sewing program follows
+```
+
+After the program finishes, `plan` reorders whole independent thread runs inside each color block. It never reverses a run, crosses colors, changes stitch geometry, or removes an explicit `trim`; it runs before autotrim and locks, so shortened connectors usually need fewer automatic cuts. Explicit per-motif trims still remain—planning shortens their travel but does not remove machine stops. If same-color motifs overlap deliberately, remember that reordering can change which one lies on top; separate layers with `color`/`stop` or leave planning off.
 
 One sandbox interaction is worth engraving: **machine commands inside `trace` are discarded.** The sandbox exists to capture geometry, so a `trim` or `color` inside a trace block mutates sandboxed state and is thrown away (with a one-time console note). Trims live in the sewing code, never in the region constructor — if your connectors aren't being cut, check whether the `trim` accidentally rode along into a trace.
 

@@ -8,7 +8,7 @@ const compiler = {
     const opts: RunOptions | undefined = seed !== undefined ? { seed } : undefined;
     try {
       const result = run(source, opts);
-      const stats = designStats(result.events);
+      const stats = designStats(result.events, result.plan);
       // id is a placeholder; the hook that wraps us never reads it —
       // Comlink resolves each call via its own internal message routing.
       return { id: 0, ok: true, result, stats };

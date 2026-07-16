@@ -79,6 +79,13 @@ function StatsRow({ stats, error }: { stats: DesignStats | null; error: string |
         {stats.width.toFixed(1)} × {stats.height.toFixed(1)} mm
       </span>
       {stats.colorsUsed > 1 && <span>{stats.colorsUsed} colours</span>}
+      {stats.planMode &&
+        stats.travelBeforeMm !== undefined &&
+        stats.travelAfterMm !== undefined && (
+          <span>
+            plan {stats.travelBeforeMm.toFixed(1)} → {stats.travelAfterMm.toFixed(1)} mm
+          </span>
+        )}
     </div>
   );
 }

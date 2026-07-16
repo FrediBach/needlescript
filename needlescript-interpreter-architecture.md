@@ -69,6 +69,13 @@ interpreter/
 
 The value model those modules operate on lives one level up in `list.ts`.
 
+Travel routing deliberately lives outside the evaluator modules. `routing.ts` owns the
+generic deterministic algorithm registry and spatial-bucket nearest implementation;
+`travel-planner.ts` adapts final `StitchEvent` runs to that interface. `gen-func.ts`
+adapts NeedleScript point/path values to the same interface for `routesort`. This
+keeps future algorithms additive: implement one `RouteAlgorithm`, register it, then
+map a language mode to it without duplicating spatial search or tie semantics.
+
 ---
 
 ## 3. The `RunContext` pattern
@@ -80,21 +87,22 @@ state from it and installs its functions onto it.
 
 ### 3.1 Mutable state (`context.ts:15-33`)
 
-| Field             | Purpose                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------ |
-| `globals`         | top-level variable bindings (`Record<string, Val>`)                                  |
-| `procs`           | procedure name → its `to` AST node (populated as `to` statements execute)            |
-| `rng`             | main PRNG stream; reassigned by `seed`                                               |
-| `noise`           | legacy coherent noise; reassigned by `seed`                                          |
-| `snoise2/snoise3` | seeded simplex noise streams                                                         |
-| `ops`             | operation counter (the anti-infinite-loop budget)                                    |
-| `cells`           | live list-cell counter                                                               |
-| `stringChars`     | cumulative string-char allocation counter                                            |
-| `printed`         | accumulated `print`/`printloc` output                                                |
-| `insideTrace`     | trace-sandbox nesting depth                                                          |
-| `traceNoted`      | one-time notes already emitted inside trace                                          |
-| `structuralDepth` | structural block nesting (loop/if/transform/effect) — for directive placement guards |
-| `m`               | the `Machine` — the side-effect target                                               |
+| Field               | Purpose                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `globals`           | top-level variable bindings (`Record<string, Val>`)                                  |
+| `procs`             | procedure name → its `to` AST node (populated as `to` statements execute)            |
+| `rng`               | main PRNG stream; reassigned by `seed`                                               |
+| `noise`             | legacy coherent noise; reassigned by `seed`                                          |
+| `snoise2/snoise3`   | seeded simplex noise streams                                                         |
+| `ops`               | operation counter (the anti-infinite-loop budget)                                    |
+| `cells`             | live list-cell counter                                                               |
+| `stringChars`       | cumulative string-char allocation counter                                            |
+| `printed`           | accumulated `print`/`printloc` output                                                |
+| `insideTrace`       | trace-sandbox nesting depth                                                          |
+| `traceNoted`        | one-time notes already emitted inside trace                                          |
+| `structuralDepth`   | structural block nesting (loop/if/transform/effect) — for directive placement guards |
+| `planMode/planLine` | selected post-run travel strategy and its source line                                |
+| `m`                 | the `Machine` — the side-effect target                                               |
 
 ### 3.2 Function slots and init ordering
 
@@ -421,8 +429,9 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
 
 1. **Flush and close**: `m.flushSatin()`; if a fill was left open, close it with a
    warning (`index.ts:90-95`).
-2. **Tiny-stitch merge warnings** and **auto-trim** application (`index.ts:96-117`).
-3. **Density analysis** before locks (so tie-offs don't read as false hotspots), then
+2. **Tiny-stitch merge warnings**, then optional **travel planning**. Planning sees
+   the closed raw event stream and runs before every order-sensitive pass.
+3. **Auto-trim**, then **density analysis** before locks (so tie-offs don't read as false hotspots), then
    density/stack hotspot warnings with `WarningLocation` spatial data
    (`index.ts:121-153`).
 4. **Lock (tie-off) pass** via `applyLocks` (`index.ts:155-160`).
@@ -432,7 +441,12 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    (`index.ts:206-241`).
 7. **Assemble `RunResult`** (`index.ts:250-260`): `events`, `warnings`,
    `warningLocations`, `printed`, `locks`, `density`, `activeHoop`, `activeOverrides`,
-   and `globals` (the top-level variable bindings).
+   `globals` (the top-level variable bindings), and optional `plan` statistics.
+
+The load-bearing finalize order is `flush → plan → autotrim → density → locks`.
+Planning therefore prevents unnecessary automatic cuts, while locks see only final
+run boundaries. The live density grid and history queries intentionally remain in
+program order; density accumulation is order-independent.
 
 The `RunResult` shape is defined in `types.ts:76-89`; downstream, the exporters
 (`svg.ts`, `dst.ts`, `pes.ts`, `exp.ts`) consume `events` to produce files.
@@ -473,6 +487,8 @@ The `RunResult` shape is defined in `types.ts:76-89`; downstream, the exporters
 | `interpreter/reporters.ts`   | `@name` reporter contracts + effect clamps                       |
 | `interpreter/list-func.ts`   | list library dispatcher                                          |
 | `interpreter/gen-func.ts`    | generative-math dispatcher                                       |
+| `routing.ts`                 | generic route strategy registry + spatial nearest search         |
+| `travel-planner.ts`          | color/run partitioning and event-level plan strategy registry    |
 | `interpreter/query-func.ts`  | stitch-history query dispatcher                                  |
 | `interpreter/string-func.ts` | string library dispatcher                                        |
 | `list.ts`                    | value model (`Val`, `NsList`, `FuncRef`) + value utilities       |

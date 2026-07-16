@@ -1,4 +1,5 @@
 import type { ASTNode, ExprNode } from '../types.ts';
+import type { PlanMode } from '../travel-planner.ts';
 import type { Machine } from '../machine.ts';
 import type { Val, NsList, FuncRef, ComposedRef } from '../list.ts';
 import type { Pt } from '../genmath.ts';
@@ -31,6 +32,8 @@ export interface RunContext {
   insideFillGenerator: number;
   traceNoted: Set<string>;
   structuralDepth: number;
+  planMode: PlanMode | 'off' | null;
+  planLine?: number;
   m: Machine;
 
   // ---- budget (initBudget) ----

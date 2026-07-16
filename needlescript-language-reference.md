@@ -346,7 +346,7 @@ Immutable character sequences in single quotes; must close on the same line. Esc
 
 ### Mode consumers
 
-`fabric`, `underlay`, `fillunderlay`, `clippaths`, `hoop` accept any string expression for their mode argument, matched case-insensitively. Unknown modes error with did-you-mean.
+`fabric`, `underlay`, `fillunderlay`, `clippaths`, `hoop`, `routesort`, and `plan` accept any string expression for their mode argument, matched case-insensitively. Unknown modes error with did-you-mean.
 
 Strings inside lists: allowed; rendered single-quoted; `pick`/`shuffle`/`contains`/`indexof`/`for…in`/destructuring work; numeric aggregates (`sum`, `sort`, …) error on string elements.
 
@@ -386,6 +386,12 @@ for p in path [ setpos(p) ]
 | `sum(xs)` · `mean(xs)` · `minof(xs)` · `maxof(xs)` | numeric aggregates; `sum([])` = 0, the others error on empty   |
 | `pick(xs)`                                         | random element — seeded, exactly 1 draw                        |
 | `shuffle(xs)`                                      | new shuffled list — seeded, exactly 1 main-stream draw (forks) |
+
+### Travel routing
+
+`routesort(items[, start[, mode]])` returns a new greedy nearest-neighbor ordering of points and paths. Without `start`, `items[0]` stays first; with `[x, y]`, the nearest item starts. Paths advance the cursor from their first to last vertex. Mode `'both'` also considers the last endpoint and returns a reversed **copy** when it is nearer; `'chain'` is the default. The outer result is new, ordinary elements are shared, and reversed path containers are new. Empty and singleton inputs work naturally. Equal distances within `1e-9` choose the lowest original index.
+
+The function is pure and drawless, Library-tier, charged to `'geoinput'` by item count and to ordinary list/op allocation budgets. Malformed elements name their original index.
 
 `push`/`pop` are turtle-state commands, not list ops — use `append`.
 
@@ -642,6 +648,14 @@ Presets (case-insensitive): `'round100'` (default), `'4x4'` 100×100, `'5x7'` 13
 
 Hoop-agnostic margin idiom: `let margin = first(offsetpath(fieldpath(), -6))`.
 
+### `plan` directive
+
+`plan 'nearest'` enables whole-design travel planning; `plan 'off'` is the default and a byte-identical no-op. Like `hoop`, it is top-level only, before any committed stitch, forbidden in `trace`, and allowed at most once.
+
+After execution, planning partitions every color block into atomic thread runs at explicit trims and at jumps that active autotrim would cut. Each color's first run stays first; remaining runs are chained by nearest entry point, with deterministic original-index ties. Runs are never reversed or internally edited, explicit trims remain, and color boundaries are never crossed. Connector jumps are rebuilt for the new adjacency. The pass runs before autotrim, density finalization, and locks, so automatic trims and locks see the shortened route.
+
+Planning can change which overlapping same-color run lies on top. History queries still see program order because they execute before this final pass; density is unchanged. Active planning prints before/after travel and autotrim counts and exposes `planMode`, `travelBeforeMm`, and `travelAfterMm` through result statistics.
+
 ### 16.3 Custom fill-path helpers
 
 These Library-tier functions are pure and call-syntax only. Region arguments accept one ring or a list of rings under the even-odd rule.
@@ -789,10 +803,10 @@ Annotate `let`/`make`/bare declarations to expose live controls in the playgroun
 
 1. Keep designs within ~44 mm radius (default hoop) to avoid overflow warnings; for other hoops, guard with `infield(pos())` or inset `fieldpath()`.
 2. Use `moveto` (not `setxy`) for repositioning — it jump-stitches correctly. Never use `home` for navigation (it sews when the pen is down).
-3. `trim` after each region/motif to avoid dangling connector threads; run many small motifs with trims, not one huge continuous path.
+3. Sort motif travel with `routesort`, or use `plan 'nearest'` for emergent/imported order. Prefer autotrim for long connectors; explicit `trim` remains useful where a cut is mandatory.
 4. Satin columns: 2–8 mm width; `density 0.35–0.5` typical; avoid > 8 mm (snag).
 5. Fills: `fillspacing 0.35–0.5` for most work; smaller = denser = higher stitch count.
-6. Put `seed N` at the top for reproducibility; `hoop`/`override` at the very top, before any stitch.
+6. Put `seed N` at the top for reproducibility; `hoop`/`override`/`plan` at the very top, before any stitch.
 7. Use `push`/`pop` to branch and return (trees, ferns).
 8. Aim for 5,000–25,000 total stitches for typical designs (hard budget: 100,000 stock).
 9. Avoid stitches < 0.5 mm and tight repeat loops that overcrowd one spot; watch density warnings; consider `declump` for radial/converging designs.
@@ -808,7 +822,7 @@ Annotate `let`/`make`/bare declarations to expose live controls in the playgroun
 1. **Brackets:** every block opens `[` and closes `]`; the characters `{` and `}` appear nowhere.
 2. **Names:** no variable, parameter, or procedure named `to`, `end`, `in`, or any reserved keyword; nothing reuses a Core builtin (`circle`, `pos`, `color`, `heading`, `random`, `scale`, `trace`, …); avoid Library names (`str`, `num`, `upper`, `lower`, `strip`, `chars`, `split`, `len`, `clamp`, …) too. (`step`, `dir`, `shape`, and `paths` are contextual keywords — safe to use as ordinary names outside their one special position.)
 3. **Declarations:** each variable has exactly one `let`, placed before any loop/branch that updates it; all later writes are bare assignments; no `let` on parameters; no shadowing; conditionally-assigned variables have a default.
-4. **Placement:** `return`/`output`/`exit` only inside `def`/`to` bodies; `break`/`continue` only inside loop bodies of the same procedure; every reporter returns on every path (add `else`); `hoop`/`override`/`seed` at the top; `trace` only in expression position, never containing `beginfill` or `seed`.
+4. **Placement:** `return`/`output`/`exit` only inside `def`/`to` bodies; `break`/`continue` only inside loop bodies of the same procedure; every reporter returns on every path (add `else`); `hoop`/`override`/`plan`/`seed` at the top; `trace` only in expression position, never containing `beginfill`, `plan`, or `seed`.
 5. **Negative literals:** ` -5` (space before, glued after) is a negative argument; `10 - 5` is subtraction — check argument counts around minus signs, or use glued-paren calls.
 6. **Strings & types:** `concat(a, b)` not `a + b`; `strip(s)` not `trim(s)` for whitespace; conditions are numbers, never strings or lists (`len(x) > 0`); `vadd` for point math, never `+` on lists.
 7. **Embroidery sanity:** trims between motifs, satin widths 2–8 mm, stitch count well under budget, everything inside the field.

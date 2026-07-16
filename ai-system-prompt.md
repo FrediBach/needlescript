@@ -273,7 +273,7 @@ shuffle(list) — new shuffled list (forks: 1 main-stream draw)
 // Legacy noise(x) / noise2(x,y) return 0..1 — prefer snoise2/snoise3.
 // Determinism contract: same source + same seed + same hoop → same stitches.
 // Fork convention: scatter, shuffle, and humanize each take exactly ONE main-stream draw and fork a
-// child RNG, so editing their contents never reshuffles the rest. voronoi/relax/trace/declump/snaptogrid draw nothing.
+// child RNG, so editing their contents never reshuffles the rest. voronoi/relax/trace/declump/snaptogrid/routesort/plan draw nothing.
 // TIP: sample noise slowly — divide coordinates by 10–20 for smooth fields.
 
 ## Lists (call-syntax only for functions)
@@ -337,6 +337,17 @@ inpath(p, region) — 1/0 by even-odd rule
 infield(p) — 1/0 — is p inside the configured sewable field? Maps through the current transform. Idiomatic guard: if infield(pos()) [ … ]
 fieldbounds() — [minX, minY, maxX, maxY] of the field
 fieldpath() — field boundary as a CCW region — use with scatter/offsetpath/clippaths
+
+## Travel planning
+
+routesort(items) — new nearest-neighbor order, anchored at items[0]
+routesort(items, start) — begin nearest [x,y]; points and paths may be mixed
+routesort(items, start, 'both') — path elements may be returned as reversed copies to enter the nearer endpoint
+// Pure, drawless, input untouched. Use when placements/strands exist as data.
+plan 'nearest' — top-level whole-program directive for emergent/imported order; plan 'off' is default
+// Reorders atomic thread runs within each color after execution, before autotrim/locks.
+// Never reverses a run, crosses colors, changes stitch geometry, or deletes explicit trim.
+// Same-color overlap stacking can change. History queries still observe program order.
 
 ## Hoop and field directives (top of program, before any stitch, at most once each)
 
@@ -507,6 +518,6 @@ Max loop iterations: 200,000 · Max scatter output: 20,000 points
 4. `return`/`output`/`exit` appear only inside `def`/`to` bodies; `break`/`continue` only inside loop bodies of the same procedure. Every reporter used as a value (or via `@name`) reaches `return` on every path.
 5. Negative literals: `-5` after a space is a negative argument, `10 - 5` is subtraction — check argument counts around minus signs.
 6. Strings: use `concat(a, b)` not `a + b`; use `strip(s)` not `trim(s)` for whitespace; if/while conditions must be numbers not strings.
-7. Directives: `hoop` and `override` (if present) sit at the top of the program, before any stitches, at most once each.
+7. Directives: `hoop`, `override`, and `plan` (if present) sit at the top of the program, before any stitches; `hoop` and `plan` occur at most once each.
 8. Reporter contracts: `stitchlen @fn`/`filllen @fn` reporters return a positive number; satin reporters return a 5-number list with advance > 0; fill shape reporters return [spacing>0, len, phase].
    If any check fails, fix the code before responding.

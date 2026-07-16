@@ -9,6 +9,8 @@ import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { tokenize } from '../tokenizer.ts';
 import { parse } from '../parser/index.ts';
 import { applyAutoTrim, applyLocks } from '../postprocess.ts';
+import { applyTravelPlan } from '../travel-planner.ts';
+import type { TravelPlanStats } from '../types.ts';
 import type { Val } from '../list.ts';
 import type { ASTNode } from '../types.ts';
 import { LIMITS } from '../machine.ts';
@@ -62,6 +64,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     // Structural block depth: incremented inside repeat/for/while/forin/if/transform/effect
     // so that the `hoop` and `override` placement guards can detect nested placement.
     structuralDepth: 0,
+    planMode: null,
+    planLine: undefined,
     m,
   } as RunContext;
 
@@ -111,6 +115,28 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     }
     m.warnings.push(
       `${m.tinyDropped} sub-${LIMITS.minStitch} mm moves merged into neighbours (too short to sew safely)`,
+    );
+  }
+
+  let planStats: TravelPlanStats | undefined;
+  if (ctx.planMode && ctx.planMode !== 'off') {
+    const beforeAutotrims = m.autoTrim > 0 ? applyAutoTrim(m.events, m.autoTrim).trims : 0;
+    const planned = applyTravelPlan(m.events, ctx.planMode, m.autoTrim, (n) =>
+      ctx.tickN(n, ctx.planLine),
+    );
+    const afterAutotrims = m.autoTrim > 0 ? applyAutoTrim(planned.events, m.autoTrim).trims : 0;
+    m.events = planned.events;
+    planStats = {
+      planMode: planned.mode,
+      travelBeforeMm: planned.travelBeforeMm,
+      travelAfterMm: planned.travelAfterMm,
+      runs: planned.runs,
+      colors: planned.colors,
+    };
+    ctx.printed.push(
+      planned.reordered
+        ? `plan '${planned.mode}': travel ${planned.travelBeforeMm.toFixed(1)} mm → ${planned.travelAfterMm.toFixed(1)} mm, autotrims ${beforeAutotrims} → ${afterAutotrims} (runs: ${planned.runs}, colors: ${planned.colors})`
+        : `plan '${planned.mode}': nothing to reorder`,
     );
   }
 
@@ -260,5 +286,6 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     activeHoop,
     activeOverrides,
     globals: ctx.globals,
+    plan: planStats,
   };
 }
