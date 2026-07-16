@@ -38,6 +38,7 @@ interface Props {
   hoop: HoopConfig;
   onOpenHoopDialog: () => void;
   onSVGImport: (mode: 'quick' | 'options') => void;
+  onBitmapImport: () => void;
   onExampleSelect: (key: string) => void;
   onRun: () => void;
   onDownload: (format: ExportFormat) => void;
@@ -255,6 +256,7 @@ interface HamburgerProps {
   onOpenHoopDialog: () => void;
   onExampleSelect: (key: string) => void;
   onSVGImport: (mode: 'quick' | 'options') => void;
+  onBitmapImport: () => void;
   onDownload: (fmt: ExportFormat) => void;
   onShare: () => Promise<void>;
 }
@@ -264,6 +266,7 @@ function HamburgerMenu({
   onOpenHoopDialog,
   onExampleSelect,
   onSVGImport,
+  onBitmapImport,
   onDownload,
   onShare,
 }: HamburgerProps) {
@@ -334,6 +337,10 @@ function HamburgerMenu({
             <UploadIcon className="size-3.5 opacity-55" />
             Import with options…
           </DropdownMenuItem>
+          <DropdownMenuItem className="lg:hidden" onClick={onBitmapImport}>
+            <UploadIcon className="size-3.5 opacity-55" />
+            Import bitmap data…
+          </DropdownMenuItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator className="lg:hidden" />
@@ -374,6 +381,7 @@ export default function Header({
   hoop,
   onOpenHoopDialog,
   onSVGImport,
+  onBitmapImport,
   onExampleSelect,
   onRun,
   onDownload,
@@ -428,12 +436,12 @@ export default function Header({
         </div>
       </div>
 
-      {/* ══ IMPORT SVG (lg+ only) ═════════════════════════════════════════════ */}
+      {/* ══ IMPORT (lg+ only) ═════════════════════════════════════════════════ */}
       <div className="hidden lg:flex items-center gap-1.5">
         <DropdownMenu>
-          <DropdownMenuTrigger className={blueBtn} aria-label="Import an SVG file">
+          <DropdownMenuTrigger className={blueBtn} aria-label="Import a design file">
             <UploadIcon className="size-3.5 opacity-65" />
-            Import SVG
+            Import
             <ChevronDownIcon className="size-3 opacity-65" />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
@@ -444,6 +452,11 @@ export default function Header({
             <DropdownMenuItem onClick={() => onSVGImport('options')}>
               <UploadIcon className="size-3.5 opacity-55" />
               Import with options…
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onBitmapImport}>
+              <UploadIcon className="size-3.5 opacity-55" />
+              Import bitmap data…
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -487,6 +500,7 @@ export default function Header({
         onOpenHoopDialog={onOpenHoopDialog}
         onExampleSelect={onExampleSelect}
         onSVGImport={onSVGImport}
+        onBitmapImport={onBitmapImport}
         onDownload={onDownload}
         onShare={onShare}
       />

@@ -83,6 +83,22 @@ export { toSVG } from './svg.ts';
 export { toDST } from './dst.ts';
 export { toPES } from './pes.ts';
 export { toEXP } from './exp.ts';
+export {
+  BITMAP_HELPERS,
+  EST_STITCHES_PER_MM2,
+  bitmapPrefix,
+  emitBitmapCode,
+  processBitmap,
+  uniqueBitmapPrefix,
+} from './bitmap-importer.ts';
+export type {
+  BitmapCrop,
+  BitmapPixels,
+  BitmapPlate,
+  BitmapSettings,
+  EmitBitmapOptions,
+  ProcessedBitmap,
+} from './bitmap-importer.ts';
 
 // SVG-import staging (pure modules; the DOM parser lives in svg/parse.ts).
 export type {

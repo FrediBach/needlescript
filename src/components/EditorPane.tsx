@@ -752,7 +752,7 @@ export default function EditorPane({
         )}
       </div>
 
-      {isDragging && <div className={styles.dropOverlay}>drop SVG to convert</div>}
+      {isDragging && <div className={styles.dropOverlay}>drop SVG or bitmap to import</div>}
     </section>
   );
 }

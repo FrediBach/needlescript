@@ -29,6 +29,7 @@ import { parseParameters, updatePointParameter } from './lib/parse-parameters.ts
 import type { PointParamDef } from './lib/parse-parameters.ts';
 import { usePanelSplit } from './hooks/usePanelSplit.ts';
 import { useSvgImport } from './hooks/useSvgImport.ts';
+import { useBitmapImport } from './hooks/useBitmapImport.ts';
 import { useShare } from './hooks/useShare.ts';
 import { useAI } from './hooks/useAI.ts';
 import { useReplCommands } from './hooks/useReplCommands.ts';
@@ -42,6 +43,7 @@ const StagingDialog = lazy(() => import('./components/svg-staging/StagingDialog.
 import HoopDialog from './components/HoopDialog.tsx';
 import { Toaster } from '@/components/ui/sonner.tsx';
 import ImportChooser from './components/svg-staging/ImportChooser.tsx';
+const BitmapImportDialog = lazy(() => import('./components/BitmapImportDialog.tsx'));
 import { MachineContextMenu } from './components/MachineMenu.tsx';
 import type { ActiveMachine, EditorContextActions } from './components/MachineMenu.tsx';
 import {
@@ -422,6 +424,15 @@ export default function App() {
   }, [source]);
 
   const {
+    bitmapFileRef,
+    bitmapSource,
+    requestBitmapImport,
+    handleBitmapFileInput,
+    openBitmapFile,
+    closeBitmapImport,
+  } = useBitmapImport({ addMsg });
+
+  const {
     isDragging,
     svgFileRef,
     handleFileInput,
@@ -435,7 +446,7 @@ export default function App() {
     cancelChooser,
     stagingDoc,
     closeStaging,
-  } = useSvgImport({ fitMM, runProgram, setSource, addMsg });
+  } = useSvgImport({ fitMM, runProgram, setSource, addMsg, onBitmapFile: openBitmapFile });
 
   const { handleShare } = useShare({
     source,
@@ -607,6 +618,17 @@ export default function App() {
     [runProgram, closeStaging],
   );
 
+  const handleBitmapInsert = useCallback(
+    (code: string, summary: string) => {
+      const prior = sourceRef.current.trimEnd();
+      const next = `${prior}${prior ? '\n\n' : ''}${code}\n`;
+      setSource(next);
+      addMsg(summary, 'ok');
+      closeBitmapImport();
+    },
+    [addMsg, closeBitmapImport],
+  );
+
   const handleDownload = useCallback(
     (format: ExportFormat) => {
       if (!design.ok || design.pts.length === 0) {
@@ -729,6 +751,7 @@ export default function App() {
         hoop={selectedHoop}
         onOpenHoopDialog={() => setShowHoopDialog(true)}
         onSVGImport={requestImport}
+        onBitmapImport={requestBitmapImport}
         onExampleSelect={handleExampleSelect}
         onRun={handleRun}
         onDownload={handleDownload}
@@ -836,6 +859,15 @@ export default function App() {
         onChange={handleFileInput}
       />
 
+      <input
+        ref={bitmapFileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,.png,.jpg,.jpeg,.gif,.webp,.bmp"
+        aria-label="Import bitmap image"
+        style={{ display: 'none' }}
+        onChange={handleBitmapFileInput}
+      />
+
       <ImportChooser pending={pending} onChoose={chooseImport} onCancel={cancelChooser} />
 
       <Suspense fallback={stagingDoc ? <DialogSpinner /> : null}>
@@ -849,6 +881,17 @@ export default function App() {
             hoop={selectedHoop}
             reporters={svgReporters}
             onCommit={handleStagingCommit}
+          />
+        )}
+      </Suspense>
+
+      <Suspense fallback={bitmapSource ? <DialogSpinner /> : null}>
+        {bitmapSource && (
+          <BitmapImportDialog
+            source={bitmapSource}
+            programSource={source}
+            onClose={closeBitmapImport}
+            onInsert={handleBitmapInsert}
           />
         )}
       </Suspense>

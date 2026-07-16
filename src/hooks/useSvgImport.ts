@@ -16,6 +16,7 @@ interface UseSvgImportOptions {
   runProgram: (src: string, name: string) => void;
   setSource: (src: string) => void;
   addMsg: AddMsg;
+  onBitmapFile: (file: File) => void;
 }
 
 /**
@@ -23,7 +24,13 @@ interface UseSvgImportOptions {
  * Import with options…), file-picker, drag-and-drop, and opening the staging
  * workspace. Quick import is unchanged from the original one-shot path.
  */
-export function useSvgImport({ fitMM, runProgram, setSource, addMsg }: UseSvgImportOptions) {
+export function useSvgImport({
+  fitMM,
+  runProgram,
+  setSource,
+  addMsg,
+  onBitmapFile,
+}: UseSvgImportOptions) {
   const [isDragging, setIsDragging] = useState(false);
   const svgFileRef = useRef<HTMLInputElement>(null);
   const modeRef = useRef<ImportMode>('quick');
@@ -116,7 +123,8 @@ export function useSvgImport({ fitMM, runProgram, setSource, addMsg }: UseSvgImp
       const f = e.dataTransfer?.files?.[0];
       if (!f) return;
       if (!/\.svg$/i.test(f.name) && f.type !== 'image/svg+xml') {
-        addMsg('only .svg files can be imported', 'err');
+        if (f.type.startsWith('image/')) onBitmapFile(f);
+        else addMsg('drop an SVG or bitmap image to import', 'err');
         return;
       }
       const reader = new FileReader();
@@ -130,7 +138,7 @@ export function useSvgImport({ fitMM, runProgram, setSource, addMsg }: UseSvgImp
       };
       reader.readAsText(f);
     },
-    [process, addMsg],
+    [process, addMsg, onBitmapFile],
   );
 
   // chooser resolution
