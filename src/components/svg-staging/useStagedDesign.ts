@@ -21,6 +21,7 @@ const EMPTY_DESIGN: DesignState = {
   warnings: [],
   chalk: [],
   dataVars: [],
+  referenceVars: [],
   colorTable: [],
   background: '#f5efe4',
   name: 'import',
@@ -96,6 +97,7 @@ export function useStagedDesign(initial: StagedDocument): StagedPreview {
         ok: true,
         chalk: result.chalk ?? [],
         dataVars: result.dataVars ?? [],
+        referenceVars: result.referenceVars ?? [],
         colorTable: result.colorTable,
         background: result.background,
       });

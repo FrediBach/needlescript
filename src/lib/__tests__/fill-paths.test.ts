@@ -33,7 +33,7 @@ describe('fill paths syntax and contract', () => {
 
   it('rejects invalid generator arity at the arm', () => {
     expect(() => run('def bad(a, b) [ return [] ] fill paths @bad ' + square)).toThrow(
-      /takes 1 input/,
+      /expects a 1-argument reporter/,
     );
   });
 

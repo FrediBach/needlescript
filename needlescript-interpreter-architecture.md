@@ -172,9 +172,15 @@ Runtime values are the union `Val = number | string | NsList | FuncRef`
 - **`NsList`** (`list.ts:19-27`) — a class wrapping `items: Val[]`. `instanceof` is the
   type tag; identity is reference identity (Python-like: mutable, reference semantics,
   explicit `copy()`).
-- **`FuncRef`** (`list.ts:36-41`) — a reference to a procedure or builtin produced by
-  `@name`. `ComposedRef` (`list.ts:48-54`) extends it for `compose(@f, @g, …)`
-  left-to-right pipelines.
+- **`FuncRef`** (`list.ts`) — a reference to a procedure or builtin produced by
+  `@name`, carrying a declared arity range plus an immutable tuple of leading bound
+  values. Plain references have an empty tuple; `bind` and lambda-lifted closures
+  populate it. `ComposedRef` extends it for `compose(@f, @g, …)` pipelines.
+
+References are first-class list elements and callable values. Equality involving a
+reference is deliberately an error. Formatting exposes the effective arity and bound
+slot count; final top-level references are also serialized into `referenceVars` for
+the playground Data inspector.
 
 `list.ts` also provides the shared value utilities the interpreter leans on
 everywhere:
@@ -266,7 +272,7 @@ Most parameter commands emit a **trace note** via `ctx.traceNote` if used inside
 | `neg`         | numeric negation                                                                     |
 | `list`        | evaluate items, allocate an `NsList` (depth-capped)                                  |
 | `index`       | index into a list or string (`toIndex` handles negatives + bounds)                   |
-| `callval`     | always an error (list/string values are not callable)                                |
+| `callval`     | evaluate a computed target; references route through `callRef`, other values error   |
 | `listfunc`    | routes to `genFunc` / `queryFunc` / `listFunc` by name-table membership              |
 | `bin`         | binary operators                                                                     |
 | `func`        | scalar builtins, with `repcount` special-cased to the loop counter                   |
@@ -312,10 +318,13 @@ converted to a clear error); real errors propagate. `trace` returns a single pat
 - **`scalarBuiltin`** (`proc-call.ts:82`) — evaluates the `FUNC_ARITY`/`ZERO_FUNCS`
   math tier (`sin`, `sqrt`, `mod`, `atan`, `distance`, `towards`, `xcor`, `heading`,
   …) on numeric values. `random`/`noise` draw from `ctx.rng`/`ctx.noise`.
-- **`callRef`** (`proc-call.ts:143`) — invoke a `FuncRef`/`ComposedRef` with argument
-  values. Resolution order: composed pipeline → user proc (shadows builtins) → scalar
-  builtin → list/gen/query/string builtin. This is what powers `map`, `filter`,
-  `reduce`, `compose`, and `warp`.
+- **`callRef`** (`proc-call.ts`) — validate the effective arity, prepend bound values,
+  then invoke a `FuncRef`/`ComposedRef`. Resolution order is composed pipeline → user
+  proc (shadows builtins) → scalar builtin → list/gen/query/string builtin. Every
+  higher-order function and embroidery reporter consumer uses this path.
+- **`bindRef` / `effectiveRefSignature` / `assertRefArity`** — shared configured-reference
+  construction and ranged-arity validation. Binding all parameters is legal and creates
+  a zero-argument reference; more than 16 bound slots is rejected.
 
 ---
 
@@ -416,9 +425,9 @@ two-part contract: an **arity check** at the engage site and a **per-call valida
 | `applyFillDir`           | 1 param `[x, y]` → heading                                              | `fill dir @fn`               |
 | `applyFillShape`         | 3 params `(p, row, v)` → `[spacing, len, phase]`                        | `fill shape @fn`             |
 
-Each validates that the reporter is defined, has the exact parameter count, reaches
-`output`, and returns the right shape — with errors that name exactly which slot went
-wrong. `reporters.ts` also holds the `clampHumanize`/`clampMaxshift` range clamps for
+Each validates the reference's effective parameter count at engagement, invokes it
+through `callRef`, and validates the returned shape — with errors that name exactly
+which slot went wrong. `reporters.ts` also holds the `clampHumanize`/`clampMaxshift` range clamps for
 the `humanize`/`declump` effects.
 
 These reporters are installed onto the `Machine` (e.g. `ctx.m.satinReporter`,

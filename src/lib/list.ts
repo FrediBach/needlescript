@@ -16,6 +16,11 @@ import { LIMITS } from './machine.ts';
 
 export type Val = number | string | NsList | FuncRef;
 
+export interface RefSignature {
+  min: number;
+  max: number;
+}
+
 export class NsList {
   items: Val[];
   constructor(items: Val[] = []) {
@@ -35,8 +40,22 @@ export class NsList {
  */
 export class FuncRef {
   name: string;
-  constructor(name: string) {
+  bound: Val[];
+  signature: RefSignature;
+  sourceLine?: number;
+  captureNames?: string[];
+  constructor(
+    name: string,
+    signature: RefSignature = { min: 0, max: Infinity },
+    bound: Val[] = [],
+    sourceLine?: number,
+    captureNames?: string[],
+  ) {
     this.name = name;
+    this.signature = signature;
+    this.bound = bound;
+    this.sourceLine = sourceLine;
+    this.captureNames = captureNames;
   }
 }
 
@@ -47,8 +66,15 @@ export class FuncRef {
  */
 export class ComposedRef extends FuncRef {
   steps: FuncRef[];
-  constructor(steps: FuncRef[]) {
-    super('<composed>');
+  constructor(steps: FuncRef[], bound: Val[] = []) {
+    const first = steps[0];
+    const signature = first
+      ? {
+          min: Math.max(0, first.signature.min - first.bound.length),
+          max: Math.max(0, first.signature.max - first.bound.length),
+        }
+      : { min: 0, max: 0 };
+    super('<composed>', signature, bound);
     this.steps = steps;
   }
 }
@@ -87,9 +113,20 @@ const PRINT_CAP = 64;
  * - Lists: [1, 'a', …]  (capped at 64 elements)
  */
 export function formatVal(v: Val, insideList = false, depth = 0): string {
-  if (v instanceof ComposedRef)
-    return `compose(${v.steps.map((s) => formatVal(s, true)).join(', ')})`;
-  if (isFuncRef(v)) return '@' + v.name;
+  if (v instanceof ComposedRef) {
+    const pipeline = `compose(${v.steps.map((s) => formatVal(s, true)).join(', ')})`;
+    return v.bound.length > 0 ? `${pipeline}(+${v.bound.length} bound)` : pipeline;
+  }
+  if (isFuncRef(v)) {
+    const displayName = v.name.startsWith('$anon:')
+      ? `anon:L${v.sourceLine ?? v.name.slice('$anon:'.length)}`
+      : v.name;
+    const effectiveMin = Math.max(0, v.signature.min - v.bound.length);
+    const effectiveMax = Math.max(0, v.signature.max - v.bound.length);
+    const arity =
+      effectiveMin === effectiveMax ? String(effectiveMin) : `${effectiveMin}..${effectiveMax}`;
+    return `@${displayName}${v.bound.length > 0 ? `(+${v.bound.length} bound)` : ''}/${arity}`;
+  }
   if (typeof v === 'string') return insideList ? escapeStringForDisplay(v) : v;
   if (typeof v === 'number') return formatNum(v);
   if (depth >= LIMITS.maxListDepth)
@@ -141,13 +178,7 @@ export function valDepth(v: Val, depth = 0): number {
 export function deepEqual(a: Val, b: Val, depth = 0): boolean {
   if (depth >= LIMITS.maxListDepth)
     throw new NeedlescriptError(`list nesting deeper than ${LIMITS.maxListDepth}`);
-  // ComposedRef: equal if same steps in the same order
-  if (a instanceof ComposedRef || b instanceof ComposedRef) {
-    if (!(a instanceof ComposedRef) || !(b instanceof ComposedRef)) return false;
-    if (a.steps.length !== b.steps.length) return false;
-    return a.steps.every((s, i) => deepEqual(s, b.steps[i], depth + 1));
-  }
-  if (isFuncRef(a) || isFuncRef(b)) return isFuncRef(a) && isFuncRef(b) && a.name === b.name;
+  if (isFuncRef(a) || isFuncRef(b)) throw new NeedlescriptError('references are not comparable');
   // Strings: exact, case-sensitive comparison. Cross-type always false.
   if (typeof a === 'string' || typeof b === 'string') {
     return typeof a === 'string' && typeof b === 'string' && a === b;

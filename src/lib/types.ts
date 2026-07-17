@@ -13,6 +13,8 @@ export interface Token {
   end: number;
   spBefore?: boolean;
   spAfter?: boolean;
+  /** Internal closure-lowering metadata; never produced by the tokenizer. */
+  captureNames?: string[];
 }
 
 export type EventType = 'stitch' | 'jump' | 'color' | 'trim' | 'mark';
@@ -107,6 +109,13 @@ export interface ChalkDataVar {
   pathLength?: number;
 }
 
+export interface ReferenceDataVar {
+  name: string;
+  declarationLine?: number;
+  display: string;
+  environment: Array<{ name: string; value: string }>;
+}
+
 export interface RunResult {
   events: StitchEvent[];
   warnings: string[];
@@ -124,6 +133,8 @@ export interface RunResult {
   chalk?: ChalkEvent[];
   /** Inspectable final top-level data snapshots. */
   dataVars?: ChalkDataVar[];
+  /** Inspectable final top-level references and their immutable environments. */
+  referenceVars?: ReferenceDataVar[];
   /** Whole-design travel planning metadata, present only when `plan` is active. */
   plan?: TravelPlanStats;
   colorTable: ColorTableEntry[];
@@ -199,9 +210,8 @@ export type ASTNode =
   | { k: 'listcmd'; name: string; args: ExprNode[]; line: number }
   | {
       k: 'fillarm';
-      dirRef: string | null;
-      shapeRef: string | null;
-      pathsRef: string | null;
+      dirExpr: ExprNode | null;
+      shapeExpr: ExprNode | null;
       pathsExpr: ExprNode | null;
       line: number;
     }
@@ -219,7 +229,14 @@ export type ExprNode =
   | { k: 'index'; obj: ExprNode; idx: ExprNode; line: number }
   | { k: 'callval'; obj: ExprNode; args: ExprNode[]; line: number }
   | { k: 'callexpr'; name: string; args: ExprNode[]; line: number }
-  | { k: 'procref'; name: string; line: number }
+  | {
+      k: 'procref';
+      name: string;
+      minArity: number;
+      maxArity: number;
+      captureNames?: string[];
+      line: number;
+    }
   | { k: 'trace'; multi: boolean; body: ASTNode[]; line: number };
 
 // ---------- Density analysis types ----------

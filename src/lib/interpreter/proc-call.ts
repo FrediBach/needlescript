@@ -14,6 +14,40 @@ import type { RunContext, Env } from './context.ts';
 import type { ExprNode } from '../types.ts';
 
 export function initProcCall(ctx: RunContext): void {
+  ctx.effectiveRefSignature = (ref: FuncRef) => ({
+    min: Math.max(0, ref.signature.min - ref.bound.length),
+    max: Math.max(0, ref.signature.max - ref.bound.length),
+  });
+
+  ctx.assertRefArity = (ref: FuncRef, arity: number, what: string, line?: number): void => {
+    const signature = ctx.effectiveRefSignature(ref);
+    if (arity >= signature.min && arity <= signature.max) return;
+    const got =
+      signature.min === signature.max
+        ? `${signature.min}-argument`
+        : `${signature.min}..${signature.max}-argument`;
+    throw new NeedlescriptError(
+      `${what} expects a ${arity}-argument reporter; got a ${got} reference`,
+      line,
+    );
+  };
+
+  ctx.bindRef = (ref: FuncRef, values: Val[], line?: number): FuncRef => {
+    const total = ref.bound.length + values.length;
+    if (total > 16)
+      throw new NeedlescriptError(`bind supports at most 16 bound values; got ${total}`, line);
+    if (total > ref.signature.max) {
+      const name = ref instanceof ComposedRef ? 'the composed reference' : ref.name;
+      throw new NeedlescriptError(
+        `bind: ${name} accepts at most ${ref.signature.max} arguments; cannot bind ${total}`,
+        line,
+      );
+    }
+    const bound = [...ref.bound, ...values];
+    if (ref instanceof ComposedRef) return new ComposedRef(ref.steps, bound);
+    return new FuncRef(ref.name, ref.signature, bound, ref.sourceLine, ref.captureNames);
+  };
+
   ctx.callProc = (
     name: string,
     argNodes: ExprNode[],
@@ -141,18 +175,30 @@ export function initProcCall(ctx: RunContext): void {
    * argument values. Used by map, filter, reduce, and any future HOFs.
    */
   ctx.callRef = (ref: FuncRef | ComposedRef, argVals: Val[], depth: number, line?: number): Val => {
+    const effective = ctx.effectiveRefSignature(ref);
+    if (argVals.length < effective.min || argVals.length > effective.max) {
+      const expected =
+        effective.min === effective.max
+          ? String(effective.min)
+          : `${effective.min} to ${effective.max}`;
+      throw new NeedlescriptError(
+        `${ref instanceof ComposedRef ? 'composed reference' : `@${ref.name}`} expects ${expected} arguments, got ${argVals.length}`,
+        line,
+      );
+    }
     // 0. Composed reference — pipe through each step left-to-right
     if (ref instanceof ComposedRef) {
-      let result = ctx.callRef(ref.steps[0], argVals, depth, line);
+      let result = ctx.callRef(ref.steps[0], [...ref.bound, ...argVals], depth, line);
       for (let i = 1; i < ref.steps.length; i++) {
         ctx.tick(line);
         result = ctx.callRef(ref.steps[i], [result], depth, line);
       }
       return result;
     }
+    const allArgs = [...ref.bound, ...argVals];
     // 1. User-defined proc takes priority (can shadow builtins)
     if (ctx.procs[ref.name]) {
-      const result = ctx.callProcVals(ref.name, argVals, depth, line);
+      const result = ctx.callProcVals(ref.name, allArgs, depth, line);
       if (result === undefined)
         throw new NeedlescriptError(
           `"${ref.name}" must return a value when used as a callback`,
@@ -162,12 +208,12 @@ export function initProcCall(ctx: RunContext): void {
     }
     // 2. Scalar builtins (FUNC_ARITY + ZERO_FUNCS)
     if (FUNC_ARITY[ref.name] !== undefined || ZERO_FUNCS.has(ref.name))
-      return ctx.scalarBuiltin(ref.name, argVals, line);
+      return ctx.scalarBuiltin(ref.name, allArgs, line);
     // 3. List / Gen / Query / String builtins
-    if (LIST_FUNCS[ref.name] !== undefined) return ctx.listFunc(ref.name, argVals, line);
-    if (GEN_FUNCS[ref.name] !== undefined) return ctx.genFunc(ref.name, argVals, line);
-    if (QUERY_FUNCS[ref.name] !== undefined) return ctx.queryFunc(ref.name, argVals, line);
-    if (STRING_FUNCS[ref.name] !== undefined) return ctx.stringFunc(ref.name, argVals, line);
+    if (LIST_FUNCS[ref.name] !== undefined) return ctx.listFunc(ref.name, allArgs, line, depth);
+    if (GEN_FUNCS[ref.name] !== undefined) return ctx.genFunc(ref.name, allArgs, line);
+    if (QUERY_FUNCS[ref.name] !== undefined) return ctx.queryFunc(ref.name, allArgs, line);
+    if (STRING_FUNCS[ref.name] !== undefined) return ctx.stringFunc(ref.name, allArgs, line);
 
     throw new NeedlescriptError(`Unknown function "${ref.name}" in @${ref.name} reference`, line);
   };

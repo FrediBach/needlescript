@@ -57,6 +57,22 @@ describe('standard-library modules', () => {
     ).not.toThrow();
   });
 
+  it('provides configured reporter factories without changing legacy exports', () => {
+    const result = run(`
+      import std.textures.griddir as griddir
+      import std.textures.curldirwith as curldirwith
+      import std.textures.gradientshapewith as gradientshapewith
+      import std.mathx.easepow as easepow
+      print griddir(35)([2, 3])
+      print isref(curldirwith(9))
+      print gradientshapewith(0.3, 0.9)([0, 0], 0, 1)
+      print easepow(3)(0.5)
+      fill dir griddir(20)
+      beginfill repeat 4 [ fd 8 rt 90 ] endfill
+    `);
+    expect(result.printed).toEqual(['35', '1', '[0.9, 2.5, 0.5]', '0.125']);
+  });
+
   it('provides clipped geometric texture path generators', () => {
     const result = run(`
       import std.textures.hilbertpaths as hilbertpaths

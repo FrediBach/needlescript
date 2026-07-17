@@ -223,9 +223,8 @@ function rewriteStatements(stmts: ASTNode[], names: ReadonlyMap<string, string>)
         stmt.args.forEach((arg) => rewriteExpr(arg, names));
         break;
       case 'fillarm':
-        if (stmt.dirRef) stmt.dirRef = names.get(stmt.dirRef) ?? stmt.dirRef;
-        if (stmt.shapeRef) stmt.shapeRef = names.get(stmt.shapeRef) ?? stmt.shapeRef;
-        if (stmt.pathsRef) stmt.pathsRef = names.get(stmt.pathsRef) ?? stmt.pathsRef;
+        if (stmt.dirExpr) rewriteExpr(stmt.dirExpr, names);
+        if (stmt.shapeExpr) rewriteExpr(stmt.shapeExpr, names);
         if (stmt.pathsExpr) rewriteExpr(stmt.pathsExpr, names);
         break;
       case 'call':

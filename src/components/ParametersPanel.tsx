@@ -11,7 +11,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import type { ChalkDataVar } from '../lib/engine.ts';
+import type { ChalkDataVar, ReferenceDataVar } from '../lib/engine.ts';
 import { parsePresets, snapValue, projectPoint, sampleRegion } from '../lib/parse-parameters.ts';
 import type {
   ParamItem,
@@ -50,6 +50,7 @@ interface Props {
   /** Which handle the stage is currently highlighting (from stage hover → back to panel) */
   highlightedHandle?: string | null;
   dataVars: ChalkDataVar[];
+  referenceVars: ReferenceDataVar[];
   pinnedDataVars: Set<string>;
   onTogglePinnedDataVar: (name: string) => void;
   onHoverDataVar: (name: string | null) => void;
@@ -131,6 +132,29 @@ function DataRow({
         aria-pressed={pinned}
       >
         {pinned ? <Eye size={12} aria-hidden="true" /> : <EyeOff size={12} aria-hidden="true" />}
+      </button>
+    </div>
+  );
+}
+
+function ReferenceRow({
+  value,
+  onRevealLine,
+}: {
+  value: ReferenceDataVar;
+  onRevealLine: (line: number) => void;
+}) {
+  const environment = value.environment.map((entry) => `${entry.name} = ${entry.value}`).join('\n');
+  return (
+    <div className={styles.dataRow}>
+      <button
+        className={styles.dataIdentity}
+        type="button"
+        onClick={() => value.declarationLine && onRevealLine(value.declarationLine)}
+        title={environment || 'This reference has no bound environment'}
+      >
+        <span className={styles.dataName}>{value.name}</span>
+        <span className={styles.dataSummary}>{value.display}</span>
       </button>
     </div>
   );
@@ -575,6 +599,7 @@ export default function ParametersPanel({
   onHighlightHandle,
   highlightedHandle,
   dataVars,
+  referenceVars,
   pinnedDataVars,
   onTogglePinnedDataVar,
   onHoverDataVar,
@@ -830,7 +855,7 @@ export default function ParametersPanel({
     if (paramCount === 0) hadParamsRef.current = false;
   }, [paramCount]);
 
-  if (paramCount === 0 && inspectableData.length === 0) return null;
+  if (paramCount === 0 && inspectableData.length === 0 && referenceVars.length === 0) return null;
 
   return (
     <div className={styles.panel} role="region" aria-label="Parameters">
@@ -843,7 +868,9 @@ export default function ParametersPanel({
           type="button"
         >
           <span className={styles.headerLabel}>Parameters &amp; Data</span>
-          <span className={styles.paramCount}>{paramCount + inspectableData.length}</span>
+          <span className={styles.paramCount}>
+            {paramCount + inspectableData.length + referenceVars.length}
+          </span>
           <span className={styles.headerSpacer} />
           {open ? (
             <ChevronUp size={12} aria-hidden="true" />
@@ -990,6 +1017,15 @@ export default function ParametersPanel({
                   onLocate={handleLocateData}
                   onRevealLine={onRevealLine}
                 />
+              ))}
+            </>
+          )}
+          {referenceVars.length > 0 && (
+            <>
+              <SectionHeader title="References · final values" />
+              <div className={styles.dataHint}>Hover to inspect the captured environment</div>
+              {referenceVars.map((value) => (
+                <ReferenceRow key={value.name} value={value} onRevealLine={onRevealLine} />
               ))}
             </>
           )}

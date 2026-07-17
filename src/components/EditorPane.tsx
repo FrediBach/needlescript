@@ -4,7 +4,7 @@ import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { editor, IDisposable } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
 import type { LineStitchBounds } from '../App.tsx';
-import type { ChalkDataVar, WarningLocation } from '../lib/engine.ts';
+import type { ChalkDataVar, ReferenceDataVar, WarningLocation } from '../lib/engine.ts';
 import type { ParamItem } from '../lib/parse-parameters.ts';
 import type { AIModelInfo } from '../hooks/useAI.ts';
 import { registerNeedlescript, scheduleNeedlescriptProviders } from '../lib/needlescript-monaco.ts';
@@ -68,6 +68,7 @@ interface Props {
   /** Which handle name the stage is currently highlighting */
   highlightedHandle?: string | null;
   dataVars: ChalkDataVar[];
+  referenceVars: ReferenceDataVar[];
   pinnedDataVars: Set<string>;
   onTogglePinnedDataVar: (name: string) => void;
   onHoverDataVar: (name: string | null) => void;
@@ -123,6 +124,7 @@ export default function EditorPane({
   onHighlightHandle,
   highlightedHandle,
   dataVars,
+  referenceVars,
   pinnedDataVars,
   onTogglePinnedDataVar,
   onHoverDataVar,
@@ -698,6 +700,7 @@ export default function EditorPane({
         onHighlightHandle={onHighlightHandle}
         highlightedHandle={highlightedHandle}
         dataVars={dataVars}
+        referenceVars={referenceVars}
         pinnedDataVars={pinnedDataVars}
         onTogglePinnedDataVar={onTogglePinnedDataVar}
         onHoverDataVar={onHoverDataVar}

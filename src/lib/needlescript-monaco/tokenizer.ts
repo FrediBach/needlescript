@@ -169,6 +169,7 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'filled',
       'len',
       'islist',
+      'isref',
       'first',
       'last',
       'concat',
@@ -196,6 +197,7 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'filter',
       'reduce',
       'compose',
+      'bind',
       // generative math
       'snoise2',
       'snoise3',

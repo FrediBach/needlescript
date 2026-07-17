@@ -22,6 +22,10 @@ export def easeback(t) [
   return c3 * u * u * u - c1 * u * u
 ]
 
+export def easepow(power) [
+  return def(t) [ return pow(clamp(t, 0, 1), power) ]
+]
+
 export def triwave(t) [
   let u = mod(t, 1)
   return 1 - abs(2 * u - 1) * 2

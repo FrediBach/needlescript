@@ -327,7 +327,7 @@ describe('definition-time collision errors (§4.3)', () => {
 
 describe('call and comma errors', () => {
   it('glued paren on a variable errors (test #14)', () => {
-    expect(() => run('let f = 3 fd f(2)')).toThrow(/"f" is a variable, not a procedure/);
+    expect(() => run('let f = 3 fd f(2)')).toThrow(/only references are callable/);
     expect(() => run('let f = 3 f(2)')).toThrow(/"f" is a variable, not a procedure/);
   });
 

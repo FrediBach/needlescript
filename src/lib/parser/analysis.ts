@@ -73,10 +73,8 @@ function collectValueUsesStmt(st: ASTNode, out: Set<string>): void {
       st.args.forEach((e) => collectValueUsesExpr(e, out));
       break;
     case 'fillarm':
-      // dirRef and shapeRef are stored as strings (not ExprNode), so collect them directly
-      if (st.dirRef) out.add(st.dirRef);
-      if (st.shapeRef) out.add(st.shapeRef);
-      if (st.pathsRef) out.add(st.pathsRef);
+      if (st.dirExpr) collectValueUsesExpr(st.dirExpr, out);
+      if (st.shapeExpr) collectValueUsesExpr(st.shapeExpr, out);
       if (st.pathsExpr) collectValueUsesExpr(st.pathsExpr, out);
       break;
   }

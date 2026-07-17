@@ -227,9 +227,10 @@ export function parsePostfix(ctx: ParseContext, expr: ExprNode, indexable: boole
       expr = { k: 'index', obj: expr, idx, line: open.line };
       continue;
     }
-    if (nxt.t === '(' && prev.t === ']') {
-      // paths[i](…) — parses; erroring is the runtime's job (§3.1).
-      const args = parseParenArgsRange(ctx, 'a list value', 0, Infinity, nxt.line);
+    if (nxt.t === '(') {
+      // Computed call target: refs stored in variables/lists, returned from
+      // factories, and higher-order expressions are all callable values.
+      const args = parseParenArgsRange(ctx, 'a reference value', 0, Infinity, nxt.line);
       expr = { k: 'callval', obj: expr, args, line: nxt.line };
       continue;
     }
@@ -304,7 +305,19 @@ export function parsePrimary(ctx: ParseContext): ExprNode {
     const name = tok.v as string;
     // 1. User-defined procedure — always accepted (shadows builtins)
     if (ctx.procArity[name] !== undefined) {
-      return { k: 'procref', name, line: tok.line };
+      const arity = ctx.procArity[name];
+      return parsePostfix(
+        ctx,
+        {
+          k: 'procref',
+          name,
+          minArity: arity,
+          maxArity: arity,
+          captureNames: tok.captureNames,
+          line: tok.line,
+        },
+        true,
+      );
     }
     // 2. Value-returning builtins — accepted as references
     if (
@@ -315,7 +328,20 @@ export function parsePrimary(ctx: ParseContext): ExprNode {
       QUERY_FUNCS[name] !== undefined ||
       STRING_FUNCS[name] !== undefined
     ) {
-      return { k: 'procref', name, line: tok.line };
+      const ranged = LIST_FUNCS[name] ?? GEN_FUNCS[name] ?? QUERY_FUNCS[name] ?? STRING_FUNCS[name];
+      const arity = FUNC_ARITY[name] ?? (ZERO_FUNCS.has(name) ? 0 : undefined);
+      return parsePostfix(
+        ctx,
+        {
+          k: 'procref',
+          name,
+          minArity: ranged?.min ?? arity ?? 0,
+          maxArity: ranged?.max ?? arity ?? 0,
+          captureNames: tok.captureNames,
+          line: tok.line,
+        },
+        true,
+      );
     }
     // 3. Statement-only builtins — explicit rejection with helpful message
     const kind = ctx.builtinKind(name);
@@ -368,6 +394,19 @@ export function parsePrimary(ctx: ParseContext): ExprNode {
     // Call syntax: name(args) — only when ( is glued to the name; with a
     // space between,  f (10)  keeps its Logo meaning (grouped expression).
     if (ctx.gluedParenNext(tok)) {
+      if (w === '$bind') {
+        ctx.next();
+        return parsePostfix(
+          ctx,
+          {
+            k: 'listfunc',
+            name: w,
+            args: parseParenArgsRange(ctx, w, 1, 17, tok.line),
+            line: tok.line,
+          },
+          true,
+        );
+      }
       if (FUNC_ARITY[w] !== undefined) {
         ctx.next();
         return parsePostfix(
@@ -455,8 +494,12 @@ export function parsePrimary(ctx: ParseContext): ExprNode {
           true,
         );
       }
-      if (ctx.isVariableName(w))
-        throw new NeedlescriptError(`"${w}" is a variable, not a procedure`, tok.line);
+      if (ctx.isVariableName(w)) {
+        ctx.next();
+        const obj: ExprNode = { k: 'var', name: w, line: tok.line, bare: true };
+        const args = parseParenArgsRange(ctx, 'a reference value', 0, Infinity, tok.line);
+        return parsePostfix(ctx, { k: 'callval', obj, args, line: tok.line }, true);
+      }
       if (
         BUILTIN_ARITY[ALIASES[w] || w] !== undefined ||
         LIST_CMDS[w] !== undefined ||

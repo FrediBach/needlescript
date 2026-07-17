@@ -78,9 +78,21 @@ export function initEvalExpr(ctx: RunContext): void {
       }
       case 'callval': {
         const callTarget = ctx.evalExpr(node.obj, env, repcount, depth);
+        if (callTarget instanceof FuncRef) {
+          const args = node.args.map((arg) => ctx.evalExpr(arg, env, repcount, depth));
+          return ctx.callRef(callTarget, args, depth, node.line);
+        }
         if (typeof callTarget === 'string')
           throw new NeedlescriptError("a string value can't be called like a procedure", node.line);
-        throw new NeedlescriptError("a list value can't be called like a procedure", node.line);
+        if (isList(callTarget))
+          throw new NeedlescriptError(
+            "a list value can't be called like a procedure — only references are callable",
+            node.line,
+          );
+        throw new NeedlescriptError(
+          `${describeVal(callTarget)} can't be called like a procedure — only references are callable`,
+          node.line,
+        );
       }
       case 'listfunc': {
         const args = node.args.map((a) => ctx.evalExpr(a, env, repcount, depth));
@@ -107,7 +119,14 @@ export function initEvalExpr(ctx: RunContext): void {
         // Equality: deep equal handles all types (strings, lists, numbers).
         // Cross-type always returns 0/1 without error — equality is a question.
         if (node.op === '=' || node.op === '!=') {
-          if (isList(av) || isList(bv) || typeof av === 'string' || typeof bv === 'string') {
+          if (
+            isList(av) ||
+            isList(bv) ||
+            typeof av === 'string' ||
+            typeof bv === 'string' ||
+            av instanceof FuncRef ||
+            bv instanceof FuncRef
+          ) {
             const eq = deepEqual(av, bv);
             return node.op === '=' ? (eq ? 1 : 0) : eq ? 0 : 1;
           }
@@ -183,7 +202,13 @@ export function initEvalExpr(ctx: RunContext): void {
         return v;
       }
       case 'procref':
-        return new FuncRef(node.name);
+        return new FuncRef(
+          node.name,
+          { min: node.minArity, max: node.maxArity },
+          [],
+          node.name.startsWith('$anon:') ? node.line : undefined,
+          node.captureNames,
+        );
 
       case 'trace': {
         // ── Trace sandbox (RFC-trace §4) ──────────────────────────────────

@@ -137,12 +137,12 @@ describe('reporter type errors', () => {
     [
       'wrong arity (3)',
       'def c(t,s,i) [ return [0.4,2,2,0,0] ]\nsatin @c\nfd 5',
-      /exactly 4 parameters/,
+      /expects a 4-argument reporter/,
     ],
     [
       'wrong arity (5)',
       'def c(t,s,i,u,x) [ return [0.4,2,2,0,0] ]\nsatin @c\nfd 5',
-      /exactly 4 parameters/,
+      /expects a 4-argument reporter/,
     ],
     [
       'non-list return',

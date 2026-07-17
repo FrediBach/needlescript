@@ -5,17 +5,35 @@ export def radialdir(p) [
   return vheading(p)
 ]
 
+// Configured direction reporters. Existing point-in/reporter-out exports stay
+// available; these factories are the composable forms for fill dir.
+export def griddir(deg) [ return def(p) [ return deg ] ]
+
+export def radialdirfrom(cx, cy) [
+  return def(p) [
+    let ray = vsub(p, [cx, cy])
+    if vlen(ray) < 0.000001 [ return 0 ]
+    return vheading(ray)
+  ]
+]
+
 // A drawless, divergence-free direction field. Rotating the gradient of a
 // scalar noise field by 90 degrees makes streamlines circulate instead of
 // converging on a pole. The 14 mm scale is a useful embroidery default.
-export def curldir(p) [
+def curlheading(p, scaledown) [
   let epsilon = 0.05
-  let scaledown = 14
   let dx = snoise2(p[0] / scaledown + epsilon, p[1] / scaledown) - snoise2(p[0] / scaledown - epsilon, p[1] / scaledown)
   let dy = snoise2(p[0] / scaledown, p[1] / scaledown + epsilon) - snoise2(p[0] / scaledown, p[1] / scaledown - epsilon)
   let flow = [dy, -dx]
   if vlen(flow) < 0.000001 [ return 0 ]
   return vheading(flow)
+]
+
+export def curldir(p) [ return curlheading(p, 14) ]
+
+export def curldirwith(scaledown) [
+  assert(scaledown > 0, 'curldirwith scale must be greater than zero')
+  return def(p) [ return curlheading(p, scaledown) ]
 ]
 
 // Alternating brick phase gives neighbouring rows a simple over-under rhythm.
@@ -26,6 +44,12 @@ export def wovenshape(p, row, v) [
 // A reporter-compatible spacing ramp across the fill's normalized cross-field axis.
 export def gradientshape(p, row, v) [
   return tatamirow(lerp(0.45, 1.2, clamp(v, 0, 1)), 2.5, 0.5)
+]
+
+export def gradientshapewith(lo, hi) [
+  return def(p, row, v) [
+    return tatamirow(lerp(lo, hi, clamp(v, 0, 1)), 2.5, 0.5)
+  ]
 ]
 
 def addcut(cuts, p, startpoint) [

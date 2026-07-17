@@ -11,6 +11,7 @@ import { linkStandardModules } from '../module-linker.ts';
 import { applyAutoTrim, applyLocks } from '../postprocess.ts';
 import { applyTravelPlan } from '../travel-planner.ts';
 import type { TravelPlanStats } from '../types.ts';
+import { formatVal, isFuncRef } from '../list.ts';
 import type { Val } from '../list.ts';
 import type { ASTNode } from '../types.ts';
 import { LIMITS } from '../machine.ts';
@@ -327,6 +328,20 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       },
     ];
   });
+  const referenceVars = Object.entries(ctx.globals).flatMap(([name, value]) => {
+    if (!isFuncRef(value)) return [];
+    return [
+      {
+        name,
+        declarationLine: ctx.globalLines[name],
+        display: formatVal(value),
+        environment: value.bound.map((bound, index) => ({
+          name: value.captureNames?.[index] ?? `argument ${index + 1}`,
+          value: formatVal(bound, true),
+        })),
+      },
+    ];
+  });
 
   const allIndices = new Set(ctx.usedColorIndices);
   for (const event of m.events) allIndices.add(event.c);
@@ -372,6 +387,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     globals: ctx.globals,
     chalk,
     dataVars,
+    referenceVars,
     plan: planStats,
     colorTable,
     background: ctx.background,

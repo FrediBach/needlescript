@@ -14,19 +14,8 @@ export function initReporters(ctx: RunContext): void {
    * with errors that name exactly what went wrong.
    */
   ctx.applyReporter = (ref: FuncRef, x: number, y: number, line?: number): Pt => {
-    const proc = ctx.procs[ref.name];
-    if (!proc) throw new NeedlescriptError(`the warp reporter @${ref.name} is not defined`, line);
-    if (proc.params.length !== 1)
-      throw new NeedlescriptError(
-        `the warp reporter @${ref.name} must take exactly one argument (the point [x, y]), but takes ${proc.params.length}`,
-        line,
-      );
-    const out = ctx.callProcVals(ref.name, [ctx.allocList([x, y], line)], 0, line);
-    if (out === undefined)
-      throw new NeedlescriptError(
-        `the warp reporter @${ref.name} never reached output/return — it must return a point [x, y]`,
-        line,
-      );
+    ctx.assertRefArity(ref, 1, 'warp', line);
+    const out = ctx.callRef(ref, [ctx.allocList([x, y], line)], 0, line);
     return gm.toPoint(out, `the warp reporter @${ref.name}`, line);
   };
 
@@ -36,13 +25,7 @@ export function initReporters(ctx: RunContext): void {
    * signature is reported there; the return-value half is checked per call.
    */
   ctx.applyShapeReporterArity = (ref: FuncRef, line?: number) => {
-    const proc = ctx.procs[ref.name];
-    if (!proc) throw new NeedlescriptError(`the satin reporter @${ref.name} is not defined`, line);
-    if (proc.params.length !== 4)
-      throw new NeedlescriptError(
-        `the satin reporter @${ref.name} must take exactly 4 parameters (t, s, i, u), but takes ${proc.params.length}`,
-        line,
-      );
+    ctx.assertRefArity(ref, 4, 'satin', line);
   };
 
   /**
@@ -57,19 +40,7 @@ export function initReporters(ctx: RunContext): void {
     u: number,
     line?: number,
   ): [number, number, number, number, number] => {
-    const proc = ctx.procs[ref.name];
-    if (!proc) throw new NeedlescriptError(`the satin reporter @${ref.name} is not defined`, line);
-    if (proc.params.length !== 4)
-      throw new NeedlescriptError(
-        `the satin reporter @${ref.name} must take exactly 4 parameters (t, s, i, u), but takes ${proc.params.length}`,
-        line,
-      );
-    const out = ctx.callProcVals(ref.name, [t, s, i, u], 0, line);
-    if (out === undefined)
-      throw new NeedlescriptError(
-        `the satin reporter @${ref.name} never reached output/return — it must return [advance, leftw, rightw, leftlag, rightlag]`,
-        line,
-      );
+    const out = ctx.callRef(ref, [t, s, i, u], 0, line);
     if (!isList(out))
       throw new NeedlescriptError(
         `the satin reporter @${ref.name} must return a list of 5 numbers [advance, leftw, rightw, leftlag, rightlag], got ${describeVal(out)}`,
@@ -93,21 +64,11 @@ export function initReporters(ctx: RunContext): void {
   };
 
   ctx.applyRailShapeReporterArity = (ref: FuncRef, line?: number) => {
-    const proc = ctx.procs[ref.name];
-    if (!proc)
-      throw new NeedlescriptError(`the satinbetween reporter @${ref.name} is not defined`, line);
-    if (proc.params.length !== 4)
-      throw new NeedlescriptError(
-        `the satinbetween reporter @${ref.name} must take exactly 4 parameters (t, s, i, u), but takes ${proc.params.length}`,
-        line,
-      );
+    ctx.assertRefArity(ref, 4, 'satinbetween', line);
   };
 
   ctx.applyRailShapeReporter = (ref, t, s, i, u, line) => {
-    const proc = ctx.procs[ref.name];
-    if (!proc)
-      throw new NeedlescriptError(`the satinbetween reporter @${ref.name} is not defined`, line);
-    const out = ctx.callProcVals(ref.name, [t, s, i, u], 0, line);
+    const out = ctx.callRef(ref, [t, s, i, u], 0, line);
     const contract = '[advance, insetA, insetB, lagA, lagB]';
     if (out === undefined)
       throw new NeedlescriptError(
@@ -134,14 +95,7 @@ export function initReporters(ctx: RunContext): void {
   // ---- Programmable stitchlen reporter (`stitchlen @fn`, §5) ----------
 
   ctx.applyStitchLenReporterArity = (ref: FuncRef, line?: number) => {
-    const proc = ctx.procs[ref.name];
-    if (!proc)
-      throw new NeedlescriptError(`the stitchlen reporter @${ref.name} is not defined`, line);
-    if (proc.params.length !== 4)
-      throw new NeedlescriptError(
-        `the stitchlen reporter @${ref.name} must take exactly 4 parameters (t, s, i, p), but takes ${proc.params.length}`,
-        line,
-      );
+    ctx.assertRefArity(ref, 4, 'stitchlen', line);
   };
 
   /** Invoke a stitchlen reporter once; validates and returns the advance (mm). */
@@ -153,15 +107,7 @@ export function initReporters(ctx: RunContext): void {
     p: [number, number],
     line?: number,
   ): number => {
-    const proc = ctx.procs[ref.name];
-    if (!proc)
-      throw new NeedlescriptError(`the stitchlen reporter @${ref.name} is not defined`, line);
-    const out = ctx.callProcVals(ref.name, [t, s, i, ctx.allocList([p[0], p[1]], line)], 0, line);
-    if (out === undefined)
-      throw new NeedlescriptError(
-        `the stitchlen reporter @${ref.name} never reached output/return — it must return a number (mm)`,
-        line,
-      );
+    const out = ctx.callRef(ref, [t, s, i, ctx.allocList([p[0], p[1]], line)], 0, line);
     if (typeof out !== 'number' || !isFinite(out))
       throw new NeedlescriptError(
         `the stitchlen reporter @${ref.name} must return a finite number (mm advance), got ${describeVal(out)}`,
@@ -178,14 +124,7 @@ export function initReporters(ctx: RunContext): void {
   // ---- Programmable fill rows — stitchlen equivalent (`filllen @fn`) ----------
 
   ctx.applyFillLenReporterArity = (ref: FuncRef, line?: number) => {
-    const proc = ctx.procs[ref.name];
-    if (!proc)
-      throw new NeedlescriptError(`the filllen reporter @${ref.name} is not defined`, line);
-    if (proc.params.length !== 4)
-      throw new NeedlescriptError(
-        `the filllen reporter @${ref.name} must take exactly 4 parameters (t, s, i, p), but takes ${proc.params.length}`,
-        line,
-      );
+    ctx.assertRefArity(ref, 4, 'filllen', line);
   };
 
   /** Invoke a filllen reporter once; validates and returns the requested advance (mm). */
@@ -197,15 +136,7 @@ export function initReporters(ctx: RunContext): void {
     p: [number, number],
     line?: number,
   ): number => {
-    const proc = ctx.procs[ref.name];
-    if (!proc)
-      throw new NeedlescriptError(`the filllen reporter @${ref.name} is not defined`, line);
-    const out = ctx.callProcVals(ref.name, [t, s, i, ctx.allocList([p[0], p[1]], line)], 0, line);
-    if (out === undefined)
-      throw new NeedlescriptError(
-        `the filllen reporter @${ref.name} never reached output/return — it must return a number (mm)`,
-        line,
-      );
+    const out = ctx.callRef(ref, [t, s, i, ctx.allocList([p[0], p[1]], line)], 0, line);
     if (typeof out !== 'number' || !isFinite(out))
       throw new NeedlescriptError(
         `the filllen reporter @${ref.name} must return a finite number (mm advance), got ${describeVal(out)}`,
@@ -221,73 +152,51 @@ export function initReporters(ctx: RunContext): void {
 
   // ---- Programmable fill reporters (`fill dir @d shape @s`, §3) ----------
 
-  ctx.applyFillDirArity = (name: string, line?: number) => {
-    const proc = ctx.procs[name];
-    if (!proc) throw new NeedlescriptError(`the fill dir reporter @${name} is not defined`, line);
-    if (proc.params.length !== 1)
-      throw new NeedlescriptError(
-        `the fill dir reporter @${name} must take exactly 1 parameter (the point [x, y]), but takes ${proc.params.length}`,
-        line,
-      );
+  ctx.applyFillDirArity = (ref: FuncRef, line?: number) => {
+    ctx.assertRefArity(ref, 1, 'fill dir', line);
   };
 
   /** Invoke a dir reporter; returns a turtle heading. Non-finite ⇒ NaN (a field
    * singularity the generator handles per §5.2), not an error. */
-  ctx.applyFillDir = (name: string, px: number, py: number, line?: number): number => {
-    const out = ctx.callProcVals(name, [ctx.allocList([px, py], line)], 0, line);
-    if (out === undefined)
-      throw new NeedlescriptError(
-        `the fill dir reporter @${name} never reached output/return — it must return a heading (a number)`,
-        line,
-      );
+  ctx.applyFillDir = (ref: FuncRef, px: number, py: number, line?: number): number => {
+    const out = ctx.callRef(ref, [ctx.allocList([px, py], line)], 0, line);
     if (typeof out !== 'number')
       throw new NeedlescriptError(
-        `the fill dir reporter @${name} must return a heading (a number), got ${describeVal(out)}`,
+        `the fill dir reporter @${ref.name} must return a heading (a number), got ${describeVal(out)}`,
         line,
       );
     return out;
   };
 
-  ctx.applyFillShapeArity = (name: string, line?: number) => {
-    const proc = ctx.procs[name];
-    if (!proc) throw new NeedlescriptError(`the fill shape reporter @${name} is not defined`, line);
-    if (proc.params.length !== 3)
-      throw new NeedlescriptError(
-        `the fill shape reporter @${name} must take exactly 3 parameters (p, row, v), but takes ${proc.params.length}`,
-        line,
-      );
+  ctx.applyFillShapeArity = (ref: FuncRef, line?: number) => {
+    ctx.assertRefArity(ref, 3, 'fill shape', line);
   };
 
   /** Invoke a shape reporter; returns the validated [spacing, len, phase]. */
   ctx.applyFillShape = (
-    name: string,
+    ref: FuncRef,
     px: number,
     py: number,
     row: number,
     v: number,
     line?: number,
   ): [number, number, number] => {
-    const out = ctx.callProcVals(name, [ctx.allocList([px, py], line), row, v], 0, line);
-    if (out === undefined)
-      throw new NeedlescriptError(
-        `the fill shape reporter @${name} never reached output/return — it must return [spacing, len, phase]`,
-        line,
-      );
+    const out = ctx.callRef(ref, [ctx.allocList([px, py], line), row, v], 0, line);
     if (!isList(out))
       throw new NeedlescriptError(
-        `the fill shape reporter @${name} must return a list of 3 numbers [spacing, len, phase], got ${describeVal(out)}`,
+        `the fill shape reporter @${ref.name} must return a list of 3 numbers [spacing, len, phase], got ${describeVal(out)}`,
         line,
       );
     if (out.items.length !== 3)
       throw new NeedlescriptError(
-        `the fill shape reporter @${name} must return exactly 3 numbers [spacing, len, phase], got a list of ${out.items.length}`,
+        `the fill shape reporter @${ref.name} must return exactly 3 numbers [spacing, len, phase], got a list of ${out.items.length}`,
         line,
       );
     const slot = ['spacing', 'len', 'phase'];
     const r = out.items.map((val, k) => {
       if (typeof val !== 'number')
         throw new NeedlescriptError(
-          `the fill shape reporter @${name} returned ${describeVal(val)} for ${slot[k]} (slot ${k + 1} of 3) — it must be a number`,
+          `the fill shape reporter @${ref.name} returned ${describeVal(val)} for ${slot[k]} (slot ${k + 1} of 3) — it must be a number`,
           line,
         );
       return val;

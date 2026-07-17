@@ -95,7 +95,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'keyword',
     detail: 'define a procedure',
     documentation:
-      'Define a procedure. Parameters are local and can recurse (depth limit 200).\n\n```\ndef leaf(size) [\n  fd size  bk size\n]\n```\nClassic form: `to name :a :b … end`',
+      'Define a procedure. Parameters are local and can recurse (depth limit 200). Anonymous `def(params) [ … ]` expressions capture enclosing locals by snapshot and return a configured reference.\n\n```\ndef multiplier(k) [\n  return def(x) [ return x * k ]\n]\n```\nClassic form: `to name :a :b … end`',
     insertText: 'def ${1:name}(${2:params}) [\n\t$0\n]',
     isSnippet: true,
   },
@@ -1424,6 +1424,26 @@ export const NS_ITEMS: NSItem[] = [
     insertText: 'compose(@${1:fn1}, @${2:fn2})',
     isSnippet: true,
     params: [['@fn1', '@fn2', '...']],
+  },
+  {
+    label: 'bind',
+    kindName: 'function',
+    detail: 'bind leading reference arguments',
+    documentation:
+      'Return a configured reference with one or more leading arguments fixed. Values are evaluated once; lists retain reference semantics.\n\n```\ndef add(a, b) [ return a + b ]\nlet add10 = bind(@add, 10)\nprint add10(5)  // 15\n```',
+    insertText: 'bind(@${1:fn}, ${2:value})',
+    isSnippet: true,
+    params: [['@fn', 'value', '...']],
+  },
+  {
+    label: 'isref',
+    kindName: 'function',
+    detail: 'test for a reference value',
+    documentation:
+      'Return 1 when the value is a plain, bound, composed, or capturing reference; otherwise 0.',
+    insertText: 'isref(${1:value})',
+    isSnippet: true,
+    params: [['value']],
   },
 
   // ── String functions ─────────────────────────────────────────────────────

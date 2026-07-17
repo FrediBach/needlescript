@@ -229,7 +229,7 @@ describe('reporter contract errors', () => {
     [
       'dir wrong arity',
       'def d(a, b) [ return 0 ]\nfill dir @d\nbeginfill arc 360 10 endfill',
-      /dir reporter @d must take exactly 1 parameter.*\(line \d+\)/,
+      /fill dir expects a 1-argument reporter.*\(line \d+\)/,
     ],
     [
       'dir non-number',
@@ -239,7 +239,7 @@ describe('reporter contract errors', () => {
     [
       'shape wrong arity',
       'def s(p, row) [ return [0.4, 2, 0.5] ]\nfill shape @s\nbeginfill arc 360 10 endfill',
-      /shape reporter @s must take exactly 3 parameters.*\(line \d+\)/,
+      /fill shape expects a 3-argument reporter.*\(line \d+\)/,
     ],
     [
       'shape 2-element',

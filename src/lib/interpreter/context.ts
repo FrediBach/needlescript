@@ -1,7 +1,7 @@
 import type { ASTNode, ChalkEvent, ExprNode, ColorTableEntry } from '../types.ts';
 import type { PlanMode } from '../travel-planner.ts';
 import type { Machine } from '../machine.ts';
-import type { Val, NsList, FuncRef, ComposedRef } from '../list.ts';
+import type { Val, NsList, FuncRef, ComposedRef, RefSignature } from '../list.ts';
 import type { Pt } from '../genmath.ts';
 
 /** Environment frame: local variable bindings inside a procedure call. */
@@ -98,6 +98,9 @@ export interface RunContext {
   ) => Val | undefined;
   callProcVals: (name: string, argVals: Val[], depth: number, line?: number) => Val | undefined;
   scalarBuiltin: (name: string, argVals: Val[], line?: number) => Val;
+  bindRef: (ref: FuncRef, values: Val[], line?: number) => FuncRef;
+  effectiveRefSignature: (ref: FuncRef) => RefSignature;
+  assertRefArity: (ref: FuncRef, arity: number, what: string, line?: number) => void;
   callRef: (ref: FuncRef | ComposedRef, argVals: Val[], depth: number, line?: number) => Val;
 
   // ---- reporter validation (initReporters) ----
@@ -138,11 +141,11 @@ export interface RunContext {
     p: [number, number],
     line?: number,
   ) => number;
-  applyFillDirArity: (name: string, line?: number) => void;
-  applyFillDir: (name: string, px: number, py: number, line?: number) => number;
-  applyFillShapeArity: (name: string, line?: number) => void;
+  applyFillDirArity: (ref: FuncRef, line?: number) => void;
+  applyFillDir: (ref: FuncRef, px: number, py: number, line?: number) => number;
+  applyFillShapeArity: (ref: FuncRef, line?: number) => void;
   applyFillShape: (
-    name: string,
+    ref: FuncRef,
     px: number,
     py: number,
     row: number,

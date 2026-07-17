@@ -235,8 +235,8 @@ describe('grammar', () => {
     expect(() => run('coverat([0, 0])')).toThrow(/returns a value/);
   });
 
-  it('@coverat is accepted as a @ref but warp rejects it at runtime (wrong type)', () => {
-    expect(() => run('warp @coverat [ fd 10 ]')).toThrow(/not defined/);
+  it('@coverat is accepted as a @ref and warp validates its returned type', () => {
+    expect(() => run('warp @coverat [ fd 10 ]')).toThrow(/expected a point.*got a number/);
   });
 
   it('a user procedure may shadow a query name (library tier)', () => {

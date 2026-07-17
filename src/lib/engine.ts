@@ -42,6 +42,7 @@ export type {
   ChalkStroke,
   ChalkEvent,
   ChalkDataVar,
+  ReferenceDataVar,
   ColorTableEntry,
 } from './types.ts';
 export {

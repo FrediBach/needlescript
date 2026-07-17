@@ -245,7 +245,30 @@ repeat 8 [ leaf(1.2) rt 45 ]
 
 ### `@name` procedure references
 
-`@name` yields a reference to a user reporter or a value-returning builtin (`@abs`, `@vadd`, `@sin`, `@str`, …). Consumed by `map`/`filter`/`reduce`/`compose`, `warp`/`warppath`, `satin`, `fill`, `stitchlen`/`filllen`, `resample`. Statement-only commands (`@fd`) are rejected. Using a reference anywhere else is a type error.
+`@name` yields a first-class reference to a user reporter or value-returning builtin (`@abs`, `@vadd`, `@sin`, `@str`, …). References can be stored, returned, placed in lists, passed to every reporter consumer, and called directly (`f(x)`, `refs[i](x)`, `maker()(x)`). Statement-only commands such as `@fd` are rejected.
+
+`bind(@fn, leading, …)` evaluates and fixes leading arguments once. Binding all arguments creates a zero-argument reference; binding more than the target accepts is an error. Stacked binds fix the next free arguments. At most 16 values may be bound. Lists retain ordinary reference semantics; use `copy(xs)` when isolation is required. `isref(value)` returns 1/0.
+
+References are not comparable and have no truthiness, ordering, or arithmetic. `print` includes their effective arity, for example `@abs/1` or `@helper(+1 bound)/2`; `str(ref)` is an error.
+
+### Capturing closures
+
+Modern `def(params) [ … ]` is an anonymous reporter expression. It snapshots every enclosing parameter/local it reads and returns a configured reference:
+
+```text
+def multiplier(k) [
+  return def(x) [ return x * k ]
+]
+let triple = multiplier(3)
+print triple(4) // 12
+```
+
+- Captures are snapshotted when the expression evaluates. Reassigning the outer binding later does not change the closure.
+- Captured bindings are read-only inside the closure. Captured lists remain shared mutable objects, consistent with ordinary list assignment.
+- Globals are never captured; they are read live at invocation time.
+- Parameters/locals may not shadow an enclosing procedure binding. A closure captures at most 16 values.
+- Every anonymous body must return a value on every path.
+- Anonymous syntax is modern-only. Classic procedures have equivalent capability through named reporters plus `bind`.
 
 ### Source modules and the standard library
 
@@ -277,7 +300,8 @@ Bundled modules currently include:
   `headingat`, `paramof`, and `subpath` use parameters in 0…1. Positive `offsetopen`
   offsets to the polyline's left.
 - `std.mathx` — easing, waveform, angle, vector, clamped remap, and deterministic random
-  helpers. Draw counts are documented in the module source and tested.
+  helpers, plus the configured easing factory `easepow(power)`. Draw counts are documented
+  in the module source and tested.
 - `std.listx` — callback-based sorting/selection and common structural list helpers.
 - `std.regions` — area, interior-pole, repeated inset, clipped tiling, grid-point, and
   seeded Voronoi partition helpers. `partitions` follows the fork convention and consumes
@@ -287,8 +311,10 @@ Bundled modules currently include:
 - `std.stitchcraft` — running, satin, bean, appliqué, eyelet, gradient-band,
   two-color row-blend, and coverage-aware stipple rituals. `stipple` consumes exactly
   one main-stream draw through `scatter`; the other helpers are drawless.
-- `std.textures` — drawless direction fields (`radialdir(p)`, `curldir(p)`), fill shapers
-  (`wovenshape(p, row, v)`, `gradientshape(p, row, v)`), and clipped geometric fill-path
+- `std.textures` — drawless direction fields (`radialdir(p)`, `curldir(p)`), configured
+  field factories (`griddir(deg)`, `radialdirfrom(cx, cy)`, `curldirwith(scale)`), fill
+  shapers (`wovenshape(p, row, v)`, `gradientshape(p, row, v)`) and the configured
+  `gradientshapewith(lo, hi)` factory, plus clipped geometric fill-path
   generators (`hilbertpaths(region, cell)`, `truchetpaths(region, cell)`,
   `hitomezashi(region, cell, rowbits, colbits)`, `seigaiha(region, r)`,
   `asanoha(region, cell)`, `herringbonepaths(region, w)`). `curldir` uses a fixed 14 mm
@@ -478,6 +504,8 @@ The function is pure and drawless, Library-tier, charged to `'geoinput'` by item
 | `filter(xs, @fn)`       | elements where `fn(element)` is truthy                             |
 | `reduce(xs, @fn, init)` | fold: `fn(fn(init, xs[0]), xs[1]) …`                               |
 | `compose(@f, @g, …)`    | left-to-right pipeline reference: `compose(@f, @g)(x)` = `g(f(x))` |
+| `bind(@f, value, …)`    | reference with leading arguments fixed at creation                 |
+| `isref(value)`          | 1 for plain, bound, composed, and capturing references; else 0     |
 
 `print` renders lists as `[1, 2, 3]`, capped at 64 elements with `… +n more`.
 
@@ -711,6 +739,7 @@ Draw accounting (the **fork convention** — edits stay local):
 | `scatter(…)`, `shuffle(xs)`, `humanize` block / `humanizepath`                                             | 1 each (forks a child RNG for internal work) |
 | `snoise2/3`, `fbm2`, `noise`, `noise2`                                                                     | 0 (seeded fields, no stream consumption)     |
 | `voronoi`, `relax`, `snaptogrid`, `declump`, `trace`, `satinbetween`, `railspine`, field/history reporters | 0                                            |
+| `@name`, `bind`, `compose`, anonymous `def` creation                                                       | 0                                            |
 
 Inserting a `scatter(6)` shifts a later `random 10` by exactly one draw.
 

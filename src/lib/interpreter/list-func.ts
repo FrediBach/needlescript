@@ -6,6 +6,7 @@ import {
   num,
   deepEqual,
   deepCopy,
+  isFuncRef,
   FuncRef,
   ComposedRef,
 } from '../list.ts';
@@ -54,6 +55,8 @@ export function initListFunc(ctx: RunContext): void {
         return ctx.list(args[0], 'len', line).items.length;
       case 'islist':
         return isList(args[0]) ? 1 : 0;
+      case 'isref':
+        return isFuncRef(args[0]) ? 1 : 0;
       case 'first': {
         if (typeof args[0] === 'string') {
           if (args[0].length === 0) throw new NeedlescriptError('first of an empty string', line);
@@ -280,9 +283,16 @@ export function initListFunc(ctx: RunContext): void {
       case 'compose': {
         const refs: FuncRef[] = [];
         for (let i = 0; i < args.length; i++) {
-          refs.push(ctx.funcRef(args[i], `compose argument ${i + 1}`, line));
+          const ref = ctx.funcRef(args[i], `compose argument ${i + 1}`, line);
+          if (i > 0) ctx.assertRefArity(ref, 1, `compose argument ${i + 1}`, line);
+          refs.push(ref);
         }
         return new ComposedRef(refs);
+      }
+      case 'bind':
+      case '$bind': {
+        const ref = ctx.funcRef(args[0], 'bind', line);
+        return ctx.bindRef(ref, args.slice(1), line);
       }
     }
     // ---------- String builtins ----------

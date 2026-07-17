@@ -28,6 +28,10 @@ source string
                        │  module linker  ├────────────┐
                        │ module-linker.ts│            │
                        └─────────────────┘            ▼
+                                             ┌─────────────────┐
+                                             │ closure lowering │
+                                             └────────┬────────┘
+                                                      ▼
                                              ┌──────────────┐   ASTNode[]
                                              │ prescan/parse├──────────────► interpreter
                                              │ parser/*.ts  │
@@ -46,6 +50,14 @@ const program = linkStandardModules(tokens, parseNotes); // link, pre-scan, pars
 `parse()` still invokes `prescan()` internally for an individual source unit. Full
 program execution inserts `linkStandardModules()` between tokenization and parsing;
 both lower-level surfaces are re-exported from the library barrel.
+
+Before pre-scan, `closure-lowering.ts` recognizes modern anonymous
+`def(params) [ … ]` expressions. It builds lexical scope records, computes free
+variables, rejects writes/shadowing and the 16-capture limit, then lambda-lifts each
+body to a synthetic top-level procedure. The expression becomes an internal `$bind`
+of that procedure to snapshot capture expressions. The internal spelling cannot be
+shadowed by a user procedure named `bind`; downstream stages otherwise see ordinary
+procedures and references.
 
 Key design principle stated in `parser/index.ts:1-5`: the parser accepts **both**
 classic Logo syntax **and** a modern syntax (RFC-1). Every modern form _lowers_ to
@@ -314,6 +326,9 @@ Notable lowerings and rules:
 - **`@name`** (`pref` token) produces a `procref` node, accepting user procedures and
   value-returning builtins but rejecting statement-only builtins with a helpful
   message (`expressions.ts:302-332`).
+- **Callable values** use `callval`: a reference held in a variable, list element,
+  factory result, or composed expression may be followed by glued call parentheses.
+  Non-reference values parse and fail with a runtime type diagnostic.
 - **Postfix index chains** only engage when the preceding primary is a valid
   index left-context (bare identifier, `)`, or `]` — never a numeric literal or legacy
   `:var`) and the `[` is glued (`expressions.ts:203-238`).
@@ -483,6 +498,7 @@ need no color-specific token or node.
 | File                    | Responsibility                                                                    |
 | ----------------------- | --------------------------------------------------------------------------------- |
 | `tokenizer.ts`          | `tokenize()` — source → `Token[]`                                                 |
+| `closure-lowering.ts`   | anonymous-def scope analysis, capture checks, and lambda lifting                  |
 | `prescan.ts`            | `prescan()` — token stream → `PreScan` (names, arity, scopes)                     |
 | `module-linker.ts`      | import/export extraction, std resolution, qualification, AST linking              |
 | `standard-library/`     | bundled NeedleScript source modules and pure module registry                      |

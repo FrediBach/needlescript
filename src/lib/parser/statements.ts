@@ -291,6 +291,7 @@ export function parseStatement(ctx: ParseContext): ASTNode {
     const isValueWord = (w: string) =>
       w === 'trace' ||
       w === 'tracerings' ||
+      w === '$bind' ||
       FUNC_ARITY[w] !== undefined ||
       ZERO_FUNCS.has(w) ||
       LIST_FUNCS[w] !== undefined ||
@@ -699,29 +700,17 @@ export function parseStatement(ctx: ParseContext): ASTNode {
   // ordinary variables named dir/shape are untouched.
   if (canonical === 'fill') {
     ctx.next();
-    // Read one `@name` procedure reference, reusing parsePrimary's resolution
-    // (it errors loudly if @name isn't a real def/to procedure).
-    const readRef = (channel: string): string => {
-      if (ctx.atEnd() || ctx.peek()!.t !== 'pref')
-        throw new NeedlescriptError(
-          `fill ${channel} needs a procedure reference, e.g.  fill ${channel} @${channel === 'shape' ? 'texture' : 'contour'}`,
-          tok.line,
-        );
-      const e = ctx.parsePrimary(); // cross-module
-      if (e.k !== 'procref')
-        throw new NeedlescriptError(
-          `fill ${channel} needs a procedure reference (@name)`,
-          tok.line,
-        );
-      return e.name;
+    const readReporterExpr = (channel: string): ExprNode => {
+      if (ctx.atEnd())
+        throw new NeedlescriptError(`fill ${channel} needs a reporter expression`, tok.line);
+      return ctx.parseExpr();
     };
     const isKw = (w: string) =>
       !ctx.atEnd() &&
       (ctx.peek()!.t === 'word' || ctx.peek()!.t === 'qword') &&
       ctx.peek()!.v === w;
-    let dirRef: string | null = null;
-    let shapeRef: string | null = null;
-    let pathsRef: string | null = null;
+    let dirExpr: ExprNode | null = null;
+    let shapeExpr: ExprNode | null = null;
     let pathsExpr: ExprNode | null = null;
     if (isKw('paths')) {
       ctx.next();
@@ -730,8 +719,7 @@ export function parseStatement(ctx: ParseContext): ASTNode {
           'fill paths expects a procedure reference (@name) or a list of paths',
           tok.line,
         );
-      if (ctx.peek()!.t === 'pref') pathsRef = readRef('paths');
-      else pathsExpr = ctx.parseExpr();
+      pathsExpr = ctx.parseExpr();
       if (isKw('dir') || isKw('shape'))
         throw new NeedlescriptError(
           'fill paths cannot be combined with dir/shape — they both define the fill geometry',
@@ -739,10 +727,10 @@ export function parseStatement(ctx: ParseContext): ASTNode {
         );
     } else if (isKw('dir')) {
       ctx.next();
-      dirRef = readRef('dir');
+      dirExpr = readReporterExpr('dir');
       if (isKw('shape')) {
         ctx.next();
-        shapeRef = readRef('shape');
+        shapeExpr = readReporterExpr('shape');
       }
       if (isKw('paths'))
         throw new NeedlescriptError(
@@ -751,22 +739,22 @@ export function parseStatement(ctx: ParseContext): ASTNode {
         );
     } else if (isKw('shape')) {
       ctx.next();
-      shapeRef = readRef('shape');
+      shapeExpr = readReporterExpr('shape');
       if (isKw('paths'))
         throw new NeedlescriptError(
           'fill paths cannot be combined with dir/shape — they both define the fill geometry',
           tok.line,
         );
     } else {
-      // Bare `fill @name` — the shorthand: @name is the DIRECTION field (§2).
-      if (ctx.atEnd() || ctx.peek()!.t !== 'pref')
+      // Bare `fill expr` — shorthand for the direction field.
+      if (ctx.atEnd())
         throw new NeedlescriptError(
-          'fill needs a direction field or shape reporter, e.g.  fill @contour  or  fill shape @texture',
+          'fill needs a direction field or shape reporter, e.g.  fill dir @contour',
           tok.line,
         );
-      dirRef = readRef('dir');
+      dirExpr = readReporterExpr('dir');
     }
-    return { k: 'fillarm', dirRef, shapeRef, pathsRef, pathsExpr, line: tok.line };
+    return { k: 'fillarm', dirExpr, shapeExpr, pathsExpr, line: tok.line };
   }
   if (BUILTIN_ARITY[canonical] !== undefined) {
     ctx.next();

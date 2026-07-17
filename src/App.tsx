@@ -18,6 +18,7 @@ import type {
   OverrideKey,
   ChalkEvent,
   ChalkDataVar,
+  ReferenceDataVar,
   ColorTableEntry,
 } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
@@ -95,6 +96,7 @@ export interface DesignState {
   activeOverrides?: Partial<Record<OverrideKey, number>>;
   chalk: ChalkEvent[];
   dataVars: ChalkDataVar[];
+  referenceVars: ReferenceDataVar[];
   colorTable: ColorTableEntry[];
   background: string;
 }
@@ -115,6 +117,7 @@ const INITIAL_DESIGN: DesignState = {
   warnings: [],
   chalk: [],
   dataVars: [],
+  referenceVars: [],
   colorTable: [],
   background: '#f5efe4',
   name: 'bloom',
@@ -410,6 +413,7 @@ export default function App() {
         activeOverrides: result.activeOverrides,
         chalk: result.chalk ?? [],
         dataVars: result.dataVars ?? [],
+        referenceVars: result.referenceVars ?? [],
         colorTable: result.colorTable,
         background: result.background,
       };
@@ -832,6 +836,7 @@ export default function App() {
             onHighlightHandle={handleHighlightHandle}
             highlightedHandle={highlightedHandle}
             dataVars={design.dataVars}
+            referenceVars={design.referenceVars}
             pinnedDataVars={pinnedDataVars}
             onTogglePinnedDataVar={togglePinnedDataVar}
             onHoverDataVar={setHoveredDataVar}

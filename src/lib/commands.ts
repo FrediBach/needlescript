@@ -196,6 +196,7 @@ export const LIST_FUNCS: Record<string, { min: number; max: number }> = {
   filled: { min: 2, max: 2 },
   len: { min: 1, max: 1 },
   islist: { min: 1, max: 1 },
+  isref: { min: 1, max: 1 },
   first: { min: 1, max: 1 },
   last: { min: 1, max: 1 },
   concat: { min: 2, max: 2 },
@@ -219,6 +220,7 @@ export const LIST_FUNCS: Record<string, { min: number; max: number }> = {
   filter: { min: 2, max: 2 }, // filter(list, @fn)
   reduce: { min: 3, max: 3 }, // reduce(list, @fn, initial)
   compose: { min: 2, max: 16 }, // compose(@fn1, @fn2, …) — left-to-right pipeline
+  bind: { min: 2, max: 17 }, // bind(@fn, leading1, …, leading16)
 };
 
 /** List commands usable as statements (mutators + setpos). */

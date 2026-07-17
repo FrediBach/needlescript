@@ -65,7 +65,7 @@ describe('satinbetween', () => {
   it('validates reporter signatures, return paths, and tuple slots', () => {
     expect(() =>
       run('def bad(t,s,i)[return railinset(0.4,0)] satinbetween([[0,0],[0,3]],[[2,0],[2,3]],@bad)'),
-    ).toThrow(/exactly 4 parameters/);
+    ).toThrow(/expects a 4-argument reporter/);
     expect(() =>
       run(
         'def bad(t,s,i,u)[if s > 0.5 [return railinset(0.4,0)]] satinbetween([[0,0],[0,3]],[[2,0],[2,3]],@bad)',

@@ -443,15 +443,11 @@ export function initExecStmt(ctx: RunContext): void {
         ctx.m.fillPathsReporter = null;
         ctx.m.fillPathsStatic = null;
         ctx.m.fillPathsName = null;
-        if (st.pathsRef) {
-          const proc = ctx.procs[st.pathsRef];
-          if (!proc || proc.params.length !== 1)
-            throw new NeedlescriptError(
-              `custom fill generator "${st.pathsRef}" takes 1 input (the region rings) — it is defined with ${proc?.params.length ?? 0}`,
-              st.line,
-            );
-          const ref = st.pathsRef;
-          ctx.m.fillPathsName = ref;
+        const pathsValue = st.pathsExpr ? ctx.evalExpr(st.pathsExpr, env, repcount, depth) : null;
+        if (pathsValue !== null && isFuncRef(pathsValue)) {
+          const ref = pathsValue;
+          ctx.assertRefArity(ref, 1, 'fill paths', st.line);
+          ctx.m.fillPathsName = formatVal(ref);
           ctx.m.fillPathsReporter = (rings) => {
             const machineSnap = ctx.m.snapshotForTrace();
             const rng = ctx.rng;
@@ -472,8 +468,8 @@ export function initExecStmt(ctx: RunContext): void {
                 st.line,
               );
               return validateFillPaths(
-                ctx.callProcVals(ref, [region], 0, st.line),
-                `custom fill generator "${ref}"`,
+                ctx.callRef(ref, [region], 0, st.line),
+                `custom fill generator ${formatVal(ref)}`,
                 st.line,
               );
             } finally {
@@ -486,24 +482,32 @@ export function initExecStmt(ctx: RunContext): void {
               if (ctx.snoise3 !== snoise3) ctx.snoise3 = snoise3;
             }
           };
-        } else if (st.pathsExpr) {
+        } else if (pathsValue !== null) {
           ctx.m.fillPathsStatic = validateFillPaths(
-            ctx.evalExpr(st.pathsExpr, env, repcount, depth),
+            pathsValue,
             'fill paths list',
             st.line,
             true,
           ).map((path) => path.map((p) => [p[0], p[1]]));
         }
-        if (st.dirRef) {
-          ctx.applyFillDirArity(st.dirRef, st.line);
-          const ref = st.dirRef;
+        let dirRef: FuncRef | null = null;
+        if (st.dirExpr) {
+          dirRef = ctx.funcRef(ctx.evalExpr(st.dirExpr, env, repcount, depth), 'fill dir', st.line);
+          ctx.applyFillDirArity(dirRef, st.line);
+          const ref = dirRef;
           ctx.m.fillDirReporter = (px, py) => ctx.applyFillDir(ref, px, py, st.line);
         } else {
           ctx.m.fillDirReporter = null;
         }
-        if (st.shapeRef) {
-          ctx.applyFillShapeArity(st.shapeRef, st.line);
-          const ref = st.shapeRef;
+        let shapeRef: FuncRef | null = null;
+        if (st.shapeExpr) {
+          shapeRef = ctx.funcRef(
+            ctx.evalExpr(st.shapeExpr, env, repcount, depth),
+            'fill shape',
+            st.line,
+          );
+          ctx.applyFillShapeArity(shapeRef, st.line);
+          const ref = shapeRef;
           ctx.m.fillShapeReporter = (px, py, row, v) =>
             ctx.applyFillShape(ref, px, py, row, v, st.line);
         } else {
@@ -513,11 +517,11 @@ export function initExecStmt(ctx: RunContext): void {
         ctx.m.fillArmLine = st.line;
         if (ctx.m.fillDirReporter && ctx.m.fillAngle !== 0)
           ctx.m.warnings.push(
-            `fillangle is ignored while fill dir @${st.dirRef} is engaged — the direction field supersedes it`,
+            `fillangle is ignored while fill dir ${dirRef ? formatVal(dirRef) : 'reporter'} is engaged — the direction field supersedes it`,
           );
         if (ctx.m.fillShapeReporter && (ctx.m.fillSpacing !== 0.4 || ctx.m.fillLen !== null))
           ctx.m.warnings.push(
-            `fillspacing/filllen are ignored while fill shape @${st.shapeRef} is engaged — the shape reporter supersedes them`,
+            `fillspacing/filllen are ignored while fill shape ${shapeRef ? formatVal(shapeRef) : 'reporter'} is engaged — the shape reporter supersedes them`,
           );
         return;
       }

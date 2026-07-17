@@ -519,15 +519,15 @@ describe('steps()', () => {
 describe('@builtin references', () => {
   it('@sin resolves as a FuncRef', () => {
     // just verify it parses and produces a value (FuncRef prints as @sin)
-    expect(printed('print @sin')).toEqual(['@sin']);
+    expect(printed('print @sin')).toEqual(['@sin/1']);
   });
 
   it('@vadd resolves as a FuncRef', () => {
-    expect(printed('print @vadd')).toEqual(['@vadd']);
+    expect(printed('print @vadd')).toEqual(['@vadd/2']);
   });
 
   it('@vlen resolves as a FuncRef', () => {
-    expect(printed('print @vlen')).toEqual(['@vlen']);
+    expect(printed('print @vlen')).toEqual(['@vlen/1']);
   });
 
   it('@fd (command) is rejected at parse time', () => {
@@ -737,7 +737,7 @@ describe('compose()', () => {
   });
 
   it('print shows compose(...) format', () => {
-    expect(printed('print compose(@abs, @round)')).toEqual(['compose(@abs, @round)']);
+    expect(printed('print compose(@abs, @round)')).toEqual(['compose(@abs/1, @round/1)']);
   });
 
   it('compose + steps + map integration', () => {

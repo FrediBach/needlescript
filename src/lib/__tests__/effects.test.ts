@@ -287,7 +287,7 @@ describe('@name procedure references', () => {
   });
   it('the wrong arity is rejected by name', () => {
     expect(() => run('def two(a, b) [ return a ]\nwarp @two [ fd 5 ]')).toThrow(
-      /must take exactly one argument/,
+      /expects a 1-argument reporter; got a 2-argument reference/,
     );
   });
   it('a funcref is not a number — arithmetic on it is a loud error', () => {

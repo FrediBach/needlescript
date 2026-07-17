@@ -32,6 +32,7 @@ import type { ParseContext } from './context.ts';
 import { parseExpr, parsePrimary, parseParenArgs, parseParenArgsRange } from './expressions.ts';
 import { parseBracketBlock, parseStatement } from './statements.ts';
 import { collectValueUses, allPathsReturn } from './analysis.ts';
+import { lowerClosures } from '../closure-lowering.ts';
 
 // ---------- parseProgram ----------
 
@@ -79,6 +80,7 @@ export function parse(
   notes?: string[],
   knownProcedures: Readonly<Record<string, KnownProcedure>> = {},
 ): ASTNode[] {
+  tokens = lowerClosures(tokens);
   // Pre-scan procedures, globals and per-procedure locals so both call arity
   // and bare-name resolution are known at parse time.
   const ps = prescan(tokens);
