@@ -1,0 +1,33 @@
+// ============================================================
+//  MORPHING MEDALLION — circles slowly become stars
+//
+//  std.shapes supplies the two outlines, std.pathops aligns their
+//  different point counts, and std.mathx controls the transition.
+// ============================================================
+
+import std.shapes.ellipsepath as ellipsepath
+import std.shapes.starpath as starpath
+import std.pathops.morphpaths as morphpaths
+import std.mathx.easeinout as easeinout
+import std.stitchcraft.sewrun as sewrun
+
+let layers = 10       // [4:1:16] nested outlines
+let inner = 8         // [4:1:14] inner circle radius, mm
+let outer = 36        // [24:1:42] outer star radius, mm
+let points = 7        // [4:1:12] star points
+
+lock 0
+stitchlen 1.8
+
+let circleform = ellipsepath(inner, inner)
+let starform = starpath(points, outer, outer * 0.42)
+
+for i = 0 to layers - 1 [
+  let u = easeinout(i / (layers - 1))
+  let outline = morphpaths(circleform, starform, u)
+
+  color 2 + mod(i, 3)
+  sewrun(outline, 1.8)
+  trim
+]
+

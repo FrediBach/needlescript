@@ -1,0 +1,57 @@
+// ============================================================
+//  WILDFLOWER GARLAND — motifs placed along a winding stem
+//
+//  std.layout provides arc-length-aware positions and headings.
+//  Each standard shape is transformed as path data, then sewn with
+//  reusable stitchcraft rituals. A seeded jitter keeps it organic.
+// ============================================================
+
+import std.shapes.wavepath as wavepath
+import std.shapes.heartpath as heartpath
+import std.shapes.starpath as starpath
+import std.layout.alongpath as alongpath
+import std.mathx.jitterpt as jitterpt
+import std.listx.rotatedlist as rotatedlist
+import std.stitchcraft.sewrun as sewrun
+import std.stitchcraft.satinalong as satinalong
+
+let flowers = 11      // [5:2:17] blossoms along the stem
+let sway = 6          // [2:1:11] stem wave amplitude, mm
+let turns = 2.5       // [1:0.5:4] stem waves
+let palette_shift = 1 // [0:1:3] rotate the flower palette
+
+seed 314
+lock 0
+
+let stem = wavepath(70, sway, turns)
+let placements = alongpath(stem, flowers)
+let thread_colors = rotatedlist([2, 5, 3, 4], palette_shift)
+
+// A narrow satin stem establishes the route shared by every motif.
+color 1
+satinalong(stem, 1.2)
+trim
+
+for i = 0 to len(placements) - 1 [
+  let placement = placements[i]
+  let center = jitterpt(placement[0], 0.7)
+  let hdg = placement[1]
+  let side = 1
+  if mod(i, 2) = 0 [ side = -1 ]
+
+  // Hearts become leaves when turned across the local stem heading.
+  let leaf = xscale(heartpath(7), 0.8 + mod(i, 3) * 0.12)
+  leaf = xrotate(leaf, hdg + side * 80)
+  leaf = xlate(leaf, center[0], center[1])
+  color 6
+  sewrun(leaf, 1.4)
+  trim
+
+  // Alternate five- and six-petalled blossoms along the same route.
+  let blossom = starpath(5 + mod(i, 2), 4.2, 1.8)
+  blossom = xrotate(blossom, hdg + i * 17)
+  blossom = xlate(blossom, center[0], center[1])
+  color thread_colors[mod(i, len(thread_colors))]
+  sewrun(blossom, 1.2)
+  trim
+]

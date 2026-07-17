@@ -1,0 +1,51 @@
+// ============================================================
+//  STAINED GLASS — relaxed Voronoi panes in a superellipse
+//
+//  std.regions divides the frame, std.listx gives the panes a stable
+//  left-to-right sewing order, while stitchcraft sews the leading.
+// ============================================================
+
+import std.shapes.superellipsepath as superellipsepath
+import std.regions.partitions as partitions
+import std.regions.insetrings as insetrings
+import std.listx.sortby as sortby
+import std.stitchcraft.sewrun as sewrun
+
+let pane_count = 12   // [5:1:20] glass panes
+let frame_size = 72   // [48:2:84] frame diameter, mm
+let squareness = 4    // [2:0.5:8] superellipse exponent
+
+def lefttoright(pane) [ return centroid(pane)[0] ]
+
+seed 808
+lock 0
+fillspacing 0.85
+fillangle 28
+
+let frame = superellipsepath(frame_size, frame_size, squareness)
+let panes = sortby(partitions(frame, pane_count), @lefttoright)
+let glass_colors = [2, 3, 5, 4]
+
+// Fill each pane separately. Varying hatch angles catches the light
+// differently while the deterministic partition keeps the design stable.
+for i = 0 to len(panes) - 1 [
+  let pane = panes[i]
+  color glass_colors[mod(i, len(glass_colors))]
+  fillangle 18 + mod(i, 4) * 27
+  let glass_rings = insetrings(pane, 0.7, 1)
+  for glass_ring in glass_rings [
+    let fill_ring = resample(glass_ring, 1.5)
+    up setpos(first(fill_ring)) down
+    beginfill sewpath(fill_ring) endfill
+  ]
+  trim
+]
+
+// A final monochrome pass reads as the lead joining the glass.
+color 1
+for pane in panes [
+  sewrun(pane, 2.2)
+  trim
+]
+sewrun(frame, 2.2)
+trim

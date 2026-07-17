@@ -1,0 +1,35 @@
+// ============================================================
+//  TRUCHET WINDOW — a clipped maze in a soft frame
+//
+//  The texture generator returns only the curve fragments inside
+//  the rounded rectangle. stitchcraft then turns those paths into
+//  even running stitch and a clean satin border.
+// ============================================================
+
+import std.shapes.roundrect as roundrect
+import std.textures.truchetpaths as truchetpaths
+import std.stitchcraft.sewrun as sewrun
+import std.stitchcraft.satinalong as satinalong
+
+let width = 68        // [36:2:82] frame width, mm
+let height = 52       // [28:2:78] frame height, mm
+let corner = 8        // [2:1:16] corner radius, mm
+let cell = 9          // [5:1:15] tile size, mm
+
+lock 0
+stitchlen 2
+
+let window = roundrect(width, height, corner)
+let curves = truchetpaths(window, cell)
+let outer_frame = xscale(window, 1.04)
+
+color 4
+for curve in curves [
+  up setpos(first(curve)) down
+  sewrun(curve, 1.6)
+  trim
+]
+
+color 2
+satinalong(outer_frame, 1.4)
+trim
