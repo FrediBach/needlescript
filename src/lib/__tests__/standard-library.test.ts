@@ -252,4 +252,57 @@ describe('standard-library modules', () => {
       '[[0, 2], [10, 2]]',
     ]);
   });
+
+  it('provides every std.regions measurement, inset, tiling, and grid helper', () => {
+    const result = run(`
+      import std.regions.regionarea as regionarea
+      import std.regions.poleof as poleof
+      import std.regions.insetrings as insetrings
+      import std.regions.tilecells as tilecells
+      import std.regions.gridpoints as gridpoints
+      let square = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+      print regionarea(square)
+      print poleof(square)
+      print len(insetrings(square, 2, 2))
+      print len(tilecells(square, 'square', 8)) > 0
+      print len(tilecells(square, 'hex', 5)) > 0
+      print len(tilecells(square, 'tri', 8)) > 0
+      print len(gridpoints(square, 10))
+    `);
+    expect(result.printed).toEqual(['400', '[0, 0]', '2', '1', '1', '1', '4']);
+  });
+
+  it('partitions a region into n cells with exactly one main-stream draw', () => {
+    const source = `
+      import std.regions.partitions as partitions
+      seed 321
+      let square = [[-20, -20], [20, -20], [20, 20], [-20, 20]]
+      print len(partitions(square, 4))
+      print random(1)
+    `;
+    const result = run(source);
+    const baseline = run('seed 321 print random(1) print random(1)');
+    expect(result.printed[0]).toBe('4');
+    expect(result.printed[1]).toBe(baseline.printed[1]);
+    expect(run(source).printed).toEqual(result.printed);
+  });
+
+  it('provides every std.layout placement and fitting helper', () => {
+    const result = run(`
+      import std.layout.circlelayout as circlelayout
+      import std.layout.gridlayout as gridlayout
+      import std.layout.alongpath as alongpath
+      import std.layout.fitpath as fitpath
+      print circlelayout(4, 10)
+      print gridlayout(2, 2, 10, 20)
+      print alongpath([[0, 0], [10, 0], [10, 10]], 3)
+      print bbox(fitpath([[-1, -1], [1, -1], [1, 1], [-1, 1]], [[-10, -5], [10, -5], [10, 5], [-10, 5]], 1))
+    `);
+    expect(result.printed).toEqual([
+      '[[[0, 10], 270], [[-10, 0], 180], [[0, -10], 90], [[10, 0], 0]]',
+      '[[[-5, 10], 0], [[5, 10], 0], [[-5, -10], 0], [[5, -10], 0]]',
+      '[[[0, 0], 90], [[10, 0], 90], [[10, 10], 0]]',
+      '[-4, -4, 4, 4]',
+    ]);
+  });
 });

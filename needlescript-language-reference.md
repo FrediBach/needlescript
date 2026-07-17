@@ -275,6 +275,11 @@ Bundled modules currently include:
 - `std.mathx` — easing, waveform, angle, vector, clamped remap, and deterministic random
   helpers. Draw counts are documented in the module source and tested.
 - `std.listx` — callback-based sorting/selection and common structural list helpers.
+- `std.regions` — area, interior-pole, repeated inset, clipped tiling, grid-point, and
+  seeded Voronoi partition helpers. `partitions` follows the fork convention and consumes
+  exactly one main-stream draw.
+- `std.layout` — centered circle/grid placements, normalized along-path placements, and
+  uniform path fitting. Placements have the form `[[x, y], heading]`.
 - `std.textures` — direction-field reporters, beginning with `radialdir(p)` centered on
   the origin.
 
