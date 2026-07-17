@@ -1,14 +1,22 @@
 ---
-title: 'SVG import'
-part: 'Part IX — Tooling and Ecosystem'
+title: 'Math and list recipes'
+part: 'Part IX — Standard Library and Reusable Design'
 partNumber: 9
 order: 2
-subtitle: 'What maps to what and how to take it to production'
+subtitle: 'std.mathx and std.listx: easing, probability, sorting, grouping, and sequence tools'
 ---
 
-_Content coming soon._
+_Content coming soon._ The emphasis is on recurring generative recipes: easing a parameter,
+interpolating headings across the wrap point, weighted choice without hidden randomness, and
+turning lists into ordered, paired, chunked, or grouped design data.
 
-<Run>{`// After SVG import, code can be refined and re-parameterized
-repeat 4 [ fd 20 rt 90 ]`}</Run>
+<Run>{`import std.mathx.easeinout as ease
+import std.mathx.lerpheading as turnbetween
+
+repeat 24 [
+let t = (repcount - 1) / 23
+seth turnbetween(330, 30, t)
+fd lerp(2, 10, ease(t))
+]`}</Run>
 
 <Checkpoint chapterId="ch-55">Chapter content coming soon.</Checkpoint>

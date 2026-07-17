@@ -1,12 +1,14 @@
 ---
-title: 'Offsets and booleans'
+title: 'Offsets, booleans, and regions'
 part: 'Part VI — Computational Geometry'
 partNumber: 6
 order: 3
-subtitle: 'offsetpath, clippaths, and parity vs union'
+subtitle: 'offsetpath, clippaths, std.regions, and parity vs union'
 ---
 
-_Content coming soon._
+_Content coming soon._ Region area, poles, inset rings, clipped tile cells, grid points, and
+partitions from `std.regions` now turn the low-level offset and clipping operators into a
+practical region toolkit.
 
 <Run>{`// Concentric inset fills via offsetpath
 let shape = trace [ repeat 36 [ fd 4 rt 10 ] ]

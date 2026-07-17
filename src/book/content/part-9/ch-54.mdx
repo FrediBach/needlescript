@@ -1,16 +1,20 @@
 ---
-title: 'Playground power use'
-part: 'Part IX — Tooling and Ecosystem'
+title: 'Using the standard library'
+part: 'Part IX — Standard Library and Reusable Design'
 partNumber: 9
 order: 1
-subtitle: 'REPL, Parameters panel, presets, and editor ergonomics'
+subtitle: 'Imports, aliases, exports, dependency linking, and the std.* map'
 ---
 
-_Content coming soon._
+_Content coming soon._ This chapter introduces explicit symbol imports, aliases, exported
+procedures, transitive standard-library dependencies, and the nine bundled `std.*` modules.
+It also sets the rule for the rest of this part: learn families and composition patterns, not
+a flat catalogue of names.
 
-<Run>{`// Annotated parameters become sliders in the Parameters panel
-let sides = 6  // [3:12]
-let size = 20  // [5:40]
-repeat sides [ fd size  rt (360 / sides) ]`}</Run>
+<Run>{`import std.shapes.starpath as star
+
+let outline = star(7, 24, 11)
+up setpos(first(outline)) down
+sewpath(outline)`}</Run>
 
 <Checkpoint chapterId="ch-54">Chapter content coming soon.</Checkpoint>

@@ -1,19 +1,21 @@
 ---
-title: 'Debugging like a digitizer'
+title: 'Debugging and visual annotation'
 part: 'Part III — The Language'
 partNumber: 3
 order: 9
-subtitle: 'print, mark, assert, the scrubber, and the warning taxonomy'
+subtitle: 'print, assert, chalk, the scrubber, debug helpers, and warning taxonomy'
 ---
 
-_Content coming soon._
+_Content coming soon._ The preview-only `chalk` command replaces the old `mark`-centred plan.
+The chapter will cover labelled points and paths, `std.debugx` overlays, assertions, warnings,
+the scrubber, and stitch/coverage diagnostics without altering exported machine events.
 
-<Run>{`// print and mark for debugging
+<Run>{`// Chalk is visible in the preview but never sewn or exported
 let side = 20
-print "Drawing a square with side: " side
-repeat 4 [
-  fd side  rt 90
-  mark pos()
-]`}</Run>
+print 'Drawing a square'
+print side
+let guide = trace [ repeat 4 [ fd side rt 90 ] ]
+chalk guide 'planned boundary' 'line'
+sewpath(guide)`}</Run>
 
 <Checkpoint chapterId="ch-21">Chapter content coming soon.</Checkpoint>

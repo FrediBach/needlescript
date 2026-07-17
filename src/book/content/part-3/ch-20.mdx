@@ -1,19 +1,20 @@
 ---
-title: 'Higher-order programming'
+title: 'Higher-order and modular programming'
 part: 'Part III — The Language'
 partNumber: 3
 order: 8
-subtitle: '@name references, map, filter, reduce, and compose'
+subtitle: '@name, closures, map/filter/reduce, import/export, and the module linker'
 ---
 
-_Content coming soon._
+_Content coming soon._ This chapter connects first-class procedure references and closures to
+`map`, `filter`, `reduce`, `bind`, and `compose`, then introduces `import`/`export` and the
+bundled `std.*` module namespace used throughout Part IX.
 
-<Run>{`// map a shape-drawing procedure over a list of radii
-def ring(r) [
-  push
-  repeat 36 [ fd (r * 0.175) rt 10 ]
-  pop
+<Run>{`// A closure remembers the radius it was configured with
+def ringof(r) [
+  return def(p) [ return vdist(p, [0, 0]) < r ]
 ]
-for r in [8, 16, 24] [ ring(r) ]`}</Run>
+let inside = ringof(20)
+print map([[0, 0], [10, 10], [30, 0]], inside)`}</Run>
 
 <Checkpoint chapterId="ch-20">Chapter content coming soon.</Checkpoint>

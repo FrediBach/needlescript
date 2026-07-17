@@ -1,14 +1,22 @@
 ---
-title: 'Where to go from here'
-part: 'Part IX — Tooling and Ecosystem'
+title: 'Stitchcraft and diagnostic recipes'
+part: 'Part IX — Standard Library and Reusable Design'
 partNumber: 9
 order: 5
-subtitle: 'Community, contributing, and a reading list'
+subtitle: 'std.stitchcraft, std.debugx, and a reusable-design capstone'
 ---
 
-_Content coming soon._
+_Content coming soon._ The final standard-library chapter covers sewing rituals such as runs,
+satin outlines, appliqué steps, eyelets, gradient bands, thread blending, and stippling, then
+uses chalk overlays, thread estimates, and coverage profiles to validate a composed design.
 
-<Run>{`// The end — and the beginning
-repeat 36 [ fd 4 rt 10 ]`}</Run>
+<Run>{`import std.debugx.chalkfield as showfield
+import std.stitchcraft.eyelet as eyelet
+
+showfield()
+repeat 8 [
+push up fd 24 down eyelet(3) pop
+rt 45
+]`}</Run>
 
 <Checkpoint chapterId="ch-58">Chapter content coming soon.</Checkpoint>

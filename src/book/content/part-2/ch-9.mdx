@@ -1,18 +1,20 @@
 ---
-title: 'Colour, stops, and locks'
+title: 'Colour, palettes, stops, and locks'
 part: 'Part II — The Thread Vocabulary'
 partNumber: 2
 order: 4
-subtitle: 'color, stop, lock, and colour economics'
+subtitle: 'Named and hex colours, palette metadata, stops, locks, and colour economics'
 ---
 
-_Content coming soon._
+_Content coming soon._ This chapter will cover the native colour system: named and hex
+colours, palette slots, `slotcolor`, colour-space helpers, background colour, machine stops,
+locks, and batching work by thread.
 
-<Run>{`// Two colours, one design
-color 1
+<Run>{`// Colours can be named, hex, or selected by palette slot
+color 'crimson'
 repeat 4 [ fd 20 rt 90 ]
 trim
-color 2
+color '#2b6cb0'
 up  moveto 0 0  down
 repeat 6 [ fd 10 rt 60 ]`}</Run>
 

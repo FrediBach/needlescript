@@ -1,14 +1,22 @@
 ---
-title: 'The engine as a library'
-part: 'Part IX — Tooling and Ecosystem'
+title: 'Layout, regions, and textures'
+part: 'Part IX — Standard Library and Reusable Design'
 partNumber: 9
 order: 4
-subtitle: 'npm install needlescript — run, designStats, toDST, and beyond'
+subtitle: 'std.layout, std.regions, and std.textures from placement to geometric fill paths'
 ---
 
-_Content coming soon._
+_Content coming soon._ This chapter composes motif layouts, region analysis, clipped cells,
+configured direction/shape closures, and cultural/geometric texture generators. It explicitly
+separates texture path generation from the later decision of how those paths are sewn.
 
-<Run>{`// The same engine that powers this book is available as a library
-repeat 4 [ fd 20 rt 90 ]`}</Run>
+<Run>{`import std.shapes.ellipsepath as ellipse
+import std.textures.truchetpaths as truchet
+
+let region = ellipse(35, 25)
+for path in truchet(region, 7) [
+up setpos(first(path)) down
+sewpath(path)
+]`}</Run>
 
 <Checkpoint chapterId="ch-57">Chapter content coming soon.</Checkpoint>

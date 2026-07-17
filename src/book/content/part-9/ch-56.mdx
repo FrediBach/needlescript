@@ -1,14 +1,22 @@
 ---
-title: 'The AI assistant'
-part: 'Part IX — Tooling and Ecosystem'
+title: 'Shape and path recipes'
+part: 'Part IX — Standard Library and Reusable Design'
 partNumber: 9
 order: 3
-subtitle: '/ai setup, the four verbs, and review discipline'
+subtitle: 'std.shapes and std.pathops: construction, sampling, dashes, morphs, and open offsets'
 ---
 
-_Content coming soon._
+_Content coming soon._ Shape factories provide predictable path data; path operations sample,
+slice, simplify, smooth, morph, intersect, dash, and offset it. This chapter teaches the
+compose-as-data workflow before any stitch mode is chosen.
 
-<Run>{`// AI output should always be reviewed with the scrubber
-repeat 6 [ fd 20 rt 60 ]`}</Run>
+<Run>{`import std.shapes.heartpath as heart
+import std.pathops.dashes as dashpath
+
+let outline = heart(38)
+for dash in dashpath(outline, 4, 2) [
+up setpos(first(dash)) down
+sewpath(dash)
+]`}</Run>
 
 <Checkpoint chapterId="ch-56">Chapter content coming soon.</Checkpoint>
