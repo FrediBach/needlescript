@@ -271,6 +271,17 @@ return expr // makes it a reporter (usable in expressions)
 // consumed by map/filter/reduce/compose, warp, satin, fill, stitchlen/filllen/resample.
 // Statement-only commands (@fd) are rejected.
 
+## Standard-library imports
+
+Imports are compile-time only, top-level, and currently restricted to bundled `std.*` modules. The final dotted component is the exported procedure; `as` gives it a local procedure name:
+
+```text
+import std.textures.radialdir as radial
+fill dir @radial
+```
+
+The initial `radialdir(p)` reporter is centered on the origin and returns the outward turtle heading for point `p`. Import aliases must not collide with a local definition, another import, or any built-in. Source modules export procedures with `export def name(args) [ … ]` (or classic `export to name … end`).
+
 ## Randomness (all seeded and deterministic)
 
 seed n — set seed (default 42)

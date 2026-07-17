@@ -247,6 +247,24 @@ repeat 8 [ leaf(1.2) rt 45 ]
 
 `@name` yields a reference to a user reporter or a value-returning builtin (`@abs`, `@vadd`, `@sin`, `@str`, …). Consumed by `map`/`filter`/`reduce`/`compose`, `warp`/`warppath`, `satin`, `fill`, `stitchlen`/`filllen`, `resample`. Statement-only commands (`@fd`) are rejected. Using a reference anywhere else is a type error.
 
+### Source modules and the standard library
+
+Import one exported procedure from a bundled module with a local alias:
+
+```text
+import std.textures.radialdir as radial
+fill dir @radial
+```
+
+- Imports are compile-time only, top-level, and currently restricted to bundled `std.*` modules.
+- The final dotted component is the exported procedure; everything before it is the module ID.
+- The alias is an ordinary local procedure name and must not collide with another import, a local definition, or a built-in.
+- Module procedures are qualified internally, so private helpers and same-named procedures in different modules do not collide.
+- Modules expose procedures by prefixing a top-level definition with `export`: `export def name(args) [ … ]` (classic `export to name … end` also works).
+- Standard-library modules contain only imports and procedure definitions. Importing a module has no runtime side effects and consumes no RNG draws.
+
+The initial surface is `std.textures.radialdir`, a one-argument direction-field reporter centered on the origin. It accepts a point and returns its outward turtle heading.
+
 ---
 
 ## 8. Movement

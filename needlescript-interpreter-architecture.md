@@ -16,7 +16,7 @@ concerns. It is part of the publishable core.
 ## 1. Where the interpreter sits
 
 ```
-source ──tokenize──► Token[] ──parse──► ASTNode[] ──run()──► RunResult
+source ──tokenize──► Token[] ──link/parse──► ASTNode[] ──run()──► RunResult
                                                     │
                                        ┌────────────┴────────────┐
                                        │   interpreter/  +  Machine │
@@ -31,13 +31,20 @@ surfaced from the library barrel `engine.ts:81`.
 
 ```ts
 const tokens = tokenize(source); // lex
-const program = parse(tokens, parseNotes); // parse (+ prescan)
+const program = linkStandardModules(tokens, parseNotes); // modules + parse (+ pre-scan)
 const m = new Machine(); // side-effect target
 // … build RunContext, wire modules, execute, finalize …
 ```
 
-For profiling, `RunOptions.onTiming` receives the elapsed time for tokenization,
-parsing (including pre-scan), and execution/finalization. The callback is optional
+Module linking is entirely compile-time. Imported standard-library procedures are parsed
+from bundled NeedleScript source, qualified to collision-free internal names, and prepended
+as ordinary `to` nodes. The runtime has no module loader and does not distinguish imported
+procedures from local ones; importing consumes no operations or random draws beyond the
+normal definition registration and calls the program actually makes. Module loading itself
+never touches the RNG or stitch machine.
+
+For profiling, `RunOptions.onTiming` receives the elapsed time for root tokenization,
+module linking/parsing (including module tokenization and pre-scan), and execution/finalization. The callback is optional
 and synchronous, so normal library results and deterministic language behavior are
 unchanged. The playground worker adds statistics, worker-total, and message
 round-trip timings in `CompileResponse.timings`.

@@ -73,6 +73,24 @@ export const NS_ITEMS: NSItem[] = [
     insertText: 'continue',
   },
   {
+    label: 'import',
+    kindName: 'keyword',
+    detail: 'import a standard-library procedure',
+    documentation:
+      'Imports one exported procedure from a bundled standard-library module under a local name. Imports are compile-time only and must be top-level.\n\n```\nimport std.textures.radialdir as radial\nfill dir @radial\n```',
+    insertText: 'import std.${1:module}.${2:name} as ${3:alias}',
+    isSnippet: true,
+  },
+  {
+    label: 'export',
+    kindName: 'keyword',
+    detail: 'export a module procedure',
+    documentation:
+      "Marks a top-level procedure as part of a source module's public surface. The keyword directly prefixes `def` or classic `to`.\n\n```\nexport def radialdir(p) [\n  return vheading(p)\n]\n```",
+    insertText: 'export def ${1:name}(${2:params}) [\n\t$0\n]',
+    isSnippet: true,
+  },
+  {
     label: 'def',
     kindName: 'keyword',
     detail: 'define a procedure',

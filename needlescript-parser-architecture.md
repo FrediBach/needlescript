@@ -13,7 +13,8 @@ UI concerns, and no side-effectful top-level code. It is the publishable core.
 
 ## 1. Pipeline overview
 
-Source text flows through three front-end stages before it reaches the interpreter:
+Source text flows through tokenization, compile-time module linking, and the existing
+pre-scan/parser stages before it reaches the interpreter:
 
 ```
 source string
@@ -23,14 +24,14 @@ source string
 │  tokenize()  ├──────────────┐
 │ tokenizer.ts │              │
 └──────────────┘              ▼
-                       ┌──────────────┐   PreScan
-                       │  prescan()   ├────────────┐
-                       │ prescan.ts   │            │
-                       └──────────────┘            ▼
-                                            ┌──────────────┐   ASTNode[]
-                                            │   parse()    ├──────────────►  interpreter
-                                            │  parser/*.ts │
-                                            └──────────────┘
+                       ┌─────────────────┐   linked sources
+                       │  module linker  ├────────────┐
+                       │ module-linker.ts│            │
+                       └─────────────────┘            ▼
+                                             ┌──────────────┐   ASTNode[]
+                                             │ prescan/parse├──────────────► interpreter
+                                             │ parser/*.ts  │
+                                             └──────────────┘
 ```
 
 The orchestration lives in `interpreter/index.ts:30` (`run()`):
@@ -38,13 +39,13 @@ The orchestration lives in `interpreter/index.ts:30` (`run()`):
 ```ts
 const tokens = tokenize(source); // 1. lexing
 const parseNotes: string[] = [];
-const program = parse(tokens, parseNotes); // 2. prescan (internal) + 3. parse
+const program = linkStandardModules(tokens, parseNotes); // link, pre-scan, parse
 // … program (ASTNode[]) is then executed by the interpreter
 ```
 
-`parse()` internally invokes `prescan()`, so callers see a two-call surface:
-`tokenize` then `parse`. Both are re-exported from the library barrel
-`engine.ts:61-62`.
+`parse()` still invokes `prescan()` internally for an individual source unit. Full
+program execution inserts `linkStandardModules()` between tokenization and parsing;
+both lower-level surfaces are re-exported from the library barrel.
 
 Key design principle stated in `parser/index.ts:1-5`: the parser accepts **both**
 classic Logo syntax **and** a modern syntax (RFC-1). Every modern form _lowers_ to
@@ -177,6 +178,35 @@ globally reserved, so no prescan guard is needed for it). It invokes a visitor
 The distinction between locals and globals is enforced here: a name registered inside
 a procedure and either force-local (params, `let`, `local`, `for`) or already known
 local becomes a local; otherwise it is global.
+
+### 3.3 Compile-time source modules (`module-linker.ts`)
+
+`linkStandardModules(rootTokens, notes)` recognizes top-level module directives before
+ordinary parsing:
+
+```text
+import std.textures.radialdir as radial
+export def radialdir(p) [ return vheading(p) ]
+```
+
+An import specifier splits at its final dot: `std.textures` is the module ID and
+`radialdir` is the exported procedure. Bundled source is resolved from the pure registry
+in `standard-library/index.ts`; non-`std.*` IDs are rejected for now. The resolver
+boundary is deliberately separate from parsing so a future host resolver can supply user
+module source without adding filesystem or network APIs to `src/lib/`.
+
+The linker parses each module as its own source unit. `parse()` accepts an optional map of
+known imported procedure signatures so imported aliases participate in arity checking and
+forward resolution during pre-scan. It then rewrites local and imported procedure symbols
+to stable module-qualified names, prepends each module once in dependency order, and runs
+the reporter-path check over the combined AST. The interpreter consequently receives the
+same ordinary `to`/call AST it has always executed; import/export have no runtime nodes,
+side effects, or RNG behavior.
+
+For this first standard-library foundation, modules may contain only imports and procedure
+definitions, and only procedures can be exported. `export` directly prefixes `def` or
+classic `to`. This keeps modules deterministic and gives private helpers collision-free
+module scope while leaving room for exported values and host resolvers later.
 
 ---
 
@@ -454,6 +484,8 @@ need no color-specific token or node.
 | ----------------------- | --------------------------------------------------------------------------------- |
 | `tokenizer.ts`          | `tokenize()` — source → `Token[]`                                                 |
 | `prescan.ts`            | `prescan()` — token stream → `PreScan` (names, arity, scopes)                     |
+| `module-linker.ts`      | import/export extraction, std resolution, qualification, AST linking              |
+| `standard-library/`     | bundled NeedleScript source modules and pure module registry                      |
 | `parser/index.ts`       | `parse()` entry, `ParseContext` construction, top-level loop, reporter-path check |
 | `parser/context.ts`     | `ParseContext` interface (shared state + helpers)                                 |
 | `parser/expressions.ts` | precedence ladder, primaries, argument lists, postfix chains                      |

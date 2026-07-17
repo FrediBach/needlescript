@@ -69,10 +69,28 @@ function parseProgram(ctx: ParseContext): ASTNode[] {
 
 // ---------- Public parse() export ----------
 
-export function parse(tokens: Token[], notes?: string[]): ASTNode[] {
+export interface KnownProcedure {
+  arity: number;
+  line?: number;
+}
+
+export function parse(
+  tokens: Token[],
+  notes?: string[],
+  knownProcedures: Readonly<Record<string, KnownProcedure>> = {},
+): ASTNode[] {
   // Pre-scan procedures, globals and per-procedure locals so both call arity
   // and bare-name resolution are known at parse time.
   const ps = prescan(tokens);
+  for (const [name, known] of Object.entries(knownProcedures)) {
+    if (ps.procArity[name] !== undefined)
+      throw new NeedlescriptError(
+        `"${name}" is both imported and defined locally`,
+        ps.procLine[name],
+      );
+    ps.procArity[name] = known.arity;
+    ps.procLine[name] = known.line ?? 1;
+  }
 
   // Build the ParseContext. All methods close over `ctx` so they can read and
   // mutate state without `this`. Cross-module function references (parseExpr,

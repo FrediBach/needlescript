@@ -7,7 +7,7 @@ import type { BudgetKey } from '../machine.ts';
 import { makeRNG, makeNoise } from '../prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { tokenize } from '../tokenizer.ts';
-import { parse } from '../parser/index.ts';
+import { linkStandardModules } from '../module-linker.ts';
 import { applyAutoTrim, applyLocks } from '../postprocess.ts';
 import { applyTravelPlan } from '../travel-planner.ts';
 import type { TravelPlanStats } from '../types.ts';
@@ -37,7 +37,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   const tokens = tokenize(source);
   const tokenizedAt = performance.now();
   const parseNotes: string[] = [];
-  const program = parse(tokens, parseNotes);
+  const program = linkStandardModules(tokens, parseNotes);
   const parsedAt = performance.now();
   const m = new Machine();
   m.warnings.push(...parseNotes);

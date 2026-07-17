@@ -81,6 +81,7 @@ export {
 export { suggest } from './suggestions.ts';
 export { tokenize } from './tokenizer.ts';
 export { parse } from './parser/index.ts';
+export { linkStandardModules } from './module-linker.ts';
 export { NsList, isList, isString } from './list.ts';
 export type { Val } from './list.ts';
 export type { Pt } from './genmath.ts';
