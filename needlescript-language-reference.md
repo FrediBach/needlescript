@@ -280,6 +280,9 @@ Bundled modules currently include:
   exactly one main-stream draw.
 - `std.layout` — centered circle/grid placements, normalized along-path placements, and
   uniform path fitting. Placements have the form `[[x, y], heading]`.
+- `std.stitchcraft` — running, satin, bean, appliqué, eyelet, gradient-band,
+  two-color row-blend, and coverage-aware stipple rituals. `stipple` consumes exactly
+  one main-stream draw through `scatter`; the other helpers are drawless.
 - `std.textures` — direction-field reporters, beginning with `radialdir(p)` centered on
   the origin.
 

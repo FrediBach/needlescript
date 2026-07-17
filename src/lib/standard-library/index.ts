@@ -4,6 +4,7 @@ import { MATHX_SOURCE } from './mathx.ns.ts';
 import { PATHOPS_SOURCE } from './pathops.ns.ts';
 import { REGIONS_SOURCE } from './regions.ns.ts';
 import { SHAPES_SOURCE } from './shapes.ns.ts';
+import { STITCHCRAFT_SOURCE } from './stitchcraft.ns.ts';
 import { TEXTURES_SOURCE } from './textures.ns.ts';
 
 const STANDARD_MODULES: Readonly<Record<string, string>> = {
@@ -13,6 +14,7 @@ const STANDARD_MODULES: Readonly<Record<string, string>> = {
   'std.pathops': PATHOPS_SOURCE,
   'std.regions': REGIONS_SOURCE,
   'std.shapes': SHAPES_SOURCE,
+  'std.stitchcraft': STITCHCRAFT_SOURCE,
   'std.textures': TEXTURES_SOURCE,
 };
 

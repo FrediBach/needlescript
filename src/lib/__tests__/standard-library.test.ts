@@ -305,4 +305,91 @@ describe('standard-library modules', () => {
       '[-4, -4, 4, 4]',
     ]);
   });
+
+  it('provides sewrun, satinalong, and beanoutline stitch-mode rituals', () => {
+    const runResult = run(`
+      import std.stitchcraft.sewrun as sewrun
+      lock 0
+      sewrun([[0, 0], [0, 10]], 2)
+    `);
+    const directResult = run(`lock 0 sewpath(resample([[0, 0], [0, 10]], 2))`);
+    const geometry = (result: typeof runResult) =>
+      result.events.map(({ t, x, y, c }) => ({ t, x, y, c }));
+    expect(geometry(runResult)).toEqual(geometry(directResult));
+
+    const satinResult = run(`
+      import std.stitchcraft.satinalong as satinalong
+      lock 0 underlay 'off'
+      satinalong([[0, 0], [0, 10]], 2)
+      fd 5
+    `);
+    expect(satinResult.events.filter((event) => event.t === 'stitch').length).toBeGreaterThan(10);
+    expect(satinResult.events.at(-1)).toMatchObject({ t: 'stitch', x: 0, y: 15 });
+
+    const beanResult = run(`
+      import std.stitchcraft.beanoutline as beanoutline
+      lock 0 stitchlen 5
+      beanoutline([[0, 0], [10, 0], [10, 10]], 3)
+      fd 5
+    `);
+    const plainResult = run(
+      `lock 0 stitchlen 5 sewpath(closepath([[0, 0], [10, 0], [10, 10]])) fd 5`,
+    );
+    expect(beanResult.events.length).toBeGreaterThan(plainResult.events.length);
+  });
+
+  it('provides appliquesteps and eyelet as complete sewing procedures', () => {
+    const applique = run(`
+      import std.stitchcraft.appliquesteps as appliquesteps
+      lock 0 underlay 'off'
+      appliquesteps([[-5, -5], [5, -5], [5, 5], [-5, 5]], 2)
+    `);
+    expect(applique.events.filter((event) => event.t === 'color')).toHaveLength(2);
+    expect(applique.events.some((event) => event.t === 'stitch')).toBe(true);
+
+    const eyelet = run(`
+      import std.stitchcraft.eyelet as eyelet
+      lock 0 underlay 'off'
+      up setxy 4 6 down seth 90
+      eyelet(2)
+      print pos()
+      print heading
+    `);
+    expect(eyelet.printed).toEqual(['[4, 6]', '90']);
+    expect(eyelet.events.some((event) => event.t === 'stitch')).toBe(true);
+  });
+
+  it('provides gradientbands and two-color threadblend', () => {
+    const bands = run(`
+      import std.stitchcraft.gradientbands as gradientbands
+      let square = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+      print len(gradientbands(square, 30, 4))
+    `);
+    expect(bands.printed).toEqual(['4']);
+
+    const blend = run(`
+      import std.stitchcraft.threadblend as threadblend
+      lock 0
+      threadblend([[-8, -8], [8, -8], [8, 8], [-8, 8]], 20)
+    `);
+    const stitchColors = new Set(
+      blend.events.filter((event) => event.t === 'stitch').map((event) => event.c),
+    );
+    expect(stitchColors).toEqual(new Set([0, 1]));
+    expect(blend.events.filter((event) => event.t === 'color')).toHaveLength(1);
+  });
+
+  it('provides deterministic, coverage-aware stipple with one main-stream draw', () => {
+    const source = `
+      import std.stitchcraft.stipple as stipple
+      seed 777 lock 0
+      stipple([[-10, -10], [10, -10], [10, 10], [-10, 10]], 5)
+      print random(1)
+    `;
+    const result = run(source);
+    const baseline = run('seed 777 print random(1) print random(1)');
+    expect(result.printed[0]).toBe(baseline.printed[1]);
+    expect(result.events.some((event) => event.t === 'stitch')).toBe(true);
+    expect(run(source).events).toEqual(result.events);
+  });
 });
