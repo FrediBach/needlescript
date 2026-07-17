@@ -1,6 +1,14 @@
+import { LISTX_SOURCE } from './listx.ns.ts';
+import { MATHX_SOURCE } from './mathx.ns.ts';
+import { PATHOPS_SOURCE } from './pathops.ns.ts';
+import { SHAPES_SOURCE } from './shapes.ns.ts';
 import { TEXTURES_SOURCE } from './textures.ns.ts';
 
 const STANDARD_MODULES: Readonly<Record<string, string>> = {
+  'std.listx': LISTX_SOURCE,
+  'std.mathx': MATHX_SOURCE,
+  'std.pathops': PATHOPS_SOURCE,
+  'std.shapes': SHAPES_SOURCE,
   'std.textures': TEXTURES_SOURCE,
 };
 

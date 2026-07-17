@@ -263,7 +263,20 @@ fill dir @radial
 - Modules expose procedures by prefixing a top-level definition with `export`: `export def name(args) [ … ]` (classic `export to name … end` also works).
 - Standard-library modules contain only imports and procedure definitions. Importing a module has no runtime side effects and consumes no RNG draws.
 
-The initial surface is `std.textures.radialdir`, a one-argument direction-field reporter centered on the origin. It accepts a point and returns its outward turtle heading.
+Bundled modules currently include:
+
+- `std.shapes` — centered outline constructors (`polypath`, `starpath`, `rectpath`,
+  `roundrect`, `ellipsepath`, `arcpath`, `coilpath`, `heartpath`, `gearpath`,
+  `superellipsepath`, `wavepath`, `rosepath`, `lissajouspath`). Closed outlines repeat
+  their first point; polygonal outlines start at north and proceed counter-clockwise.
+- `std.pathops` — normalized arc-length queries and polyline operations. `pointat`,
+  `headingat`, `paramof`, and `subpath` use parameters in 0…1. Positive `offsetopen`
+  offsets to the polyline's left.
+- `std.mathx` — easing, waveform, angle, vector, clamped remap, and deterministic random
+  helpers. Draw counts are documented in the module source and tested.
+- `std.listx` — callback-based sorting/selection and common structural list helpers.
+- `std.textures` — direction-field reporters, beginning with `radialdir(p)` centered on
+  the origin.
 
 ---
 
