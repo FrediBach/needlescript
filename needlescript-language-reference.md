@@ -283,8 +283,13 @@ Bundled modules currently include:
 - `std.stitchcraft` — running, satin, bean, appliqué, eyelet, gradient-band,
   two-color row-blend, and coverage-aware stipple rituals. `stipple` consumes exactly
   one main-stream draw through `scatter`; the other helpers are drawless.
-- `std.textures` — direction-field reporters, beginning with `radialdir(p)` centered on
-  the origin.
+- `std.textures` — drawless direction fields (`radialdir(p)`, `curldir(p)`), fill shapers
+  (`wovenshape(p, row, v)`, `gradientshape(p, row, v)`), and clipped geometric fill-path
+  generators (`hilbertpaths(region, cell)`, `truchetpaths(region, cell)`,
+  `hitomezashi(region, cell, rowbits, colbits)`, `seigaiha(region, r)`,
+  `asanoha(region, cell)`, `herringbonepaths(region, w)`). `curldir` uses a fixed 14 mm
+  divergence-free curl-noise scale. The shapers use embroidery-safe defaults; path
+  generators return open fragments clipped to the supplied simple region.
 
 ---
 

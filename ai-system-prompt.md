@@ -280,7 +280,7 @@ import std.textures.radialdir as radial
 fill dir @radial
 ```
 
-The initial `radialdir(p)` reporter is centered on the origin and returns the outward turtle heading for point `p`. Import aliases must not collide with a local definition, another import, or any built-in. Source modules export procedures with `export def name(args) [ … ]` (or classic `export to name … end`).
+`std.textures` includes drawless `radialdir(p)` and curl-noise `curldir(p)` direction reporters; `wovenshape(p, row, v)` and `gradientshape(p, row, v)` fill shapers; and clipped `hilbertpaths`, `truchetpaths`, `hitomezashi`, `seigaiha`, `asanoha`, and `herringbonepaths` geometric path generators. Import aliases must not collide with a local definition, another import, or any built-in. Source modules export procedures with `export def name(args) [ … ]` (or classic `export to name … end`).
 
 ## Randomness (all seeded and deterministic)
 

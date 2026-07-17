@@ -24,6 +24,69 @@ describe('standard-library modules', () => {
     ).not.toThrow();
   });
 
+  it('provides drawless curl direction and fill-shape reporters', () => {
+    const source = `
+      import std.textures.curldir as curldir
+      import std.textures.wovenshape as wovenshape
+      import std.textures.gradientshape as gradientshape
+      seed 912
+      print curldir([7, -3])
+      print wovenshape([0, 0], 0, 0.5)
+      print wovenshape([0, 0], 1, 0.5)
+      print gradientshape([0, 0], 0, 0)
+      print gradientshape([0, 0], 0, 1)
+      print random(1)
+    `;
+    const result = run(source);
+    const baseline = run('seed 912 print random(1)');
+    expect(Number.isFinite(Number(result.printed[0]))).toBe(true);
+    expect(result.printed.slice(1, 5)).toEqual([
+      '[0.8, 3, 0]',
+      '[0.8, 3, 0.5]',
+      '[0.45, 2.5, 0.5]',
+      '[1.2, 2.5, 0.5]',
+    ]);
+    expect(result.printed[5]).toBe(baseline.printed[0]);
+
+    expect(() =>
+      run(`
+        import std.textures.wovenshape as woven
+        fill shape @woven
+        beginfill repeat 4 [ fd 10 rt 90 ] endfill
+      `),
+    ).not.toThrow();
+  });
+
+  it('provides clipped geometric texture path generators', () => {
+    const result = run(`
+      import std.textures.hilbertpaths as hilbertpaths
+      import std.textures.truchetpaths as truchetpaths
+      import std.textures.hitomezashi as hitomezashi
+      import std.textures.seigaiha as seigaiha
+      import std.textures.asanoha as asanoha
+      import std.textures.herringbonepaths as herringbonepaths
+      let square = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+      print len(hilbertpaths(square, 5)) > 0
+      print len(truchetpaths(square, 5)) > 0
+      print len(hitomezashi(square, 4, [0, 1], [1, 0])) > 0
+      print len(seigaiha(square, 5)) > 0
+      print len(asanoha(square, 6)) > 0
+      print len(herringbonepaths(square, 4)) > 0
+    `);
+    expect(result.printed).toEqual(['1', '1', '1', '1', '1', '1']);
+
+    expect(() =>
+      run(`
+        import std.textures.hilbertpaths as hilbertpaths
+        let square = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+        lock 0 fillunderlay 'off'
+        fill paths hilbertpaths(square, 5)
+        up setxy -10 -10 down
+        beginfill repeat 4 [ fd 20 rt 90 ] endfill
+      `),
+    ).not.toThrow();
+  });
+
   it('accepts export-prefixed definitions in a source program', () => {
     const result = run(`
       export def twice(n) [ return n * 2 ]
