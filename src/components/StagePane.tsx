@@ -8,6 +8,8 @@ import PlaybackBar from './PlaybackBar.tsx';
 import StatsChips from './StatsChips.tsx';
 import styles from './StagePane.module.css';
 import { cn } from '@/lib/utils.ts';
+import { colorDist } from '../lib/colormath.ts';
+import type { CSSProperties } from 'react';
 
 interface Props {
   design: DesignState;
@@ -114,10 +116,19 @@ export default function StagePane({
 }: Props) {
   // Only show the handles toggle when there are point params to show
   const hasHandles = (pointParams?.length ?? 0) > 0;
+  const darkGround = colorDist(design.background, '#000000') < 0.5;
 
   return (
     <section className={styles.pane}>
-      <div className={styles.fabric}>
+      <div
+        className={styles.fabric}
+        style={
+          {
+            backgroundColor: design.background,
+            '--color-on-canvas': darkGround ? '#fffdf7' : '#302b25',
+          } as CSSProperties
+        }
+      >
         <StageCanvas
           design={design}
           hoop={hoop}

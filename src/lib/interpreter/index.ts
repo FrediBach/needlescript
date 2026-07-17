@@ -29,6 +29,8 @@ import { initProcCall } from './proc-call.ts';
 import { initReporters } from './reporters.ts';
 import { initExecStmt } from './exec-stmt.ts';
 import { inspectChalkValue } from '../chalk.ts';
+import { DEFAULT_BACKGROUND, defaultSlotColor } from '../colormath.ts';
+import type { ColorTableEntry } from '../types.ts';
 
 export function run(source: string, opts: RunOptions = {}): RunResult {
   const tokens = tokenize(source);
@@ -70,6 +72,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     structuralDepth: 0,
     planMode: null,
     planLine: undefined,
+    palette: [] as ColorTableEntry[],
+    paletteSetLine: undefined,
+    background: DEFAULT_BACKGROUND,
+    backgroundSetLine: undefined,
+    colorOrStopLine: undefined,
+    usedColorIndices: new Set<number>([0]),
     m,
   } as RunContext;
 
@@ -317,6 +325,38 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     ];
   });
 
+  const allIndices = new Set(ctx.usedColorIndices);
+  for (const event of m.events) allIndices.add(event.c);
+  const maxIndex = Math.max(0, ...allIndices, ctx.palette.length - 1);
+  const colorTable: ColorTableEntry[] = [];
+  for (let index = 0; index <= maxIndex; index++) {
+    const defined = ctx.palette[index];
+    let stitchCount = 0;
+    let pathLenMm = 0;
+    let previous: { x: number; y: number; c: number } | undefined;
+    for (const event of m.events) {
+      if (event.t === 'stitch' && event.c === index) {
+        stitchCount++;
+        if (previous?.c === index)
+          pathLenMm += Math.hypot(event.x - previous.x, event.y - previous.y);
+      }
+      if (event.t === 'stitch' || event.t === 'jump') previous = event;
+    }
+    colorTable.push({
+      slot: index + 1,
+      hex: defined?.hex ?? defaultSlotColor(index),
+      ...(defined?.name ? { name: defined.name } : {}),
+      source: defined?.source ?? 'default',
+      ...(defined?.firstUseLine !== undefined ? { firstUseLine: defined.firstUseLine } : {}),
+      stitchCount,
+      pathLenMm,
+    });
+  }
+  if (allIndices.size > 16)
+    m.warnings.push(
+      `note: design uses ${allIndices.size} thread slots — plan the thread changes for your machine`,
+    );
+
   return {
     events: m.events,
     warnings: m.warnings,
@@ -330,5 +370,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     chalk,
     dataVars,
     plan: planStats,
+    colorTable,
+    background: ctx.background,
   };
 }

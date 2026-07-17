@@ -1,6 +1,5 @@
 import type { DesignState, LineStitchBounds } from '../../App.tsx';
 import type { HoopConfig } from '../../data.ts';
-import { THREADS } from '../../data.ts';
 import type { ChalkStroke, HoopInfo, WarningLocation } from '../../lib/engine.ts';
 import type { PointParamDef, XYRegion } from '../../lib/parse-parameters.ts';
 import {
@@ -24,6 +23,7 @@ import {
   goldHi,
 } from '../../theme.ts';
 import type { CanvasOverlay, RenderTransform, Viewport } from './types.ts';
+import { colorDist, defaultSlotColor } from '../../lib/colormath.ts';
 
 // ── rendering ────────────────────────────────────────────────────────────────
 
@@ -58,6 +58,9 @@ export function draw(
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = design.background;
+  ctx.fillRect(0, 0, w, h);
+  const darkGround = colorDist(design.background, '#000000') < 0.5;
 
   // Auto-fit scale (shared logic with computeAutoFitScale helper)
   const autoFitScale = computeAutoFitScale(w, h, design, hoop, activeHoop);
@@ -82,7 +85,7 @@ export function draw(
   const X = (mx: number) => cx + (mx - viewCX) * scale;
   const Y = (my: number) => cy - (my - viewCY) * scale; // y-up in mm
 
-  drawGrid(ctx, scale, cx, cy, viewCX, viewCY, w, h, dpr);
+  drawGrid(ctx, scale, cx, cy, viewCX, viewCY, w, h, dpr, darkGround);
   drawHoop(ctx, hoop, activeHoop, scale, cx, cy, viewCX, viewCY, w, h);
 
   drawOverlays(ctx, overlays, X, Y, dpr);
@@ -90,7 +93,18 @@ export function draw(
   const pts = design.pts;
   const upto = Math.min(pts.length, scrubPos || 0);
   if (pts.length === 0) {
-    drawChalkLayer(ctx, design, upto, showChalk, hoveredDataVar, pinnedDataVars, X, Y, dpr);
+    drawChalkLayer(
+      ctx,
+      design,
+      upto,
+      showChalk,
+      hoveredDataVar,
+      pinnedDataVars,
+      X,
+      Y,
+      dpr,
+      darkGround,
+    );
     if (showHandles && pointParams.length > 0) {
       drawHandles(
         ctx,
@@ -109,12 +123,23 @@ export function draw(
     return { scale, cx, cy, viewCX, viewCY };
   }
 
-  drawStitches(ctx, pts, upto, X, Y, scale, dpr, hideJumps);
+  drawStitches(ctx, design, pts, upto, X, Y, scale, dpr, hideJumps, darkGround);
 
   drawDensity(ctx, design, X, Y, scale, showDensity);
-  drawChalkLayer(ctx, design, upto, showChalk, hoveredDataVar, pinnedDataVars, X, Y, dpr);
-  drawScrubNeedle(ctx, pts, upto, X, Y, dpr);
-  drawDebugMarks(ctx, design, upto, X, Y, dpr);
+  drawChalkLayer(
+    ctx,
+    design,
+    upto,
+    showChalk,
+    hoveredDataVar,
+    pinnedDataVars,
+    X,
+    Y,
+    dpr,
+    darkGround,
+  );
+  drawScrubNeedle(ctx, pts, upto, X, Y, dpr, darkGround);
+  drawDebugMarks(ctx, design, upto, X, Y, dpr, darkGround);
   drawHoveredLineBounds(ctx, hoveredLineBounds, X, Y, scale, dpr);
   drawWarningMarkers(ctx, warningLoc, X, Y, dpr);
 
@@ -154,6 +179,7 @@ function drawChalkLayer(
   X: (mm: number) => number,
   Y: (mm: number) => number,
   dpr: number,
+  darkGround: boolean,
 ) {
   if (!showChalk) return;
 
@@ -187,7 +213,11 @@ function drawChalkLayer(
   }
 
   for (const guide of [...codeGuides, ...dataGuides]) {
-    const color = CHALK_PALETTE[Math.abs(guide.seed) % CHALK_PALETTE.length];
+    const color = darkGround
+      ? ['#f7f0df', '#d8f3ea', '#f5ddea', '#dce8ff', '#f5e2cf', '#ebf3d1'][
+          Math.abs(guide.seed) % CHALK_PALETTE.length
+        ]
+      : CHALK_PALETTE[Math.abs(guide.seed) % CHALK_PALETTE.length];
     drawChalkGuide(
       ctx,
       guide.strokes,
@@ -318,6 +348,7 @@ function drawChalkDirection(
 /** Draw jumps, thread runs, and penetration points in their layering order. */
 function drawStitches(
   ctx: CanvasRenderingContext2D,
+  design: DesignState,
   pts: DesignState['pts'],
   upto: number,
   X: (mm: number) => number,
@@ -325,12 +356,13 @@ function drawStitches(
   scale: number,
   dpr: number,
   hideJumps: boolean,
+  darkGround: boolean,
 ) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   if (!hideJumps) {
     ctx.setLineDash([4 * dpr, 4 * dpr]);
-    ctx.strokeStyle = canvasJumpThread;
+    ctx.strokeStyle = darkGround ? 'rgba(255,255,255,0.48)' : canvasJumpThread;
     ctx.lineWidth = dpr;
     ctx.beginPath();
     for (let i = 1; i < upto; i++) {
@@ -357,7 +389,7 @@ function drawStitches(
       if (runColor !== null) ctx.stroke();
       runColor = point.c;
       runUnderlay = isUnderlay;
-      ctx.strokeStyle = THREADS[runColor % THREADS.length];
+      ctx.strokeStyle = design.colorTable[runColor]?.hex ?? defaultSlotColor(runColor);
       ctx.lineWidth = isUnderlay ? Math.max(0.8 * dpr, threadWidth * 0.5) : threadWidth;
       ctx.globalAlpha = isUnderlay ? 0.4 : 1;
       ctx.beginPath();
@@ -369,7 +401,7 @@ function drawStitches(
   ctx.globalAlpha = 1;
 
   if (scale <= 2.4 * dpr) return;
-  ctx.fillStyle = canvasNeedlePoint;
+  ctx.fillStyle = darkGround ? 'rgba(255,255,255,0.72)' : canvasNeedlePoint;
   const radius = Math.max(0.8 * dpr, 0.09 * scale);
   for (let i = 0; i < upto; i++) {
     if (pts[i].t !== 'stitch' || (hideJumps && pts[i].u === 1)) continue;
@@ -410,10 +442,11 @@ function drawScrubNeedle(
   X: (mm: number) => number,
   Y: (mm: number) => number,
   dpr: number,
+  darkGround: boolean,
 ) {
   if (upto === 0 || upto === pts.length) return;
   const needle = pts[upto - 1];
-  ctx.strokeStyle = canvasNeedleMarker;
+  ctx.strokeStyle = darkGround ? '#ffffff' : canvasNeedleMarker;
   ctx.lineWidth = 1.4 * dpr;
   ctx.beginPath();
   ctx.arc(X(needle.x), Y(needle.y), 4.5 * dpr, 0, 6.2832);
@@ -427,6 +460,7 @@ function drawDebugMarks(
   X: (mm: number) => number,
   Y: (mm: number) => number,
   dpr: number,
+  darkGround: boolean,
 ) {
   const marks = design.marks.filter((mark) => mark.at <= upto);
   if (!marks.length) return;
@@ -439,12 +473,12 @@ function drawDebugMarks(
     const y = Y(mark.y);
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, 6.2832);
-    ctx.fillStyle = canvasDebugPinFill;
+    ctx.fillStyle = darkGround ? '#f7f0df' : canvasDebugPinFill;
     ctx.fill();
-    ctx.strokeStyle = canvasDebugPinStroke;
+    ctx.strokeStyle = darkGround ? '#241f18' : canvasDebugPinStroke;
     ctx.lineWidth = 1.2 * dpr;
     ctx.stroke();
-    ctx.fillStyle = canvasAnnotationText;
+    ctx.fillStyle = darkGround ? '#241f18' : canvasAnnotationText;
     ctx.fillText(String(index + 1), x, y + 0.5 * dpr);
   });
 }
@@ -819,6 +853,7 @@ function drawGrid(
   w: number,
   h: number,
   dpr: number,
+  darkGround: boolean,
 ) {
   const CELL = 10; // mm — 1 cm
   if (CELL * scale < 8) return;
@@ -829,7 +864,7 @@ function drawGrid(
   const maxMmY = viewCY + cy / scale;
 
   ctx.save();
-  ctx.strokeStyle = canvasGridCm;
+  ctx.strokeStyle = darkGround ? 'rgba(255,255,255,0.12)' : canvasGridCm;
   ctx.lineWidth = dpr;
   ctx.beginPath();
 

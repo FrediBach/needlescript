@@ -441,6 +441,11 @@ comment-annotation scanner that reads OpenSCAD-style `// [min:max]` annotations 
 code path with `tokenize`/`prescan`/`parse` and does not produce an AST. It is noted
 here only to avoid confusion with the language front-end.
 
+It also recognizes color-specific `[color]` and `[palette]` annotations. The language
+directives `palette` and `background` themselves use the ordinary `cmd` AST node and
+expression parser; color literals remain strings, so the tokenizer and AST value union
+need no color-specific token or node.
+
 ---
 
 ## 8. File reference

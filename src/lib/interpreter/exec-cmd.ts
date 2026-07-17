@@ -17,6 +17,7 @@ import type { PlanMode } from '../travel-planner.ts';
 import { apply } from '../affine.ts';
 import { inspectChalkValue } from '../chalk.ts';
 import type { ChalkStyle } from '../types.ts';
+import { parseColorDetails } from '../colormath.ts';
 
 /**
  * Handler for the `'cmd'` statement branch of execStmt. Returns a function
@@ -46,6 +47,107 @@ export function initExecCmdHandler(
       ctx.printed.push(
         (st.label ?? 'loc') + ': [' + formatNum(ctx.m.x) + ', ' + formatNum(ctx.m.y) + ']',
       );
+      return;
+    }
+    if (st.name === 'palette') {
+      if (ctx.insideTrace > 0 || ctx.structuralDepth > 0 || depth > 0)
+        throw new NeedlescriptError(
+          'palette must be at the top level — put it near the top of the program',
+          st.line,
+        );
+      if (ctx.m.started || ctx.colorOrStopLine !== undefined)
+        throw new NeedlescriptError(
+          'palette must run before the first stitch and before color or stop; move it to the top of the program',
+          st.line,
+        );
+      if (ctx.paletteSetLine !== undefined)
+        throw new NeedlescriptError(
+          `palette already set on line ${ctx.paletteSetLine} — only one palette directive is allowed per program`,
+          st.line,
+        );
+      const value = vals[0];
+      if (!isList(value))
+        throw new NeedlescriptError(
+          `palette expects a list of colors, got ${describeVal(value)}`,
+          st.line,
+        );
+      if (value.items.length < 1 || value.items.length > 64)
+        throw new NeedlescriptError('palette needs 1–64 colors', st.line);
+      ctx.palette = value.items.map((entry, index) => {
+        if (typeof entry !== 'string')
+          throw new NeedlescriptError(
+            `palette entry ${index + 1} must be a color string, got ${describeVal(entry)}`,
+            st.line,
+          );
+        const parsed = parseColorDetails(entry, st.line);
+        return {
+          slot: index + 1,
+          hex: parsed.hex,
+          ...(parsed.name ? { name: parsed.name } : {}),
+          source: 'palette' as const,
+          stitchCount: 0,
+          pathLenMm: 0,
+        };
+      });
+      ctx.paletteSetLine = st.line;
+      return;
+    }
+    if (st.name === 'background') {
+      if (ctx.insideTrace > 0 || ctx.structuralDepth > 0 || depth > 0)
+        throw new NeedlescriptError(
+          'background must be at the top level — put it near the top of the program',
+          st.line,
+        );
+      if (ctx.m.started)
+        throw new NeedlescriptError(
+          'background must run before the first stitch; move it to the top of the program',
+          st.line,
+        );
+      if (ctx.backgroundSetLine !== undefined)
+        throw new NeedlescriptError(
+          `background already set on line ${ctx.backgroundSetLine} — only one background directive is allowed per program`,
+          st.line,
+        );
+      if (typeof vals[0] !== 'string')
+        throw new NeedlescriptError(
+          `background expects a color string, got ${describeVal(vals[0])}`,
+          st.line,
+        );
+      ctx.background = parseColorDetails(vals[0], st.line).hex;
+      ctx.backgroundSetLine = st.line;
+      return;
+    }
+    if (st.name === 'color') {
+      ctx.traceNote('color', 'note: color inside trace has no effect on the captured path');
+      ctx.colorOrStopLine ??= st.line;
+      const value = vals[0];
+      if (typeof value === 'string') {
+        const parsed = parseColorDetails(value, st.line);
+        let index = ctx.palette.findIndex((slot) => slot.hex === parsed.hex);
+        if (index < 0) {
+          index = ctx.palette.length;
+          ctx.palette.push({
+            slot: index + 1,
+            hex: parsed.hex,
+            ...(parsed.name ? { name: parsed.name } : {}),
+            source: 'auto',
+            firstUseLine: st.line,
+            stitchCount: 0,
+            pathLenMm: 0,
+          });
+          ctx.m.warnings.push(
+            `note: new thread slot ${index + 1} = '${parsed.hex}' (line ${st.line})`,
+          );
+        }
+        ctx.usedColorIndices.add(index);
+        ctx.m.colorChange(index);
+        return;
+      }
+      const numeric = num(value, 'color', st.line);
+      if (!Number.isInteger(numeric) || numeric < 0)
+        throw new NeedlescriptError('color slot must be a non-negative integer', st.line);
+      ctx.usedColorIndices.add(numeric);
+      ctx.m.colorChange(numeric);
       return;
     }
     if (st.name === 'chalk') {
@@ -707,12 +809,10 @@ export function initExecCmdHandler(
         ctx.m.maxDensity = Math.min(Math.max(a[0], 1), 8);
         return;
       }
-      case 'color':
-        ctx.traceNote('color', 'note: color inside trace has no effect on the captured path');
-        ctx.m.colorChange(a[0]);
-        return;
       case 'stop':
         ctx.traceNote('stop', 'note: stop inside trace has no effect on the captured path');
+        ctx.colorOrStopLine ??= st.line;
+        ctx.usedColorIndices.add(ctx.m.colorIdx + 1);
         ctx.m.colorChange(ctx.m.colorIdx + 1);
         return;
       case 'trim':

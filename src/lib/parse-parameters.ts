@@ -57,6 +57,24 @@ export interface TextParamDef {
   line: number;
 }
 
+export interface ColorParamDef {
+  name: string;
+  value: string;
+  line: number;
+  controlType: 'color';
+  choices?: string[];
+  paletteOnly?: boolean;
+}
+
+export interface PaletteParamDef {
+  name: string;
+  value: string[];
+  line: number;
+  controlType: 'palette';
+  min: number;
+  max: number;
+}
+
 // ── XY point parameter types ───────────────────────────────────────────────
 
 /** Constraint region for an [xy] point parameter. */
@@ -87,6 +105,8 @@ export type ParamItem =
   | { kind: 'section'; title: string }
   | { kind: 'param'; def: ParamDef }
   | { kind: 'text'; def: TextParamDef }
+  | { kind: 'color'; def: ColorParamDef }
+  | { kind: 'palette'; def: PaletteParamDef }
   | { kind: 'point'; def: PointParamDef };
 
 // ── Preset type ────────────────────────────────────────────────────────────
@@ -99,7 +119,7 @@ export type ParamItem =
 export interface Preset {
   name: string;
   /** Keyed by lowercased variable name — same casing as ParamDef.name */
-  values: Record<string, number | [number, number]>;
+  values: Record<string, number | string | [number, number] | string[]>;
 }
 
 // ── Regex helpers ──────────────────────────────────────────────────────────
@@ -118,6 +138,11 @@ const DECL_RE =
 const STRING_LITERAL_PATTERN = String.raw`'(?:\\['\\nt]|[^'\\\n])*'`;
 const TEXT_DECL_RE = new RegExp(
   `^\\s*(?:let\\s+([A-Za-z_]\\w*)\\s*=|make\\s+"([A-Za-z_]\\w*)\\s+|([A-Za-z_]\\w*)\\s*=)\\s*(${STRING_LITERAL_PATTERN})`,
+);
+const COLOR_DECL_RE = TEXT_DECL_RE;
+const COLOR_LIST_PATTERN = String.raw`\[\s*${STRING_LITERAL_PATTERN}(?:\s*,\s*${STRING_LITERAL_PATTERN})*\s*\]`;
+const PALETTE_DECL_RE = new RegExp(
+  `^\\s*(?:let\\s+([A-Za-z_]\\w*)\\s*=|make\\s+"([A-Za-z_]\\w*)\\s+|([A-Za-z_]\\w*)\\s*=)\\s*(${COLOR_LIST_PATTERN})`,
 );
 
 // Matches a two-element numeric-literal list on the declaration RHS:
@@ -363,6 +388,53 @@ export function parseParameters(source: string): ParamItem[] {
     if (!annotMatch) continue;
     const annotContent = annotMatch[1].trim();
 
+    if (/^color(?:\s*:|\s*$)/i.test(annotContent)) {
+      const match = COLOR_DECL_RE.exec(line);
+      if (!match) continue;
+      const name = (match[1] ?? match[2] ?? match[3]).toLowerCase();
+      const value = decodeStringLiteral(match[4].slice(1, -1));
+      const constraint = annotContent.slice(5).trim();
+      let choices: string[] | undefined;
+      let paletteOnly = false;
+      if (constraint.startsWith(':')) {
+        const body = constraint.slice(1).trim();
+        if (body.toLowerCase() === 'palette') paletteOnly = true;
+        else
+          choices = body
+            .split(',')
+            .map((part) => part.trim())
+            .filter(Boolean);
+      }
+      items.push({
+        kind: 'color',
+        def: { name, value, line: lineNo, controlType: 'color', choices, paletteOnly },
+      });
+      continue;
+    }
+
+    if (/^palette(?:\s*:|\s*$)/i.test(annotContent)) {
+      const match = PALETTE_DECL_RE.exec(line);
+      if (!match) continue;
+      const name = (match[1] ?? match[2] ?? match[3]).toLowerCase();
+      const value = [...match[4].matchAll(new RegExp(STRING_LITERAL_PATTERN, 'g'))].map((entry) =>
+        decodeStringLiteral(entry[0].slice(1, -1)),
+      );
+      const bounds = annotContent.slice(7).trim();
+      let min = value.length;
+      let max = value.length;
+      const bounded = /^:\s*(\d+)\s*:\s*(\d+)\s*$/.exec(bounds);
+      if (bounded) {
+        min = Number(bounded[1]);
+        max = Number(bounded[2]);
+        if (min < 1 || max < min || value.length < min || value.length > max) continue;
+      }
+      items.push({
+        kind: 'palette',
+        def: { name, value, line: lineNo, controlType: 'palette', min, max },
+      });
+      continue;
+    }
+
     // ── [xy] point parameter ──────────────────────────────────────────────
     if (/^xy\b/i.test(annotContent)) {
       const pointDeclMatch = POINT_DECL_RE.exec(line);
@@ -537,6 +609,29 @@ export function updateTextParameter(
   if (updated === original) return source;
 
   lines[idx] = updated;
+  return lines.join('\n');
+}
+
+export function updatePaletteParameter(
+  source: string,
+  line: number,
+  name: string,
+  colors: string[],
+): string {
+  const lines = source.split('\n');
+  const index = line - 1;
+  if (index < 0 || index >= lines.length) return source;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const literal = `[${colors
+    .map((color) => `'${color.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
+    .join(', ')}]`;
+  const letOrBare = new RegExp(`((?:let\\s+)?${escaped}\\s*=\\s*)${COLOR_LIST_PATTERN}`, 'i');
+  const makeRe = new RegExp(`(make\\s+"${escaped}\\s+)${COLOR_LIST_PATTERN}`, 'i');
+  const original = lines[index];
+  let updated = original.replace(letOrBare, `$1${literal}`);
+  if (updated === original) updated = original.replace(makeRe, `$1${literal}`);
+  if (updated === original) return source;
+  lines[index] = updated;
   return lines.join('\n');
 }
 
@@ -793,13 +888,28 @@ export function parsePresets(source: string): Preset[] {
     const name = m[1].trim();
     if (!name) continue;
 
-    const values: Record<string, number | [number, number]> = {};
+    const values: Preset['values'] = {};
     for (const pair of splitPresetPairs(m[2])) {
       const eq = pair.indexOf('=');
       if (eq === -1) continue;
       const key = pair.slice(0, eq).trim().toLowerCase();
       if (!key) continue;
       const rawVal = pair.slice(eq + 1).trim();
+
+      if (new RegExp(`^${COLOR_LIST_PATTERN}$`).test(rawVal)) {
+        values[key] = [...rawVal.matchAll(new RegExp(STRING_LITERAL_PATTERN, 'g'))].map((entry) =>
+          decodeStringLiteral(entry[0].slice(1, -1)),
+        );
+        continue;
+      }
+      if (/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(rawVal)) {
+        values[key] = rawVal.toLowerCase();
+        continue;
+      }
+      if (new RegExp(`^${STRING_LITERAL_PATTERN}$`).test(rawVal)) {
+        values[key] = decodeStringLiteral(rawVal.slice(1, -1));
+        continue;
+      }
 
       // Point value: [x, y]
       const pointMatch = /^\[\s*(-?(?:\d+\.?\d*|\.\d+))\s*,\s*(-?(?:\d+\.?\d*|\.\d+))\s*\]$/.exec(

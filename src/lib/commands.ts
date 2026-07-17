@@ -68,6 +68,8 @@ export const BUILTIN_ARITY: Record<string, number> = {
   autotrim: 1,
   maxdensity: 1,
   color: 1,
+  palette: 1,
+  background: 1,
   stop: 0,
   trim: 0,
   seed: 1,
@@ -236,6 +238,16 @@ export const LIST_CMDS: Record<string, { min: number; max: number }> = {
 
 /** Generative-math functions usable in expressions (RFC-3 §4). */
 export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
+  rgb: { min: 3, max: 3 },
+  hsl: { min: 3, max: 3 },
+  hexparts: { min: 1, max: 1 },
+  lerpcolor: { min: 3, max: 4 },
+  nearestcolor: { min: 2, max: 2 },
+  colordist: { min: 2, max: 2 },
+  slotcolor: { min: 1, max: 1 },
+  colorindex: { min: 0, max: 0 },
+  colorhex: { min: 0, max: 0 },
+  backgroundcolor: { min: 0, max: 0 },
   // §4.1 scalars
   lerp: { min: 3, max: 3 },
   remap: { min: 5, max: 5 },

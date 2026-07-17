@@ -414,7 +414,11 @@ export function densityMap(events: StitchEvent[], cellMM = 1, threshold = 3): De
 
 // ---------- Design stats ----------
 
-export function designStats(events: StitchEvent[], plan?: TravelPlanStats): DesignStats {
+export function designStats(
+  events: StitchEvent[],
+  plan?: TravelPlanStats,
+  colorTable?: import('./types.ts').ColorTableEntry[],
+): DesignStats {
   let minX = Infinity,
     maxX = -Infinity,
     minY = Infinity,
@@ -479,6 +483,15 @@ export function designStats(events: StitchEvent[], plan?: TravelPlanStats): Desi
     maxStitchLen: maxLen,
     maxRadius: maxR,
     yarnLength,
+    ...(colorTable
+      ? {
+          slots: colorTable.map(({ slot, stitchCount, pathLenMm }) => ({
+            slot,
+            stitchCount,
+            pathLenMm,
+          })),
+        }
+      : {}),
     ...(plan
       ? {
           planMode: plan.planMode,

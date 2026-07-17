@@ -1,4 +1,4 @@
-import type { ASTNode, ChalkEvent, ExprNode } from '../types.ts';
+import type { ASTNode, ChalkEvent, ExprNode, ColorTableEntry } from '../types.ts';
 import type { PlanMode } from '../travel-planner.ts';
 import type { Machine } from '../machine.ts';
 import type { Val, NsList, FuncRef, ComposedRef } from '../list.ts';
@@ -37,6 +37,12 @@ export interface RunContext {
   structuralDepth: number;
   planMode: PlanMode | 'off' | null;
   planLine?: number;
+  palette: ColorTableEntry[];
+  paletteSetLine?: number;
+  background: string;
+  backgroundSetLine?: number;
+  colorOrStopLine?: number;
+  usedColorIndices: Set<number>;
   m: Machine;
 
   // ---- budget (initBudget) ----

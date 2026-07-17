@@ -9,7 +9,8 @@
 // the exporter flips Y so the SVG is Y-down (standard SVG).
 // ============================================================
 
-import type { StitchEvent } from './types.ts';
+import type { ColorTableEntry, StitchEvent } from './types.ts';
+import { DEFAULT_BACKGROUND, defaultSlotColor } from './colormath.ts';
 
 function escapeXml(s: string): string {
   return s
@@ -45,8 +46,13 @@ interface ColorRun {
  * - stroke-width="0.4" reflects typical embroidery thread diameter in mm.
  * - No hoop boundary, density overlay, or debug marks.
  */
-export function toSVG(events: StitchEvent[], name: string, threads: string[]): string {
-  const palette = threads.length > 0 ? threads : ['#000000'];
+export function toSVG(
+  events: StitchEvent[],
+  name: string,
+  threads: readonly string[] | readonly ColorTableEntry[] = [],
+  background = DEFAULT_BACKGROUND,
+): string {
+  const palette = threads.map((entry) => (typeof entry === 'string' ? entry : entry.hex));
 
   // ── 1. Bounding box from visible (non-underlay) stitches ─────────────────
   let minX = Infinity,
@@ -90,7 +96,8 @@ export function toSVG(events: StitchEvent[], name: string, threads: string[]): s
   let colorIdx = 0;
 
   const currentRun = (): ColorRun => runs[runs.length - 1];
-  const startRun = () => runs.push({ color: palette[colorIdx % palette.length], segments: [] });
+  const threadColor = (index: number) => palette[index] ?? defaultSlotColor(index);
+  const startRun = () => runs.push({ color: threadColor(colorIdx), segments: [] });
   startRun();
 
   let currentSeg: Pt[] = [];
@@ -132,6 +139,10 @@ export function toSVG(events: StitchEvent[], name: string, threads: string[]): s
         break;
 
       case 'stitch': {
+        if (currentRun().segments.length === 0 && currentSeg.length === 0) {
+          colorIdx = e.c;
+          currentRun().color = threadColor(colorIdx);
+        }
         if (e.u === 1) {
           // Underlay stitch: excluded from SVG output.
           // Treat like a jump so position context is maintained for any
@@ -169,6 +180,7 @@ export function toSVG(events: StitchEvent[], name: string, threads: string[]): s
       ` width="${f2(W)}mm" height="${f2(H)}mm">`,
   );
   out.push(`  <title>${escapeXml(name)}</title>`);
+  out.push(`  <rect width="100%" height="100%" fill="${background}"/>`);
 
   for (const run of runs) {
     if (run.segments.length === 0) continue;

@@ -18,13 +18,14 @@ import type {
   OverrideKey,
   ChalkEvent,
   ChalkDataVar,
+  ColorTableEntry,
 } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
 import { toDST } from './lib/dst.ts';
 import { toPES } from './lib/pes.ts';
 import { toEXP } from './lib/exp.ts';
 import { toSVG } from './lib/svg.ts';
-import { THREADS, EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, MACHINES } from './data.ts';
+import { EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, MACHINES } from './data.ts';
 import type { HoopConfig, MachineHoop, MachinePreset } from './data.ts';
 import type { ExportFormat } from './components/Header.tsx';
 import { parseParameters, updatePointParameter } from './lib/parse-parameters.ts';
@@ -94,6 +95,8 @@ export interface DesignState {
   activeOverrides?: Partial<Record<OverrideKey, number>>;
   chalk: ChalkEvent[];
   dataVars: ChalkDataVar[];
+  colorTable: ColorTableEntry[];
+  background: string;
 }
 
 export interface ConsoleMessage {
@@ -112,6 +115,8 @@ const INITIAL_DESIGN: DesignState = {
   warnings: [],
   chalk: [],
   dataVars: [],
+  colorTable: [],
+  background: '#f5efe4',
   name: 'bloom',
   ok: false,
 };
@@ -391,6 +396,8 @@ export default function App() {
         activeOverrides: result.activeOverrides,
         chalk: result.chalk ?? [],
         dataVars: result.dataVars ?? [],
+        colorTable: result.colorTable,
+        background: result.background,
       };
       setErrorMarkers([]);
       lastErrorRef.current = null;
@@ -659,7 +666,7 @@ export default function App() {
         const slug = design.name.replace(/[^a-z0-9_-]+/gi, '_').toLowerCase();
 
         if (format === 'svg') {
-          const svgStr = toSVG(design.events, design.name, THREADS);
+          const svgStr = toSVG(design.events, design.name, design.colorTable, design.background);
           const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
@@ -674,7 +681,7 @@ export default function App() {
 
         let bytes: Uint8Array;
         if (format === 'pes') {
-          bytes = toPES(design.events, design.name);
+          bytes = toPES(design.events, design.name, design.colorTable);
         } else if (format === 'exp') {
           bytes = toEXP(design.events, design.name);
         } else {

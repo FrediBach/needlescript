@@ -11,6 +11,7 @@ import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
 import {
   updateParameter,
   updatePointParameter,
+  updatePaletteParameter,
   updateTextParameter,
 } from '../lib/parse-parameters.ts';
 import type { ParamChange } from './ParametersPanel.tsx';
@@ -222,7 +223,12 @@ export default function EditorPane({
       let src = sourceRef.current;
       for (const { name, line, value } of changes) {
         if (Array.isArray(value)) {
-          src = updatePointParameter(src, line, name, value[0], value[1]);
+          if (typeof value[0] === 'string')
+            src = updatePaletteParameter(src, line, name, value as string[]);
+          else {
+            const point = value as [number, number];
+            src = updatePointParameter(src, line, name, point[0], point[1]);
+          }
         } else if (typeof value === 'string') {
           src = updateTextParameter(src, line, name, value);
         } else {

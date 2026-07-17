@@ -475,6 +475,10 @@ than an exporter filtering rule.
 - **Deterministic** — same seed ⇒ same design. RNG lives on `ctx.rng` (reseedable only
   outside `trace`), generative noise is seeded on its own streams, and the trace
   sandbox restores RNG state so captures don't perturb the main stream.
+- **Color as metadata** — `RunContext` owns the declared/auto-extended palette and
+  fabric background. `exec-cmd.ts` resolves string colors without consuming RNG;
+  `gen-func.ts` hosts the pure color reporters/math; finalization derives
+  `RunResult.colorTable` counts and path lengths from unchanged stitch events.
 - **Metered** — every allocation and operation is charged against a budget, keeping
   untrusted generative code safe to run in a browser tab; `override` lets authors opt
   into a wider (clearly-warned) envelope.
@@ -503,6 +507,7 @@ than an exporter filtering rule.
 | `interpreter/query-func.ts`  | stitch-history query dispatcher                                  |
 | `interpreter/string-func.ts` | string library dispatcher                                        |
 | `list.ts`                    | value model (`Val`, `NsList`, `FuncRef`) + value utilities       |
+| `colormath.ts`               | CSS colors, normalization, HSL/RGB, OKLab math and defaults      |
 | `machine/`                   | the stitch machine (side-effect target, budgets, events)         |
 
 Interpreter behavior is exercised by tests in `src/lib/__tests__/` — notably

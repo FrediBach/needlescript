@@ -12,7 +12,40 @@
 // No DOM dependencies.
 // ============================================================
 
-import type { StitchEvent } from './engine.ts';
+import type { ColorTableEntry, StitchEvent } from './types.ts';
+import { colorDist, defaultSlotColor } from './colormath.ts';
+
+export const PES_CATALOG = [
+  '#000000',
+  '#ffffff',
+  '#d7342e',
+  '#e76e2e',
+  '#f4c430',
+  '#2f8f46',
+  '#167d8d',
+  '#2864b4',
+  '#293466',
+  '#6c3fa0',
+  '#a73b79',
+  '#e78db4',
+  '#7a4b2d',
+  '#b18452',
+  '#9a9a9a',
+  '#d6d6d6',
+] as const;
+
+function nearestCatalogIndex(hex: string): number {
+  let best = 0;
+  let distance = Infinity;
+  PES_CATALOG.forEach((candidate, index) => {
+    const next = colorDist(hex, candidate);
+    if (next < distance) {
+      distance = next;
+      best = index;
+    }
+  });
+  return best;
+}
 
 // PEC long-encoding flag bits (placed in the high byte of the 2-byte long record)
 const PEC_JUMP_FLAG = 0x10; // bit 4 of high byte → jump move
@@ -55,7 +88,18 @@ function emitCoord(val: number, forceLong: boolean, flag: number, out: number[])
   }
 }
 
-export function toPES(events: StitchEvent[], label?: string): Uint8Array {
+export function toPES(
+  events: StitchEvent[],
+  label?: string,
+  colorTable: readonly ColorTableEntry[] = [],
+): Uint8Array {
+  const blockColors: number[] = [];
+  for (const event of events) {
+    if (event.t === 'stitch' && blockColors.at(-1) !== event.c) blockColors.push(event.c);
+  }
+  const catalogIndices = blockColors.map((index) =>
+    nearestCatalogIndex(colorTable[index]?.hex ?? defaultSlotColor(index)),
+  );
   // ── Phase 1: Build PEC stitch byte array ────────────────────────────────────
   const stitchBytes: number[] = [];
   let cx = 0,
@@ -191,10 +235,10 @@ export function toPES(events: StitchEvent[], label?: string): Uint8Array {
   // Colour-index list: [numChanges, idx0, idx1, ...]
   // numChanges = numColors - 1; indices are simplified sequential values
   buf[o++] = numColors - 1;
-  for (let i = 0; i < numColors - 1; i++) buf[o++] = i & 0xff;
+  for (let i = 0; i < numColors; i++) buf[o++] = catalogIndices[i] ?? 0;
 
   // Pad the colour section to exactly 463 bytes (spaces fill remaining slots)
-  for (let i = numColors; i < 463; i++) buf[o++] = 0x20;
+  for (let i = numColors + 1; i < 463; i++) buf[o++] = 0x20;
 
   // Total PEC header bytes written: 20 + 14 + 2 + 12 + 463 = 511 ✓
 

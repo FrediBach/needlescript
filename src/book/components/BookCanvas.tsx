@@ -30,6 +30,8 @@ const EMPTY_DESIGN: DesignState = {
   warnings: [],
   chalk: [],
   dataVars: [],
+  colorTable: [],
+  background: '#f5efe4',
   name: '',
   ok: false,
 };
@@ -55,6 +57,8 @@ function buildDesign(result: RunResult, stats: DesignStats): DesignState {
     ok: true,
     chalk: result.chalk ?? [],
     dataVars: result.dataVars ?? [],
+    colorTable: result.colorTable,
+    background: result.background,
   };
 }
 

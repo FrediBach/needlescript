@@ -4,16 +4,31 @@ import {
   updateParameter,
   updateTextParameter,
   updatePointParameter,
+  updatePaletteParameter,
+  parsePresets,
   snapValue,
   projectPoint,
   sampleRegion,
-  parsePresets,
 } from '../parse-parameters.ts';
 import type { PointParamDef, XYRegion } from '../parse-parameters.ts';
 
 // ── parseParameters ────────────────────────────────────────────────────────
 
 describe('parseParameters', () => {
+  it('recognises color and palette controls', () => {
+    const items = parseParameters(
+      [
+        "let accent = '#e94560' // [color]",
+        "let ink = '#0b132b' // [color:#0b132b,#5bc0be]",
+        "let pal = ['#0b132b', '#5bc0be'] // [palette:2:4]",
+      ].join('\n'),
+    );
+    expect(items).toMatchObject([
+      { kind: 'color', def: { name: 'accent', value: '#e94560' } },
+      { kind: 'color', def: { name: 'ink', choices: ['#0b132b', '#5bc0be'] } },
+      { kind: 'palette', def: { name: 'pal', value: ['#0b132b', '#5bc0be'], min: 2, max: 4 } },
+    ]);
+  });
   describe('integer slider', () => {
     it('recognises [min:max] with both integer bounds', () => {
       const src = 'let n = 8 // [4:30]';
@@ -191,6 +206,23 @@ describe('parseParameters', () => {
     );
     const items = parseParameters(src);
     expect(items.map((i) => i.kind)).toEqual(['section', 'param', 'section', 'param']);
+  });
+});
+
+describe('color parameter updates and presets', () => {
+  it('updates a palette literal without touching its annotation', () => {
+    expect(
+      updatePaletteParameter("let pal = ['#000000'] // [palette]", 1, 'pal', [
+        '#112233',
+        '#abcdef',
+      ]),
+    ).toBe("let pal = ['#112233', '#abcdef'] // [palette]");
+  });
+
+  it('parses hex, strings, and color lists in presets', () => {
+    expect(
+      parsePresets("// @preset Night : accent=#e94560, bg='linen', pal=['#111111','#eeeeee']"),
+    ).toMatchObject([{ values: { accent: '#e94560', bg: 'linen', pal: ['#111111', '#eeeeee'] } }]);
   });
 });
 

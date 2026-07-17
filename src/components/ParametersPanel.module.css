@@ -554,6 +554,31 @@
 }
 
 /* Override shadcn Switch to use gold + warm palette */
+.colorInput {
+  width: 34px;
+  height: 26px;
+  padding: 2px;
+  border: 1px solid var(--border-warm-sub);
+  border-radius: 5px;
+  background: var(--bg-warm-deep);
+  cursor: pointer;
+}
+
+.paletteRow {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) 2fr;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 0;
+}
+
+.paletteSwatches {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .switch {
   background: var(--border-warm-sub) !important;
 }

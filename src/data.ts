@@ -1,15 +1,8 @@
 // Shared constants for the NeedleScript playground UI
 
-export const THREADS: string[] = [
-  '#C8472F', // 0 — red
-  '#31604F', // 1 — forest
-  '#3A4E8C', // 2 — blue
-  '#D9A441', // 3 — gold
-  '#8C4A6B', // 4 — mauve
-  '#2B2B2B', // 5 — black
-  '#5E8F8C', // 6 — teal
-  '#B8651B', // 7 — amber
-];
+import { DEFAULT_PALETTE } from './lib/colormath.ts';
+
+export const THREADS: string[] = [...DEFAULT_PALETTE];
 
 export interface HoopConfig {
   id: string;

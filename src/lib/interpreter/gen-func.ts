@@ -27,6 +27,15 @@ import type { RunContext } from './context.ts';
 import { routeItems, ROUTESORT_MODES } from '../routing.ts';
 import type { RoutePoint } from '../routing.ts';
 import { prepareRailPair } from '../rail-pair.ts';
+import {
+  colorDist,
+  defaultSlotColor,
+  hexParts,
+  hsl,
+  lerpColor,
+  parseColor,
+  rgb,
+} from '../colormath.ts';
 
 export function initGenFunc(ctx: RunContext): void {
   ctx.genFunc = (name: string, args: Val[], line: number | undefined): Val => {
@@ -73,6 +82,68 @@ export function initGenFunc(ctx: RunContext): void {
     };
 
     switch (name) {
+      case 'rgb':
+        return ctx.allocString(rgb(sc(0), sc(1), sc(2)), line);
+      case 'hsl':
+        return ctx.allocString(hsl(sc(0), sc(1), sc(2)), line);
+      case 'hexparts': {
+        if (typeof args[0] !== 'string')
+          throw new NeedlescriptError(
+            `hexparts expects a color string, got ${describeVal(args[0])}`,
+            line,
+          );
+        return ctx.allocList(hexParts(args[0], line), line);
+      }
+      case 'lerpcolor': {
+        if (typeof args[0] !== 'string' || typeof args[1] !== 'string')
+          throw new NeedlescriptError('lerpcolor expects two color strings', line);
+        const mode = args[3] === undefined ? 'oklab' : args[3];
+        if (typeof mode !== 'string')
+          throw new NeedlescriptError('lerpcolor mode must be a string', line);
+        return ctx.allocString(lerpColor(args[0], args[1], sc(2), mode.toLowerCase(), line), line);
+      }
+      case 'colordist': {
+        if (typeof args[0] !== 'string' || typeof args[1] !== 'string')
+          throw new NeedlescriptError('colordist expects two color strings', line);
+        return colorDist(args[0], args[1], line);
+      }
+      case 'nearestcolor': {
+        if (typeof args[0] !== 'string' || !isList(args[1]) || args[1].items.length === 0)
+          throw new NeedlescriptError(
+            'nearestcolor expects a color and a non-empty list of colors',
+            line,
+          );
+        let best = '';
+        let bestDistance = Infinity;
+        args[1].items.forEach((entry, index) => {
+          if (typeof entry !== 'string')
+            throw new NeedlescriptError(
+              `nearestcolor list entry ${index + 1} must be a color string`,
+              line,
+            );
+          const distance = colorDist(args[0] as string, entry, line);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            best = parseColor(entry, line);
+          }
+        });
+        return ctx.allocString(best, line);
+      }
+      case 'colorindex':
+        return ctx.m.colorIdx + 1;
+      case 'colorhex':
+        return ctx.allocString(
+          ctx.palette[ctx.m.colorIdx]?.hex ?? defaultSlotColor(ctx.m.colorIdx),
+          line,
+        );
+      case 'slotcolor': {
+        const slot = sc(0);
+        if (!Number.isInteger(slot) || slot < 1)
+          throw new NeedlescriptError('slotcolor expects a positive integer slot', line);
+        return ctx.allocString(ctx.palette[slot - 1]?.hex ?? defaultSlotColor(slot - 1), line);
+      }
+      case 'backgroundcolor':
+        return ctx.allocString(ctx.background, line);
       // ----- §4.1 scalars -----
       case 'lerp':
         return gm.lerp(sc(0), sc(1), sc(2));

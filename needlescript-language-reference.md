@@ -285,12 +285,31 @@ Modes are sticky: they apply to every move until changed.
 | `density mm`                    | satin penetration spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                          |
 | `bean n`                        | each stitch sewn n times (forced odd, max 9); `bean 1` off                                                                                                                                                      |
 | `estitch mm`                    | blanket stitch: prongs of this length on the left of travel, spaced by `stitchlen`; `estitch 0` off                                                                                                             |
-| `color n`                       | switch to thread n (emits DST colour-change stop)                                                                                                                                                               |
+| `color n`                       | switch to numeric thread index n (existing event/DST semantics are unchanged)                                                                                                                                   |
+| `color c`                       | with a color string (`'#e94560'`, `'crimson'`), resolve the lowest exact palette match or append a new thread slot                                                                                              |
 | `stop`                          | shorthand for "next colour"                                                                                                                                                                                     |
 | `trim`                          | cut thread at current position                                                                                                                                                                                  |
 | `lock mm`                       | tie-in/tie-off: 4 micro back-stitches auto-sewn wherever thread starts or ends (design start/end, colour changes, trims, jumps ≥ 4 mm). Size 0.3–1.5 mm (default **0.7**); `lock 0` disables                    |
 
 A satin column is buffered while drawn and flushed (underlay first, then zigzag) when it ends: pen up, mode change, colour change, trim, fill, or end of program.
+
+### Native color metadata
+
+Colors are ordinary strings. Hex accepts `#rgb` or `#rrggbb` and normalizes to lowercase six-digit form; CSS named colors are case-insensitive. Alpha is rejected because thread is opaque. In classic syntax, named colors may use quoted words (`color "crimson`), but hex must use a string because `#` outside a string opens a comment.
+
+```text
+let bg = '#101418' // [color]
+let inks = ['#0b132b', '#5bc0be', 'crimson'] // [palette]
+background bg
+palette inks
+color nearestcolor(hsl(205, 0.6, 0.5), inks)
+```
+
+`palette colors` is a top-level, once-only directive accepting 1–64 colors. It must run before stitches, `color`, or `stop`. `background color` is also top-level and once-only, and must precede the first stitch. Both are metadata: they do not alter geometry or DST bytes. Missing slots repeat the built-in default palette; missing background uses the default fabric color.
+
+Color reporters are `colorindex()`, `colorhex()`, `slotcolor(i)`, and `backgroundcolor()`. Pure Library-tier functions are `rgb(r,g,b)`, `hsl(h,s,l)`, `hexparts(c)`, `lerpcolor(a,b,t[,mode])`, `nearestcolor(c,colors)`, and `colordist(a,b)`. `lerpcolor` and nearest/distance use OKLab by default; pass `'rgb'` to `lerpcolor` for raw sRGB interpolation. All are drawless.
+
+Customizer annotations: `[color]`, `[color:#112233,#445566]`, `[color:palette]`, fixed-length `[palette]`, and resizable `[palette:min:max]`. Color presets accept unquoted hex and lists of quoted colors.
 
 ---
 

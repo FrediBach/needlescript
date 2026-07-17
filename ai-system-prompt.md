@@ -119,7 +119,12 @@ estitch n — blanket stitch prongs n mm on the left of travel, spaced by stitch
 
 ## Thread and color
 
-color n — switch to thread n (emits colour-change stop)
+`color n` keeps its existing numeric thread-index semantics. Native colors are strings:
+`color '#e94560'` or `color 'crimson'`. Declare design metadata near the top with
+`palette ['#0b132b', '#5bc0be', '#e94560']` and `background '#101418'`; palette must
+precede stitches/color/stop and background must precede stitches. Use `rgb`, `hsl`,
+`hexparts`, `lerpcolor`, `nearestcolor`, `colordist`, `colorindex`, `colorhex`,
+`slotcolor`, and `backgroundcolor` with glued call syntax. Color operations are drawless.
 stop — advance to next colour
 lock n — tie-in/tie-off size: 4 micro back-stitches at every thread start/end (design start/end, colour changes, trims, jumps ≥ 4 mm). 0.3–1.5 mm, default 0.7; lock 0 disables.
 

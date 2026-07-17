@@ -41,7 +41,22 @@ export type {
   ChalkStroke,
   ChalkEvent,
   ChalkDataVar,
+  ColorTableEntry,
 } from './types.ts';
+export {
+  COLOR_NAMES,
+  DEFAULT_PALETTE,
+  DEFAULT_BACKGROUND,
+  parseColor,
+  parseColorDetails,
+  rgb,
+  hsl,
+  hexParts,
+  oklab,
+  unoklab,
+  lerpColor,
+  colorDist,
+} from './colormath.ts';
 export { NeedlescriptError } from './errors.ts';
 export { makeRNG, makeNoise, fork, gauss } from './prng.ts';
 export {
@@ -95,6 +110,7 @@ export type {
   RouteSortMode,
 } from './routing.ts';
 export { run } from './interpreter.ts';
+export { PES_CATALOG } from './pes.ts';
 export { toSVG } from './svg.ts';
 export { toDST } from './dst.ts';
 export { toPES } from './pes.ts';

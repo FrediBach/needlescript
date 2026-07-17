@@ -11,7 +11,7 @@ let stepsize  = 1.6  // [0.5:0.2:4] step length, mm
 let echospace = 2.5  // [0.5:0.5:8] horizontal drift per echo, mm
 
 seed 5
-let palette = [2, 3, 5, 7]
+let thread_slots = [2, 3, 5, 7]
 let path = []
 
 up setxy(-26, 24) down
@@ -23,7 +23,7 @@ repeat nsteps [
 trim
 
 let off = 0
-for c in shuffle(palette) [
+for c in shuffle(thread_slots) [
   color c
   up setpos([-first(path)[0] + off, first(path)[1]]) down
   for p in path [

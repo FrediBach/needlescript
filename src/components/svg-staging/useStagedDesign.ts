@@ -21,6 +21,8 @@ const EMPTY_DESIGN: DesignState = {
   warnings: [],
   chalk: [],
   dataVars: [],
+  colorTable: [],
+  background: '#f5efe4',
   name: 'import',
   ok: false,
 };
@@ -94,6 +96,8 @@ export function useStagedDesign(initial: StagedDocument): StagedPreview {
         ok: true,
         chalk: result.chalk ?? [],
         dataVars: result.dataVars ?? [],
+        colorTable: result.colorTable,
+        background: result.background,
       });
       setSewSpans(spans);
     }, DEBOUNCE_MS);

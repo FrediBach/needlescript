@@ -126,6 +126,18 @@ export interface RunResult {
   dataVars?: ChalkDataVar[];
   /** Whole-design travel planning metadata, present only when `plan` is active. */
   plan?: TravelPlanStats;
+  colorTable: ColorTableEntry[];
+  background: string;
+}
+
+export interface ColorTableEntry {
+  slot: number;
+  hex: string;
+  name?: string;
+  source: 'palette' | 'auto' | 'default';
+  firstUseLine?: number;
+  stitchCount: number;
+  pathLenMm: number;
 }
 
 export interface TravelPlanStats {
@@ -154,6 +166,7 @@ export interface DesignStats {
   planMode?: string;
   travelBeforeMm?: number;
   travelAfterMm?: number;
+  slots?: Array<Pick<ColorTableEntry, 'slot' | 'stitchCount' | 'pathLenMm'>>;
 }
 
 // ---------- AST node types ----------

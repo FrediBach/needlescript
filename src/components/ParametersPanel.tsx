@@ -25,19 +25,22 @@ import type {
   PointParamDef,
   Preset,
   TextParamDef,
+  ColorParamDef,
+  PaletteParamDef,
 } from '../lib/parse-parameters.ts';
 import { Slider } from '@/components/ui/slider.tsx';
 import { Switch } from '@/components/ui/switch.tsx';
 import { Input } from '@/components/ui/input.tsx';
 import { cn } from '@/lib/utils.ts';
 import styles from './ParametersPanel.module.css';
+import { oklab, parseColor, unoklab } from '../lib/colormath.ts';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface ParamChange {
   name: string;
   line: number;
-  value: number | string | [number, number];
+  value: number | string | [number, number] | string[];
 }
 
 interface Props {
@@ -337,6 +340,105 @@ function TextRow({ def, onChange }: TextRowProps) {
   );
 }
 
+function ColorRow({
+  def,
+  isLocked,
+  onChange,
+  onToggleLock,
+}: {
+  def: ColorParamDef;
+  isLocked: boolean;
+  onChange: (name: string, line: number, value: string) => void;
+  onToggleLock: () => void;
+}) {
+  const choices = def.choices;
+  return (
+    <div className={styles.paramRow}>
+      <label className={styles.paramName} htmlFor={`param-${def.name}-${def.line}`}>
+        {def.name}
+      </label>
+      {choices ? (
+        <select
+          id={`param-${def.name}-${def.line}`}
+          value={def.value}
+          onChange={(event) => onChange(def.name, def.line, event.target.value)}
+          className={styles.textInput}
+        >
+          {choices.map((color) => (
+            <option key={color} value={color}>
+              {color}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          id={`param-${def.name}-${def.line}`}
+          type="color"
+          value={def.value}
+          onChange={(event) => onChange(def.name, def.line, event.target.value)}
+          className={styles.colorInput}
+        />
+      )}
+      <button
+        className={cn(styles.lockBtn, isLocked && styles.lockBtnLocked)}
+        onClick={onToggleLock}
+        type="button"
+        aria-label={`${isLocked ? 'Unlock' : 'Lock'} ${def.name}`}
+      >
+        {isLocked ? <Lock size={11} /> : <LockOpen size={11} />}
+      </button>
+    </div>
+  );
+}
+
+function PaletteRow({
+  def,
+  onChange,
+}: {
+  def: PaletteParamDef;
+  onChange: (name: string, line: number, value: string[]) => void;
+}) {
+  return (
+    <div className={styles.paletteRow}>
+      <span className={styles.paramName}>{def.name}</span>
+      <div className={styles.paletteSwatches}>
+        {def.value.map((color, index) => (
+          <input
+            key={index}
+            type="color"
+            value={color}
+            onChange={(event) => {
+              const next = [...def.value];
+              next[index] = event.target.value;
+              onChange(def.name, def.line, next);
+            }}
+            className={styles.colorInput}
+            aria-label={`${def.name} color ${index + 1}`}
+          />
+        ))}
+        {def.value.length > def.min && (
+          <button
+            type="button"
+            onClick={() => onChange(def.name, def.line, def.value.slice(0, -1))}
+          >
+            −
+          </button>
+        )}
+        {def.value.length < def.max && (
+          <button
+            type="button"
+            onClick={() =>
+              onChange(def.name, def.line, [...def.value, def.value.at(-1) ?? '#000000'])
+            }
+          >
+            +
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Point row ─────────────────────────────────────────────────────────────────
 
 interface PointRowProps {
@@ -484,8 +586,16 @@ export default function ParametersPanel({
 }: Props) {
   const items = useMemo(() => parseParameters(source), [source]);
   const presets = useMemo(() => parsePresets(source), [source]);
+  const programPalette = items
+    .filter((item): item is Extract<ParamItem, { kind: 'palette' }> => item.kind === 'palette')
+    .flatMap((item) => item.def.value);
   const paramCount = items.filter(
-    (i) => i.kind === 'param' || i.kind === 'point' || i.kind === 'text',
+    (i) =>
+      i.kind === 'param' ||
+      i.kind === 'point' ||
+      i.kind === 'text' ||
+      i.kind === 'color' ||
+      i.kind === 'palette',
   ).length;
   const pointParamNames = new Set(
     items
@@ -551,6 +661,12 @@ export default function ParametersPanel({
 
   // ── Randomize (respects locks, clears active preset) ────────────────────
   const handleRandomize = useCallback(() => {
+    const rotateHue = (color: string, angle: number) => {
+      const [lightness, a, b] = oklab(parseColor(color));
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      return unoklab([lightness, a * cos - b * sin, a * sin + b * cos]);
+    };
     const scalarChanges = items
       .filter((item): item is Extract<ParamItem, { kind: 'param' }> => item.kind === 'param')
       .filter(({ def }) => !lockedParams.has(def.name))
@@ -572,7 +688,33 @@ export default function ParametersPanel({
         };
       });
 
-    const changes = [...scalarChanges, ...pointChanges];
+    const colorChanges = items
+      .filter((item): item is Extract<ParamItem, { kind: 'color' }> => item.kind === 'color')
+      .filter(({ def }) => !lockedParams.has(def.name))
+      .map(({ def }) => {
+        const choices = def.choices;
+        const value = choices?.length
+          ? choices[Math.floor(Math.random() * choices.length)]
+          : rotateHue(def.value, Math.random() * Math.PI * 2);
+        return { name: def.name, line: def.line, value };
+      });
+
+    const paletteAngle = Math.random() * Math.PI * 2;
+    const paletteChanges = items
+      .filter((item): item is Extract<ParamItem, { kind: 'palette' }> => item.kind === 'palette')
+      .filter(({ def }) => !lockedParams.has(def.name))
+      .map(({ def }) => ({
+        name: def.name,
+        line: def.line,
+        value: def.value.map((color) => rotateHue(color, paletteAngle)),
+      }));
+
+    const changes: ParamChange[] = [
+      ...scalarChanges,
+      ...pointChanges,
+      ...colorChanges,
+      ...paletteChanges,
+    ];
     if (changes.length > 0) {
       setActivePreset(null);
       onAllParamsChange(changes);
@@ -609,7 +751,27 @@ export default function ParametersPanel({
           return { name: def.name, line: def.line, value: [x, y] as [number, number] };
         });
 
-      const changes = [...scalarChanges, ...pointChanges];
+      const colorChanges: ParamChange[] = items
+        .filter((item): item is Extract<ParamItem, { kind: 'color' }> => item.kind === 'color')
+        .flatMap(({ def }) => {
+          const value = preset.values[def.name];
+          return typeof value === 'string' ? [{ name: def.name, line: def.line, value }] : [];
+        });
+      const paletteChanges: ParamChange[] = items
+        .filter((item): item is Extract<ParamItem, { kind: 'palette' }> => item.kind === 'palette')
+        .flatMap(({ def }) => {
+          const value = preset.values[def.name];
+          return Array.isArray(value) && value.every((entry) => typeof entry === 'string')
+            ? [{ name: def.name, line: def.line, value: value as string[] }]
+            : [];
+        });
+
+      const changes: ParamChange[] = [
+        ...scalarChanges,
+        ...pointChanges,
+        ...colorChanges,
+        ...paletteChanges,
+      ];
       if (changes.length > 0) {
         setActivePreset(presetName);
         onAllParamsChange(changes);
@@ -622,12 +784,15 @@ export default function ParametersPanel({
   const handleCopy = useCallback(() => {
     const assignments = items
       .filter(
-        (i): i is Extract<ParamItem, { kind: 'param' | 'point' }> =>
-          i.kind === 'param' || i.kind === 'point',
+        (i): i is Extract<ParamItem, { kind: 'param' | 'point' | 'color' | 'palette' }> =>
+          i.kind === 'param' || i.kind === 'point' || i.kind === 'color' || i.kind === 'palette',
       )
       .map((i) => {
         if (i.kind === 'param') return `${i.def.name}=${formatPresetValue(i.def.value)}`;
-        return `${i.def.name}=[${formatPointCoord(i.def.valueX)},${formatPointCoord(i.def.valueY)}]`;
+        if (i.kind === 'point')
+          return `${i.def.name}=[${formatPointCoord(i.def.valueX)},${formatPointCoord(i.def.valueY)}]`;
+        if (i.kind === 'color') return `${i.def.name}=${i.def.value}`;
+        return `${i.def.name}=[${i.def.value.map((color) => `'${color}'`).join(',')}]`;
       })
       .join(', ');
     const name = activePreset ?? 'My Preset';
@@ -766,6 +931,27 @@ export default function ParametersPanel({
               const { def } = item;
               return (
                 <TextRow key={`${def.name}-${def.line}`} def={def} onChange={handleParamChange} />
+              );
+            }
+            if (item.kind === 'color') {
+              const { def } = item;
+              return (
+                <ColorRow
+                  key={`${def.name}-${def.line}`}
+                  def={def.paletteOnly ? { ...def, choices: programPalette } : def}
+                  isLocked={lockedParams.has(def.name)}
+                  onChange={handleParamChange}
+                  onToggleLock={() => onToggleLock(def.name)}
+                />
+              );
+            }
+            if (item.kind === 'palette') {
+              return (
+                <PaletteRow
+                  key={`${item.def.name}-${item.def.line}`}
+                  def={item.def}
+                  onChange={(name, line, value) => onAllParamsChange([{ name, line, value }])}
+                />
               );
             }
             const { def } = item;

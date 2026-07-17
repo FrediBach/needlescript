@@ -726,10 +726,29 @@ export const NS_ITEMS: NSItem[] = [
     label: 'color',
     kindName: 'function',
     detail: 'switch thread color',
-    documentation: 'Switch to thread n (emits a DST colour-change stop).',
-    insertText: 'color ${1:n}',
+    documentation:
+      "Switch to numeric thread n, or resolve a color string such as `color '#e94560'` or `color 'crimson'`.",
+    insertText: "color ${1:'#e94560'}",
     isSnippet: true,
     params: [['n']],
+  },
+  {
+    label: 'palette',
+    kindName: 'function',
+    detail: 'declare thread colors',
+    documentation:
+      'Top-level, once-only palette metadata. Takes a list of 1–64 colors and must precede stitches, `color`, and `stop`.',
+    insertText: "palette ['${1:#0b132b}', '${2:#5bc0be}', '${3:#e94560}']",
+    isSnippet: true,
+  },
+  {
+    label: 'background',
+    kindName: 'function',
+    detail: 'declare fabric color',
+    documentation:
+      'Top-level fabric-color metadata. Must precede the first stitch and does not affect DST output.',
+    insertText: "background '${1:#f5efe4}'",
+    isSnippet: true,
   },
   {
     label: 'stop',

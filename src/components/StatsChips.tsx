@@ -4,6 +4,7 @@ import type { MachinePreset } from '../data.ts';
 import { Badge } from '@/components/ui/badge.tsx';
 import { cn } from '@/lib/utils.ts';
 import styles from './StatsChips.module.css';
+import { colorDist } from '../lib/colormath.ts';
 
 interface Props {
   design: DesignState;
@@ -25,6 +26,7 @@ export default function StatsChips({ design, machine }: Props) {
   if (!design.stats) return null;
 
   const s = design.stats;
+  const darkGround = colorDist(design.background, '#000000') < 0.5;
   const chips: { text: string; type?: 'warn' | 'err'; title?: string }[] = [];
 
   if (!design.ok) {
@@ -86,13 +88,36 @@ export default function StatsChips({ design, machine }: Props) {
 
   return (
     <div className={styles.stats}>
+      <div
+        className={styles.slotStrip}
+        aria-label="Fabric and thread colors"
+        style={{ background: darkGround ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }}
+      >
+        <span
+          className={styles.swatch}
+          style={{ backgroundColor: design.background }}
+          title={`Fabric ${design.background}`}
+        />
+        {design.colorTable
+          .filter((slot) => slot.stitchCount > 0)
+          .map((slot) => (
+            <span
+              key={slot.slot}
+              className={styles.swatch}
+              style={{ backgroundColor: slot.hex }}
+              title={`Slot ${slot.slot} · ${slot.hex} · ${slot.stitchCount.toLocaleString()} stitches · contrast ${colorDist(slot.hex, design.background).toFixed(3)}`}
+            />
+          ))}
+      </div>
       {chips.map((chip) => (
         <Badge
           key={chip.text}
           variant={chip.type === 'err' ? 'destructive' : 'outline'}
           className={cn(
             'font-mono text-[10.5px] h-auto py-[3px] px-[8px] rounded-[5px]',
-            'bg-[rgba(0,0,0,0.05)] border-[rgba(0,0,0,0.1)] text-[rgba(0,0,0,0.4)]',
+            darkGround
+              ? 'bg-[rgba(255,255,255,0.09)] border-[rgba(255,255,255,0.16)] text-[rgba(255,255,255,0.72)]'
+              : 'bg-[rgba(0,0,0,0.05)] border-[rgba(0,0,0,0.1)] text-[rgba(0,0,0,0.4)]',
             chip.type === 'warn' && 'border-[var(--gold-60)] text-gold',
             chip.type === 'err' && 'bg-[var(--run-25)] border-[var(--run-50)] text-white',
           )}
