@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { run, NeedlescriptError, LIMITS } from '../engine.ts';
-import type { StitchEvent } from '../engine.ts';
+import type { RunTimings, StitchEvent } from '../engine.ts';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -465,6 +465,23 @@ describe('run — print', () => {
   it('print formats integers without decimal point', () => {
     const { printed } = run('print 42');
     expect(printed[0]).toBe('42');
+  });
+});
+
+describe('run — performance instrumentation', () => {
+  it('reports each language-pipeline stage through the optional timing sink', () => {
+    let timings: RunTimings | undefined;
+
+    run('repeat 4 [ fd 5 rt 90 ]', {
+      onTiming(value) {
+        timings = value;
+      },
+    });
+
+    expect(timings).toBeDefined();
+    expect(timings!.tokenizeMs).toBeGreaterThanOrEqual(0);
+    expect(timings!.parseMs).toBeGreaterThanOrEqual(0);
+    expect(timings!.executeMs).toBeGreaterThanOrEqual(0);
   });
 });
 

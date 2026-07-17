@@ -4,6 +4,7 @@
  * Top-level entry for the /book section.
  * Imports book.css, wraps everything in BookLayout, and sets up sub-routes.
  */
+import '../monaco-setup.ts';
 import { Routes, Route } from 'react-router-dom';
 import './book.css';
 import { BookErrorBoundary } from './BookErrorBoundary.tsx';

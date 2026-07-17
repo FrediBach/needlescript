@@ -12,13 +12,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import type { ChalkDataVar } from '../lib/engine.ts';
-import {
-  parseParameters,
-  parsePresets,
-  snapValue,
-  projectPoint,
-  sampleRegion,
-} from '../lib/parse-parameters.ts';
+import { parsePresets, snapValue, projectPoint, sampleRegion } from '../lib/parse-parameters.ts';
 import type {
   ParamItem,
   ParamDef,
@@ -45,6 +39,7 @@ export interface ParamChange {
 
 interface Props {
   source: string;
+  items: ParamItem[];
   onParamChange: (name: string, line: number, value: number | string) => void;
   onAllParamsChange: (changes: ParamChange[]) => void;
   /** Lock state managed by parent (App.tsx) so stage can also show locked handles */
@@ -572,6 +567,7 @@ function PointRow({
 
 export default function ParametersPanel({
   source,
+  items,
   onParamChange,
   onAllParamsChange,
   lockedParams,
@@ -584,7 +580,6 @@ export default function ParametersPanel({
   onHoverDataVar,
   onRevealLine,
 }: Props) {
-  const items = useMemo(() => parseParameters(source), [source]);
   const presets = useMemo(() => parsePresets(source), [source]);
   const programPalette = items
     .filter((item): item is Extract<ParamItem, { kind: 'palette' }> => item.kind === 'palette')

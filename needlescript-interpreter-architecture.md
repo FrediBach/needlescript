@@ -36,11 +36,19 @@ const m = new Machine(); // side-effect target
 // … build RunContext, wire modules, execute, finalize …
 ```
 
+For profiling, `RunOptions.onTiming` receives the elapsed time for tokenization,
+parsing (including pre-scan), and execution/finalization. The callback is optional
+and synchronous, so normal library results and deterministic language behavior are
+unchanged. The playground worker adds statistics, worker-total, and message
+round-trip timings in `CompileResponse.timings`.
+
 The interpreter is a **tree-walker**: it recursively evaluates `ASTNode`/`ExprNode`
 values directly, with no bytecode or intermediate compilation step. CPU-heavy runs are
 kept off the UI thread by running the whole compiler/interpreter in a Web Worker at the
 app layer (`src/compiler.worker.ts`), but the interpreter itself is a plain synchronous
-function.
+function. `useCompiler` shares one worker across playground/book consumers and serializes
+jobs; stale queued work is discarded, and the execution timeout starts only when a job
+reaches the worker.
 
 ---
 

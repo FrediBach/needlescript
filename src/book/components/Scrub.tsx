@@ -15,7 +15,10 @@ import type { BeforeMount, OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import type { RunResult, DesignStats, StitchEvent } from '../../lib/types.ts';
 import { useCompiler } from '../../hooks/useCompiler.ts';
-import { registerNeedlescript } from '../../lib/needlescript-monaco.ts';
+import {
+  registerNeedlescript,
+  scheduleNeedlescriptProviders,
+} from '../../lib/needlescript-monaco.ts';
 import BookCanvas from './BookCanvas.tsx';
 import { useBookTheme } from '../lib/useBookTheme.ts';
 
@@ -170,6 +173,7 @@ export default function Scrub({ children, canvasHeight = 280 }: Props) {
 
   const handleMount: OnMount = useCallback(
     (ed, monaco) => {
+      scheduleNeedlescriptProviders(monaco);
       editorRef.current = ed;
       ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => run());
     },

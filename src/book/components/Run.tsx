@@ -15,7 +15,10 @@ import type { BeforeMount, OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import type { RunResult, DesignStats } from '../../lib/types.ts';
 import { useCompiler } from '../../hooks/useCompiler.ts';
-import { registerNeedlescript } from '../../lib/needlescript-monaco.ts';
+import {
+  registerNeedlescript,
+  scheduleNeedlescriptProviders,
+} from '../../lib/needlescript-monaco.ts';
 import BookCanvas from './BookCanvas.tsx';
 import { useBookTheme } from '../lib/useBookTheme.ts';
 
@@ -142,6 +145,7 @@ export default function Run({ children, canvasHeight = 280, autoRun = true }: Pr
 
   const handleMount: OnMount = useCallback(
     (ed: editor.IStandaloneCodeEditor, monaco) => {
+      scheduleNeedlescriptProviders(monaco);
       // Cmd/Ctrl+Enter → Run
       ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
         run();

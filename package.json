@@ -22,7 +22,8 @@
     "doctor": "npx react-doctor@latest",
     "knip": "knip",
     "e18e": "npx @e18e/cli analyze",
-    "analyze": "ANALYZE=true npm run build"
+    "analyze": "ANALYZE=true npm run build",
+    "build:size": "node scripts/report-build-sizes.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

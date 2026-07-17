@@ -5,8 +5,9 @@ import type { editor, IDisposable } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
 import type { LineStitchBounds } from '../App.tsx';
 import type { ChalkDataVar, WarningLocation } from '../lib/engine.ts';
+import type { ParamItem } from '../lib/parse-parameters.ts';
 import type { AIModelInfo } from '../hooks/useAI.ts';
-import { registerNeedlescript } from '../lib/needlescript-monaco.ts';
+import { registerNeedlescript, scheduleNeedlescriptProviders } from '../lib/needlescript-monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
 import {
   updateParameter,
@@ -23,7 +24,9 @@ import type { EditorContextActions } from './MachineMenu.tsx';
 
 interface Props {
   source: string;
+  parameterItems: ParamItem[];
   onSourceChange: (src: string) => void;
+  onEditorReady?: () => void;
   onRun: (src?: string) => void;
   messages: ConsoleMessage[];
   isDragging: boolean;
@@ -95,7 +98,9 @@ const MAX_SUGGESTIONS = 8;
 
 export default function EditorPane({
   source,
+  parameterItems,
   onSourceChange,
+  onEditorReady,
   onRun,
   messages,
   isDragging,
@@ -154,12 +159,11 @@ export default function EditorPane({
   // Stable ref so the keyboard-shortcut handler always calls the latest onRun
   // even after source/design state changes rebuild the callback.
   const onRunRef = useRef(onRun);
-  onRunRef.current = onRun;
+  const onEditorReadyRef = useRef(onEditorReady);
 
   // Stable ref to source so the parameter-change handler never captures a
   // stale closure value.
   const sourceRef = useRef(source);
-  sourceRef.current = source;
 
   // Stable refs for the hover-provider and mouse-listener callbacks so they
   // always read the latest props without re-registering Monaco listeners.
@@ -167,10 +171,13 @@ export default function EditorPane({
   const onHoverLineRef = useRef(onHoverLine);
   const onMachineContextMenuRef = useRef(onMachineContextMenu);
   useLayoutEffect(() => {
+    onRunRef.current = onRun;
+    onEditorReadyRef.current = onEditorReady;
+    sourceRef.current = source;
     lineStitchMapRef.current = lineStitchMap;
     onHoverLineRef.current = onHoverLine;
     onMachineContextMenuRef.current = onMachineContextMenu;
-  });
+  }, [lineStitchMap, onEditorReady, onHoverLine, onMachineContextMenu, onRun, source]);
 
   // Disposables created in handleMount — cleaned up on unmount.
   const hoverProviderRef = useRef<IDisposable | null>(null);
@@ -245,10 +252,24 @@ export default function EditorPane({
 
   // ── Monaco lifecycle callbacks ──────────────────────────────────────
   const handleBeforeMount = useCallback<BeforeMount>((monaco) => {
+    performance.mark('needlescript:editor-before-mount');
     registerNeedlescript(monaco);
   }, []);
 
   const handleMount = useCallback<OnMount>((ed, monaco) => {
+    performance.mark('needlescript:editor-mounted');
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        performance.mark('needlescript:editor-first-paint');
+        performance.measure(
+          'needlescript:editor-mount-to-paint',
+          'needlescript:editor-before-mount',
+          'needlescript:editor-first-paint',
+        );
+        onEditorReadyRef.current?.();
+      }, 0);
+    });
+    scheduleNeedlescriptProviders(monaco);
     editorRef.current = ed;
     decoCollRef.current = ed.createDecorationsCollection();
     stitchLineDecoCollRef.current = ed.createDecorationsCollection();
@@ -669,6 +690,7 @@ export default function EditorPane({
 
       <ParametersPanel
         source={source}
+        items={parameterItems}
         onParamChange={handleParamChange}
         onAllParamsChange={handleAllParamsChange}
         lockedParams={lockedParams}

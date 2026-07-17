@@ -33,9 +33,12 @@ import { DEFAULT_BACKGROUND, defaultSlotColor } from '../colormath.ts';
 import type { ColorTableEntry } from '../types.ts';
 
 export function run(source: string, opts: RunOptions = {}): RunResult {
+  const startedAt = performance.now();
   const tokens = tokenize(source);
+  const tokenizedAt = performance.now();
   const parseNotes: string[] = [];
   const program = parse(tokens, parseNotes);
+  const parsedAt = performance.now();
   const m = new Machine();
   m.warnings.push(...parseNotes);
 
@@ -357,7 +360,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       `note: design uses ${allIndices.size} thread slots — plan the thread changes for your machine`,
     );
 
-  return {
+  const result: RunResult = {
     events: m.events,
     warnings: m.warnings,
     warningLocations,
@@ -373,4 +376,11 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     colorTable,
     background: ctx.background,
   };
+  const completedAt = performance.now();
+  opts.onTiming?.({
+    tokenizeMs: tokenizedAt - startedAt,
+    parseMs: parsedAt - tokenizedAt,
+    executeMs: completedAt - parsedAt,
+  });
+  return result;
 }

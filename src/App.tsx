@@ -29,7 +29,7 @@ import { EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, MACHINES } from './data.ts'
 import type { HoopConfig, MachineHoop, MachinePreset } from './data.ts';
 import type { ExportFormat } from './components/Header.tsx';
 import { parseParameters, updatePointParameter } from './lib/parse-parameters.ts';
-import type { PointParamDef } from './lib/parse-parameters.ts';
+import type { ParamItem, PointParamDef } from './lib/parse-parameters.ts';
 import { usePanelSplit } from './hooks/usePanelSplit.ts';
 import { useSvgImport } from './hooks/useSvgImport.ts';
 import { useBitmapImport } from './hooks/useBitmapImport.ts';
@@ -38,9 +38,9 @@ import { useAI } from './hooks/useAI.ts';
 import { useReplCommands } from './hooks/useReplCommands.ts';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
-import EditorPane from './components/EditorPane.tsx';
 import StagePane from './components/StagePane.tsx';
 import Splitter from './components/Splitter.tsx';
+const EditorPane = lazy(() => import('./components/MonacoEditorPane.tsx'));
 const ReferenceDialog = lazy(() => import('./components/ReferenceDialog.tsx'));
 const StagingDialog = lazy(() => import('./components/svg-staging/StagingDialog.tsx'));
 import HoopDialog from './components/HoopDialog.tsx';
@@ -181,7 +181,9 @@ export default function App() {
   // the Header's Run button never captures a stale closure value — same
   // principle as sourceRef in EditorPane.
   const sourceRef = useRef(source);
-  sourceRef.current = source;
+  useLayoutEffect(() => {
+    sourceRef.current = source;
+  }, [source]);
   const [selectedHoop, setSelectedHoop] = useState<HoopConfig>(DEFAULT_HOOP);
   const [showHoopDialog, setShowHoopDialog] = useState(false);
   const [showDensity, setShowDensity] = useState(false);
@@ -289,13 +291,17 @@ export default function App() {
     });
   }, []);
 
-  // ── Point params derived from source (for stage handles) ─────────────────
+  // ── Parameters derived from source ───────────────────────────────────────
+  // This scan used to run independently in App and ParametersPanel on every
+  // keystroke. Keep one source-version result and share it with both consumers.
+  const parameterItems = useMemo<ParamItem[]>(() => parseParameters(source), [source]);
+
+  // Point params drive the stage handles.
   const pointParamDefs = useMemo<PointParamDef[]>(() => {
-    const items = parseParameters(source);
-    return items
+    return parameterItems
       .filter((i): i is Extract<typeof i, { kind: 'point' }> => i.kind === 'point')
       .map((i) => i.def);
-  }, [source]);
+  }, [parameterItems]);
 
   // ── Panel split, SVG import, and share ───────────────────────────────────
   const { leftWidth, isMobile, mainRef, handleHorizDrag, handleHorizReset } = usePanelSplit();
@@ -334,6 +340,14 @@ export default function App() {
 
       // null means a newer compile superseded this one — discard silently.
       if (response === null) return;
+
+      if (response.ok) {
+        performance.measure('needlescript:compile-round-trip', {
+          start: t0,
+          end: performance.now(),
+          detail: response.timings,
+        });
+      }
 
       if (!response.ok) {
         addMsg(response.message, 'err');
@@ -546,6 +560,15 @@ export default function App() {
     [design.name, runProgram],
   );
 
+  const initialised = useRef(false);
+  const handleEditorReady = useCallback(() => {
+    if (initialised.current) return;
+    initialised.current = true;
+    // Shared links are loaded and run by the share hook.
+    if (new URLSearchParams(window.location.search).has('share')) return;
+    runProgram(EXAMPLES[DEFAULT_EXAMPLE_ID], DEFAULT_EXAMPLE_ID);
+  }, [runProgram]);
+
   const handleExampleSelect = useCallback(
     (key: string) => {
       const src = EXAMPLES[key];
@@ -706,19 +729,6 @@ export default function App() {
     [design, addMsg],
   );
 
-  // Kick off initial render
-  const initialised = useRef(false);
-  if (!initialised.current) {
-    initialised.current = true;
-    // Only run the default example if there's no ?share= param —
-    // the share effect above handles that case.
-    const hasShare = new URLSearchParams(window.location.search).has('share');
-    if (!hasShare) {
-      // Run on first paint via a microtask so state is settled
-      Promise.resolve().then(() => runProgram(EXAMPLES[DEFAULT_EXAMPLE_ID], DEFAULT_EXAMPLE_ID));
-    }
-  }
-
   // Source line currently sewing (only meaningful while scrubbed back / playing)
   const activeLine =
     design.ok && scrubPos > 0 && scrubPos < design.pts.length
@@ -794,38 +804,42 @@ export default function App() {
       />
 
       <main className={styles.main} ref={mainRef}>
-        <EditorPane
-          source={source}
-          onSourceChange={setSource}
-          onRun={handleRun}
-          messages={messages}
-          isDragging={isDragging}
-          activeLine={activeLine}
-          onWarnHover={setHoverWarn}
-          errorMarkers={errorMarkers}
-          lineStitchMap={lineStitchMap}
-          onHoverLine={setHoveredEditorLine}
-          onAiCommand={handleAiCommand}
-          aiModels={aiModels}
-          aiSelectedModel={aiSelectedModel}
-          aiHasApiKey={aiHasApiKey}
-          aiIsGenerating={aiIsGenerating}
-          onReplCommand={handleReplCommand}
-          savedSnippetNames={savedSnippetNames}
-          activeSnippetName={activeSnippetName}
-          style={!isMobile ? { width: leftWidth, flexShrink: 0 } : undefined}
-          lockedParams={lockedParams}
-          onToggleLock={toggleLock}
-          onHighlightHandle={handleHighlightHandle}
-          highlightedHandle={highlightedHandle}
-          dataVars={design.dataVars}
-          pinnedDataVars={pinnedDataVars}
-          onTogglePinnedDataVar={togglePinnedDataVar}
-          onHoverDataVar={setHoveredDataVar}
-          onMachineContextMenu={(x, y, editorActions) =>
-            setMachineContextMenu({ x, y, editorActions })
-          }
-        />
+        <Suspense fallback={<div style={!isMobile ? { width: leftWidth } : undefined} />}>
+          <EditorPane
+            source={source}
+            parameterItems={parameterItems}
+            onSourceChange={setSource}
+            onEditorReady={handleEditorReady}
+            onRun={handleRun}
+            messages={messages}
+            isDragging={isDragging}
+            activeLine={activeLine}
+            onWarnHover={setHoverWarn}
+            errorMarkers={errorMarkers}
+            lineStitchMap={lineStitchMap}
+            onHoverLine={setHoveredEditorLine}
+            onAiCommand={handleAiCommand}
+            aiModels={aiModels}
+            aiSelectedModel={aiSelectedModel}
+            aiHasApiKey={aiHasApiKey}
+            aiIsGenerating={aiIsGenerating}
+            onReplCommand={handleReplCommand}
+            savedSnippetNames={savedSnippetNames}
+            activeSnippetName={activeSnippetName}
+            style={!isMobile ? { width: leftWidth, flexShrink: 0 } : undefined}
+            lockedParams={lockedParams}
+            onToggleLock={toggleLock}
+            onHighlightHandle={handleHighlightHandle}
+            highlightedHandle={highlightedHandle}
+            dataVars={design.dataVars}
+            pinnedDataVars={pinnedDataVars}
+            onTogglePinnedDataVar={togglePinnedDataVar}
+            onHoverDataVar={setHoveredDataVar}
+            onMachineContextMenu={(x, y, editorActions) =>
+              setMachineContextMenu({ x, y, editorActions })
+            }
+          />
+        </Suspense>
         {!isMobile && (
           <Splitter orientation="horizontal" onDrag={handleHorizDrag} onReset={handleHorizReset} />
         )}

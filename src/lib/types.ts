@@ -250,4 +250,12 @@ export interface DensityResult {
 
 export interface RunOptions {
   seed?: number;
+  /** Optional synchronous timing sink for profiling the language pipeline. */
+  onTiming?: (timings: RunTimings) => void;
+}
+
+export interface RunTimings {
+  tokenizeMs: number;
+  parseMs: number;
+  executeMs: number;
 }

@@ -34,6 +34,7 @@ export type {
   DensityHotspot,
   DensityResult,
   RunOptions,
+  RunTimings,
   HoopInfo,
   OverrideKey,
   TravelPlanStats,

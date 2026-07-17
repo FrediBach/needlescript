@@ -2,8 +2,26 @@ import type { Monaco } from '@monaco-editor/react';
 import type { editor as MonacoEditor, IMarkdownString, languages } from 'monaco-editor';
 import { NS_ITEMS, NS_ITEM_MAP, type NSItemKind } from './catalog.ts';
 import { codePortionOfLine, extractUserSymbols, getSignatureContext } from './symbols.ts';
+import type { UserSymbol } from './symbols.ts';
 
 type IPos = { readonly lineNumber: number; readonly column: number };
+
+interface SymbolCacheEntry {
+  version: number;
+  symbols: UserSymbol[];
+}
+
+const symbolCache = new WeakMap<MonacoEditor.ITextModel, SymbolCacheEntry>();
+
+function userSymbolsFor(model: MonacoEditor.ITextModel): UserSymbol[] {
+  const version = model.getVersionId();
+  const cached = symbolCache.get(model);
+  if (cached?.version === version) return cached.symbols;
+
+  const symbols = extractUserSymbols(model.getValue());
+  symbolCache.set(model, { version, symbols });
+  return symbols;
+}
 
 export function registerNeedlescriptProviders(monaco: Monaco): void {
   const CIK = monaco.languages.CompletionItemKind;
@@ -14,6 +32,17 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
     constant: CIK.Constant,
   };
   const SNIPPET_RULE = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet;
+  const builtInCompletions = NS_ITEMS.map((item) => ({
+    label: item.label,
+    kind: kindMap[item.kindName],
+    detail: item.detail,
+    documentation: {
+      value: item.documentation,
+      isTrusted: true,
+    } as IMarkdownString,
+    insertText: item.insertText,
+    insertTextRules: item.isSnippet ? SNIPPET_RULE : undefined,
+  }));
 
   // ── Completion provider ───────────────────────────────────────────
   monaco.languages.registerCompletionItemProvider('needlescript', {
@@ -29,21 +58,13 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
       };
 
       // Built-in completions
-      const suggestions = NS_ITEMS.map((item) => ({
-        label: item.label,
-        kind: kindMap[item.kindName],
-        detail: item.detail,
-        documentation: {
-          value: item.documentation,
-          isTrusted: true,
-        } as IMarkdownString,
-        insertText: item.insertText,
-        insertTextRules: item.isSnippet ? SNIPPET_RULE : undefined,
+      const suggestions = builtInCompletions.map((item) => ({
+        ...item,
         range,
       }));
 
       // User-defined completions (scanned from the current document)
-      const userSymbols = extractUserSymbols(model.getValue());
+      const userSymbols = userSymbolsFor(model);
       for (const sym of userSymbols) {
         const userKind = sym.kindName === 'function' ? CIK.Function : CIK.Variable;
 
@@ -106,7 +127,7 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
       }
 
       // ── User-defined symbol hover ────────────────────────────────
-      const userSymbols = extractUserSymbols(model.getValue());
+      const userSymbols = userSymbolsFor(model);
       const sym = userSymbols.find((s) => s.label === wordLower);
       if (!sym) return null;
 
@@ -197,7 +218,7 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
       }
 
       // ── User-defined procedure signature help ────────────────────
-      const userSymbols = extractUserSymbols(model.getValue());
+      const userSymbols = userSymbolsFor(model);
       const userProc = userSymbols.find((s) => s.label === ctx.name && s.kindName === 'function');
       if (!userProc || !userProc.params) return null;
 
@@ -296,7 +317,7 @@ export function registerNeedlescriptDefinitionProvider(monaco: Monaco): void {
       // Only navigate for user-defined symbols; built-ins have no source location.
       if (NS_ITEM_MAP.has(wordLower)) return null;
 
-      const userSymbols = extractUserSymbols(model.getValue());
+      const userSymbols = userSymbolsFor(model);
       const sym = userSymbols.find((s) => s.label === wordLower);
       if (!sym) return null;
 
