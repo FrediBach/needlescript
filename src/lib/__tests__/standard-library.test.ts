@@ -455,4 +455,38 @@ describe('standard-library modules', () => {
     expect(result.events.some((event) => event.t === 'stitch')).toBe(true);
     expect(run(source).events).toEqual(result.events);
   });
+
+  it('provides stitch-inert debug chalk overlays', () => {
+    const result = run(`
+      import std.debugx.chalkgrid as chalkgrid
+      import std.debugx.chalkbbox as chalkbbox
+      import std.debugx.chalkfield as chalkfield
+      chalkgrid(20)
+      chalkbbox([[-3, -2], [5, 4]])
+      chalkfield()
+    `);
+    expect(result.events).toHaveLength(0);
+    expect(result.chalk?.map(({ label, style }) => [label, style])).toEqual([
+      ['grid', 'line'],
+      ['bbox', 'line'],
+      ['field', 'line'],
+    ]);
+    expect(result.chalk?.[0]).toMatchObject({ kind: 'group' });
+    expect(result.chalk?.[1]).toMatchObject({ kind: 'path', vertexCount: 5 });
+  });
+
+  it('provides thread-length and coverage-profile diagnostics', () => {
+    const result = run(`
+      import std.debugx.threadestimate as threadestimate
+      import std.debugx.coverprofile as coverprofile
+      lock 0 stitchlen 5
+      down fd 10
+      print threadestimate()
+      print coverprofile([[0, 0], [0, 10]], 5)
+    `);
+    expect(Number(result.printed[0])).toBeGreaterThan(0);
+    expect(result.printed[1]).toMatch(/^\[\[0, /);
+    expect(result.printed[1]).toContain('[5, ');
+    expect(result.printed[1]).toContain('[10, ');
+  });
 });

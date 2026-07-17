@@ -282,6 +282,8 @@ fill dir @radial
 
 `std.textures` includes drawless `radialdir(p)` and curl-noise `curldir(p)` direction reporters; `wovenshape(p, row, v)` and `gradientshape(p, row, v)` fill shapers; and clipped `hilbertpaths`, `truchetpaths`, `hitomezashi`, `seigaiha`, `asanoha`, and `herringbonepaths` geometric path generators. Import aliases must not collide with a local definition, another import, or any built-in. Source modules export procedures with `export def name(args) [ … ]` (or classic `export to name … end`).
 
+`std.debugx` provides stitch-inert `chalkgrid(cell)`, `chalkbbox(path)`, and `chalkfield()` preview overlays, plus drawless `threadestimate()` and `coverprofile(path, stride)` live-history diagnostics. The profile is a list of `[distanceMm, coverageLayers]` samples; the thread length is an approximation from committed penetrations.
+
 ## Randomness (all seeded and deterministic)
 
 seed n — set seed (default 42)

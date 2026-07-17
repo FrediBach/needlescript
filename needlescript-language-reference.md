@@ -265,6 +265,10 @@ fill dir @radial
 
 Bundled modules currently include:
 
+- `std.debugx` — preview-only `chalkgrid`, `chalkbbox`, and `chalkfield` overlays plus
+  live `threadestimate()` and `coverprofile(path, stride)` stitch-history diagnostics.
+  `threadestimate` approximates millimetres of top thread from committed penetrations;
+  `coverprofile` returns `[distanceMm, coverageLayers]` samples. All helpers are drawless.
 - `std.shapes` — centered outline constructors (`polypath`, `starpath`, `rectpath`,
   `roundrect`, `ellipsepath`, `arcpath`, `coilpath`, `heartpath`, `gearpath`,
   `superellipsepath`, `wavepath`, `rosepath`, `lissajouspath`). Closed outlines repeat

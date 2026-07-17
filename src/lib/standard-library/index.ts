@@ -1,3 +1,4 @@
+import { DEBUGX_SOURCE } from './debugx.ns.ts';
 import { LISTX_SOURCE } from './listx.ns.ts';
 import { LAYOUT_SOURCE } from './layout.ns.ts';
 import { MATHX_SOURCE } from './mathx.ns.ts';
@@ -8,6 +9,7 @@ import { STITCHCRAFT_SOURCE } from './stitchcraft.ns.ts';
 import { TEXTURES_SOURCE } from './textures.ns.ts';
 
 const STANDARD_MODULES: Readonly<Record<string, string>> = {
+  'std.debugx': DEBUGX_SOURCE,
   'std.listx': LISTX_SOURCE,
   'std.layout': LAYOUT_SOURCE,
   'std.mathx': MATHX_SOURCE,
