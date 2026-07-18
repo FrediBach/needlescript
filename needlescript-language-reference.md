@@ -272,6 +272,10 @@ print triple(4) // 12
 
 ### Source modules and the standard library
 
+For signatures, input contracts, edge cases, examples, state effects, and RNG draw counts for every
+bundled export, see the
+[NeedleScript Standard Library Reference](./needlescript-standard-library-reference.md).
+
 Import one exported procedure from a bundled module with a local alias:
 
 ```text
