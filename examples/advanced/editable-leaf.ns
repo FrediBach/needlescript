@@ -1,0 +1,72 @@
+// EDITABLE LEAF
+//
+// Turn on stage handles, then drag the leaf anchors, tangent dots, or vein
+// vertices. The list literals are the source of truth: every edit recompiles
+// this ordinary NeedleScript program without consuming a random draw.
+
+seed 17
+fabric 'woven'
+palette ['#274c3a', '#78a85a', '#d7c66a']
+background '#f3efe1'
+fillspacing 0.55
+filllen 2.6
+fillunderlay 'auto'
+autotrim 5
+
+// Relative tangent handles make this a closed four-segment cubic leaf.
+let leaf_spec = [
+  [[0, 38], [-10, 0], [10, 0]],
+  [[23, 0], [0, 15], [0, -15]],
+  [[0, -34], [12, 0], [-12, 0]],
+  [[-23, 0], [0, -15], [0, 15]],
+] // [curve: closed, disc 42, snap 0.5]
+
+// This authored polyline is clipped against the live curve after every drag.
+let cross_vein = [
+  [-34, -17],
+  [-8, -5],
+  [9, 7],
+  [34, 18],
+] // [path: disc 43, snap 0.5, min 2, max 8]
+
+// An open cubic spec becomes the raised central rib.
+let rib_spec = [
+  [[0, -31], [0, 0], [-3, 9]],
+  [[2, 0], [2, -10], [-2, 10]],
+  [[0, 34], [3, -9], [0, 0]],
+] // [curve: disc 40, snap 0.5]
+
+let leaf = curvepath(leaf_spec, 2.2, 'closed')
+
+// Soft tatami body.
+color '#78a85a'
+up setpos(first(leaf)) down
+beginfill
+  sewpath(leaf)
+endfill
+trim
+
+// Dark outline follows the same canonical closed path.
+color '#274c3a'
+stitchlen 2.2
+up setpos(first(leaf)) down
+sewpath(leaf)
+trim
+
+// Clip the editable vein to the leaf. clipopen returns fragments in travel order.
+for vein_piece in clipopen(cross_vein, leaf, 'inside') [
+  up setpos(first(vein_piece)) down
+  sewpath(resample(vein_piece, 1.8))
+  trim
+]
+
+// Turn the editable rib into a narrow filled stroke.
+let rib = curveflat(rib_spec, 0.08)
+for rib_band in strokepath(rib, 2.8, 'round', 'round') [
+  color '#d7c66a'
+  up setpos(first(rib_band)) down
+  beginfill
+    sewpath(rib_band)
+  endfill
+  trim
+]

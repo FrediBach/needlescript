@@ -15,6 +15,13 @@ import type { Val } from './list.ts';
 /** A point in working (mm) space. */
 export type Pt = [number, number];
 
+/** Editable cubic anchor: position plus incoming/outgoing relative handles. */
+export interface CurveAnchor {
+  pos: Pt;
+  hin: Pt;
+  hout: Pt;
+}
+
 // ---------- Shape guards (NsList → plain arrays) ----------
 
 /** The value must be a point: a list of exactly 2 numbers. */
@@ -62,6 +69,35 @@ export function toRegion(v: Val, what: string, line?: number): Pt[] {
 /** Plain points back to runtime lists, via the caller's allocator. */
 export function fromPoints(pts: Pt[], alloc: (items: Val[]) => NsList): NsList {
   return alloc(pts.map((p) => alloc([p[0], p[1]])));
+}
+
+/** Validate and unpack the RFC editable-curves list shape. */
+export function toCurveSpec(v: Val, what: string, line?: number): CurveAnchor[] {
+  if (!isList(v) || v.items.length < 2)
+    throw new NeedlescriptError(`${what}: expected a curve spec with at least 2 anchors`, line);
+  return v.items.map((raw, index) => {
+    try {
+      if (!isList(raw)) throw new Error();
+      if (raw.items.length === 2 && raw.items.every((item) => typeof item === 'number')) {
+        const pos = toPoint(raw, what, line);
+        if (!pos.every(Number.isFinite)) throw new Error();
+        return { pos, hin: [0, 0], hout: [0, 0] };
+      }
+      if (raw.items.length === 3 && raw.items.every(isList)) {
+        const pos = toPoint(raw.items[0], what, line);
+        const hin = toPoint(raw.items[1], what, line);
+        const hout = toPoint(raw.items[2], what, line);
+        if (![...pos, ...hin, ...hout].every(Number.isFinite)) throw new Error();
+        return { pos, hin, hout };
+      }
+    } catch {
+      // Replaced below with the stable, index-bearing public error.
+    }
+    throw new NeedlescriptError(
+      `${what}: anchor ${index} must be [x, y] or [[x, y], [inx, iny], [outx, outy]] with finite numbers`,
+      line,
+    );
+  });
 }
 
 // ---------- §4.1 Scalars ----------
@@ -218,6 +254,174 @@ export function pathlen(path: Pt[]): number {
   let l = 0;
   for (let i = 1; i < path.length; i++) l += vdist(path[i - 1], path[i]);
   return l;
+}
+
+const CLOSED_EPS = 1e-3;
+
+export const isClosedPath = (path: Pt[]): boolean =>
+  path.length >= 4 && vdist(path[0], path[path.length - 1]) <= CLOSED_EPS;
+
+export function openPath(path: Pt[]): Pt[] {
+  const end = isClosedPath(path) ? path.length - 1 : path.length;
+  return path.slice(0, end).map(([x, y]) => [x, y]);
+}
+
+export function closePathCanonical(path: Pt[]): Pt[] {
+  const out = openPath(path);
+  if (out.length) out.push([out[0][0], out[0][1]]);
+  return out;
+}
+
+export function pathOrientation(path: Pt[]): number {
+  const area = signedArea(openPath(path));
+  return Math.abs(area) <= 1e-12 ? 0 : area > 0 ? 1 : -1;
+}
+
+function cumulative(path: Pt[]): number[] {
+  const out = [0];
+  for (let i = 1; i < path.length; i++) out.push(out[i - 1] + vdist(path[i - 1], path[i]));
+  return out;
+}
+
+export function pointAtDistance(path: Pt[], distance: number): Pt {
+  if (path.length === 1) return [...path[0]];
+  const cum = cumulative(path);
+  const target = clamp(distance, 0, cum[cum.length - 1]);
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < target) i++;
+  const length = cum[i] - cum[i - 1];
+  return length <= 1e-12
+    ? [...path[i]]
+    : vlerp(path[i - 1], path[i], (target - cum[i - 1]) / length);
+}
+
+export const pointAt = (path: Pt[], t: number): Pt =>
+  pointAtDistance(path, clamp(t, 0, 1) * pathlen(path));
+
+export function headingAt(path: Pt[], t: number): number {
+  const target = clamp(t, 0, 1) * pathlen(path);
+  let walked = 0;
+  let answer = 0;
+  for (let i = 1; i < path.length; i++) {
+    const length = vdist(path[i - 1], path[i]);
+    if (length > 1e-9) {
+      answer = vheading(vsub(path[i], path[i - 1]));
+      if (walked + length >= target) break;
+    }
+    walked += length;
+  }
+  return answer;
+}
+
+export function paramOf(p: Pt, path: Pt[]): number {
+  const total = pathlen(path);
+  if (total < 1e-9) return 0;
+  let walked = 0,
+    bestDistance = Infinity,
+    bestAlong = 0;
+  for (let i = 1; i < path.length; i++) {
+    const delta = vsub(path[i], path[i - 1]);
+    const length2 = vdot(delta, delta);
+    const length = Math.sqrt(length2);
+    const u = length2 > 1e-9 ? clamp(vdot(vsub(p, path[i - 1]), delta) / length2, 0, 1) : 0;
+    const distance = vdist(p, vlerp(path[i - 1], path[i], u));
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestAlong = walked + u * length;
+    }
+    walked += length;
+  }
+  return bestAlong / total;
+}
+
+export function subPath(path: Pt[], t0: number, t1: number): Pt[] {
+  if (t1 < t0) return subPath(path, t1, t0).reverse();
+  const total = pathlen(path),
+    lo = clamp(t0, 0, 1) * total,
+    hi = clamp(t1, 0, 1) * total;
+  const out = [pointAtDistance(path, lo)];
+  const cum = cumulative(path);
+  for (let i = 1; i < path.length; i++) if (cum[i] > lo && cum[i] < hi) out.push([...path[i]]);
+  out.push(pointAtDistance(path, hi));
+  return out;
+}
+
+export function insertVertex(path: Pt[], t: number): Pt[] {
+  const target = clamp(t, 0, 1) * pathlen(path),
+    cum = cumulative(path);
+  const existing = cum.findIndex((d) => Math.abs(d - target) <= 1e-6);
+  if (existing >= 0) return path.map((p) => [...p]);
+  let i = 1;
+  while (i < cum.length && cum[i] < target) i++;
+  return [
+    ...path.slice(0, i).map((p) => [...p] as Pt),
+    pointAtDistance(path, target),
+    ...path.slice(i).map((p) => [...p] as Pt),
+  ];
+}
+
+function pointLineDistance(p: Pt, a: Pt, b: Pt): number {
+  return segdist(p, a, b);
+}
+
+function flattenCubic(p0: Pt, c0: Pt, c1: Pt, p1: Pt, tol: number, out: Pt[], depth = 0): void {
+  if (
+    depth >= 24 ||
+    Math.max(pointLineDistance(c0, p0, p1), pointLineDistance(c1, p0, p1)) <= tol
+  ) {
+    out.push([...p1]);
+    return;
+  }
+  const a = vlerp(p0, c0, 0.5),
+    b = vlerp(c0, c1, 0.5),
+    c = vlerp(c1, p1, 0.5);
+  const d = vlerp(a, b, 0.5),
+    e = vlerp(b, c, 0.5),
+    m = vlerp(d, e, 0.5);
+  flattenCubic(p0, a, d, m, tol, out, depth + 1);
+  flattenCubic(m, e, c, p1, tol, out, depth + 1);
+}
+
+export function curveFlat(spec: CurveAnchor[], tolerance: number, closed = false): Pt[] {
+  const tol = Math.max(0.005, tolerance);
+  const out: Pt[] = [[...spec[0].pos]];
+  const count = closed ? spec.length : spec.length - 1;
+  for (let i = 0; i < count; i++) {
+    const a = spec[i],
+      b = spec[(i + 1) % spec.length];
+    const c0 = vadd(a.pos, a.hout),
+      c1 = vadd(b.pos, b.hin);
+    if (
+      pointLineDistance(c0, a.pos, b.pos) <= 1e-12 &&
+      pointLineDistance(c1, a.pos, b.pos) <= 1e-12
+    )
+      out.push([...b.pos]);
+    else flattenCubic(a.pos, c0, c1, b.pos, tol, out);
+  }
+  return closed ? closePathCanonical(out) : out;
+}
+
+/** Numeric closed-ring resampling with an evenly distributed seam. */
+export function resampleClosed(
+  path: Pt[],
+  spacing: number,
+  maxPoints: number,
+  line?: number,
+): Pt[] {
+  if (!(spacing > 0)) throw new NeedlescriptError('resample: spacing must be greater than 0', line);
+  const ring = closePathCanonical(path),
+    total = pathlen(ring);
+  if (!(total > 0)) return ring;
+  const segments = Math.max(1, Math.round(total / spacing));
+  if (segments + 1 > maxPoints)
+    throw new NeedlescriptError(
+      `List too long (resample would produce over ${maxPoints.toLocaleString('en-US')} points)`,
+      line,
+    );
+  const out: Pt[] = [];
+  for (let i = 0; i < segments; i++) out.push(pointAtDistance(ring, (i * total) / segments));
+  out.push([...out[0]]);
+  return out;
 }
 
 /**
@@ -552,4 +756,103 @@ export function pointInRegion(p: Pt, region: Pt[]): boolean {
     }
   }
   return inside;
+}
+
+export interface PathIntersection {
+  point: Pt;
+  ta: number;
+  tb: number;
+}
+
+export function pathIntersectionParams(a: Pt[], b: Pt[]): PathIntersection[] {
+  const ca = cumulative(a),
+    cb = cumulative(b);
+  const la = ca[ca.length - 1] || 1,
+    lb = cb[cb.length - 1] || 1;
+  const out: PathIntersection[] = [];
+  for (let i = 1; i < a.length; i++)
+    for (let j = 1; j < b.length; j++) {
+      const point = segisect(a[i - 1], a[i], b[j - 1], b[j]);
+      if (!point) continue;
+      const ta = (ca[i - 1] + vdist(a[i - 1], point)) / la;
+      const tb = (cb[j - 1] + vdist(b[j - 1], point)) / lb;
+      if (
+        !out.some(
+          (hit) =>
+            vdist(hit.point, point) <= 1e-9 &&
+            Math.abs(hit.ta - ta) <= 1e-9 &&
+            Math.abs(hit.tb - tb) <= 1e-9,
+        )
+      )
+        out.push({ point, ta, tb });
+    }
+  return out.sort((x, y) => x.ta - y.ta || x.tb - y.tb);
+}
+
+export function pathSelfIntersections(path: Pt[]): PathIntersection[] {
+  const cum = cumulative(path),
+    total = cum[cum.length - 1] || 1;
+  const out: PathIntersection[] = [];
+  for (let i = 1; i < path.length; i++)
+    for (let j = i + 2; j < path.length; j++) {
+      if (isClosedPath(path) && i === 1 && j === path.length - 1) continue;
+      const point = segisect(path[i - 1], path[i], path[j - 1], path[j]);
+      if (!point) continue;
+      const t1 = (cum[i - 1] + vdist(path[i - 1], point)) / total;
+      const t2 = (cum[j - 1] + vdist(path[j - 1], point)) / total;
+      out.push({ point, ta: Math.min(t1, t2), tb: Math.max(t1, t2) });
+    }
+  return out.sort((x, y) => x.ta - y.ta || x.tb - y.tb);
+}
+
+/** Deterministically weld endpoint-adjacent fragments without mutating inputs. */
+export function joinPaths(fragments: Pt[][], tolerance: number): Pt[][] {
+  if (tolerance < 0) throw new NeedlescriptError('joinpaths: tolerance must not be negative');
+  const unused = new Set(fragments.map((_, i) => i));
+  const result: Pt[][] = [];
+  while (unused.size) {
+    const seed = Math.min(...unused);
+    unused.delete(seed);
+    const chain = fragments[seed].map((p) => [...p] as Pt);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      let best: { index: number; side: 0 | 1; reverse: boolean; distance: number } | undefined;
+      for (const index of unused) {
+        const frag = fragments[index],
+          ends = [frag[0], frag[frag.length - 1]];
+        const candidates = [
+          { side: 1 as const, reverse: false, distance: vdist(chain[chain.length - 1], ends[0]) },
+          { side: 1 as const, reverse: true, distance: vdist(chain[chain.length - 1], ends[1]) },
+          { side: 0 as const, reverse: true, distance: vdist(chain[0], ends[0]) },
+          { side: 0 as const, reverse: false, distance: vdist(chain[0], ends[1]) },
+        ];
+        for (const c of candidates)
+          if (
+            c.distance <= tolerance &&
+            (!best ||
+              c.distance < best.distance - 1e-12 ||
+              (Math.abs(c.distance - best.distance) <= 1e-12 &&
+                (index < best.index || (index === best.index && !c.reverse && best.reverse))))
+          )
+            best = { index, ...c };
+      }
+      if (best) {
+        unused.delete(best.index);
+        const add = fragments[best.index].map((p) => [...p] as Pt);
+        if (best.reverse) add.reverse();
+        if (best.side === 1)
+          chain.push(...add.slice(vdist(chain[chain.length - 1], add[0]) <= tolerance ? 1 : 0));
+        else
+          chain.unshift(
+            ...add.slice(0, vdist(chain[0], add[add.length - 1]) <= tolerance ? -1 : undefined),
+          );
+        changed = true;
+      }
+    }
+    if (chain.length >= 3 && vdist(chain[0], chain[chain.length - 1]) <= tolerance)
+      chain[chain.length - 1] = [...chain[0]];
+    result.push(chain);
+  }
+  return result;
 }

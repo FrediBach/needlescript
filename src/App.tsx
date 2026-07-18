@@ -29,7 +29,11 @@ import { toSVG } from './lib/svg.ts';
 import { EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, MACHINES } from './data.ts';
 import type { HoopConfig, MachineHoop, MachinePreset } from './data.ts';
 import type { ExportFormat } from './components/Header.tsx';
-import { parseParameters, updatePointParameter } from './lib/parse-parameters.ts';
+import {
+  parseParameters,
+  updatePathParameterPoint,
+  updatePointParameter,
+} from './lib/parse-parameters.ts';
 import type { ParamItem, PointParamDef } from './lib/parse-parameters.ts';
 import { usePanelSplit } from './hooks/usePanelSplit.ts';
 import { useSvgImport } from './hooks/useSvgImport.ts';
@@ -301,9 +305,37 @@ export default function App() {
 
   // Point params drive the stage handles.
   const pointParamDefs = useMemo<PointParamDef[]>(() => {
-    return parameterItems
-      .filter((i): i is Extract<typeof i, { kind: 'point' }> => i.kind === 'point')
-      .map((i) => i.def);
+    return parameterItems.flatMap((item): PointParamDef[] => {
+      if (item.kind === 'point') return [item.def];
+      if (item.kind !== 'path' && item.kind !== 'curve') return [];
+      return item.def.value.flatMap((raw, anchor): PointParamDef[] => {
+        if (!Array.isArray(raw)) return [];
+        const full = Array.isArray(raw[0]) ? (raw as number[][]) : null;
+        const pos = (full?.[0] ?? raw) as number[];
+        const make = (role: 'pos' | 'hin' | 'hout', x: number, y: number): PointParamDef => ({
+          name: `${item.def.name}:${anchor}:${role}`,
+          valueX: x,
+          valueY: y,
+          line: item.def.line,
+          region: role === 'pos' ? item.def.region : { kind: 'free' },
+          snap: role === 'pos' ? item.def.snap : undefined,
+          controlType: 'point',
+          pathHandle: {
+            controlName: item.def.name,
+            controlType: item.kind,
+            anchor,
+            role,
+            closed: item.def.closed,
+          },
+        });
+        const handles = [make('pos', pos[0], pos[1])];
+        if (full) {
+          handles.push(make('hin', pos[0] + full[1][0], pos[1] + full[1][1]));
+          handles.push(make('hout', pos[0] + full[2][0], pos[1] + full[2][1]));
+        }
+        return handles;
+      });
+    });
   }, [parameterItems]);
 
   // ── Panel split, SVG import, and share ───────────────────────────────────
@@ -430,10 +462,40 @@ export default function App() {
   const xyDragRafRef = useRef<number | null>(null);
   const xySourceRef = useRef<string | null>(null);
 
+  const updateStageHandle = useCallback(
+    (base: string, name: string, line: number, x: number, y: number) => {
+      const handle = pointParamDefs.find((point) => point.name === name);
+      if (!handle?.pathHandle) return updatePointParameter(base, line, name, x, y);
+      const item = parameterItems.find(
+        (candidate) =>
+          (candidate.kind === 'path' || candidate.kind === 'curve') &&
+          candidate.def.name === handle.pathHandle?.controlName,
+      );
+      if (!item || (item.kind !== 'path' && item.kind !== 'curve')) return base;
+      let valueX = x;
+      let valueY = y;
+      if (handle.pathHandle.role !== 'pos') {
+        const raw = item.def.value[handle.pathHandle.anchor];
+        const pos = Array.isArray(raw?.[0]) ? (raw[0] as number[]) : (raw as number[]);
+        valueX -= pos[0];
+        valueY -= pos[1];
+      }
+      return updatePathParameterPoint(
+        base,
+        item.def,
+        handle.pathHandle.anchor,
+        handle.pathHandle.role,
+        valueX,
+        valueY,
+      );
+    },
+    [parameterItems, pointParamDefs],
+  );
+
   const handleXYHandleDrag = useCallback(
     (name: string, line: number, x: number, y: number) => {
       const base = xySourceRef.current ?? sourceRef.current;
-      const updated = updatePointParameter(base, line, name, x, y);
+      const updated = updateStageHandle(base, name, line, x, y);
       xySourceRef.current = updated;
       setSource(updated);
 
@@ -444,13 +506,13 @@ export default function App() {
         runProgram(latest, design.name);
       });
     },
-    [design.name, runProgram],
+    [design.name, runProgram, updateStageHandle],
   );
 
   const handleXYHandleCommit = useCallback(
     (name: string, line: number, x: number, y: number) => {
       const base = xySourceRef.current ?? sourceRef.current;
-      const updated = updatePointParameter(base, line, name, x, y);
+      const updated = updateStageHandle(base, name, line, x, y);
       xySourceRef.current = null; // reset pending source after final commit
       setSource(updated);
       if (xyDragRafRef.current !== null) {
@@ -459,7 +521,7 @@ export default function App() {
       }
       runProgram(updated, design.name);
     },
-    [design.name, runProgram],
+    [design.name, runProgram, updateStageHandle],
   );
 
   // When the source changes from outside (editor, example, share), clear the

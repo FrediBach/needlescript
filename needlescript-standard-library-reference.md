@@ -157,6 +157,9 @@ To place or transform a returned path, use geometry built-ins such as `xlate`, `
 
 ## 5. `std.pathops` — polyline queries and operations
 
+`pointat`, `headingat`, `paramof`, and `subpath` are also Library-tier built-ins. These exports
+remain as compatibility wrappers, so existing imports keep their pinned behavior.
+
 Normalized parameters are based on total arc length rather than vertex index. Unless noted, `t`
 values are clamped to 0…1. Query functions expect at least one point; segment-based functions are
 most meaningful with at least two.

@@ -55,7 +55,11 @@ function readImport(tokens: Token[], index: number): ImportDirective {
   const alias = aliasToken.v as string;
   if (!IDENTIFIER.test(alias))
     throw new NeedlescriptError(`Invalid import alias "${alias}"`, aliasToken.line);
-  if (RESERVED.has(alias) || LIBRARY_FUNCS.has(alias))
+  const promotedPathop =
+    specifier.startsWith('std.pathops.') &&
+    specifier.slice(specifier.lastIndexOf('.') + 1) === alias &&
+    ['pointat', 'headingat', 'paramof', 'subpath'].includes(alias);
+  if (RESERVED.has(alias) || (LIBRARY_FUNCS.has(alias) && !promotedPathop))
     throw new NeedlescriptError(
       `"${alias}" is a built-in word and can't be an import alias`,
       aliasToken.line,

@@ -976,6 +976,19 @@ export default function ParametersPanel({
                 />
               );
             }
+            if (item.kind === 'path' || item.kind === 'curve') {
+              const { def } = item;
+              return (
+                <div className={styles.paramRow} key={`${def.name}-${def.line}`}>
+                  <span className={styles.paramName} title={def.name}>
+                    {def.name}
+                  </span>
+                  <span className={styles.pointWrap}>
+                    {def.value.length} {item.kind === 'curve' ? 'anchors' : 'vertices'}
+                  </span>
+                </div>
+              );
+            }
             const { def } = item;
             if (def.controlType === 'switch') {
               return (

@@ -4,6 +4,7 @@ import {
   updateParameter,
   updateTextParameter,
   updatePointParameter,
+  updatePathParameterPoint,
   updatePaletteParameter,
   parsePresets,
   snapValue,
@@ -538,6 +539,54 @@ describe('parseParameters — [xy] point params', () => {
     );
     const items = parseParameters(src);
     expect(items.map((i) => i.kind)).toEqual(['section', 'point', 'param']);
+  });
+});
+
+describe('parseParameters — editable path params', () => {
+  it('parses path options and literal vertices', () => {
+    const items = parseParameters(
+      'let patch = [[-10, -5], [10, -5], [0, 12]] // [path: closed, disc 40, snap 0.5, min 3, max 12]',
+    );
+    const item = items.find((entry) => entry.kind === 'path');
+    expect(item?.kind).toBe('path');
+    if (item?.kind !== 'path') return;
+    expect(item.def.value).toEqual([
+      [-10, -5],
+      [10, -5],
+      [0, 12],
+    ]);
+    expect(item.def).toMatchObject({ closed: true, snap: 0.5, min: 3, max: 12 });
+  });
+
+  it('parses multiline mixed-form curve specs', () => {
+    const items = parseParameters(
+      [
+        'let spine = [',
+        '  [0, -20],',
+        '  [[6, -4], [-2, -7], [2, 7]],',
+        '  [2, 14],',
+        '] // [curve: disc 40]',
+      ].join('\n'),
+    );
+    const item = items.find((entry) => entry.kind === 'curve');
+    expect(item?.kind).toBe('curve');
+    if (item?.kind !== 'curve') return;
+    expect(item.def.value).toHaveLength(3);
+    expect(item.def.line).toBe(1);
+  });
+
+  it('rewrites a selected multiline curve handle without changing the annotation', () => {
+    const source = [
+      'let spine = [',
+      '  [0, -20],',
+      '  [[6, -4], [-2, -7], [2, 7]],',
+      '] // [curve: disc 40]',
+    ].join('\n');
+    const item = parseParameters(source).find((entry) => entry.kind === 'curve');
+    if (item?.kind !== 'curve') throw new Error('curve did not parse');
+    const updated = updatePathParameterPoint(source, item.def, 1, 'hout', 3.25, 8);
+    expect(updated).toContain('[[6, -4], [-2, -7], [3.25, 8]],');
+    expect(updated).toContain('// [curve: disc 40]');
   });
 });
 

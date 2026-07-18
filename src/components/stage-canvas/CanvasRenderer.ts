@@ -545,6 +545,41 @@ function drawHandles(
   ctx.font = `${Math.round(fsBase * 0.85) * dpr}px ${fontMono}`;
   ctx.textBaseline = 'middle';
 
+  const groups = new Map<string, PointParamDef[]>();
+  for (const param of params) {
+    const key = param.pathHandle?.controlName;
+    if (!key) continue;
+    const group = groups.get(key) ?? [];
+    group.push(param);
+    groups.set(key, group);
+  }
+  ctx.save();
+  ctx.strokeStyle = 'rgba(203,161,109,0.5)';
+  ctx.lineWidth = dpr;
+  for (const group of groups.values()) {
+    const anchors = group
+      .filter((param) => param.pathHandle?.role === 'pos')
+      .sort((a, b) => (a.pathHandle?.anchor ?? 0) - (b.pathHandle?.anchor ?? 0));
+    if (anchors.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(X(anchors[0].valueX), Y(anchors[0].valueY));
+      for (const anchor of anchors.slice(1)) ctx.lineTo(X(anchor.valueX), Y(anchor.valueY));
+      if (anchors[0].pathHandle?.closed) ctx.closePath();
+      ctx.stroke();
+    }
+    for (const handle of group.filter((param) => param.pathHandle?.role !== 'pos')) {
+      const anchor = anchors.find(
+        (candidate) => candidate.pathHandle?.anchor === handle.pathHandle?.anchor,
+      );
+      if (!anchor) continue;
+      ctx.beginPath();
+      ctx.moveTo(X(anchor.valueX), Y(anchor.valueY));
+      ctx.lineTo(X(handle.valueX), Y(handle.valueY));
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
   for (const p of params) {
     const isDragging = draggingHandleName === p.name;
     const isHovered = hoveredHandleName === p.name;
@@ -619,7 +654,10 @@ function drawHandles(
     ctx.globalAlpha = isActive ? 0.9 : 0.55;
     ctx.fillStyle = canvasAnnotationText;
     ctx.textAlign = 'left';
-    ctx.fillText(p.name, px + ringR + 3 * dpr, py);
+    if (!p.pathHandle || p.pathHandle.role === 'pos') {
+      const label = p.pathHandle ? `${p.pathHandle.controlName}[${p.pathHandle.anchor}]` : p.name;
+      ctx.fillText(label, px + ringR + 3 * dpr, py);
+    }
     ctx.restore();
 
     ctx.globalAlpha = 1;

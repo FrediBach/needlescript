@@ -335,6 +335,13 @@ nearestonpath(p,path) — closest point on an open polyline to p; O(len(path))
 resample(path, mm) — evenly-spaced path (bridges math and stitch space)
 resample(path, [4, 1.5]) — cycling list pattern; optional third arg is phase offset
 resample(path, @fn) — reporter fn(t, s, i, p) per point (p in path coordinates)
+resample(path, spacing[, phase], 'closed') — closed sampling with an even seam; returns first point repeated
+curveflat(spec, tol[, 'closed']) — flatten editable cubic anchors `[[anchor, hin, hout], …]`; handles are relative
+curvepath(spec, spacing[, phase][, 'closed']) — flatten at 0.05 mm then arc-length resample
+isclosed(path) openpath(path) pathorientation(path) — canonical closure and orientation helpers
+pointat(path,t) headingat(path,t) normalat(path,t) paramof(p,path) — arc-length queries
+paramtomm(path,t) mmtoparam(path,mm) subpath(path,t0,t1) splitat(path,t) insertvertex(path,t)
+ispoint(v) ispath(v) iscurvespec(v) — structural predicates
 chaikin(path, n) — corner-cutting smoothing (1–6 passes)
 catmull(points, mm) — Catmull-Rom spline, resampled
 bezier(p0,c0,c1,p1,mm) — cubic Bézier, resampled
@@ -353,6 +360,11 @@ hull(points) — convex hull (region, CCW)
 relax(points, n) — Lloyd's relaxation (n rounds), evens out spacing; field-aware like voronoi
 
 ## Geometry (call-syntax)
+
+strokepath(path,width[,cap[,join]]) — stroke outline regions; caps round/butt/square, joins round/miter/bevel
+clipopen(path,region[,mode]) — open fragments inside (default) or outside an even-odd region
+joinpaths(fragments,tol) — deterministically weld nearby endpoints; closures are canonical rings
+pathisectparams(a,b) pathselfisects(path) — intersections with normalized path parameters
 
 offsetpath(region, mm) — list of regions (positive=inflate, negative=shrink — may return an EMPTY list, loop over it)
 clippaths(a, b, 'op') — boolean: 'union' 'intersect' 'difference' 'xor' → list of regions (also "op quoted-word form)

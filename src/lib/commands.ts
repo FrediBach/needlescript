@@ -278,13 +278,33 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   nearestonpath: { min: 2, max: 2 },
   // §4.4 paths & curves
   pathlen: { min: 1, max: 1 },
-  resample: { min: 2, max: 3 }, // resample(path, mm) | resample(path, [pat]) | resample(path, [pat], phase) | resample(path, @fn)
+  resample: { min: 2, max: 4 }, // optional phase and trailing 'closed' mode
+  curvepath: { min: 2, max: 4 },
+  curveflat: { min: 2, max: 3 },
   chaikin: { min: 2, max: 2 },
   catmull: { min: 2, max: 2 },
   bezier: { min: 5, max: 5 },
   centroid: { min: 1, max: 1 },
   bbox: { min: 1, max: 1 },
   routesort: { min: 1, max: 3 },
+  isclosed: { min: 1, max: 1 },
+  openpath: { min: 1, max: 1 },
+  pathorientation: { min: 1, max: 1 },
+  pointat: { min: 2, max: 2 },
+  headingat: { min: 2, max: 2 },
+  normalat: { min: 2, max: 2 },
+  paramof: { min: 2, max: 2 },
+  paramtomm: { min: 2, max: 2 },
+  mmtoparam: { min: 2, max: 2 },
+  subpath: { min: 3, max: 3 },
+  splitat: { min: 2, max: 2 },
+  insertvertex: { min: 2, max: 2 },
+  pathisectparams: { min: 2, max: 2 },
+  pathselfisects: { min: 1, max: 1 },
+  joinpaths: { min: 2, max: 2 },
+  ispoint: { min: 1, max: 1 },
+  ispath: { min: 1, max: 1 },
+  iscurvespec: { min: 1, max: 1 },
   // §4.5 generators
   scatter: { min: 1, max: 2 },
   voronoi: { min: 1, max: 2 },
@@ -294,6 +314,8 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   // §4.6 geometry ops
   offsetpath: { min: 2, max: 2 },
   clippaths: { min: 3, max: 3 },
+  strokepath: { min: 2, max: 4 },
+  clipopen: { min: 2, max: 3 },
   inpath: { min: 2, max: 2 },
   // §hoop: field reporters (Library tier, same soft-reservation as inpath/bbox).
   infield: { min: 1, max: 1 }, // infield(p) → 0|1 — is p inside the sewable field?

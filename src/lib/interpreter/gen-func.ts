@@ -4,7 +4,7 @@ import type { Val } from '../list.ts';
 import * as gm from '../genmath.ts';
 import type { Pt } from '../genmath.ts';
 import { gauss, fork } from '../prng.ts';
-import { offsetRegion, clipRegions } from '../geometry.ts';
+import { offsetRegion, clipRegions, clipOpenPath, strokePath } from '../geometry.ts';
 import { scatter, voronoiCells, triangulate, hull, relax } from '../generators.ts';
 import type { Domain } from '../generators.ts';
 import {
@@ -225,9 +225,120 @@ export function initGenFunc(ctx: RunContext): void {
         ctx.tickN(p.length, line);
         return gm.pathlen(p);
       }
+      case 'ispoint':
+        return isList(args[0]) &&
+          args[0].items.length === 2 &&
+          args[0].items.every((v) => typeof v === 'number' && Number.isFinite(v))
+          ? 1
+          : 0;
+      case 'ispath': {
+        if (!isList(args[0]) || args[0].items.length < 2) return 0;
+        return args[0].items.every(
+          (v) =>
+            isList(v) &&
+            v.items.length === 2 &&
+            v.items.every((n) => typeof n === 'number' && Number.isFinite(n)),
+        )
+          ? 1
+          : 0;
+      }
+      case 'iscurvespec':
+        try {
+          gm.toCurveSpec(args[0], name, line);
+          return 1;
+        } catch {
+          return 0;
+        }
+      case 'isclosed':
+        return gm.isClosedPath(pathArg(0, 1)) ? 1 : 0;
+      case 'openpath':
+        return path(gm.openPath(pathArg(0, 1)));
+      case 'pathorientation':
+        return gm.pathOrientation(pathArg(0, 3));
+      case 'pointat':
+        return point(gm.pointAt(pathArg(0, 1), sc(1)));
+      case 'headingat':
+        return gm.headingAt(pathArg(0, 1), sc(1));
+      case 'normalat':
+        return (((gm.headingAt(pathArg(0, 1), sc(1)) - 90) % 360) + 360) % 360;
+      case 'paramof':
+        return gm.paramOf(pointArg(0), pathArg(1, 1));
+      case 'paramtomm': {
+        const p = pathArg(0, 1);
+        return gm.clamp(sc(1), 0, 1) * gm.pathlen(p);
+      }
+      case 'mmtoparam': {
+        const p = pathArg(0, 1),
+          total = gm.pathlen(p);
+        return total <= 1e-12 ? 0 : gm.clamp(sc(1), 0, total) / total;
+      }
+      case 'subpath':
+        return path(gm.subPath(pathArg(0, 1), sc(1), sc(2)));
+      case 'splitat': {
+        const p = pathArg(0, 1),
+          t = sc(1);
+        return regions([gm.subPath(p, 0, t), gm.subPath(p, t, 1)]);
+      }
+      case 'insertvertex':
+        return path(gm.insertVertex(pathArg(0, 1), sc(1)));
+      case 'curveflat': {
+        const mode = args[2] === undefined ? 'open' : args[2];
+        if (typeof mode !== 'string' || !['open', 'closed'].includes(mode.toLowerCase()))
+          throw new NeedlescriptError("curveflat: mode must be 'open' or 'closed'", line);
+        const flat = gm.curveFlat(
+          gm.toCurveSpec(args[0], name, line),
+          sc(1),
+          mode.toLowerCase() === 'closed',
+        );
+        if (flat.length > ctx.m.effectiveLimits.maxListLen)
+          throw new NeedlescriptError('List too long (curveflat output exceeds listlen)', line);
+        return path(flat);
+      }
+      case 'curvepath': {
+        let mode = 'open';
+        if (typeof args[args.length - 1] === 'string')
+          mode = (args[args.length - 1] as string).toLowerCase();
+        if (!['open', 'closed'].includes(mode))
+          throw new NeedlescriptError("curvepath: mode must be 'open' or 'closed'", line);
+        const flat = gm.curveFlat(gm.toCurveSpec(args[0], name, line), 0.05, mode === 'closed');
+        const spacing = args[1];
+        if (isFuncRef(spacing)) {
+          ctx.applyStitchLenReporterArity(spacing, line);
+          return path(
+            gm.resampleReporter(
+              flat,
+              (t, s, i, p) => ctx.applyStitchLenReporter(spacing, t, s, i, p, line),
+              ctx.m.effectiveLimits.maxListLen,
+              line,
+            ),
+          );
+        }
+        if (isList(spacing)) {
+          const pattern = spacing.items.map((v, i) => {
+            if (typeof v !== 'number')
+              throw new NeedlescriptError(`curvepath: pattern element ${i} must be a number`, line);
+            return v;
+          });
+          const phase = typeof args[2] === 'number' ? Math.round(args[2]) : 0;
+          return path(
+            gm.resampleList(flat, pattern, phase, ctx.m.effectiveLimits.maxListLen, line),
+          );
+        }
+        return path(
+          mode === 'closed'
+            ? gm.resampleClosed(flat, sc(1), ctx.m.effectiveLimits.maxListLen, line)
+            : gm.resample(flat, sc(1), ctx.m.effectiveLimits.maxListLen, line),
+        );
+      }
       case 'resample': {
         const pts = pathArg(0);
         const spec = args[1];
+        const mode =
+          typeof args[args.length - 1] === 'string'
+            ? (args[args.length - 1] as string).toLowerCase()
+            : 'open';
+        if (!['open', 'closed'].includes(mode))
+          throw new NeedlescriptError("resample: mode must be 'open' or 'closed'", line);
         if (isFuncRef(spec)) {
           // Reporter form: resample(path, @fn)  [phase ignored]
           const ref = spec;
@@ -236,7 +347,7 @@ export function initGenFunc(ctx: RunContext): void {
           ctx.tickN(pts.length * 4, line);
           return path(
             gm.resampleReporter(
-              pts,
+              mode === 'closed' ? gm.closePathCanonical(pts) : pts,
               (t, s, i, p) => ctx.applyStitchLenReporter(ref, t, s, i, p, line),
               ctx.m.effectiveLimits.maxListLen,
               line,
@@ -255,12 +366,19 @@ export function initGenFunc(ctx: RunContext): void {
               );
             return el as number;
           });
-          const phase = args.length > 2 ? Math.round(sc(2)) : 0;
+          const phase = typeof args[2] === 'number' ? Math.round(sc(2)) : 0;
           ctx.tickN(pts.length * 4, line);
-          return path(gm.resampleList(pts, patRaw, phase, ctx.m.effectiveLimits.maxListLen, line));
+          const input = mode === 'closed' ? gm.closePathCanonical(pts) : pts;
+          return path(
+            gm.resampleList(input, patRaw, phase, ctx.m.effectiveLimits.maxListLen, line),
+          );
         }
         // Numeric form (unchanged)
-        return path(gm.resample(pts, sc(1), ctx.m.effectiveLimits.maxListLen, line));
+        return path(
+          mode === 'closed'
+            ? gm.resampleClosed(pts, sc(1), ctx.m.effectiveLimits.maxListLen, line)
+            : gm.resample(pts, sc(1), ctx.m.effectiveLimits.maxListLen, line),
+        );
       }
       case 'chaikin': {
         const p = pathArg(0);
@@ -457,6 +575,73 @@ export function initGenFunc(ctx: RunContext): void {
           );
         ctx.tickN((a.length + b.length) * 4, line);
         return regions(clipRegions(a, b, op, line, ctx.m.effectiveLimits.maxClipVerts));
+      }
+      case 'strokepath': {
+        const capValue = args[2] ?? 'round',
+          joinValue = args[3] ?? 'round';
+        if (
+          typeof capValue !== 'string' ||
+          !['round', 'butt', 'square'].includes(capValue.toLowerCase())
+        )
+          throw new NeedlescriptError("strokepath: cap must be 'round', 'butt', or 'square'", line);
+        if (
+          typeof joinValue !== 'string' ||
+          !['round', 'miter', 'bevel'].includes(joinValue.toLowerCase())
+        )
+          throw new NeedlescriptError(
+            "strokepath: join must be 'round', 'miter', or 'bevel'",
+            line,
+          );
+        return regions(
+          strokePath(
+            pathArg(0),
+            sc(1),
+            capValue.toLowerCase() as 'round' | 'butt' | 'square',
+            joinValue.toLowerCase() as 'round' | 'miter' | 'bevel',
+            line,
+            ctx.m.effectiveLimits.maxClipVerts,
+          ),
+        );
+      }
+      case 'clipopen': {
+        const modeValue = args[2] ?? 'inside';
+        if (
+          typeof modeValue !== 'string' ||
+          !['inside', 'outside'].includes(modeValue.toLowerCase())
+        )
+          throw new NeedlescriptError("clipopen: mode must be 'inside' or 'outside'", line);
+        return regions(
+          clipOpenPath(
+            pathArg(0),
+            compoundRegionArg(1),
+            modeValue.toLowerCase() as 'inside' | 'outside',
+            line,
+            ctx.m.effectiveLimits.maxClipVerts,
+          ),
+        );
+      }
+      case 'joinpaths': {
+        if (!isList(args[0]))
+          throw new NeedlescriptError('joinpaths: expected a list of paths', line);
+        const fragments = args[0].items.map((v) => gm.toPath(v, name, line, 1));
+        const count = fragments.reduce((n, fragment) => n + fragment.length, 0);
+        if (count > ctx.m.effectiveLimits.maxDelaunayPoints)
+          throw new NeedlescriptError(
+            `joinpaths: too many input vertices (${count.toLocaleString('en-US')})`,
+            line,
+          );
+        return regions(gm.joinPaths(fragments, sc(1)));
+      }
+      case 'pathisectparams':
+      case 'pathselfisects': {
+        const hits =
+          name === 'pathisectparams'
+            ? gm.pathIntersectionParams(pathArg(0, 1), pathArg(1, 1))
+            : gm.pathSelfIntersections(pathArg(0, 1));
+        return ctx.allocList(
+          hits.map((hit) => ctx.allocList([point(hit.point), hit.ta, hit.tb], line)),
+          line,
+        );
       }
       case 'inpath':
         return gm.pointInRegion(pointArg(0), regionArg(1)) ? 1 : 0;

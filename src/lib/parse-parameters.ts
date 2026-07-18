@@ -99,6 +99,26 @@ export interface PointParamDef {
   /** Optional snapping grid size in mm */
   snap?: number;
   controlType: 'point';
+  /** Present for a synthetic stage handle belonging to a path/curve control. */
+  pathHandle?: {
+    controlName: string;
+    controlType: 'path' | 'curve';
+    anchor: number;
+    role: 'pos' | 'hin' | 'hout';
+    closed: boolean;
+  };
+}
+
+export interface PathParamDef {
+  name: string;
+  value: number[][] | (number[] | number[][])[];
+  line: number;
+  region: XYRegion;
+  snap?: number;
+  closed: boolean;
+  min: number;
+  max: number;
+  controlType: 'path' | 'curve';
 }
 
 export type ParamItem =
@@ -107,7 +127,9 @@ export type ParamItem =
   | { kind: 'text'; def: TextParamDef }
   | { kind: 'color'; def: ColorParamDef }
   | { kind: 'palette'; def: PaletteParamDef }
-  | { kind: 'point'; def: PointParamDef };
+  | { kind: 'point'; def: PointParamDef }
+  | { kind: 'path'; def: PathParamDef }
+  | { kind: 'curve'; def: PathParamDef };
 
 // ── Preset type ────────────────────────────────────────────────────────────
 
@@ -119,8 +141,10 @@ export type ParamItem =
 export interface Preset {
   name: string;
   /** Keyed by lowercased variable name — same casing as ParamDef.name */
-  values: Record<string, number | string | [number, number] | string[]>;
+  values: Record<string, number | string | string[] | NestedNumberList>;
 }
+
+export type NestedNumberList = Array<number | NestedNumberList>;
 
 // ── Regex helpers ──────────────────────────────────────────────────────────
 
@@ -363,6 +387,67 @@ function parseXYAnnotation(content: string): { region: XYRegion; snap?: number }
   return { region, snap };
 }
 
+function parsePathAnnotation(content: string, kind: 'path' | 'curve') {
+  if (!new RegExp(`^${kind}\\b`, 'i').test(content.trim())) return null;
+  let body = content.trim().slice(kind.length).trim();
+  if (body.startsWith(':')) body = body.slice(1).trim();
+  const closed = /(?:^|,)\s*closed\s*(?=,|$)/i.test(body);
+  const snapMatch = /(?:^|,)\s*snap\s+([\d.]+)\s*(?=,|$)/i.exec(body);
+  const minMatch = /(?:^|,)\s*min\s+(\d+)\s*(?=,|$)/i.exec(body);
+  const maxMatch = /(?:^|,)\s*max\s+(\d+)\s*(?=,|$)/i.exec(body);
+  const snap = snapMatch ? Number(snapMatch[1]) : undefined;
+  const min = minMatch ? Number(minMatch[1]) : 2;
+  const max = maxMatch ? Number(maxMatch[1]) : kind === 'path' ? 64 : 32;
+  if ((snap !== undefined && (!(snap > 0) || !Number.isFinite(snap))) || min < 2 || max < min)
+    return null;
+  body = body
+    .replace(/(?:^|,)\s*(?:closed|snap\s+[\d.]+|min\s+\d+|max\s+\d+)\s*(?=,|$)/gi, '')
+    .replace(/^\s*,|,\s*$/g, '')
+    .trim();
+  const xy = parseXYAnnotation(`xy${body ? `: ${body}` : ''}${snap ? `, snap ${snap}` : ''}`);
+  if (!xy) return null;
+  return { ...xy, closed, min, max };
+}
+
+function parseNestedNumberList(raw: string): NestedNumberList | null {
+  if (!raw.trim().startsWith('[')) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw.replace(/,\s*]/g, ']'));
+    const valid = (value: unknown): value is number | NestedNumberList =>
+      (typeof value === 'number' && Number.isFinite(value)) ||
+      (Array.isArray(value) && value.every(valid));
+    return Array.isArray(parsed) && parsed.every(valid) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function annotatedListDeclaration(lines: string[], annotationLine: number) {
+  for (let start = annotationLine; start >= Math.max(0, annotationLine - 100); start--) {
+    const prefix =
+      /^\s*(?:let\s+([A-Za-z_]\w*)\s*=|make\s+"([A-Za-z_]\w*)\s+|([A-Za-z_]\w*)\s*=)\s*/.exec(
+        lines[start],
+      );
+    if (!prefix) continue;
+    const joined = lines.slice(start, annotationLine + 1).join('\n');
+    const rhsStart = prefix[0].length;
+    const open = joined.indexOf('[', rhsStart);
+    if (open < 0) continue;
+    let depth = 0;
+    for (let i = open; i < joined.length; i++) {
+      if (joined[i] === '[') depth++;
+      else if (joined[i] === ']' && --depth === 0) {
+        return {
+          name: (prefix[1] ?? prefix[2] ?? prefix[3]).toLowerCase(),
+          line: start + 1,
+          value: parseNestedNumberList(joined.slice(open, i + 1)),
+        };
+      }
+    }
+  }
+  return null;
+}
+
 // ── Main parser ────────────────────────────────────────────────────────────
 
 /**
@@ -387,6 +472,40 @@ export function parseParameters(source: string): ParamItem[] {
     const annotMatch = ANNOT_RE.exec(line);
     if (!annotMatch) continue;
     const annotContent = annotMatch[1].trim();
+
+    if (/^(?:path|curve)\b/i.test(annotContent)) {
+      const kind = /^curve\b/i.test(annotContent) ? 'curve' : 'path';
+      const declaration = annotatedListDeclaration(lines, i);
+      const parsed = parsePathAnnotation(annotContent, kind);
+      if (!declaration?.value || !parsed) continue;
+      const isPoint = (v: number | NestedNumberList) =>
+        Array.isArray(v) && v.length === 2 && v.every((n) => typeof n === 'number');
+      const valid =
+        kind === 'path'
+          ? declaration.value.length >= 2 && declaration.value.every(isPoint)
+          : declaration.value.length >= 2 &&
+            declaration.value.every(
+              (anchor) =>
+                isPoint(anchor) ||
+                (Array.isArray(anchor) && anchor.length === 3 && anchor.every(isPoint)),
+            );
+      if (!valid) continue;
+      items.push({
+        kind,
+        def: {
+          name: declaration.name,
+          value: declaration.value as PathParamDef['value'],
+          line: declaration.line,
+          region: parsed.region,
+          snap: parsed.snap,
+          closed: parsed.closed,
+          min: parsed.min,
+          max: parsed.max,
+          controlType: kind,
+        },
+      });
+      continue;
+    }
 
     if (/^color(?:\s*:|\s*$)/i.test(annotContent)) {
       const match = COLOR_DECL_RE.exec(line);
@@ -687,6 +806,58 @@ export function updatePointParameter(
   return lines.join('\n');
 }
 
+/** Rewrite one vertex/anchor/tangent in an annotated path literal. */
+export function updatePathParameterPoint(
+  source: string,
+  def: PathParamDef,
+  anchor: number,
+  role: 'pos' | 'hin' | 'hout',
+  newX: number,
+  newY: number,
+): string {
+  const value = JSON.parse(JSON.stringify(def.value)) as NestedNumberList;
+  const entry = value[anchor];
+  if (!Array.isArray(entry)) return source;
+  if (def.controlType === 'path' || (role === 'pos' && entry.every((v) => typeof v === 'number'))) {
+    value[anchor] = [newX, newY];
+  } else {
+    const full = entry as NestedNumberList;
+    const slot = role === 'pos' ? 0 : role === 'hin' ? 1 : 2;
+    if (!Array.isArray(full[slot])) return source;
+    full[slot] = [newX, newY];
+  }
+
+  const lines = source.split('\n');
+  const startLine = def.line - 1;
+  if (startLine < 0 || startLine >= lines.length) return source;
+  const startOffset = lines.slice(0, startLine).reduce((n, line) => n + line.length + 1, 0);
+  const open = source.indexOf('[', startOffset);
+  if (open < 0) return source;
+  let depth = 0;
+  let close = -1;
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === '[') depth++;
+    else if (source[i] === ']' && --depth === 0) {
+      close = i;
+      break;
+    }
+  }
+  if (close < 0) return source;
+  const fmt = (v: number | NestedNumberList): string =>
+    Array.isArray(v)
+      ? `[${v.map(fmt).join(', ')}]`
+      : Number.isInteger(v)
+        ? String(v)
+        : String(Number(v.toFixed(3)));
+  const original = source.slice(open, close + 1);
+  let literal = fmt(value);
+  if (original.includes('\n')) {
+    const indent = /^\s*/.exec(lines[startLine])?.[0] ?? '';
+    literal = `[\n${value.map((entry) => `${indent}  ${fmt(entry)},`).join('\n')}\n${indent}]`;
+  }
+  return source.slice(0, open) + literal + source.slice(close + 1);
+}
+
 // ── Value snapping helper ─────────────────────────────────────────────────
 
 /**
@@ -919,6 +1090,12 @@ export function parsePresets(source: string): Preset[] {
         const px = parseFloat(pointMatch[1]);
         const py = parseFloat(pointMatch[2]);
         if (Number.isFinite(px) && Number.isFinite(py)) values[key] = [px, py];
+        continue;
+      }
+
+      const nested = parseNestedNumberList(rawVal);
+      if (nested && nested.length >= 2) {
+        values[key] = nested;
         continue;
       }
 
