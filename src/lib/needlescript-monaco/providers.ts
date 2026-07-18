@@ -1,8 +1,14 @@
 import type { Monaco } from '@monaco-editor/react';
 import type { editor as MonacoEditor, IMarkdownString, languages } from 'monaco-editor';
 import { NS_ITEMS, NS_ITEM_MAP, type NSItemKind } from './catalog.ts';
-import { codePortionOfLine, extractUserSymbols, getSignatureContext } from './symbols.ts';
+import {
+  codePortionOfLine,
+  extractUserSymbols,
+  getImportCompletionContext,
+  getSignatureContext,
+} from './symbols.ts';
 import type { UserSymbol } from './symbols.ts';
+import { STANDARD_LIBRARY_PROCEDURES } from '../standard-library/index.ts';
 
 type IPos = { readonly lineNumber: number; readonly column: number };
 
@@ -46,9 +52,43 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
 
   // ── Completion provider ───────────────────────────────────────────
   monaco.languages.registerCompletionItemProvider('needlescript', {
-    triggerCharacters: [],
+    triggerCharacters: ['.'],
 
     provideCompletionItems(model: MonacoEditor.ITextModel, position: IPos) {
+      const lineBeforeCursor = model
+        .getLineContent(position.lineNumber)
+        .slice(0, position.column - 1);
+      const importContext = getImportCompletionContext(lineBeforeCursor);
+      if (importContext) {
+        const importRange = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: importContext.startColumn,
+          endColumn: position.column,
+        };
+        const suggestions = STANDARD_LIBRARY_PROCEDURES.flatMap((procedure) => {
+          const importPath = `${procedure.moduleId}.${procedure.name}`;
+          if (!importPath.startsWith(importContext.partialPath)) return [];
+
+          const signature = `${procedure.name}(${procedure.params.join(', ')})`;
+          return [
+            {
+              label: importPath,
+              kind: CIK.Module,
+              detail: signature,
+              documentation: {
+                value: `Import \`${signature}\` from \`${procedure.moduleId}\`.`,
+                isTrusted: false,
+              } as IMarkdownString,
+              filterText: importPath,
+              insertText: `${importPath} as ${procedure.name}`,
+              range: importRange,
+            },
+          ];
+        });
+        return { suggestions };
+      }
+
       const wordInfo = model.getWordUntilPosition(position);
       const range = {
         startLineNumber: position.lineNumber,
@@ -74,7 +114,10 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
             label: sym.label,
             kind: userKind,
             detail: sym.detail,
-            documentation: { value: `User-defined procedure.`, isTrusted: false },
+            documentation: {
+              value: sym.documentation ?? `User-defined procedure.`,
+              isTrusted: false,
+            },
             insertText: snippetText,
             insertTextRules: SNIPPET_RULE,
             range,
@@ -84,7 +127,10 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
             label: sym.label,
             kind: userKind,
             detail: sym.detail,
-            documentation: { value: `User-defined ${sym.kindName}.`, isTrusted: false },
+            documentation: {
+              value: sym.documentation ?? `User-defined ${sym.kindName}.`,
+              isTrusted: false,
+            },
             insertText: sym.label,
             insertTextRules: undefined,
             range,
@@ -134,14 +180,13 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
       let sigLine = `**${sym.label}**`;
       if (sym.kindName === 'function') {
         const paramStr = sym.params && sym.params.length > 0 ? sym.params.join(', ') : '';
-        sigLine += ` \`(${paramStr})\`  *(user procedure, line ${sym.line})*`;
+        sigLine += ` \`(${paramStr})\`  *(${sym.detail}, line ${sym.line})*`;
       } else {
         sigLine += `  *(user variable, line ${sym.line})*`;
       }
 
-      return {
-        contents: [{ value: sigLine, isTrusted: false }],
-      };
+      const content = sym.documentation ? `${sigLine}\n\n${sym.documentation}` : sigLine;
+      return { contents: [{ value: content, isTrusted: false }] };
     },
   });
 
@@ -239,7 +284,7 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
             {
               label: procLabel,
               documentation: {
-                value: `User-defined procedure (line ${userProc.line}).`,
+                value: userProc.documentation ?? `User-defined procedure (line ${userProc.line}).`,
                 isTrusted: false,
               } as IMarkdownString,
               parameters,

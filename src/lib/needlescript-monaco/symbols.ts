@@ -1,4 +1,12 @@
 import { NS_ITEM_MAP } from './catalog.ts';
+import { STANDARD_LIBRARY_PROCEDURES } from '../standard-library/index.ts';
+
+const STANDARD_LIBRARY_PROCEDURE_MAP = new Map(
+  STANDARD_LIBRARY_PROCEDURES.map((procedure) => [
+    `${procedure.moduleId}.${procedure.name}`,
+    procedure,
+  ]),
+);
 
 // ── Helper: walk text backwards to find the active function call context ─────
 //
@@ -74,6 +82,26 @@ export interface UserSymbol {
   detail: string;
   params?: string[]; // parameter names (for procedures)
   line: number; // 1-based line number of the definition in the source
+  documentation?: string;
+}
+
+export interface ImportCompletionContext {
+  partialPath: string;
+  startColumn: number;
+}
+
+/** Return the standard-library path being typed in a top-level import line. */
+export function getImportCompletionContext(
+  lineBeforeCursor: string,
+): ImportCompletionContext | null {
+  const code = codePortionOfLine(lineBeforeCursor);
+  const match = code.match(/^\s*import\s+([a-z0-9_.]*)$/i);
+  if (!match) return null;
+
+  return {
+    partialPath: match[1].toLowerCase(),
+    startColumn: match.index! + match[0].length - match[1].length + 1,
+  };
 }
 
 export function extractUserSymbols(text: string): UserSymbol[] {
@@ -87,9 +115,29 @@ export function extractUserSymbols(text: string): UserSymbol[] {
     }
   };
 
+  // Bundled import: import std.module.export as alias
+  const importedProc =
+    /\bimport\s+(std(?:\.[a-z_][a-z0-9_]*)+)\.([a-z_][a-z0-9_]*)\s+as\s+([a-z_][a-z0-9_]*)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = importedProc.exec(text)) !== null) {
+    const importPath = `${m[1]}.${m[2]}`.toLowerCase();
+    const procedure = STANDARD_LIBRARY_PROCEDURE_MAP.get(importPath);
+    if (!procedure) continue;
+
+    const alias = m[3].toLowerCase();
+    const params = [...procedure.params];
+    add({
+      label: alias,
+      kindName: 'function',
+      detail: `imported ${procedure.name}(${params.join(', ')})`,
+      params,
+      line: offsetToLine(text, m.index),
+      documentation: `Imported from \`${importPath}\`.`,
+    });
+  }
+
   // Modern procedure: def name(a, b) [
   const modernProc = /\bdef\s+([a-z_][a-z0-9_]*)\s*\(([^)]*)\)/gi;
-  let m: RegExpExecArray | null;
   while ((m = modernProc.exec(text)) !== null) {
     const name = m[1].toLowerCase();
     const rawParams = m[2].trim();
