@@ -458,6 +458,114 @@ describe('standard-library modules', () => {
     expect(blend.events.filter((event) => event.t === 'color')).toHaveLength(1);
   });
 
+  it('partitions one constant-pitch row set into an interleaved 50/50 gradient', () => {
+    const result = run(`
+      import std.stitchcraft.gradientrows as gradientrows
+      def half(v) [ return 0.5 ]
+      def rowaxes(rows) [
+        let out = []
+        for row in rows [ append(out, round(row[0][1])) ]
+        return out
+      ]
+      let square = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+      let base = fillrows(square, 2, 0)
+      let groups = gradientrows(square, 0, 2, @half)
+      let overlap = 0
+      for a in groups[0] [
+        for b in groups[1] [
+          if abs(a[0][1] - b[0][1]) < 0.000001 [ overlap = 1 ]
+        ]
+      ]
+      print len(base)
+      print [len(groups[0]), len(groups[1])]
+      print rowaxes(groups[0])
+      print rowaxes(groups[1])
+      print overlap
+    `);
+    expect(result.printed).toEqual([
+      '10',
+      '[5, 5]',
+      '[-7, -3, 1, 5, 9]',
+      '[-9, -5, -1, 3, 7]',
+      '0',
+    ]);
+  });
+
+  it('keeps ramp endpoints and empty color groups density-neutral', () => {
+    const result = run(`
+      import std.stitchcraft.gradientrows as gradientrows
+      def ramp(v) [ return v ]
+      def none(v) [ return 0 ]
+      def all(v) [ return 1 ]
+      let square = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+      let rampgroups = gradientrows(square, 0, 2, @ramp)
+      let nonegroups = gradientrows(square, 0, 2, @none)
+      let allgroups = gradientrows(square, 0, 2, @all)
+      print [rampgroups[0][0][0][1], last(rampgroups[1])[0][1]]
+      print [len(nonegroups[0]), len(nonegroups[1])]
+      print [len(allgroups[0]), len(allgroups[1])]
+    `);
+    expect(result.printed).toEqual(['[-9, 9]', '[10, 0]', '[0, 10]']);
+  });
+
+  it('assigns compound-region scanline fragments together and preserves fillrows clipping', () => {
+    const result = run(`
+      import std.stitchcraft.gradientrows as gradientrows
+      let calls = 0
+      def half(v) [ calls += 1 return 0.5 ]
+      let outer = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+      let hole = [[-4, -4], [4, -4], [4, 4], [-4, 4]]
+      let region = [outer, hole]
+      let base = fillrows(region, 2, 0)
+      let groups = gradientrows(region, 0, 2, @half)
+      let combined = concat(groups[0], groups[1])
+      let retained = 0
+      let splitrow = 0
+      for row in base [ if contains(combined, row) [ retained += 1 ] ]
+      for a in groups[0] [
+        for b in groups[1] [
+          if abs(a[0][1] - b[0][1]) < 0.000001 [ splitrow = 1 ]
+        ]
+      ]
+      print calls
+      print [len(base), len(groups[0]), len(groups[1]), retained]
+      print splitrow
+    `);
+    expect(result.printed).toEqual(['10', '[14, 7, 7, 14]', '0']);
+  });
+
+  it('keeps gradientrows drawless and validates its construction contract', () => {
+    const source = (seed: number) => `
+      import std.stitchcraft.gradientrows as gradientrows
+      seed ${seed}
+      def ramp(v) [ return v ]
+      let square = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+      print gradientrows(square, 25, 2, @ramp)
+      print random(1)
+    `;
+    const first = run(source(123));
+    const differentSeed = run(source(999));
+    const baseline = run('seed 123 print random(1)');
+    expect(first.printed[0]).toBe(differentSeed.printed[0]);
+    expect(first.printed[1]).toBe(baseline.printed[0]);
+    expect(run(source(123)).printed).toEqual(first.printed);
+
+    expect(() =>
+      run(`
+        import std.stitchcraft.gradientrows as gradientrows
+        def half(v) [ return 0.5 ]
+        gradientrows([[-1, -1], [1, -1], [1, 1], [-1, 1]], 0, 0.2, @half)
+      `),
+    ).toThrow(/gradientrows pitch must be from 0\.25 to 5 mm/);
+    expect(() =>
+      run(`
+        import std.stitchcraft.gradientrows as gradientrows
+        def invalid(v) [ return 1.1 ]
+        gradientrows([[-2, -2], [2, -2], [2, 2], [-2, 2]], 0, 1, @invalid)
+      `),
+    ).toThrow(/gradientrows amount must return a number from 0 to 1/);
+  });
+
   it('provides deterministic, coverage-aware stipple with one main-stream draw', () => {
     const source = `
       import std.stitchcraft.stipple as stipple

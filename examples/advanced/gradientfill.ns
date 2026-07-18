@@ -1,64 +1,46 @@
 hoop '4x4'
 seed 7
 
+import std.stitchcraft.gradientrows as gradientrows
+
 // --- Gradient band ---
-let w = 76          // [40:90] band width (mm)
-let h = 57          // [20:80] band height (mm)
-let pitch = 0.4     // [0.4:0.05:1.4] combined line spacing (mm)
-let gamma = 1.7       // [0.4:0.1:2.5] gradient curve (1 = linear)
-let wobble = 0    // [0:0.05:0.6] hand-stitch jitter (mm)
+let w = 76       // [40:90] band width (mm)
+let h = 57       // [20:80] band height (mm)
+let pitch = 0.4  // [0.4:0.05:1.4] combined line spacing (mm)
+let gamma = 1.7  // [0.4:0.1:2.5] gradient curve (1 = linear)
+let wobble = 0   // [0:0.05:0.6] hand-stitch jitter (mm)
 
 palette ['#1b6ca8', '#e94560']
 background '#f4efe6'
 fabric 'woven'
 stitchlen 2.5
 
-// --- Error-diffusion assignment: each candidate x yields ONE line total,
-//     A's share fades out left->right, B's fades in. Combined rate is flat. ---
-let rowsA = []
-let rowsB = []
-let n = floor(w / pitch)
-let accA = 0
-let accB = 0.5              // half-phase: mid-gradient lines interleave, never stack
-let t = 0
-let x = 0
-for i = 0 to n [
-  t = pow(i / n, gamma)
-  x = i * pitch - w / 2
-  accA += 1 - t
-  accB += t
-  if accA >= 1 [ append(rowsA, x)  accA -= 1 ]
-  if accB >= 1 [ append(rowsB, x)  accB -= 1 ]
+// `v` runs from 0 to 1 across the row-seeding axis. The helper error-diffuses
+// this color-B share so every candidate row belongs to exactly one color.
+def fade(v) [
+  return pow(v, gamma)
 ]
 
-// --- One continuous serpentine per colour ---
-def serpentine(xs, ylo, yhi) [
-  let pts = []
-  let goup = 1
-  for cx in xs [
-    if goup [
-      append(pts, [cx, ylo])
-      append(pts, [cx, yhi])
-    ] else [
-      append(pts, [cx, yhi])
-      append(pts, [cx, ylo])
-    ]
-    goup = 1 - goup
+def sewrows(rows) [
+  for row in rows [
+    up setpos(first(row)) down
+    sewpath(resample(row, 2.5))
   ]
-  return pts
 ]
 
-def sewline(pts) [
-  if len(pts) < 2 [ return ]
-  up setpos(pts[0]) down       // jump to the start, then sew the rest
-  sewpath(slice(pts, 1))
+let region = [
+  [0 - w / 2, 0 - h / 2],
+  [w / 2, 0 - h / 2],
+  [w / 2, h / 2],
+  [0 - w / 2, h / 2]
 ]
+let groups = gradientrows(region, 90, pitch, @fade)
 
 color '#1b6ca8'
-humanize wobble [ sewline(serpentine(rowsA, 0 - h / 2, h / 2)) ]
+humanize wobble [ sewrows(groups[0]) ]
 trim
 
 color '#e94560'
-// reversed: B starts at its dense end (the right), near where A finished
-humanize wobble [ sewline(serpentine(reverse(rowsB), 0 - h / 2, h / 2)) ]
+// Reverse the second group so it starts at its dense end, near where A finished.
+humanize wobble [ sewrows(reverse(groups[1])) ]
 trim

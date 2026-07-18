@@ -300,11 +300,43 @@ call `sewpath`/`setpos`.
 | `std.stitchcraft.appliquesteps` | `appliquesteps(region, w)`. Performs a 2.5 mm running placement line, a narrow satin tack-down at `max(0.8, 0.35w)`, and a final satin cover at `w`. Inserts `stop` events between the three stages so fabric can be placed/trimmed. Each stage travels with needle up to the ring start. Ends at the closed ring's end with satin turned off. |
 | `std.stitchcraft.eyelet`        | `eyelet(r)`. Sews a resampled satin circle centered at the current needle position. Radius must be positive; satin width is `clamp(0.55r, 0.6, 1.5)`. A `push`/`pop` pair restores needle position, heading, and pen state after sewing; satin ends off.                                                                                       |
 | `std.stitchcraft.gradientbands` | `gradientbands(region, deg, n) -> list of regions`. Geometry-only helper: slices a region into `max(1, round(n))` parallel bands oriented at heading/angle `deg` and returns all clipped pieces in band order. Concavity can yield more pieces than requested bands.                                                                           |
+| `std.stitchcraft.gradientrows`  | `gradientrows(region, deg, pitch, amount) -> [rowsA, rowsB]`. Geometry-only, density-neutral two-color blend. See below.                                                                                                                                                                                                                       |
 | `std.stitchcraft.threadblend`   | `threadblend(region, deg)`. Creates 1.2 mm fill rows at `deg`, sews even rows in the current color, advances once to the next color, then sews odd rows. Rows are resampled at 2.5 mm. Ends in the second color and does not restore needle position.                                                                                          |
 | `std.stitchcraft.stipple`       | `stipple(region, mindist)`. Scatters candidate points and sews a small circular mark only where coverage within `mindist/3` is below one layer. `mindist` must be positive. Each mark restores turtle state with `push`/`pop`. Consumes exactly **1 main-stream RNG draw** through `scatter`.                                                  |
 
 `threadblend` assumes a second usable thread slot. Numeric `color` selection and `colorindex()` differ
 by one internally; the helper accounts for that when it advances to the next slot.
+
+### Density-neutral two-color gradient rows
+
+`gradientrows` accepts either one ring or a compound list of rings. Compound geometry uses the
+even-odd rule, so inner rings form holes and concave scanlines can produce multiple path fragments.
+`pitch` must be 0.25–5 mm, matching the safe range of `fillrows`. The returned paths are unsplit and
+have no pull compensation; callers choose stitch length, color order, routing, trims, and palette.
+
+The one-argument reporter `amount(v)` returns color B's proportion from 0 to 1. `v` is normalized
+from 0 at the first candidate scanline to 1 at the last along the row-seeding axis; a region with
+only one candidate passes 0.5. The reporter is called once per candidate scanline, not once per
+fragment. Out-of-range results are errors.
+
+Each candidate scanline is assigned wholly to exactly one output group with deterministic error
+diffusion. Therefore `len(rowsA) + len(rowsB)` equals the `fillrows` fragment count and the two
+groups never contain coincident candidate rows. The helper itself consumes no RNG draws; an
+`amount` reporter that deliberately calls random helpers still consumes its own documented draws.
+
+```text
+import std.stitchcraft.gradientrows as gradientrows
+
+def fade(v) [ return pow(v, 1.6) ]
+let region = [[-20, -12], [20, -12], [20, 12], [-20, 12]]
+let groups = gradientrows(region, 90, 0.5, @fade)
+
+color '#1b6ca8'
+for row in groups[0] [ up setpos(first(row)) down sewpath(resample(row, 2.5)) ]
+trim
+color '#e94560'
+for row in reverse(groups[1]) [ up setpos(first(row)) down sewpath(resample(row, 2.5)) ]
+```
 
 ---
 
