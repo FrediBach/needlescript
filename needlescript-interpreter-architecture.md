@@ -320,8 +320,9 @@ converted to a clear error); real errors propagate. `trace` returns a single pat
 - **`callProcVals`** (`proc-call.ts:52`) — same, but from already-evaluated values.
   Used by the reporter machinery (once per point/stitch).
 - **`scalarBuiltin`** (`proc-call.ts:82`) — evaluates the `FUNC_ARITY`/`ZERO_FUNCS`
-  math tier (`sin`, `sqrt`, `mod`, `atan`, `distance`, `towards`, `xcor`, `heading`,
-  …) on numeric values. `random`/`noise` draw from `ctx.rng`/`ctx.noise`.
+  math tier (`sin`, `sqrt`, `pow`, `log`, `mod`, `atan`, `distance`, `towards`, `xcor`,
+  `heading`, …) on numeric values. `sqrt` and `log` enforce their real-number domains;
+  `random`/`noise` draw from `ctx.rng`/`ctx.noise`.
 - **`callRef`** (`proc-call.ts`) — validate the effective arity, prepend bound values,
   then invoke a `FuncRef`/`ComposedRef`. Resolution order is composed pipeline → user
   proc (shadows builtins) → scalar builtin → list/gen/query/string builtin. Every

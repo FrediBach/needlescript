@@ -212,9 +212,10 @@ let [x, y] = pos() — destructuring a flat fixed-arity list
 
 ## Math functions (all degree-based trig)
 
-sin(deg) cos(deg) sqrt(n) abs(n) round(n) floor(n) ceil(n)
+sin(deg) cos(deg) sqrt(n) log(n) abs(n) round(n) floor(n) ceil(n)
 min(a,b) max(a,b) pow(a,b) mod(a,b) atan(x,y) towards(x,y) distance(x,y)
 lerp(a,b,t) remap(v,inlo,inhi,outlo,outhi) clamp(v,lo,hi) smoothstep(e0,e1,x)
+// log(n) is the natural logarithm; n must be positive. Use log(x)/log(base) for another base.
 // atan(x,y) returns the HEADING of vector (x,y): atan(1,0) = 90.
 // Prefer call parens: classic `distance 0 0 < 47` parses as distance 0 (0 < 47) — write distance(0,0) < 47.
 

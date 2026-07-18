@@ -243,8 +243,8 @@ describe('parse', () => {
       }
     });
 
-    it('parses function calls in expressions: sin, cos, sqrt, abs, round, mod', () => {
-      for (const fn of ['sin 45', 'cos 90', 'sqrt 16', 'abs -3', 'round 3.7']) {
+    it('parses unary function calls in expressions', () => {
+      for (const fn of ['sin 45', 'cos 90', 'sqrt 16', 'log 10', 'abs -3', 'round 3.7']) {
         const node = first(`fd ${fn}`);
         if (node.k === 'cmd') {
           expect(node.args[0].k).toBe('func');

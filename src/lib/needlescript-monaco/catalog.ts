@@ -1063,6 +1063,16 @@ export const NS_ITEMS: NSItem[] = [
     params: [['base', 'exp']],
   },
   {
+    label: 'log',
+    kindName: 'function',
+    detail: 'natural logarithm',
+    documentation:
+      'Natural logarithm (base e) — the inverse of exponential growth. `log(1)` is 0 and `log(pow(e, x))` is x, where `e` is approximately 2.71828. Input must be positive; zero or a negative number is a runtime error. For another base, use `log(x) / log(base)`.',
+    insertText: 'log(${1:n})',
+    isSnippet: true,
+    params: [['n']],
+  },
+  {
     label: 'atan',
     kindName: 'function',
     detail: 'heading of vector (x, y)',

@@ -363,6 +363,7 @@ NeedleScript ships a full set of math functions. The ones you'll reach for const
 | `sin deg`, `cos deg`                              | trigonometry, in **degrees**                                             |
 | `sqrt n`, `abs n`, `round n`, `floor n`, `ceil n` | the usual suspects                                                       |
 | `min a b`, `max a b`, `pow a b`                   | minimum, maximum, power                                                  |
+| `log n`                                           | natural logarithm; `n` must be positive                                  |
 | `atan x y`                                        | the **heading** of vector (x, y): 0 = north, clockwise. `atan 1 0` is 90 |
 | `towards x y`                                     | heading from the needle toward a point. `seth towards 0 0` aims home     |
 | `distance x y`                                    | distance from the needle to a point                                      |
@@ -2107,7 +2108,7 @@ Everything that emits stitches or mutates turtle/machine/stitch state:
 
 Pure values in, values out — nothing here ever moves the needle:
 
-**Scalar math:** `random`, `gauss`, `noise`, `noise2`, `snoise2`, `snoise3`, `fbm2`, `sin`, `cos`, `sqrt`, `abs`, `round`, `floor`, `ceil`, `min`, `max`, `pow`, `mod`, `lerp`, `remap`, `clamp`, `smoothstep`
+**Scalar math:** `random`, `gauss`, `noise`, `noise2`, `snoise2`, `snoise3`, `fbm2`, `sin`, `cos`, `sqrt`, `log`, `abs`, `round`, `floor`, `ceil`, `min`, `max`, `pow`, `mod`, `lerp`, `remap`, `clamp`, `smoothstep`
 
 **Lists:** `filled`, `len`, `islist`, `first`, `last`, `append`, `prepend`, `insertat`, `removeat`, `concat`, `slice`, `reverse`, `sort`, `copy`, `indexof`, `contains`, `sum`, `mean`, `minof`, `maxof`, `pick`, `shuffle`, `range`, `steps`
 

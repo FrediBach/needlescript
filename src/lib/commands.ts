@@ -167,6 +167,7 @@ export const FUNC_ARITY: Record<string, number> = {
   min: 2,
   max: 2,
   pow: 2,
+  log: 1,
   atan: 2,
   noise: 1,
   noise2: 2,

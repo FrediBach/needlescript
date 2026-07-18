@@ -153,6 +153,7 @@ Operator precedence, loosest to tightest:
 | `sin deg` · `cos deg`                                 | trig in degrees                                                       |
 | `sqrt n` · `abs n` · `round n` · `floor n` · `ceil n` | usual semantics (`sqrt` of negative errors)                           |
 | `min a b` · `max a b` · `pow a b`                     | non-finite `pow` result errors                                        |
+| `log n`                                               | natural log; `n` positive; base `b` via `log(n) / log(b)`             |
 | `mod a b`                                             | floor modulo (sign of `b`); same as `%`                               |
 | `atan x y`                                            | **heading** of vector (x, y): 0 = north, clockwise — `atan 1 0` is 90 |
 | `towards x y`                                         | heading from needle to (x, y) — `seth towards 0 0` aims home          |

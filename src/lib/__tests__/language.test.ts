@@ -165,6 +165,17 @@ describe('math functions', () => {
     expect(() => run('print pow 10 10000')).toThrow(/not a finite/);
   });
 
+  it('log is the natural logarithm and supports base conversion', () => {
+    expect(
+      printed('print round(log(2.718281828459045) * 1000) print round(log(1000) / log(10))'),
+    ).toEqual(['1000', '3']);
+  });
+
+  it('log rejects zero and negative inputs', () => {
+    expect(() => run('print log 0')).toThrow(/log requires a positive number, got 0/);
+    expect(() => run('print log(-1)')).toThrow(/log requires a positive number, got -1/);
+  });
+
   it('atan returns a heading-convention angle (0 = north, clockwise)', () => {
     expect(printed('print atan 1 0 print atan 0 1 print atan 0 -1')).toEqual(['90', '0', '180']);
   });

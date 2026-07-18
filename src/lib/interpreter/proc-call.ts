@@ -147,6 +147,13 @@ export function initProcCall(ctx: RunContext): void {
           );
         return v;
       }
+      case 'log':
+        if (args[0] <= 0)
+          throw new NeedlescriptError(
+            `log requires a positive number, got ${formatNum(args[0])}`,
+            line,
+          );
+        return Math.log(args[0]);
       case 'mod':
         return ((args[0] % args[1]) + args[1]) % args[1];
       case 'atan':

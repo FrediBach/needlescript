@@ -1,0 +1,32 @@
+// LOGARITHMIC SPIRAL — recover angle from radius with log.
+//
+// The usual form grows radius exponentially with angle:
+//   r = inner * pow(growth, theta / 360)
+// Solving for theta gives the inverse used below:
+//   theta = 360 * log(r / inner) / log(growth)
+
+hoop '4x4'
+fabric 'woven'
+palette ['#173f5f']
+background '#f4efe6'
+stitchlen 1.8
+
+let inner = 1.5       // [0.5:0.25:5] starting radius, mm
+let outer = 42        // [20:1:45] ending radius, mm
+let growth = 3.8      // [1.5:0.1:8] radius multiplier per full turn
+let samples = 600     // [100:50:1000] construction detail
+
+let spiral = []
+for i = 0 to samples [
+  // Step evenly through radius, then invert the growth curve to find angle.
+  let r = lerp(inner, outer, i / samples)
+  let theta = 360 * log(r / inner) / log(growth)
+  append(spiral, [r * sin(theta), r * cos(theta)])
+]
+
+// Construction samples are radial, so resample by arc length for even stitches.
+let path = resample(spiral, 1.8)
+color '#173f5f'
+up setpos(path[0]) down
+sewpath(slice(path, 1))
+trim

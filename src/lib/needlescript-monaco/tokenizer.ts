@@ -154,6 +154,7 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'min',
       'max',
       'pow',
+      'log',
       'atan',
       'noise',
       'noise2',

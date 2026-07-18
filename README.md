@@ -437,6 +437,7 @@ seth ( noise2 xcor / 16 ycor / 16 ) * 720
 | `sin deg` · `cos deg`                                 | trigonometry in degrees                                                                                                    |
 | `sqrt n` · `abs n` · `round n` · `floor n` · `ceil n` | the usual suspects (`sqrt` of a negative is an error)                                                                      |
 | `min a b` · `max a b` · `pow a b`                     | minimum, maximum, power (a non-finite `pow` result is an error)                                                            |
+| `log n`                                               | natural logarithm (`n` must be positive); use `log(x) / log(base)` for another base                                        |
 | `mod a b`                                             | floor modulo — always returns a value with the sign of _b_. The `%` operator is the same operation                         |
 | `atan x y`                                            | the **heading** of the vector (x, y): 0 = north, clockwise — so `atan 1 0` is 90                                           |
 | `towards x y`                                         | heading from the needle to the point (x, y) — `seth towards 0 0` aims home                                                 |

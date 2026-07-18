@@ -522,6 +522,10 @@ describe('@builtin references', () => {
     expect(printed('print @sin')).toEqual(['@sin/1']);
   });
 
+  it('@log resolves as a FuncRef', () => {
+    expect(printed('print @log')).toEqual(['@log/1']);
+  });
+
   it('@vadd resolves as a FuncRef', () => {
     expect(printed('print @vadd')).toEqual(['@vadd/2']);
   });
