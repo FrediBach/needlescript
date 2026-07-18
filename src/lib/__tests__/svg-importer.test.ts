@@ -295,6 +295,20 @@ describe('svgToCode', () => {
       expect(() => run(code)).not.toThrow();
     });
 
+    it('linear-gradient SVG generates a runnable density-neutral thread recipe', () => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <defs><linearGradient id="blend">
+          <stop offset="0" stop-color="#c8472f"/>
+          <stop offset="1" stop-color="#3a4e8c"/>
+        </linearGradient></defs>
+        <rect x="10" y="10" width="80" height="80" fill="url(#blend)"/>
+      </svg>`;
+      const { code, report } = svgToCode(svg);
+      expect(code).toContain('std.stitchcraft.gradientrowsn');
+      expect(report).toMatchObject({ fills: 1, outlines: 0, colors: 2 });
+      expect(() => run(code)).not.toThrow();
+    });
+
     it('circle SVG generates runnable code', () => {
       const { code } = svgToCode(circle);
       expect(() => run(code)).not.toThrow();

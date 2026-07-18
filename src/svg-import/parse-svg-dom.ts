@@ -28,6 +28,8 @@ import {
   type SourceGeometryKind,
   type SourceObject,
   type SourcePaint,
+  type SvgGradientStop,
+  type SvgLinearGradient,
   type StagedDocument,
 } from '../lib/svg/model.ts';
 
@@ -70,7 +72,8 @@ interface RawObject {
   paths: Point[][];
   curveSpecs?: SvgCurveSpec[];
   closed: boolean[];
-  paint: Omit<SourcePaint, 'strokeWidthMM' | 'dashArrayMM' | 'dashOffsetMM'> & {
+  paint: Omit<SourcePaint, 'strokeWidthMM' | 'dashArrayMM' | 'dashOffsetMM' | 'fillGradient'> & {
+    fillGradient: SvgLinearGradient | null;
     strokeWidth: number | null;
     dashArray: number[] | null;
     dashOffset: number;
@@ -159,15 +162,7 @@ function color(
 ): string | null {
   if (raw === null || raw.trim() === '' || raw.trim() === 'inherit') return inherited;
   const value = raw.trim();
-  if (/^url\(/i.test(value)) {
-    findings.push({
-      code: 'unsupported-paint',
-      severity: 'error',
-      message: `${role} paint '${value}' needs an explicit representative thread color`,
-      sourceObjectId,
-    });
-    return null;
-  }
+  if (/^url\(/i.test(value)) return value;
   const parsed = parseColorStr(value);
   if (parsed === undefined) {
     findings.push({
@@ -252,6 +247,216 @@ function labelOf(element: Element, tag: string, counters: Map<string, number>): 
   return `${tag} #${count}`;
 }
 
+interface SvgViewport {
+  minX: number;
+  minY: number;
+  width: number;
+  height: number;
+}
+
+function localPaintId(value: string): string | null {
+  const match = value.match(/^url\(\s*['"]?#([^'"\s)]+)['"]?\s*\)$/i);
+  return match?.[1] ?? null;
+}
+
+function gradientHref(element: Element): string | null {
+  const href = element.getAttribute('href') ?? element.getAttribute('xlink:href');
+  return href?.trim().startsWith('#') ? href.trim().slice(1) : null;
+}
+
+function inheritedGradientAttribute(
+  element: Element,
+  name: string,
+  gradients: Map<string, Element>,
+  seen = new Set<Element>(),
+): string | null {
+  if (element.hasAttribute(name)) return element.getAttribute(name);
+  if (seen.has(element)) return null;
+  seen.add(element);
+  const href = gradientHref(element);
+  const parent = href ? gradients.get(href) : undefined;
+  return parent ? inheritedGradientAttribute(parent, name, gradients, seen) : null;
+}
+
+function inheritedGradientStops(
+  element: Element,
+  gradients: Map<string, Element>,
+  seen = new Set<Element>(),
+): Element[] {
+  const own = Array.from(element.children).filter(
+    (child) => child.tagName.toLowerCase() === 'stop',
+  );
+  if (own.length || seen.has(element)) return own;
+  seen.add(element);
+  const href = gradientHref(element);
+  const parent = href ? gradients.get(href) : undefined;
+  return parent ? inheritedGradientStops(parent, gradients, seen) : [];
+}
+
+function gradientStops(
+  element: Element,
+  gradients: Map<string, Element>,
+  findings: OperationFinding[],
+  sourceObjectId: string,
+): SvgGradientStop[] | null {
+  const stops: SvgGradientStop[] = [];
+  let previousOffset = 0;
+  for (const stop of inheritedGradientStops(element, gradients)) {
+    const styles = styleMap(stop);
+    const rawOffset = property(stop, styles, 'offset')?.trim() ?? '0';
+    const parsedOffset = Number.parseFloat(rawOffset);
+    const offset = Math.max(
+      previousOffset,
+      Math.min(
+        1,
+        Math.max(
+          0,
+          Number.isFinite(parsedOffset) ? parsedOffset / (rawOffset.endsWith('%') ? 100 : 1) : 0,
+        ),
+      ),
+    );
+    const rawColor = property(stop, styles, 'stop-color') ?? '#000000';
+    const parsedColor = parseColorStr(rawColor);
+    const stopOpacity = opacity(property(stop, styles, 'stop-opacity'), 1);
+    if (!Array.isArray(parsedColor) || stopOpacity < 1) {
+      findings.push({
+        code: 'unsupported-paint',
+        severity: 'error',
+        message:
+          stopOpacity < 1
+            ? 'transparent SVG gradient stops cannot be represented by thread channels'
+            : `unsupported SVG gradient stop color '${rawColor}'`,
+        sourceObjectId,
+      });
+      return null;
+    }
+    stops.push({ offset, color: rgbToHex(parsedColor) });
+    previousOffset = offset;
+  }
+  if (stops.length < 2 || stops.length > 8) {
+    findings.push({
+      code: 'unsupported-paint',
+      severity: 'error',
+      message: `SVG gradients need 2–8 opaque color stops; found ${stops.length}`,
+      sourceObjectId,
+    });
+    return null;
+  }
+  return stops;
+}
+
+function gradientCoordinate(
+  raw: string | null,
+  fallback: string,
+  units: 'objectBoundingBox' | 'userSpaceOnUse',
+  origin: number,
+  span: number,
+): number {
+  const value = (raw ?? fallback).trim();
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return 0;
+  if (units === 'objectBoundingBox') return value.endsWith('%') ? parsed / 100 : parsed;
+  return value.endsWith('%') ? origin + (parsed / 100) * span : parsed;
+}
+
+function resolveLinearGradient(
+  value: string | null,
+  localPaths: Point[][],
+  elementMatrix: Matrix,
+  gradients: Map<string, Element>,
+  viewport: SvgViewport,
+  findings: OperationFinding[],
+  sourceObjectId: string,
+  role: 'fill' | 'stroke',
+): SvgLinearGradient | null {
+  if (value === null || !/^url\(/i.test(value)) return null;
+  const id = localPaintId(value);
+  const element = id ? gradients.get(id) : undefined;
+  if (!id || !element) {
+    findings.push({
+      code: 'unsupported-paint',
+      severity: 'error',
+      message: `${role} paint '${value}' does not reference a supported local gradient; choose an explicit representative thread color`,
+      sourceObjectId,
+    });
+    return null;
+  }
+  if (role === 'stroke') {
+    findings.push({
+      code: 'unsupported-paint',
+      severity: 'error',
+      message: 'SVG gradient strokes are not supported; choose an explicit thread color',
+      sourceObjectId,
+    });
+    return null;
+  }
+  if (element.tagName.toLowerCase() !== 'lineargradient') {
+    findings.push({
+      code: 'unsupported-paint',
+      severity: 'error',
+      message:
+        'radial SVG gradients need a radial stitch recipe and are not imported as linear rows',
+      sourceObjectId,
+    });
+    return null;
+  }
+  const spread = inheritedGradientAttribute(element, 'spreadMethod', gradients) ?? 'pad';
+  if (spread !== 'pad') {
+    findings.push({
+      code: 'unsupported-paint',
+      severity: 'error',
+      message: `SVG gradient spreadMethod '${spread}' is not supported`,
+      sourceObjectId,
+    });
+    return null;
+  }
+  const stops = gradientStops(element, gradients, findings, sourceObjectId);
+  if (!stops) return null;
+  const units =
+    inheritedGradientAttribute(element, 'gradientUnits', gradients) === 'userSpaceOnUse'
+      ? 'userSpaceOnUse'
+      : 'objectBoundingBox';
+  const localBounds = bboxOf(localPaths);
+  const bboxWidth = localBounds.maxX - localBounds.minX;
+  const bboxHeight = localBounds.maxY - localBounds.minY;
+  if (units === 'objectBoundingBox' && (bboxWidth < 1e-9 || bboxHeight < 1e-9)) return null;
+  const coordinate = (name: 'x1' | 'x2' | 'y1' | 'y2', fallback: string): number => {
+    const xAxis = name.startsWith('x');
+    return gradientCoordinate(
+      inheritedGradientAttribute(element, name, gradients),
+      fallback,
+      units,
+      xAxis ? viewport.minX : viewport.minY,
+      xAxis ? viewport.width : viewport.height,
+    );
+  };
+  const gradientTransform = parseTransform(
+    inheritedGradientAttribute(element, 'gradientTransform', gradients) ?? '',
+  );
+  const coordinateMatrix =
+    units === 'objectBoundingBox'
+      ? matMul(
+          elementMatrix,
+          matMul(
+            [bboxWidth, 0, 0, bboxHeight, localBounds.minX, localBounds.minY],
+            gradientTransform,
+          ),
+        )
+      : matMul(elementMatrix, gradientTransform);
+  const start = matApply(coordinateMatrix, [coordinate('x1', '0%'), coordinate('y1', '0%')]);
+  const end = matApply(coordinateMatrix, [coordinate('x2', '100%'), coordinate('y2', '0%')]);
+  if (Math.hypot(end[0] - start[0], end[1] - start[1]) < 1e-9) {
+    findings.push({
+      code: 'unsupported-paint',
+      severity: 'error',
+      message: `SVG linearGradient '#${id}' has a zero-length vector`,
+      sourceObjectId,
+    });
+    return null;
+  }
+  return { kind: 'linear', id, start, end, stops };
+}
+
 function transformCurveSpec(spec: SvgCurveSpec, matrix: Matrix): SvgCurveSpec {
   return {
     closed: spec.closed,
@@ -271,6 +476,27 @@ function collectObjects(root: Element): { objects: RawObject[]; ignored: Record<
   const ignored: Record<string, number> = {};
   const counters = new Map<string, number>();
   let sourceIndex = 0;
+  const gradients = new Map<string, Element>();
+  for (const element of Array.from(root.getElementsByTagName('*'))) {
+    const tag = element.tagName.toLowerCase();
+    const id = element.getAttribute('id');
+    if (id && (tag === 'lineargradient' || tag === 'radialgradient')) gradients.set(id, element);
+  }
+  const viewBoxValues = (root.getAttribute('viewBox') ?? '').trim().split(/[ ,]+/).map(Number);
+  const viewport: SvgViewport =
+    viewBoxValues.length === 4 && viewBoxValues.every(Number.isFinite)
+      ? {
+          minX: viewBoxValues[0],
+          minY: viewBoxValues[1],
+          width: viewBoxValues[2],
+          height: viewBoxValues[3],
+        }
+      : {
+          minX: 0,
+          minY: 0,
+          width: numeric(root.getAttribute('width'), 1),
+          height: numeric(root.getAttribute('height'), 1),
+        };
 
   function walk(
     element: Element,
@@ -331,6 +557,7 @@ function collectObjects(root: Element): { objects: RawObject[]; ignored: Record<
         closed: [],
         paint: {
           fill: paint.fill,
+          fillGradient: null,
           stroke: paint.stroke,
           strokeWidth: null,
           fillRule: paint.fillRule,
@@ -356,13 +583,41 @@ function collectObjects(root: Element): { objects: RawObject[]; ignored: Record<
       ignored[tag] = (ignored[tag] ?? 0) + 1;
       return;
     }
-    const paths = polylines
-      .filter((path) => path.length >= 2)
-      .map((path) => path.map((point) => matApply(transformed, point)));
+    const localPaths = polylines.filter((path) => path.length >= 2);
+    const paths = localPaths.map((path) => path.map((point) => matApply(transformed, point)));
     if (!paths.length) return;
     const visible = paint.display && paint.visibility && paint.opacity > 0;
-    const fill = tag === 'line' || paint.fillOpacity === 0 ? null : paint.fill;
-    const stroke = paint.strokeOpacity === 0 ? null : paint.stroke;
+    const fillGradient =
+      tag === 'line' || paint.fillOpacity === 0
+        ? null
+        : resolveLinearGradient(
+            paint.fill,
+            localPaths,
+            transformed,
+            gradients,
+            viewport,
+            findings,
+            id,
+            'fill',
+          );
+    if (paint.strokeOpacity !== 0) {
+      resolveLinearGradient(
+        paint.stroke,
+        localPaths,
+        transformed,
+        gradients,
+        viewport,
+        findings,
+        id,
+        'stroke',
+      );
+    }
+    const fill =
+      tag === 'line' || paint.fillOpacity === 0
+        ? null
+        : (fillGradient?.stops[0]?.color ?? (/^url\(/i.test(paint.fill ?? '') ? null : paint.fill));
+    const stroke =
+      paint.strokeOpacity === 0 || /^url\(/i.test(paint.stroke ?? '') ? null : paint.stroke;
     if ((!visible || (fill === null && stroke === null)) && findings.length === 0) return;
     const curveSpecs =
       tag === 'path' && element.getAttribute('d')
@@ -381,6 +636,7 @@ function collectObjects(root: Element): { objects: RawObject[]; ignored: Record<
       closed: paths.map((path, index) => curveSpecs?.[index]?.closed ?? isClosedRing(path)),
       paint: {
         fill,
+        fillGradient,
         stroke,
         strokeWidth: stroke === null ? null : paint.strokeWidth,
         fillRule: paint.fillRule,
@@ -450,9 +706,25 @@ function scaleCurve(spec: SvgCurveSpec, scale: number, center: Point): SvgCurveS
   };
 }
 
-function physicalPaint(raw: RawObject, physicalScale: number): SourcePaint {
+function physicalPaint(
+  raw: RawObject,
+  physicalScale: number,
+  coordinateScale = 1,
+  center: Point = [0, 0],
+): SourcePaint {
+  const mapGradientPoint = ([x, y]: Point): Point => [
+    (x - center[0]) * coordinateScale,
+    -(y - center[1]) * coordinateScale,
+  ];
   return {
     fill: raw.paint.fill,
+    fillGradient: raw.paint.fillGradient
+      ? {
+          ...raw.paint.fillGradient,
+          start: mapGradientPoint(raw.paint.fillGradient.start),
+          end: mapGradientPoint(raw.paint.fillGradient.end),
+        }
+      : null,
     stroke: raw.paint.stroke,
     strokeWidthMM: raw.paint.strokeWidth === null ? null : raw.paint.strokeWidth * physicalScale,
     fillRule: raw.paint.fillRule,
@@ -548,7 +820,7 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
   for (const raw of rawObjects) {
     const geometryId = raw.unsupported ? null : `geometry-${raw.sourceIndex}`;
     const physicalScale = raw.sourceScale * finalScale;
-    const paint = physicalPaint(raw, physicalScale);
+    const paint = physicalPaint(raw, physicalScale, finalScale, center);
     sourceObjects.push({
       id: raw.id,
       name: raw.name,
@@ -599,7 +871,11 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
   }
 
   const threadMap = buildThreadMap(
-    sourceObjects.flatMap((object) => [object.paint.fill, object.paint.stroke]),
+    sourceObjects.flatMap((object) => [
+      object.paint.fill,
+      object.paint.stroke,
+      ...(object.paint.fillGradient?.stops.map((stop) => stop.color) ?? []),
+    ]),
     options.palette,
   );
   const operations: ImportOperation[] = [];
@@ -639,6 +915,7 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
       const areaMm2 = role === 'fill' ? netFillArea(rings, holeMap) : 0;
       const degenerate = role === 'fill' ? areaMm2 < 0.5 : totalPathLength(rings) < 0.5;
       const colorValue = role === 'fill' ? sourceObject.paint.fill : sourceObject.paint.stroke;
+      const sourceGradient = role === 'fill' ? sourceObject.paint.fillGradient : null;
       const operationId = `${sourceObject.id}-${role}`;
       const findings = sharedFindings.map((finding) => ({ ...finding, operationId }));
       if (degenerate) {
@@ -650,11 +927,12 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
           operationId,
         });
       }
-      if (role === 'stroke' && (sourceObject.paint.strokeWidthMM ?? 0) > 8) {
+      const strokeWidthMM = sourceObject.paint.strokeWidthMM;
+      if (role === 'stroke' && (strokeWidthMM ?? 0) > 8) {
         findings.push({
           code: 'unsafe-satin-width',
           severity: 'warning',
-          message: `source stroke is ${sourceObject.paint.strokeWidthMM!.toFixed(1)} mm wide; using a running outline`,
+          message: `source stroke is ${strokeWidthMM!.toFixed(1)} mm wide; using a running outline`,
           sourceObjectId: sourceObject.id,
           operationId,
           suggestedRecipe: 'outline',
@@ -662,13 +940,15 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
       }
       const strategy = degenerate
         ? { kind: 'skip' as const }
-        : autoSuggest(
-            geomType,
-            rings,
-            role === 'fill' ? colorValue : null,
-            role === 'stroke' ? colorValue : null,
-            role === 'stroke' ? sourceObject.paint.strokeWidthMM : null,
-          );
+        : sourceGradient
+          ? { kind: 'gradientFill' as const, params: { pitch: 0.5, stitchlen: 2.5 } }
+          : autoSuggest(
+              geomType,
+              rings,
+              role === 'fill' ? colorValue : null,
+              role === 'stroke' ? colorValue : null,
+              role === 'stroke' ? strokeWidthMM : null,
+            );
       operations.push({
         id: operationId,
         sourceObjectId: sourceObject.id,
@@ -682,8 +962,9 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
         bbox: bboxOf(rings),
         areaMm2,
         sourceFill: role === 'fill' ? colorValue : null,
+        sourceGradient,
         sourceStroke: role === 'stroke' ? colorValue : null,
-        sourceStrokeWidth: role === 'stroke' ? sourceObject.paint.strokeWidthMM : null,
+        sourceStrokeWidth: role === 'stroke' ? strokeWidthMM : null,
         fillRule: sourceObject.paint.fillRule,
         strategy,
         threadIndex:
@@ -706,7 +987,10 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
     };
 
     const closedIndices = geometry.closed.flatMap((closed, index) => (closed ? [index] : []));
-    if (sourceObject.paint.fill !== null && closedIndices.length)
+    if (
+      (sourceObject.paint.fill !== null || sourceObject.paint.fillGradient !== null) &&
+      closedIndices.length
+    )
       makeOperation('fill', closedIndices);
     if (sourceObject.paint.stroke !== null)
       makeOperation(

@@ -50,7 +50,11 @@ export function setElementStrategy(
 ): StagedDocument {
   return mapOperations(doc, (operation) =>
     ids.has(operation.id) &&
-    eligibleStrategies(operation.geomType, operation.role).includes(kind) &&
+    eligibleStrategies(
+      operation.geomType,
+      operation.role,
+      operation.sourceGradient !== null,
+    ).includes(kind) &&
     (operation.role !== 'relation' || operation.strategy.kind === kind)
       ? { ...operation, strategy: defaultStrategy(kind) }
       : operation,
@@ -131,7 +135,10 @@ export function remapSourceColor(
 ): StagedDocument {
   const next = mapOperations(doc, (operation) => {
     const source = operation.sourceFill ?? operation.sourceStroke;
-    return source === sourceHex ? { ...operation, threadIndex } : operation;
+    const usesGradientColor = operation.sourceGradient?.stops.some(
+      (stop) => stop.color === sourceHex,
+    );
+    return source === sourceHex || usesGradientColor ? { ...operation, threadIndex } : operation;
   });
   return { ...next, threadMap: { ...next.threadMap, [sourceHex]: threadIndex } };
 }
@@ -216,13 +223,15 @@ function syncOperationGeometry(doc: StagedDocument): StagedDocument {
     if (wasOutside && !isOutside && !operation.flags.degenerate) include = true;
     let strategy = operation.strategy;
     if (wasOutside && !isOutside && strategy.kind === 'skip' && !operation.flags.degenerate) {
-      strategy = autoSuggest(
-        operation.geomType,
-        rings,
-        operation.sourceFill,
-        operation.sourceStroke,
-        operation.sourceStrokeWidth,
-      );
+      strategy = operation.sourceGradient
+        ? defaultStrategy('gradientFill')
+        : autoSuggest(
+            operation.geomType,
+            rings,
+            operation.sourceFill,
+            operation.sourceStroke,
+            operation.sourceStrokeWidth,
+          );
     }
     return {
       ...operation,
@@ -279,12 +288,32 @@ export function setScale(doc: StagedDocument, newFactor: number): StagedDocument
             : sourceObject.paint.strokeWidthMM * ratio,
         dashArrayMM: sourceObject.paint.dashArrayMM?.map((value) => value * ratio) ?? null,
         dashOffsetMM: sourceObject.paint.dashOffsetMM * ratio,
+        fillGradient: sourceObject.paint.fillGradient
+          ? {
+              ...sourceObject.paint.fillGradient,
+              start: sourceObject.paint.fillGradient.start.map((value) => value * ratio) as [
+                number,
+                number,
+              ],
+              end: sourceObject.paint.fillGradient.end.map((value) => value * ratio) as [
+                number,
+                number,
+              ],
+            }
+          : null,
       },
     })),
     operations: doc.operations.map((operation) => ({
       ...operation,
       sourceStrokeWidth:
         operation.sourceStrokeWidth === null ? null : operation.sourceStrokeWidth * ratio,
+      sourceGradient: operation.sourceGradient
+        ? {
+            ...operation.sourceGradient,
+            start: operation.sourceGradient.start.map((value) => value * ratio) as [number, number],
+            end: operation.sourceGradient.end.map((value) => value * ratio) as [number, number],
+          }
+        : null,
     })),
   };
   return syncOperationGeometry(next);

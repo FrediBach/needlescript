@@ -38,6 +38,7 @@ import {
   setInclude,
   renameElement,
   remapElementThread,
+  remapSourceColor,
   canCreateMotifAlong,
   canCreateRailPair,
   createMotifAlong,
@@ -74,6 +75,10 @@ function ThreadDot({
   el: ElementModel;
   update: Props['update'];
 }) {
+  const gradientStops = el.sourceGradient?.stops ?? [];
+  const background = gradientStops.length
+    ? `linear-gradient(90deg, ${gradientStops.map((stop) => `${stop.color} ${stop.offset * 100}%`).join(', ')})`
+    : (doc.palette[el.threadIndex] ?? '#000');
   return (
     <Popover>
       <PopoverTrigger
@@ -82,27 +87,56 @@ function ThreadDot({
             type="button"
             aria-label="thread colour"
             className="h-4 w-4 rounded-full border border-foreground/20"
-            style={{ background: doc.palette[el.threadIndex] ?? '#000' }}
+            style={{ background }}
           />
         }
       />
       <PopoverContent className="w-auto p-2">
-        <div className="grid grid-cols-8 gap-1">
-          {doc.palette.map((hex, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-label={`thread ${i}`}
-              onClick={() => update((d) => remapElementThread(d, el.id, i))}
-              className={cn(
-                'h-5 w-5 rounded-full border',
-                i === el.threadIndex
-                  ? 'border-foreground ring-1 ring-foreground'
-                  : 'border-foreground/20',
-              )}
-              style={{ background: hex }}
-            />
-          ))}
+        <div className="flex flex-col gap-2">
+          {(gradientStops.length ? gradientStops : [{ offset: 0, color: null }]).map(
+            (stop, stopIndex) => (
+              <div key={`${stop.color}-${stopIndex}`} className="flex items-center gap-2">
+                {stop.color && (
+                  <span
+                    className="h-4 w-4 rounded-full border border-foreground/20"
+                    style={{ background: stop.color }}
+                  />
+                )}
+                <div className="grid grid-cols-8 gap-1">
+                  {doc.palette.map((hex, i) => {
+                    const selected = stop.color
+                      ? doc.threadMap[stop.color] === i
+                      : el.threadIndex === i;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        aria-label={
+                          stop.color
+                            ? `map gradient stop ${stopIndex} to thread ${i}`
+                            : `thread ${i}`
+                        }
+                        onClick={() =>
+                          update((d) =>
+                            stop.color
+                              ? remapSourceColor(d, stop.color, i)
+                              : remapElementThread(d, el.id, i),
+                          )
+                        }
+                        className={cn(
+                          'h-5 w-5 rounded-full border',
+                          selected
+                            ? 'border-foreground ring-1 ring-foreground'
+                            : 'border-foreground/20',
+                        )}
+                        style={{ background: hex }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ),
+          )}
         </div>
       </PopoverContent>
     </Popover>
@@ -110,7 +144,7 @@ function ThreadDot({
 }
 
 function StrategyCell({ el, update }: { el: ElementModel; update: Props['update'] }) {
-  const eligible = new Set(eligibleStrategies(el.geomType, el.role));
+  const eligible = new Set(eligibleStrategies(el.geomType, el.role, el.sourceGradient !== null));
   const order = el.role === 'relation' ? [el.strategy.kind] : STRATEGY_ORDER;
   return (
     <Select
@@ -189,7 +223,13 @@ function ElementRow({
       >
         <span
           className="h-3.5 w-3.5 shrink-0 rounded-[2px] border border-foreground/15"
-          style={{ background: doc.palette[el.threadIndex] ?? '#000' }}
+          style={{
+            background: el.sourceGradient
+              ? `linear-gradient(90deg, ${el.sourceGradient.stops
+                  .map((stop) => `${stop.color} ${stop.offset * 100}%`)
+                  .join(', ')})`
+              : (doc.palette[el.threadIndex] ?? '#000'),
+          }}
         />
         {editing ? (
           <Input
@@ -277,6 +317,21 @@ export default function ElementList({
   const applyToSelection = (kind: StrategyKind) =>
     update((d) => setElementStrategy(d, selectedIds, kind));
   const selectedInOrder = Array.from(selectedIds);
+  const operationById = new Map(doc.operations.map((operation) => [operation.id, operation]));
+  const applicableStrategies = new Set(STRATEGY_ORDER);
+  for (const id of selectedInOrder) {
+    const operation = operationById.get(id);
+    if (!operation) {
+      applicableStrategies.clear();
+      break;
+    }
+    const eligible = new Set(
+      eligibleStrategies(operation.geomType, operation.role, operation.sourceGradient !== null),
+    );
+    for (const kind of applicableStrategies) {
+      if (!eligible.has(kind)) applicableStrategies.delete(kind);
+    }
+  }
   const railPairReady = canCreateRailPair(doc, selectedInOrder);
   const motifAlongReady = canCreateMotifAlong(doc, selectedInOrder);
 
@@ -328,7 +383,11 @@ export default function ElementList({
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {STRATEGY_ORDER.map((k) => (
-                <DropdownMenuItem key={k} onClick={() => applyToSelection(k)}>
+                <DropdownMenuItem
+                  key={k}
+                  disabled={!applicableStrategies.has(k)}
+                  onClick={() => applyToSelection(k)}
+                >
                   {STRATEGIES[k].label}
                 </DropdownMenuItem>
               ))}

@@ -133,7 +133,7 @@ export default function StagingDialog({
         e.preventDefault();
         const el = doc.operations.find((x) => x.id === focusedId);
         if (el) update((d) => setInclude(d, focusedId, !el.include));
-      } else if (/^[1-6]$/.test(e.key) && selectedIds.size > 0) {
+      } else if (/^[1-7]$/.test(e.key) && selectedIds.size > 0) {
         const kind: StrategyKind = STRATEGY_ORDER[Number(e.key) - 1];
         update((d) => setElementStrategy(d, selectedIds, kind));
       }

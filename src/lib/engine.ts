@@ -142,6 +142,8 @@ export type {
   SourceGeometry,
   SourceObject,
   SourcePaint,
+  SvgGradientStop,
+  SvgLinearGradient,
   OperationFinding,
   StagedDocument,
   Strategy,

@@ -124,6 +124,7 @@ function addRelationship(
     bbox: bboxOf(rings),
     areaMm2: 0,
     sourceFill: null,
+    sourceGradient: null,
     sourceStroke: colorSource.sourceStroke ?? colorSource.sourceFill ?? '#000000',
     sourceStrokeWidth: null,
     fillRule: 'nonzero',

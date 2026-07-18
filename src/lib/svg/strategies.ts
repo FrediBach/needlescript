@@ -52,6 +52,12 @@ export interface EmitContext {
   /** Collision-free declarations used by relationship recipes. */
   helperName?: string;
   derivedName?: string;
+  gradientReporterName?: string;
+  gradientGroupsName?: string;
+  gradientColorsName?: string;
+  gradientRowsName?: string;
+  gradientRouteName?: string;
+  gradientColors?: (number | string)[];
 }
 
 export interface StrategyDef {
@@ -74,6 +80,11 @@ export function isClosedGeom(g: GeomType): boolean {
 function fmt(v: number): string {
   const r = Math.round(v * 100) / 100;
   return Object.is(r, -0) ? '0' : String(r);
+}
+
+function fmtPrecise(v: number): string {
+  const rounded = Math.round(v * 1_000_000) / 1_000_000;
+  return Object.is(rounded, -0) ? '0' : String(rounded);
 }
 
 const UNDERLAY_OPTS = [
@@ -113,6 +124,31 @@ function fillBody(ctx: EmitContext, indent = '  '): string[] {
     });
     lines.push('endfill');
   }
+  return lines;
+}
+
+function gradientWeights(el: ElementModel): string[] {
+  const gradient = el.sourceGradient;
+  if (!gradient) return [];
+  const oneHot = (index: number): string =>
+    `[${gradient.stops.map((_, stopIndex) => (stopIndex === index ? '1' : '0')).join(', ')}]`;
+  const lines: string[] = [];
+  const first = gradient.stops[0];
+  if (first.offset > 0) lines.push(`  if t < ${fmtPrecise(first.offset)} [ return ${oneHot(0)} ]`);
+  for (let index = 0; index < gradient.stops.length - 1; index++) {
+    const low = gradient.stops[index];
+    const high = gradient.stops[index + 1];
+    const span = high.offset - low.offset;
+    if (span <= 1e-9) continue;
+    const blend = `(t - ${fmtPrecise(low.offset)}) / ${fmtPrecise(span)}`;
+    const weights = gradient.stops.map((_, stopIndex) => {
+      if (stopIndex === index) return `1 - ${blend}`;
+      if (stopIndex === index + 1) return blend;
+      return '0';
+    });
+    lines.push(`  if t < ${fmtPrecise(high.offset)} [ return [${weights.join(', ')}] ]`);
+  }
+  lines.push(`  return ${oneHot(gradient.stops.length - 1)}`);
   return lines;
 }
 
@@ -279,6 +315,98 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
       lines.push(`fillspacing ${fmt(p.fillspacing)}`);
       lines.push(`filllen ${fmt(p.filllen)}`);
       lines.push(...fillBody(ctx));
+      return lines;
+    },
+  },
+
+  gradientFill: {
+    kind: 'gradientFill',
+    label: 'SVG gradient fill',
+    eligible: (g, role) => isClosedGeom(g) && role === 'fill',
+    controls: [
+      {
+        kind: 'slider',
+        key: 'pitch',
+        label: 'row pitch',
+        min: 0.25,
+        max: 5,
+        step: 0.05,
+        unit: 'mm',
+        tooltip: 'aggregate spacing across all gradient thread channels, 0.25–5 mm',
+      },
+      {
+        kind: 'slider',
+        key: 'stitchlen',
+        label: 'stitch length',
+        min: 1,
+        max: 7,
+        step: 0.1,
+        unit: 'mm',
+        tooltip: 'running-stitch length within each assigned gradient row, 1–7 mm',
+      },
+    ],
+    emit: (el, ctx) => {
+      const gradient = el.sourceGradient;
+      const reporter = ctx.gradientReporterName;
+      const groups = ctx.gradientGroupsName;
+      const colors = ctx.gradientColorsName;
+      const gradientRows = ctx.gradientRowsName;
+      const routeRows = ctx.gradientRouteName;
+      if (
+        !gradient ||
+        !reporter ||
+        !groups ||
+        !colors ||
+        !gradientRows ||
+        !routeRows ||
+        !ctx.gradientColors ||
+        gradient.stops.length < 2
+      )
+        return [];
+      const p = (el.strategy as Extract<Strategy, { kind: 'gradientFill' }>).params;
+      const dx = gradient.end[0] - gradient.start[0];
+      const dy = gradient.end[1] - gradient.start[1];
+      const length = Math.hypot(dx, dy);
+      if (length < 1e-9) return [];
+      const ux = dx / length;
+      const uy = dy / length;
+      const projections = el.rings.flatMap((ring) => ring.map(([x, y]) => x * ux + y * uy));
+      const axisLow = Math.min(...projections);
+      const axisHigh = Math.max(...projections);
+      const startProjection = gradient.start[0] * ux + gradient.start[1] * uy;
+      const angle = (Math.atan2(-ux, uy) * 180) / Math.PI;
+      const colorLiteral = ctx.gradientColors
+        .map((color) => (typeof color === 'number' ? String(color) : `'${color}'`))
+        .join(', ');
+      const lines = [
+        `def ${reporter}(v) [`,
+        `  let t = clamp((${fmtPrecise(axisLow)} + v * ${fmtPrecise(axisHigh - axisLow)} - ${fmtPrecise(startProjection)}) / ${fmtPrecise(length)}, 0, 1)`,
+        ...gradientWeights(el),
+        ']',
+        `let ${colors} = [${colorLiteral}]`,
+        `let ${groups} = filled(${gradient.stops.length}, [])`,
+      ];
+      ctx.fillGroups.forEach((group, groupIndex) => {
+        const names = group.flatMap((index) => ctx.ringNames[index] ?? []);
+        if (!names.length) return;
+        const region = names.length === 1 ? names[0] : `[${names.join(', ')}]`;
+        const part = `${groups}_part${groupIndex + 1}`;
+        lines.push(
+          `let ${part} = ${gradientRows}(${region}, ${fmt(angle)}, ${fmt(p.pitch)}, @${reporter})`,
+          `for channel = 0 to ${gradient.stops.length - 1} [`,
+          `  ${groups}[channel] = concat(${groups}[channel], ${part}[channel])`,
+          ']',
+        );
+      });
+      lines.push(
+        `for channel = 0 to ${gradient.stops.length - 1} [`,
+        `  color ${colors}[channel]`,
+        `  for row in ${routeRows}(${groups}[channel], mod(channel, 2)) [`,
+        '    up setpos(first(row)) down',
+        `    sewpath(resample(row, ${fmt(p.stitchlen)}))`,
+        '  ]',
+        ']',
+      );
       return lines;
     },
   },
@@ -483,12 +611,13 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
   },
 };
 
-/** Strategies eligible for a geometry type, in catalogue order (spec §15: keys 1–6). */
+/** Strategies eligible for a geometry type, in catalogue order (spec §15: keys 1–7). */
 export const STRATEGY_ORDER: StrategyKind[] = [
   'skip',
   'outline',
   'satinBorder',
   'tatamiFill',
+  'gradientFill',
   'directionalFill',
   'runningMotif',
 ];
@@ -496,9 +625,15 @@ export const STRATEGY_ORDER: StrategyKind[] = [
 /** Relationship recipes are created explicitly, never assigned by auto-suggest. */
 export const RELATIONSHIP_STRATEGY_ORDER: StrategyKind[] = ['railPair', 'motifAlong'];
 
-export function eligibleStrategies(g: GeomType, role?: OperationRole): StrategyKind[] {
+export function eligibleStrategies(
+  g: GeomType,
+  role?: OperationRole,
+  hasGradient = false,
+): StrategyKind[] {
   const order = role === 'relation' ? RELATIONSHIP_STRATEGY_ORDER : STRATEGY_ORDER;
-  return order.filter((k) => STRATEGIES[k].eligible(g, role));
+  return order.filter(
+    (kind) => (kind !== 'gradientFill' || hasGradient) && STRATEGIES[kind].eligible(g, role),
+  );
 }
 
 /**

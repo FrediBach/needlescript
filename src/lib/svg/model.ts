@@ -20,6 +20,7 @@ export type StrategyKind =
   | 'outline'
   | 'satinBorder'
   | 'tatamiFill'
+  | 'gradientFill'
   | 'directionalFill'
   | 'runningMotif'
   | 'railPair'
@@ -52,6 +53,10 @@ interface TatamiFillParams {
   filllen: number;
   fillunderlay: FillUnderlay;
 }
+interface GradientFillParams {
+  pitch: number;
+  stitchlen: number;
+}
 interface DirectionalFillParams {
   field: string | null;
   fillspacing: number;
@@ -79,6 +84,7 @@ export type Strategy =
   | { kind: 'outline'; params: OutlineParams }
   | { kind: 'satinBorder'; params: SatinBorderParams }
   | { kind: 'tatamiFill'; params: TatamiFillParams }
+  | { kind: 'gradientFill'; params: GradientFillParams }
   | { kind: 'directionalFill'; params: DirectionalFillParams }
   | { kind: 'runningMotif'; params: RunningMotifParams }
   | { kind: 'railPair'; params: RailPairParams }
@@ -135,8 +141,25 @@ export interface SourceGeometry {
   flags: GeometryFlags;
 }
 
+export interface SvgGradientStop {
+  /** Normalized position along the authored SVG gradient vector. */
+  offset: number;
+  color: string;
+}
+
+export interface SvgLinearGradient {
+  kind: 'linear';
+  id: string;
+  /** Hoop-space millimetres after SVG transforms and import fitting. */
+  start: Point;
+  /** Hoop-space millimetres after SVG transforms and import fitting. */
+  end: Point;
+  stops: SvgGradientStop[];
+}
+
 export interface SourcePaint {
   fill: string | null;
+  fillGradient: SvgLinearGradient | null;
   stroke: string | null;
   strokeWidthMM: number | null;
   fillRule: 'nonzero' | 'evenodd';
@@ -185,6 +208,7 @@ export interface ImportOperation {
   bbox: BBox;
   areaMm2: number;
   sourceFill: string | null;
+  sourceGradient: SvgLinearGradient | null;
   sourceStroke: string | null;
   sourceStrokeWidth: number | null;
   fillRule: 'nonzero' | 'evenodd';
@@ -246,6 +270,8 @@ export function defaultStrategy(kind: StrategyKind): Strategy {
         kind,
         params: { fillangle: 45, fillspacing: 0.4, filllen: 4, fillunderlay: 'auto' },
       };
+    case 'gradientFill':
+      return { kind, params: { pitch: 0.5, stitchlen: 2.5 } };
     case 'directionalFill':
       return { kind, params: { field: null, fillspacing: 0.4 } };
     case 'runningMotif':

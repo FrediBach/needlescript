@@ -27,6 +27,7 @@ import fillAndStrokeFixture from './fixtures/svg/fill-and-stroke.svg?raw';
 import compoundNonzeroFixture from './fixtures/svg/compound-nonzero.svg?raw';
 import nestedGroupsFixture from './fixtures/svg/nested-groups.svg?raw';
 import railPairFixture from './fixtures/svg/rail-pair.svg?raw';
+import linearGradientFixture from './fixtures/svg/linear-gradient.svg?raw';
 
 const PALETTE = ['#C8472F', '#31604F', '#3A4E8C', '#D9A441', '#8C4A6B', '#2B2B2B'];
 
@@ -693,6 +694,119 @@ describe('parseSvgToModel', () => {
     expect(doc.threadMap).not.toHaveProperty('#808080');
   });
 
+  it('parses an opaque 2–8 stop linear gradient in hoop space', () => {
+    const { doc } = parseSvgToModel(linearGradientFixture, {
+      palette: PALETTE,
+      fitMM: 70,
+      field: { shape: 'rectangle', widthMM: 94, heightMM: 94 },
+    });
+    expect(doc.operations).toHaveLength(1);
+    const operation = doc.operations[0];
+    expect(operation.strategy).toEqual({
+      kind: 'gradientFill',
+      params: { pitch: 0.5, stitchlen: 2.5 },
+    });
+    expect(operation.sourceGradient).toMatchObject({
+      kind: 'linear',
+      id: 'sunset',
+      stops: [
+        { offset: 0, color: '#c8472f' },
+        { offset: 0.5, color: '#d9a441' },
+        { offset: 1, color: '#3a4e8c' },
+      ],
+    });
+    expect(operation.sourceGradient!.start).toEqual([-35, 35]);
+    expect(operation.sourceGradient!.end).toEqual([35, 35]);
+    expect(operation.holeMap.map((ring) => ring.hole)).toEqual([false, true]);
+    expect(Object.keys(doc.threadMap)).toEqual(
+      expect.arrayContaining(['#c8472f', '#d9a441', '#3a4e8c']),
+    );
+  });
+
+  it('emits density-neutral SVG gradient rows and runs them through the real engine', () => {
+    const { doc: parsed } = parseSvgToModel(linearGradientFixture, {
+      palette: PALETTE,
+      fitMM: 50,
+    });
+    const doc: StagedDocument = {
+      ...parsed,
+      operations: parsed.operations.map((operation) => ({
+        ...operation,
+        strategy: { kind: 'gradientFill', params: { pitch: 0.75, stitchlen: 3.1 } },
+      })),
+    };
+    const code = emit(doc, { date: '2026-01-01' }).code;
+    expect(code).toContain('import std.stitchcraft.gradientrowsn as svg_gradientrowsn');
+    expect(code).toContain('import std.stitchcraft.serpentinerows as svg_serpentinerows');
+    expect(code).toContain('def gradient_badge_gradient_weights(v)');
+    expect(code).toContain('svg_gradientrowsn([gradient_badge_path1, gradient_badge_path2]');
+    expect(code).toContain(', 0.75, @gradient_badge_gradient_weights)');
+    expect(code).toContain('gradient_badge_gradient_groups[channel] = concat(');
+    expect(code).toContain('color gradient_badge_gradient_colors[channel]');
+    expect(code).toContain('sewpath(resample(row, 3.1))');
+    const result = run(code);
+    expect(result.events.filter((event) => event.t === 'stitch').length).toBeGreaterThan(0);
+    expect(result.events.filter((event) => event.t === 'color')).toHaveLength(2);
+  });
+
+  it('inherits stops, honors user-space vectors and transforms, and preserves append colors', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <defs>
+        <linearGradient id="base">
+          <stop offset="0" stop-color="#c8472f"/>
+          <stop offset="1" stop-color="#3a4e8c"/>
+        </linearGradient>
+        <linearGradient id="turned" href="#base" gradientUnits="userSpaceOnUse"
+          x1="0" y1="50" x2="100" y2="50" gradientTransform="rotate(90 50 50)"/>
+      </defs>
+      <rect x="10" y="10" width="80" height="80" fill="url(#turned)"/>
+    </svg>`;
+    const { doc } = parseSvgToModel(svg, { palette: PALETTE, fitMM: 40 });
+    const gradient = doc.operations[0].sourceGradient!;
+    expect(gradient.start[0]).toBeCloseTo(0, 6);
+    expect(gradient.start[1]).toBeCloseTo(25, 6);
+    expect(gradient.end[0]).toBeCloseTo(0, 6);
+    expect(gradient.end[1]).toBeCloseTo(-25, 6);
+
+    const appended = emitAppend(
+      doc,
+      `import std.stitchcraft.gradientrowsn as blendrows
+import std.stitchcraft.serpentinerows as routerows
+seed 9
+fd 1`,
+      { date: '2026-01-01' },
+    );
+    expect(appended.code.match(/^import std\.stitchcraft\.gradientrowsn as /gm)).toHaveLength(1);
+    expect(appended.code.match(/^import std\.stitchcraft\.serpentinerows as /gm)).toHaveLength(1);
+    expect(appended.fragmentCode).toContain("let rect_1_gradient_colors = ['#c8472f', '#3a4e8c']");
+    expect(appended.fragmentCode).toContain('blendrows(');
+    expect(appended.fragmentCode).toContain('routerows(');
+    expect(() => run(appended.code)).not.toThrow();
+  });
+
+  it('keeps radial, repeating, transparent, and oversized gradients as explicit findings', () => {
+    const cases = [
+      '<radialGradient id="g"><stop offset="0" stop-color="red"/><stop offset="1" stop-color="blue"/></radialGradient>',
+      '<linearGradient id="g" spreadMethod="repeat"><stop offset="0" stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient>',
+      '<linearGradient id="g"><stop offset="0" stop-color="red" stop-opacity="0.5"/><stop offset="1" stop-color="blue"/></linearGradient>',
+      `<linearGradient id="g">${Array.from({ length: 9 }, (_, index) => `<stop offset="${index / 8}" stop-color="#${index}${index}${index}"/>`).join('')}</linearGradient>`,
+    ];
+    for (const definition of cases) {
+      const { doc } = parseSvgToModel(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+          <defs>${definition}</defs><rect width="10" height="10" fill="url(#g)"/>
+        </svg>`,
+        { palette: PALETTE },
+      );
+      expect(doc.operations).toHaveLength(0);
+      expect(doc.sourceObjects[0].findings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'unsupported-paint', severity: 'error' }),
+        ]),
+      );
+    }
+  });
+
   it('parse → emit → run round-trips to real stitches', () => {
     const { doc } = parseSvgToModel(SVG, { palette: PALETTE, name: 'logo.svg', fitMM: 80 });
     const { code } = emit(doc);
@@ -764,6 +878,7 @@ function mkElement(partial: Partial<ElementModel> & { rings: [number, number][][
     bbox: { minX: -10, minY: -10, maxX: 10, maxY: 10 },
     areaMm2: netFillArea(rings, holeMap),
     sourceFill: '#ff0000',
+    sourceGradient: null,
     sourceStroke: null,
     sourceStrokeWidth: null,
     fillRule: 'nonzero',
@@ -805,6 +920,7 @@ function mkDoc(operations: ElementModel[]): StagedDocument {
       sourceIndex: operation.sourceOrder,
       paint: {
         fill: operation.sourceFill,
+        fillGradient: operation.sourceGradient,
         stroke: operation.sourceStroke,
         strokeWidthMM: operation.sourceStrokeWidth,
         fillRule: operation.fillRule,

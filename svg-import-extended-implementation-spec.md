@@ -53,7 +53,8 @@ understand design intent that the SVG does not express. In particular:
 
 - a filled thin shape is not automatically a well-formed satin column;
 - two nearby paths are not automatically satin rails;
-- a gradient is not automatically tonal embroidery;
+- only a supported opaque linear gradient maps to the explicit density-neutral row recipe; other
+  gradient types are not automatically tonal embroidery;
 - text is not automatically outlined through a platform font;
 - masks and filters are not automatically flattened into stitch regions.
 
@@ -76,7 +77,7 @@ The extended importer will not provide:
 
 - individual stitch or penetration editing;
 - automatic satin-column skeletonization, branching, or centerline extraction;
-- automatic conversion of photos, gradients, filters, or opacity into tonal stitch fields;
+- automatic conversion of photos, radial gradients, filters, or opacity into tonal stitch fields;
 - automatic font loading or text outlining;
 - automatic node cleanup presented as an opaque “optimize design” operation;
 - a persisted proprietary embroidery-object format;
@@ -423,6 +424,7 @@ Important rules:
 ```ts
 interface SourcePaint {
   fill: string | null;
+  fillGradient: SvgLinearGradient | null;
   stroke: string | null;
   strokeWidthMM: number | null;
   fillRule: 'nonzero' | 'evenodd';
@@ -489,6 +491,7 @@ type Recipe =
   | { kind: 'running'; params: RunningParams }
   | { kind: 'satinAlong'; params: SatinAlongParams }
   | { kind: 'tatami'; params: TatamiParams }
+  | { kind: 'gradient'; params: GradientParams }
   | { kind: 'directional'; params: DirectionalParams }
   | { kind: 'contour'; params: ContourParams }
   | { kind: 'spiral'; params: SpiralParams }
@@ -567,13 +570,16 @@ Required:
 - stroke line cap, line join, dash array, and dash offset metadata;
 - source object IDs/classes for naming;
 - same SVG paint defaults as the specification: black fill, no stroke.
+- opaque `<linearGradient>` fills with 2–8 stops, local `href` inheritance,
+  `objectBoundingBox`/`userSpaceOnUse`, `gradientTransform`, and the default `pad` spread method.
 
 Deferred with explicit findings:
 
 - stylesheet selector evaluation beyond simple inline/presentation inheritance;
 - `<use>` and `<symbol>` expansion;
 - clip paths and masks;
-- gradients and patterns beyond an explicit representative-color fallback chosen by the user;
+- radial gradients, gradient strokes, repeating/reflecting gradients, transparent gradient stops,
+  and patterns beyond an explicit representative-color fallback chosen by the user;
 - markers;
 - text and tspans;
 - embedded images;
@@ -604,7 +610,8 @@ pure and covered by topology tests.
 
 Use conservative defaults:
 
-- closed visible fill -> Tatami fill;
+- closed visible solid fill -> Tatami fill;
+- closed visible supported linear gradient -> SVG gradient fill;
 - open stroke with unknown or very narrow physical width -> Running line;
 - stroke with known width in a safe satin range -> Satin along path;
 - stroke wider than the safe satin range -> Running line plus a warning/suggestion, not unsafe satin;
@@ -760,6 +767,23 @@ hitomezashi exposes cell size and row/column bit lists.
 
 Returned paths remain generated at runtime from the editable region. Do not emit their clipped point
 fragments as literals.
+
+### 9.6.1 SVG linear gradient fill
+
+Preserve an authored opaque `<linearGradient>` as a density-neutral 2–8 thread recipe. Store its
+resolved hoop-space start/end vector and ordered stop colors on the source paint and fill operation.
+The default strategy emits `std.stitchcraft.gradientrowsn` plus `serpentinerows`; adjacent SVG stops
+become piecewise-linear channel weights, while every candidate row belongs to exactly one channel.
+
+The aggregate row pitch and within-row stitch length are independent staged controls. SVG stop
+offsets and the resolved vector remain authored geometry, including local `href` inheritance,
+`objectBoundingBox`/`userSpaceOnUse`, element transforms, and `gradientTransform`. Replace mode maps
+each stop through the document thread map. Append mode emits stop color literals and reuses compatible
+existing imports.
+
+Do not lower radial gradients, gradient strokes, transparent stops, or `repeat`/`reflect` spread to
+linear rows. Retain them as explicit `unsupported-paint` findings until matching density-neutral
+construction recipes exist.
 
 ### 9.7 Rail-pair satin
 
@@ -1055,7 +1079,8 @@ Deliverable: the importer materially uses recent NeedleScript features without d
 
 1. Add explicit rail-pair operations and `satinbetween` emission.
 2. Add motif-along-path.
-3. Add explicit appliqué, stipple, thread-blend, and gradient-band recipes based on validated demand.
+3. Add explicit appliqué, stipple, thread-blend, and radial-gradient recipes based on validated
+   demand. Linear SVG gradients already use the density-neutral gradient-row recipe.
 4. Add optional shared procedure extraction for source groups.
 
 Deliverable: advanced generative constructions based on authored relationships.
@@ -1159,6 +1184,7 @@ Add small hand-authored fixtures under a dedicated test fixture directory. Inclu
 - `dashed-strokes.svg`;
 - `mixed-subpaths.svg`;
 - `unsupported-paints.svg`;
+- `linear-gradient.svg`;
 - `rail-pair.svg` for the deferred milestone.
 
 Prefer small readable fixtures over exported application SVGs containing unrelated metadata.

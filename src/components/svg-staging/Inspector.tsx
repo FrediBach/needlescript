@@ -202,14 +202,16 @@ function StrategySelect({
   geomType,
   role,
   value,
+  hasGradient,
   onChange,
 }: {
   geomType: ElementModel['geomType'];
   role: ElementModel['role'];
   value: StrategyKind;
+  hasGradient: boolean;
   onChange: (k: StrategyKind) => void;
 }) {
-  const eligible = new Set(eligibleStrategies(geomType, role));
+  const eligible = new Set(eligibleStrategies(geomType, role, hasGradient));
   const order = role === 'relation' ? [value] : STRATEGY_ORDER;
   return (
     <Select value={value} onValueChange={(v: string | null) => v && onChange(v as StrategyKind)}>
@@ -259,6 +261,7 @@ export default function Inspector({ doc, selectedIds, reporters, update }: Props
             geomType={selected[0].geomType}
             role={selected[0].role}
             value={selected[0].strategy.kind}
+            hasGradient={selected.every((operation) => operation.sourceGradient !== null)}
             onChange={(k) => update((d) => setElementStrategy(d, selectedIds, k))}
           />
         </div>
@@ -277,6 +280,7 @@ export default function Inspector({ doc, selectedIds, reporters, update }: Props
           geomType={selected[0].geomType}
           role={selected[0].role}
           value={kind}
+          hasGradient={selected.every((operation) => operation.sourceGradient !== null)}
           onChange={(k) => update((d) => setElementStrategy(d, selectedIds, k))}
         />
         <div className="flex flex-col gap-3">
@@ -311,6 +315,7 @@ export default function Inspector({ doc, selectedIds, reporters, update }: Props
             geomType={el.geomType}
             role={el.role}
             value={el.strategy.kind}
+            hasGradient={el.sourceGradient !== null}
             onChange={(k) => update((d) => setElementStrategy(d, new Set([el.id]), k))}
           />
           {def.controls.map((c) => (

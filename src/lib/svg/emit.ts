@@ -141,6 +141,7 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
   const usedNames = new Set(Array.from(opts.reservedNames ?? [], (name) => name.toLowerCase()));
   const imports: string[] = [];
   const needsMotifLayout = operations.some((operation) => operation.strategy.kind === 'motifAlong');
+  const needsGradient = operations.some((operation) => operation.strategy.kind === 'gradientFill');
   const existingLayout = Array.from(opts.availableImports ?? []).find(
     (requirement) => requirement.specifier === 'std.layout.alongpath',
   );
@@ -149,6 +150,24 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
     : undefined;
   if (layoutName && !existingLayout) {
     imports.push(`import std.layout.alongpath as ${layoutName}`);
+  }
+  const existingGradientRows = Array.from(opts.availableImports ?? []).find(
+    (requirement) => requirement.specifier === 'std.stitchcraft.gradientrowsn',
+  );
+  const gradientRowsName = needsGradient
+    ? (existingGradientRows?.alias ?? sanitizeBase('svg_gradientrowsn', usedNames))
+    : undefined;
+  if (gradientRowsName && !existingGradientRows) {
+    imports.push(`import std.stitchcraft.gradientrowsn as ${gradientRowsName}`);
+  }
+  const existingGradientRoute = Array.from(opts.availableImports ?? []).find(
+    (requirement) => requirement.specifier === 'std.stitchcraft.serpentinerows',
+  );
+  const gradientRouteName = needsGradient
+    ? (existingGradientRoute?.alias ?? sanitizeBase('svg_serpentinerows', usedNames))
+    : undefined;
+  if (gradientRouteName && !existingGradientRoute) {
+    imports.push(`import std.stitchcraft.serpentinerows as ${gradientRouteName}`);
   }
 
   const body: string[] = ['', '// --- geometry ---'];
@@ -199,16 +218,37 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
         strategyKind === 'motifAlong'
           ? sanitizeBase(`${base}_centered_motif`, usedNames)
           : undefined,
+      gradientReporterName:
+        strategyKind === 'gradientFill'
+          ? sanitizeBase(`${base}_gradient_weights`, usedNames)
+          : undefined,
+      gradientGroupsName:
+        strategyKind === 'gradientFill'
+          ? sanitizeBase(`${base}_gradient_groups`, usedNames)
+          : undefined,
+      gradientColorsName:
+        strategyKind === 'gradientFill'
+          ? sanitizeBase(`${base}_gradient_colors`, usedNames)
+          : undefined,
+      gradientRowsName,
+      gradientRouteName,
+      gradientColors: operation.sourceGradient?.stops.map((stop) =>
+        mode === 'append' ? stop.color : (doc.threadMap[stop.color] ?? operation.threadIndex),
+      ),
     };
     const operationBody = STRATEGIES[strategyKind].emit(operation, context);
     if (operationBody.length === 0) continue;
 
-    const color =
-      mode === 'append' ? (operationColor(operation) ?? '#000000') : operation.threadIndex;
     body.push('');
-    if (color !== currentColor) {
-      body.push(typeof color === 'number' ? `color ${color}` : `color '${color}'`);
-      currentColor = color;
+    if (strategyKind !== 'gradientFill') {
+      const color =
+        mode === 'append' ? (operationColor(operation) ?? '#000000') : operation.threadIndex;
+      if (color !== currentColor) {
+        body.push(typeof color === 'number' ? `color ${color}` : `color '${color}'`);
+        currentColor = color;
+      }
+    } else {
+      currentColor = null;
     }
     const start = body.length + 1;
     body.push(...operationBody, 'trim');

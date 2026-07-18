@@ -52,7 +52,15 @@ export function svgToCode(svgText: string, options: QuickImportOptions = {}) {
     report: {
       fills: included.filter((operation) => operation.role === 'fill').length,
       outlines: included.filter((operation) => operation.role === 'stroke').length,
-      colors: new Set(included.map((operation) => operation.threadIndex)).size,
+      colors: new Set(
+        included.flatMap((operation) =>
+          operation.sourceGradient
+            ? operation.sourceGradient.stops.map(
+                (stop) => doc.threadMap[stop.color] ?? operation.threadIndex,
+              )
+            : [operation.threadIndex],
+        ),
+      ).size,
       segments: doc.geometries.reduce(
         (sum, geometry) =>
           sum + geometry.paths.reduce((pathSum, path) => pathSum + Math.max(0, path.length - 1), 0),
