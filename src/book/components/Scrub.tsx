@@ -222,7 +222,7 @@ export default function Scrub({ children, canvasHeight = 280 }: Props) {
             borderRadius: 3,
             padding: '2px 8px',
             fontFamily: 'var(--bk-font-mono)',
-            fontSize: '0.72rem',
+            fontSize: '0.75rem',
             color: 'var(--bk-text-muted)',
             cursor: 'pointer',
           }}

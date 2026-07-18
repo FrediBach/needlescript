@@ -138,7 +138,7 @@ export function initListFunc(ctx: RunContext): void {
             );
         });
         return ctx.allocList(
-          [...(xs.items as number[])].sort((a, b) => a - b),
+          (xs.items as number[]).toSorted((a, b) => a - b),
           line,
         );
       }

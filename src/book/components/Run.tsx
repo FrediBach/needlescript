@@ -68,7 +68,7 @@ function StatsRow({ stats, error }: { stats: DesignStats | null; error: string |
       style={{
         padding: '0.3rem 0.75rem',
         fontFamily: 'var(--bk-font-mono)',
-        fontSize: '0.73rem',
+        fontSize: '0.75rem',
         color: 'var(--bk-text-muted)',
         background: 'var(--bk-cell-bg)',
         borderTop: '1px solid var(--bk-cell-border)',
@@ -202,7 +202,7 @@ export default function Run({ children, canvasHeight = 280, autoRun = true }: Pr
             borderRadius: 3,
             padding: '2px 8px',
             fontFamily: 'var(--bk-font-mono)',
-            fontSize: '0.72rem',
+            fontSize: '0.75rem',
             color: 'var(--bk-text-muted)',
             cursor: 'pointer',
           }}
