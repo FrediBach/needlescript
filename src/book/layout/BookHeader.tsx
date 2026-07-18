@@ -26,6 +26,7 @@ export default function BookHeader({ theme, setTheme, onMenuToggle, menuOpen }: 
     >
       {/* Sidebar toggle (mobile) */}
       <button
+        type="button"
         onClick={onMenuToggle}
         aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}
         style={{
@@ -104,6 +105,7 @@ export default function BookHeader({ theme, setTheme, onMenuToggle, menuOpen }: 
 
       {/* Dark mode toggle */}
       <button
+        type="button"
         onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
         aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
         title={theme === 'light' ? 'Dark mode' : 'Light mode'}

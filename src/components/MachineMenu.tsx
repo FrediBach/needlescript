@@ -25,6 +25,8 @@ import {
 } from '@/components/ui/dropdown-menu.tsx';
 import { cn } from '@/lib/utils.ts';
 
+const MACHINE_CLASSES = ['home', 'multi-needle', 'commercial'] as const;
+
 export interface ActiveMachine {
   id: string;
   hoopId: string;
@@ -56,10 +58,9 @@ function MachineItems({
   onBudgetModeChange,
   onRemove,
 }: Actions) {
-  const classes = ['home', 'multi-needle', 'commercial'] as const;
   return (
     <>
-      {classes.map((cls) => {
+      {MACHINE_CLASSES.map((cls) => {
         const machines = MACHINES.filter((machine) => machine.cls === cls);
         if (!machines.length) return null;
         return (

@@ -87,6 +87,7 @@ export default function RunLocked({ children, canvasHeight = 280 }: Props) {
         </span>
 
         <button
+          type="button"
           onClick={() => setForked(true)}
           title="Fork into an editable cell"
           style={{

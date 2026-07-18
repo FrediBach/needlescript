@@ -87,6 +87,7 @@ export default function Quiz({ question, options, answer, explanation }: Props) 
             return (
               <button
                 key={i}
+                type="button"
                 onClick={() => !answered && setSelected(i)}
                 disabled={answered}
                 style={{

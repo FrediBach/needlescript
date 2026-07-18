@@ -214,6 +214,7 @@ export default function Scrub({ children, canvasHeight = 280 }: Props) {
         </span>
 
         <button
+          type="button"
           onClick={reset}
           style={{
             background: 'none',
@@ -230,6 +231,7 @@ export default function Scrub({ children, canvasHeight = 280 }: Props) {
         </button>
 
         <button
+          type="button"
           onClick={run}
           disabled={isRunning}
           style={{
@@ -297,6 +299,7 @@ export default function Scrub({ children, canvasHeight = 280 }: Props) {
           }}
         >
           <button
+            type="button"
             onClick={() => {
               setPlaying((p) => !p);
             }}

@@ -36,6 +36,14 @@ interface Props {
 
 type Section = 'region' | 'resolution' | 'colors' | 'tone' | 'insert';
 
+const IMPORT_TABS: Array<[Section, string]> = [
+  ['region', '1 Region'],
+  ['resolution', '2 Resolution'],
+  ['colors', '3 Colors'],
+  ['tone', '4 Tone'],
+  ['insert', '5 Insert'],
+];
+
 function initialSettings(image: BitmapImportSource): BitmapSettings {
   const aspect = image.width / image.height;
   const width = aspect >= 1 ? image.height : image.width;
@@ -338,14 +346,6 @@ export default function BitmapImportDialog({ source, programSource, onClose, onI
       `Inserted bitmap '${source.filename}' — ${settings.columns}×${settings.rows}, ${processed.plates.length} plate${processed.plates.length === 1 ? '' : 's'}, ~${processed.estimatedStitches.toLocaleString()} st (est.)`,
     );
   };
-  const tabs: Array<[Section, string]> = [
-    ['region', '1 Region'],
-    ['resolution', '2 Resolution'],
-    ['colors', '3 Colors'],
-    ['tone', '4 Tone'],
-    ['insert', '5 Insert'],
-  ];
-
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -364,7 +364,7 @@ export default function BitmapImportDialog({ source, programSource, onClose, onI
 
         <div className="border-b border-foreground/10 px-4 pt-3">
           <div className="flex flex-wrap gap-1" role="tablist" aria-label="Bitmap import sections">
-            {tabs.map(([id, label]) => (
+            {IMPORT_TABS.map(([id, label]) => (
               <button
                 key={id}
                 type="button"

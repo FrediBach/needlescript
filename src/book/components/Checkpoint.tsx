@@ -73,6 +73,7 @@ export default function Checkpoint({ chapterId, children, onComplete }: Props) {
         {/* Mark complete button */}
         {!done && (
           <button
+            type="button"
             onClick={handleComplete}
             style={{
               background: 'var(--bk-text)',

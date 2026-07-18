@@ -69,7 +69,7 @@ function CanvasSwitch({
   title?: string;
 }) {
   return (
-    <label className="flex items-center gap-[5px] cursor-pointer select-none" title={title}>
+    <div className="flex items-center gap-[5px] cursor-pointer select-none" title={title}>
       <span
         className={cn(
           'font-mono text-[10px] tracking-[0.12em] uppercase transition-colors',
@@ -101,7 +101,7 @@ function CanvasSwitch({
           )}
         />
       </button>
-    </label>
+    </div>
   );
 }
 

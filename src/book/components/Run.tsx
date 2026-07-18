@@ -193,6 +193,7 @@ export default function Run({ children, canvasHeight = 280, autoRun = true }: Pr
         </span>
 
         <button
+          type="button"
           onClick={reset}
           title="Reset to original code"
           style={{
@@ -210,6 +211,7 @@ export default function Run({ children, canvasHeight = 280, autoRun = true }: Pr
         </button>
 
         <button
+          type="button"
           onClick={run}
           disabled={isRunning}
           title="Run (Cmd/Ctrl+Enter)"

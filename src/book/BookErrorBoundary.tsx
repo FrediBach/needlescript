@@ -58,6 +58,7 @@ export class BookErrorBoundary extends Component<Props, State> {
             {this.state.error.message}
           </pre>
           <button
+            type="button"
             onClick={() => this.setState({ error: null })}
             style={{
               marginTop: '1.5rem',
