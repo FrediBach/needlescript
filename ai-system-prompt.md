@@ -510,6 +510,12 @@ let anchor = [0, 18] // [xy] — draggable point handle; constraints: [xy: -40:0
 
 Add 3–6 well-ranged sliders to generated designs when it makes sense — they make the piece explorable.
 
+Path/curve stage editing: double-click a segment inserts a vertex/anchor (curve insertion preserves
+the shape), Alt-click deletes down to the annotation's `min`, and dragging a segment translates the
+whole constrained shape. Double-click a curve anchor toggles smooth/corner; smooth tangent pairs stay
+collinear unless Alt-drag breaks the pair. SVG import-with-options can preserve paths as editable
+curve specs; flattened import remains the default.
+
 ## Safety limits
 
 // Physics/format — fixed, never changeable:

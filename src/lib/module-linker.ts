@@ -58,7 +58,7 @@ function readImport(tokens: Token[], index: number): ImportDirective {
   const promotedPathop =
     specifier.startsWith('std.pathops.') &&
     specifier.slice(specifier.lastIndexOf('.') + 1) === alias &&
-    ['pointat', 'headingat', 'paramof', 'subpath'].includes(alias);
+    ['pointat', 'headingat', 'paramof', 'subpath', 'dashes'].includes(alias);
   if (RESERVED.has(alias) || (LIBRARY_FUNCS.has(alias) && !promotedPathop))
     throw new NeedlescriptError(
       `"${alias}" is a built-in word and can't be an import alias`,
@@ -338,6 +338,15 @@ export function linkStandardModules(rootTokens: Token[], notes?: string[]): ASTN
         `Module "${imported.moduleId}" does not export "${imported.exportName}"`,
         imported.line,
       );
+    // `dashes` gained a ranged-arity builtin while the source-module wrapper remains
+    // fixed at three arguments for old module bytecode. An exact compatibility import
+    // resolves directly to the builtin so both the legacy and phased forms parse.
+    if (
+      imported.moduleId === 'std.pathops' &&
+      imported.exportName === 'dashes' &&
+      imported.alias === 'dashes'
+    )
+      continue;
     rootNames.set(imported.alias, target.qualifiedName);
     known[imported.alias] = target;
     publicNames.set(target.qualifiedName, imported.alias);

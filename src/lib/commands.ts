@@ -299,6 +299,7 @@ export const GEN_FUNCS: Record<string, { min: number; max: number }> = {
   subpath: { min: 3, max: 3 },
   splitat: { min: 2, max: 2 },
   insertvertex: { min: 2, max: 2 },
+  dashes: { min: 3, max: 4 },
   pathisectparams: { min: 2, max: 2 },
   pathselfisects: { min: 1, max: 1 },
   joinpaths: { min: 2, max: 2 },

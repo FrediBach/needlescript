@@ -87,4 +87,16 @@ describe('path expansion builtins', () => {
       '0',
     ]);
   });
+
+  it('supports an optional dash phase without changing the default', () => {
+    expect(output('print dashes([[0,0],[12,0]], 3, 2)')).toEqual([
+      '[[[0, 0], [3, 0]], [[5, 0], [8, 0]], [[10, 0], [12, 0]]]',
+    ]);
+    expect(output('print dashes([[0,0],[12,0]], 3, 2, 4)')).toEqual([
+      '[[[1, 0], [4, 0]], [[6, 0], [9, 0]], [[11, 0], [12, 0]]]',
+    ]);
+    expect(
+      output('import std.pathops.dashes as dashes\nprint dashes([[0,0],[12,0]], 3, 2, 4)'),
+    ).toEqual(['[[[1, 0], [4, 0]], [[6, 0], [9, 0]], [[11, 0], [12, 0]]]']);
+  });
 });

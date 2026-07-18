@@ -563,8 +563,49 @@ function drawHandles(
     if (anchors.length > 1) {
       ctx.beginPath();
       ctx.moveTo(X(anchors[0].valueX), Y(anchors[0].valueY));
-      for (const anchor of anchors.slice(1)) ctx.lineTo(X(anchor.valueX), Y(anchor.valueY));
-      if (anchors[0].pathHandle?.closed) ctx.closePath();
+      for (let i = 0; i < anchors.length - 1; i++) {
+        const anchor = anchors[i];
+        const next = anchors[i + 1];
+        const out = group.find(
+          (param) => param.pathHandle?.anchor === i && param.pathHandle.role === 'hout',
+        );
+        const incoming = group.find(
+          (param) => param.pathHandle?.anchor === i + 1 && param.pathHandle.role === 'hin',
+        );
+        if (out || incoming) {
+          ctx.bezierCurveTo(
+            X(out?.valueX ?? anchor.valueX),
+            Y(out?.valueY ?? anchor.valueY),
+            X(incoming?.valueX ?? next.valueX),
+            Y(incoming?.valueY ?? next.valueY),
+            X(next.valueX),
+            Y(next.valueY),
+          );
+        } else {
+          ctx.lineTo(X(next.valueX), Y(next.valueY));
+        }
+      }
+      if (anchors[0].pathHandle?.closed) {
+        const lastIndex = anchors.length - 1;
+        const last = anchors[lastIndex];
+        const first = anchors[0];
+        const out = group.find(
+          (param) => param.pathHandle?.anchor === lastIndex && param.pathHandle.role === 'hout',
+        );
+        const incoming = group.find(
+          (param) => param.pathHandle?.anchor === 0 && param.pathHandle.role === 'hin',
+        );
+        if (out || incoming) {
+          ctx.bezierCurveTo(
+            X(out?.valueX ?? last.valueX),
+            Y(out?.valueY ?? last.valueY),
+            X(incoming?.valueX ?? first.valueX),
+            Y(incoming?.valueY ?? first.valueY),
+            X(first.valueX),
+            Y(first.valueY),
+          );
+        } else ctx.closePath();
+      }
       ctx.stroke();
     }
     for (const handle of group.filter((param) => param.pathHandle?.role !== 'pos')) {

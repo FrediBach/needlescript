@@ -8,6 +8,7 @@
 // ============================================================
 
 import type { Pt } from '../genmath.ts';
+import type { SvgCurveSpec } from './svg-path.ts';
 
 export type Point = Pt; // [number, number], hoop-space mm
 
@@ -97,6 +98,8 @@ export interface ElementModel {
   geomType: GeomType;
   /** subpaths in hoop-space mm, transform-resolved. */
   rings: Point[][];
+  /** Original cubic geometry for SVG path subpaths, when it can be round-tripped. */
+  curveSpecs?: SvgCurveSpec[];
   bbox: BBox;
   areaMm2: number;
   sourceFill: string | null;
@@ -130,6 +133,8 @@ export interface StagedDocument {
   keepGroups: boolean;
   /** mm spacing every curve is resampled to before sewing. */
   resampleMM: number;
+  /** Emit SVG path curves as annotated editable specs instead of flattened literals. */
+  editableCurves?: boolean;
   /**
    * Uniform scale applied on top of the parser's initial fit-to-hoop scale.
    * 1.0 = no change; 2.0 = twice as large. Applied in-place to all ring

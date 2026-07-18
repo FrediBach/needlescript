@@ -2,7 +2,7 @@ import type { DesignState, LineSegment, LineStitchBounds } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import type { MachinePreset } from '../data.ts';
 import type { WarningLocation } from '../lib/engine.ts';
-import type { PointParamDef } from '../lib/parse-parameters.ts';
+import type { PathParamDef, PointParamDef } from '../lib/parse-parameters.ts';
 import StageCanvas from './StageCanvas.tsx';
 import PlaybackBar from './PlaybackBar.tsx';
 import StatsChips from './StatsChips.tsx';
@@ -29,12 +29,29 @@ interface Props {
   pinnedDataVars?: Set<string>;
   // ── XY handle props ───────────────────────────────────────────────────────
   pointParams?: PointParamDef[];
+  pathParams?: PathParamDef[];
   showHandles?: boolean;
   onToggleHandles?: () => void;
   highlightedHandle?: string | null;
   lockedHandles?: Set<string>;
-  onHandleDrag?: (name: string, line: number, x: number, y: number) => void;
-  onHandleCommit?: (name: string, line: number, x: number, y: number) => void;
+  onHandleDrag?: (
+    name: string,
+    line: number,
+    x: number,
+    y: number,
+    options?: { breakPair: boolean },
+  ) => void;
+  onHandleCommit?: (
+    name: string,
+    line: number,
+    x: number,
+    y: number,
+    options?: { breakPair: boolean },
+  ) => void;
+  onPathInsert?: (name: string, segment: number, t: number) => void;
+  onPathDelete?: (name: string, anchor: number) => void;
+  onCurveToggleSmooth?: (name: string, anchor: number) => void;
+  onPathTranslate?: (name: string, dx: number, dy: number, commit: boolean) => void;
   onMachineContextMenu?: (x: number, y: number) => void;
   machine?: MachinePreset | null;
 }
@@ -105,12 +122,17 @@ export default function StagePane({
   hoveredDataVar,
   pinnedDataVars,
   pointParams,
+  pathParams,
   showHandles = true,
   onToggleHandles,
   highlightedHandle,
   lockedHandles,
   onHandleDrag,
   onHandleCommit,
+  onPathInsert,
+  onPathDelete,
+  onCurveToggleSmooth,
+  onPathTranslate,
   onMachineContextMenu,
   machine,
 }: Props) {
@@ -142,11 +164,16 @@ export default function StagePane({
           warningLoc={warningLoc}
           hoveredLineBounds={hoveredLineBounds}
           pointParams={pointParams}
+          pathParams={pathParams}
           showHandles={showHandles}
           highlightedHandle={highlightedHandle}
           lockedHandles={lockedHandles}
           onHandleDrag={onHandleDrag}
           onHandleCommit={onHandleCommit}
+          onPathInsert={onPathInsert}
+          onPathDelete={onPathDelete}
+          onCurveToggleSmooth={onCurveToggleSmooth}
+          onPathTranslate={onPathTranslate}
           onMachineContextMenu={onMachineContextMenu}
         />
         <StatsChips design={design} machine={machine} />

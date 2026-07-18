@@ -12,6 +12,7 @@
 
 import {
   shapeToPolylines,
+  pathToCurveSpecs,
   matMul,
   matApply,
   parseTransform,
@@ -19,6 +20,7 @@ import {
   simplifyRDP,
   type Point,
   type Matrix,
+  type SvgCurveSpec,
 } from './svg-path.ts';
 import { parseColorStr, rgbToHex, threadForColor, buildThreadMap } from './thread-map.ts';
 import { autoSuggest } from './strategies.ts';
@@ -46,6 +48,7 @@ export interface ParseOptions {
 interface RawShape {
   tag: string;
   subpaths: Point[][]; // SVG space
+  curveSpecs?: SvgCurveSpec[];
   fill: string | null;
   stroke: string | null;
   strokeWidth: number | null;
@@ -194,10 +197,25 @@ function collectShapes(root: Element): { shapes: RawShape[]; ignored: Record<str
     const swRaw = styleProp(el, 'stroke-width');
     const sw = swRaw ? parseFloat(swRaw) * matScale(m) : null;
     const fr = (styleProp(el, 'fill-rule') || '').trim() === 'evenodd' ? 'evenodd' : 'nonzero';
+    const curveSpecs =
+      tag === 'path' && el.getAttribute('d')
+        ? pathToCurveSpecs(el.getAttribute('d')!).map((spec) => ({
+            closed: spec.closed,
+            anchors: spec.anchors.map(([position, incoming, outgoing]) => {
+              const mapped = matApply(m, position);
+              const mapHandle = (handle: Point): Point => {
+                const tip = matApply(m, [position[0] + handle[0], position[1] + handle[1]]);
+                return [tip[0] - mapped[0], tip[1] - mapped[1]];
+              };
+              return [mapped, mapHandle(incoming), mapHandle(outgoing)] as [Point, Point, Point];
+            }),
+          }))
+        : undefined;
 
     shapes.push({
       tag,
       subpaths: subs,
+      curveSpecs,
       fill,
       stroke: p2.stroke,
       strokeWidth: sw && isFinite(sw) ? sw : null,
@@ -249,6 +267,14 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
 
   // scale, centre, flip-Y into hoop-space mm
   const toMM = (p: Point): Point => [(p[0] - cx) * scale, -(p[1] - cy) * scale];
+  const curveToMM = (spec: SvgCurveSpec): SvgCurveSpec => ({
+    closed: spec.closed,
+    anchors: spec.anchors.map(([position, incoming, outgoing]) => [
+      toMM(position),
+      [incoming[0] * scale, -incoming[1] * scale],
+      [outgoing[0] * scale, -outgoing[1] * scale],
+    ]),
+  });
 
   // adaptive simplification across all shapes (shared tolerance ladder)
   const tolLadder = [0.2, 0.3, 0.45, 0.7, 1.0, 1.5, 2.2];
@@ -303,6 +329,7 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
       name: s.label,
       geomType,
       rings,
+      curveSpecs: s.curveSpecs?.map(curveToMM),
       bbox,
       areaMm2,
       sourceFill: s.fill,
@@ -367,6 +394,16 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
       el.rings = el.rings.map((ring) =>
         ring.map(([x, y]) => [x * autoScale, y * autoScale] as [number, number]),
       );
+      if (el.curveSpecs) {
+        el.curveSpecs = el.curveSpecs.map((spec) => ({
+          ...spec,
+          anchors: spec.anchors.map(([position, incoming, outgoing]) => [
+            [position[0] * autoScale, position[1] * autoScale],
+            [incoming[0] * autoScale, incoming[1] * autoScale],
+            [outgoing[0] * autoScale, outgoing[1] * autoScale],
+          ]),
+        }));
+      }
       el.bbox = bboxOf(el.rings);
       el.areaMm2 *= r2;
       // Clear the outsideHoop flag — geometry now fits inside the disc.
@@ -384,6 +421,7 @@ export function parseSvgToModel(svgText: string, opts: ParseOptions): ParseResul
     sewOrderKey: 'depth',
     keepGroups: true,
     resampleMM: 2.5,
+    editableCurves: false,
     scaleFactor: autoScale,
     seed: 1,
     palette,

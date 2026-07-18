@@ -6,6 +6,194 @@
 
 export type Point = [number, number];
 export type Matrix = [number, number, number, number, number, number]; // SVG 2×3 affine
+export type CurveAnchor = [Point, Point, Point];
+export interface SvgCurveSpec {
+  anchors: CurveAnchor[];
+  closed: boolean;
+}
+
+/** Parse SVG path data into cubic anchors without flattening. */
+export function pathToCurveSpecs(d: string): SvgCurveSpec[] {
+  const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g);
+  if (!tokens) return [];
+  let index = 0;
+  let command = '';
+  let x = 0;
+  let y = 0;
+  let startX = 0;
+  let startY = 0;
+  let previousCubic: Point | null = null;
+  let previousQuad: Point | null = null;
+  let active: SvgCurveSpec | null = null;
+  const specs: SvgCurveSpec[] = [];
+  const number = () => {
+    const value = Number(tokens[index++]);
+    if (!Number.isFinite(value)) throw new Error('path data ended mid-command');
+    return value;
+  };
+  const endpoint = (a: number, b: number, relative: boolean): Point =>
+    relative ? [x + a, y + b] : [a, b];
+  const start = (point: Point) => {
+    if (active && active.anchors.length >= 2) specs.push(active);
+    active = {
+      anchors: [
+        [
+          [point[0], point[1]],
+          [0, 0],
+          [0, 0],
+        ],
+      ],
+      closed: false,
+    };
+    x = startX = point[0];
+    y = startY = point[1];
+  };
+  const cubic = (c1: Point, c2: Point, end: Point, closing = false) => {
+    if (!active) start([x, y]);
+    const current = active!.anchors[active!.anchors.length - 1];
+    current[2] = [c1[0] - x, c1[1] - y];
+    if (closing) {
+      active!.anchors[0][1] = [c2[0] - end[0], c2[1] - end[1]];
+      active!.closed = true;
+    } else {
+      active!.anchors.push([
+        [end[0], end[1]],
+        [c2[0] - end[0], c2[1] - end[1]],
+        [0, 0],
+      ]);
+    }
+    x = end[0];
+    y = end[1];
+    previousCubic = [c2[0], c2[1]];
+  };
+  const line = (end: Point, closing = false) => cubic([x, y], end, end, closing);
+  const quadratic = (control: Point, end: Point) => {
+    cubic(
+      [x + (2 / 3) * (control[0] - x), y + (2 / 3) * (control[1] - y)],
+      [end[0] + (2 / 3) * (control[0] - end[0]), end[1] + (2 / 3) * (control[1] - end[1])],
+      end,
+    );
+    previousQuad = control;
+  };
+  const arc = (
+    rxValue: number,
+    ryValue: number,
+    rotation: number,
+    largeArc: boolean,
+    sweep: boolean,
+    end: Point,
+  ) => {
+    let rx = Math.abs(rxValue);
+    let ry = Math.abs(ryValue);
+    if (rx === 0 || ry === 0 || (Math.abs(end[0] - x) < 1e-12 && Math.abs(end[1] - y) < 1e-12)) {
+      line(end);
+      return;
+    }
+    const phi = (rotation * Math.PI) / 180;
+    const cosPhi = Math.cos(phi);
+    const sinPhi = Math.sin(phi);
+    const dx = (x - end[0]) / 2;
+    const dy = (y - end[1]) / 2;
+    const xp = cosPhi * dx + sinPhi * dy;
+    const yp = -sinPhi * dx + cosPhi * dy;
+    const lambda = (xp * xp) / (rx * rx) + (yp * yp) / (ry * ry);
+    if (lambda > 1) {
+      const factor = Math.sqrt(lambda);
+      rx *= factor;
+      ry *= factor;
+    }
+    const numerator = Math.max(
+      0,
+      (rx * rx * ry * ry - rx * rx * yp * yp - ry * ry * xp * xp) /
+        (rx * rx * yp * yp + ry * ry * xp * xp),
+    );
+    const factor = (largeArc === sweep ? -1 : 1) * Math.sqrt(numerator);
+    const cxp = (factor * rx * yp) / ry;
+    const cyp = (-factor * ry * xp) / rx;
+    const cx = cosPhi * cxp - sinPhi * cyp + (x + end[0]) / 2;
+    const cy = sinPhi * cxp + cosPhi * cyp + (y + end[1]) / 2;
+    const angle = (ux: number, uy: number, vx: number, vy: number) =>
+      Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+    const theta0 = angle(1, 0, (xp - cxp) / rx, (yp - cyp) / ry);
+    let delta = angle((xp - cxp) / rx, (yp - cyp) / ry, (-xp - cxp) / rx, (-yp - cyp) / ry);
+    if (!sweep && delta > 0) delta -= Math.PI * 2;
+    if (sweep && delta < 0) delta += Math.PI * 2;
+    const count = Math.max(1, Math.ceil(Math.abs(delta) / (Math.PI / 2)));
+    const part = delta / count;
+    const pointAt = (theta: number): Point => [
+      cx + rx * Math.cos(theta) * cosPhi - ry * Math.sin(theta) * sinPhi,
+      cy + rx * Math.cos(theta) * sinPhi + ry * Math.sin(theta) * cosPhi,
+    ];
+    const derivative = (theta: number): Point => [
+      -rx * Math.sin(theta) * cosPhi - ry * Math.cos(theta) * sinPhi,
+      -rx * Math.sin(theta) * sinPhi + ry * Math.cos(theta) * cosPhi,
+    ];
+    for (let partIndex = 0; partIndex < count; partIndex++) {
+      const a0 = theta0 + part * partIndex;
+      const a1 = a0 + part;
+      const p0 = pointAt(a0);
+      const p1 = partIndex === count - 1 ? end : pointAt(a1);
+      const d0 = derivative(a0);
+      const d1 = derivative(a1);
+      const alpha = (4 / 3) * Math.tan(part / 4);
+      cubic(
+        [p0[0] + alpha * d0[0], p0[1] + alpha * d0[1]],
+        [p1[0] - alpha * d1[0], p1[1] - alpha * d1[1]],
+        p1,
+      );
+    }
+  };
+
+  while (index < tokens.length) {
+    if (/^[A-Za-z]$/.test(tokens[index])) command = tokens[index++];
+    if (!command) throw new Error('path data must start with M');
+    const relative = command === command.toLowerCase();
+    const upper = command.toUpperCase();
+    if (upper === 'M') {
+      start(endpoint(number(), number(), relative));
+      command = relative ? 'l' : 'L';
+    } else if (upper === 'L') line(endpoint(number(), number(), relative));
+    else if (upper === 'H') line([relative ? x + number() : number(), y]);
+    else if (upper === 'V') line([x, relative ? y + number() : number()]);
+    else if (upper === 'C') {
+      const c1 = endpoint(number(), number(), relative);
+      const c2 = endpoint(number(), number(), relative);
+      cubic(c1, c2, endpoint(number(), number(), relative));
+    } else if (upper === 'S') {
+      const c1: Point = previousCubic
+        ? [2 * x - previousCubic[0], 2 * y - previousCubic[1]]
+        : [x, y];
+      const c2 = endpoint(number(), number(), relative);
+      cubic(c1, c2, endpoint(number(), number(), relative));
+    } else if (upper === 'Q') {
+      const control = endpoint(number(), number(), relative);
+      quadratic(control, endpoint(number(), number(), relative));
+    } else if (upper === 'T') {
+      const control: Point = previousQuad
+        ? [2 * x - previousQuad[0], 2 * y - previousQuad[1]]
+        : [x, y];
+      quadratic(control, endpoint(number(), number(), relative));
+    } else if (upper === 'A') {
+      const rx = number();
+      const ry = number();
+      const rotation = number();
+      const large = number() !== 0;
+      const sweep = number() !== 0;
+      arc(rx, ry, rotation, large, sweep, endpoint(number(), number(), relative));
+    } else if (upper === 'Z') {
+      const closingSpec = active as SvgCurveSpec | null;
+      if (closingSpec && (Math.abs(x - startX) > 1e-12 || Math.abs(y - startY) > 1e-12))
+        line([startX, startY], true);
+      else if (closingSpec) closingSpec.closed = true;
+      command = '';
+    } else throw new Error(`unsupported path command "${command}"`);
+    if (upper !== 'C' && upper !== 'S') previousCubic = null;
+    if (upper !== 'Q' && upper !== 'T') previousQuad = null;
+  }
+  const finalSpec = active as SvgCurveSpec | null;
+  if (finalSpec && finalSpec.anchors.length >= 2) specs.push(finalSpec);
+  return specs;
+}
 
 // ---------- path "d" parser ----------
 

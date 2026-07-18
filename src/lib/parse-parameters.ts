@@ -858,6 +858,184 @@ export function updatePathParameterPoint(
   return source.slice(0, open) + literal + source.slice(close + 1);
 }
 
+export type EditablePathValue = PathParamDef['value'];
+
+function clonePathValue(value: EditablePathValue): EditablePathValue {
+  return JSON.parse(JSON.stringify(value)) as EditablePathValue;
+}
+
+function formatNestedNumberList(value: number | NestedNumberList): string {
+  if (Array.isArray(value)) return `[${value.map(formatNestedNumberList).join(', ')}]`;
+  if (Number.isInteger(value)) return String(value);
+  return String(Number(value.toFixed(3)));
+}
+
+/** Replace an annotated path/curve literal while preserving its one-line or anchor-per-line layout. */
+export function updatePathParameterValue(
+  source: string,
+  def: PathParamDef,
+  value: EditablePathValue,
+): string {
+  const lines = source.split('\n');
+  const startLine = def.line - 1;
+  if (startLine < 0 || startLine >= lines.length) return source;
+  const startOffset = lines.slice(0, startLine).reduce((n, line) => n + line.length + 1, 0);
+  const open = source.indexOf('[', startOffset);
+  if (open < 0) return source;
+  let depth = 0;
+  let close = -1;
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === '[') depth++;
+    else if (source[i] === ']' && --depth === 0) {
+      close = i;
+      break;
+    }
+  }
+  if (close < 0) return source;
+  const original = source.slice(open, close + 1);
+  let literal = formatNestedNumberList(value as NestedNumberList);
+  if (original.includes('\n')) {
+    const indent = /^\s*/.exec(lines[startLine])?.[0] ?? '';
+    literal = `[\n${value
+      .map((entry) => `${indent}  ${formatNestedNumberList(entry as NestedNumberList)},`)
+      .join('\n')}\n${indent}]`;
+  }
+  return source.slice(0, open) + literal + source.slice(close + 1);
+}
+
+type PointTuple = [number, number];
+type FullCurveAnchor = [PointTuple, PointTuple, PointTuple];
+
+function pointTuple(value: number[] | number[][]): PointTuple {
+  const point = (Array.isArray(value[0]) ? value[0] : value) as number[];
+  return [point[0], point[1]];
+}
+
+function fullAnchor(value: number[] | number[][]): FullCurveAnchor {
+  if (Array.isArray(value[0])) {
+    const full = value as number[][];
+    return [
+      [full[0][0], full[0][1]],
+      [full[1][0], full[1][1]],
+      [full[2][0], full[2][1]],
+    ];
+  }
+  return [
+    [value[0] as number, value[1] as number],
+    [0, 0],
+    [0, 0],
+  ];
+}
+
+const lerpPoint = (a: PointTuple, b: PointTuple, t: number): PointTuple => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+];
+const addPoint = (a: PointTuple, b: PointTuple): PointTuple => [a[0] + b[0], a[1] + b[1]];
+const subPoint = (a: PointTuple, b: PointTuple): PointTuple => [a[0] - b[0], a[1] - b[1]];
+
+/** Insert a path vertex or shape-preserving de Casteljau curve anchor after `segment`. */
+export function insertPathParameterVertex(
+  def: PathParamDef,
+  segment: number,
+  t: number,
+  point?: PointTuple,
+): EditablePathValue {
+  const value = clonePathValue(def.value);
+  if (value.length >= def.max) return value;
+  const next = (segment + 1) % value.length;
+  const amount = Math.max(0, Math.min(1, t));
+  if (def.controlType === 'path') {
+    const a = pointTuple(value[segment] as number[]);
+    const b = pointTuple(value[next] as number[]);
+    value.splice(segment + 1, 0, point ?? lerpPoint(a, b, amount));
+    return value;
+  }
+
+  const a = fullAnchor(value[segment] as number[] | number[][]);
+  const b = fullAnchor(value[next] as number[] | number[][]);
+  const p0 = a[0];
+  const p1 = addPoint(a[0], a[2]);
+  const p2 = addPoint(b[0], b[1]);
+  const p3 = b[0];
+  const q0 = lerpPoint(p0, p1, amount);
+  const q1 = lerpPoint(p1, p2, amount);
+  const q2 = lerpPoint(p2, p3, amount);
+  const r0 = lerpPoint(q0, q1, amount);
+  const r1 = lerpPoint(q1, q2, amount);
+  const split = lerpPoint(r0, r1, amount);
+  a[2] = subPoint(q0, p0);
+  b[1] = subPoint(q2, p3);
+  const inserted: FullCurveAnchor = [split, subPoint(r0, split), subPoint(r1, split)];
+  value[segment] = a;
+  value[next] = b;
+  value.splice(segment + 1, 0, inserted);
+  return value;
+}
+
+export function deletePathParameterVertex(def: PathParamDef, anchor: number): EditablePathValue {
+  const value = clonePathValue(def.value);
+  if (value.length <= def.min || anchor < 0 || anchor >= value.length) return value;
+  value.splice(anchor, 1);
+  return value;
+}
+
+export function isSmoothCurveAnchor(value: number[] | number[][]): boolean {
+  const anchor = fullAnchor(value);
+  const incoming = anchor[1];
+  const outgoing = anchor[2];
+  const inLen = Math.hypot(incoming[0], incoming[1]);
+  const outLen = Math.hypot(outgoing[0], outgoing[1]);
+  if (inLen < 1e-9 || outLen < 1e-9) return false;
+  const cosine = (incoming[0] * outgoing[0] + incoming[1] * outgoing[1]) / (inLen * outLen);
+  return cosine <= -Math.cos((0.5 * Math.PI) / 180);
+}
+
+/** Toggle derived smoothness. Cornering nulls the incoming handle; smoothing mirrors its direction. */
+export function toggleCurveAnchorSmooth(def: PathParamDef, anchor: number): EditablePathValue {
+  const value = clonePathValue(def.value);
+  if (def.controlType !== 'curve' || anchor < 0 || anchor >= value.length) return value;
+  const full = fullAnchor(value[anchor] as number[] | number[][]);
+  if (isSmoothCurveAnchor(full)) {
+    full[1] = [0, 0];
+  } else {
+    let outgoing = full[2];
+    if (Math.hypot(outgoing[0], outgoing[1]) < 1e-9) {
+      const pos = full[0];
+      const next = pointTuple(value[(anchor + 1) % value.length] as number[] | number[][]);
+      outgoing = [(next[0] - pos[0]) / 3, (next[1] - pos[1]) / 3];
+      full[2] = outgoing;
+    }
+    const inLen = Math.max(
+      Math.hypot(full[1][0], full[1][1]),
+      Math.hypot(outgoing[0], outgoing[1]),
+    );
+    const outLen = Math.hypot(outgoing[0], outgoing[1]);
+    full[1] = [(-outgoing[0] / outLen) * inLen, (-outgoing[1] / outLen) * inLen];
+  }
+  value[anchor] = full;
+  return value;
+}
+
+/** Translate every anchor/vertex; relative curve handles remain unchanged. */
+export function translatePathParameterValue(
+  def: PathParamDef,
+  dx: number,
+  dy: number,
+): EditablePathValue {
+  const value = clonePathValue(def.value);
+  for (let i = 0; i < value.length; i++) {
+    const entry = value[i] as number[] | number[][];
+    if (Array.isArray(entry[0])) {
+      const full = entry as number[][];
+      full[0] = [full[0][0] + dx, full[0][1] + dy];
+    } else {
+      value[i] = [(entry[0] as number) + dx, (entry[1] as number) + dy];
+    }
+  }
+  return value;
+}
+
 // ── Value snapping helper ─────────────────────────────────────────────────
 
 /**

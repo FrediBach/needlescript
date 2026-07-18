@@ -43,6 +43,10 @@ procedures from local ones; importing consumes no operations or random draws bey
 normal definition registration and calls the program actually makes. Module loading itself
 never touches the RNG or stitch machine.
 
+The promoted `std.pathops.dashes as dashes` compatibility import resolves directly to the
+ranged-arity builtin. This preserves old three-argument sources while allowing the optional
+fourth dash-phase argument without adding optional procedure parameters to the grammar.
+
 For profiling, `RunOptions.onTiming` receives the elapsed time for root tokenization,
 module linking/parsing (including module tokenization and pre-scan), and execution/finalization. The callback is optional
 and synchronous, so normal library results and deterministic language behavior are

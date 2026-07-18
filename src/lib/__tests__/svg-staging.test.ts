@@ -11,6 +11,7 @@ import {
 import { STRATEGIES, eligibleStrategies, isClosedGeom, autoSuggest } from '../svg/strategies.ts';
 import { emit, resampleRing } from '../svg/emit.ts';
 import { parseSvgToModel } from '../svg/parse.ts';
+import { pathToCurveSpecs } from '../svg/svg-path.ts';
 import { defaultStrategy, type StagedDocument, type ElementModel } from '../svg/model.ts';
 import { run } from '../interpreter.ts';
 
@@ -238,6 +239,31 @@ describe('parseSvgToModel', () => {
     const unsup = doc.elements.find((e) => e.flags.unsupported);
     expect(unsup).toBeTruthy();
     expect(unsup!.include).toBe(false);
+  });
+
+  it('retains C/Q/A/Z geometry as editable cubic specs and emits it opt-in', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <path d="M10 50 C20 10 40 10 50 50 Q70 90 90 50 A10 10 0 0 1 10 50 Z"
+        fill="none" stroke="#000"/></svg>`;
+    const { doc } = parseSvgToModel(svg, { palette: PALETTE, name: 'curves.svg', fitMM: 60 });
+    expect(doc.elements[0].curveSpecs?.[0].closed).toBe(true);
+    expect(doc.elements[0].curveSpecs?.[0].anchors.length).toBeGreaterThan(3);
+    const legacy = emit(doc, { date: '2026-01-01' }).code;
+    expect(legacy).not.toContain('// [curve');
+    const editable = emit({ ...doc, editableCurves: true }, { date: '2026-01-01' }).code;
+    expect(editable).toContain('// [curve: closed]');
+    expect(editable).toContain('curvepath(');
+    expect(run(editable).events.length).toBeGreaterThan(0);
+  });
+});
+
+describe('pathToCurveSpecs', () => {
+  it('degree-elevates quadratics and resolves smooth cubic reflection', () => {
+    const [spec] = pathToCurveSpecs('M0 0 Q3 6 6 0 T12 0 C14 4 16 4 18 0 S22 -4 24 0');
+    expect(spec.anchors).toHaveLength(5);
+    expect(spec.anchors[1][1]).toEqual([-2, 4]);
+    expect(spec.anchors[2][1]).toEqual([-2, -4]);
+    expect(spec.anchors[4][1]).toEqual([-2, -4]);
   });
 });
 

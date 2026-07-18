@@ -281,6 +281,28 @@ export function initGenFunc(ctx: RunContext): void {
       }
       case 'insertvertex':
         return path(gm.insertVertex(pathArg(0, 1), sc(1)));
+      case 'dashes': {
+        const input = pathArg(0, 1);
+        const total = gm.pathlen(input);
+        const on = sc(1);
+        const off = sc(2);
+        if (on < 0 || off < 0 || on + off <= 0)
+          throw new NeedlescriptError(
+            'dashes: onmm and offmm must be non-negative with a positive sum',
+            line,
+          );
+        if (total <= 1e-12 || on <= 1e-12) return regions([]);
+        const period = on + off;
+        const rawPhase = args[3] === undefined ? 0 : sc(3);
+        const phase = ((rawPhase % period) + period) % period;
+        const pieces: gm.Pt[][] = [];
+        for (let cursor = -phase; cursor < total; cursor += period) {
+          const start = Math.max(0, cursor);
+          const end = Math.min(total, cursor + on);
+          if (end > start + 1e-12) pieces.push(gm.subPath(input, start / total, end / total));
+        }
+        return regions(pieces);
+      }
       case 'curveflat': {
         const mode = args[2] === undefined ? 'open' : args[2];
         if (typeof mode !== 'string' || !['open', 'closed'].includes(mode.toLowerCase()))

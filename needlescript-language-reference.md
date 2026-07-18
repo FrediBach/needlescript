@@ -554,6 +554,7 @@ No operator broadcasting — `[1,2] + [3,4]` is a loud error (use `vadd` for ele
 | `isclosed(path)` · `openpath(path)` · `pathorientation(path)`      | canonical-ring detection/conversion and Cartesian orientation (`1` CCW, `-1` CW, `0` degenerate)                                                                                                                                                                                             |
 | `pointat` · `headingat` · `normalat` · `paramof`                   | normalized arc-length path queries; the normal points left of travel                                                                                                                                                                                                                         |
 | `paramtomm` · `mmtoparam` · `subpath` · `splitat` · `insertvertex` | normalized parameter/length conversion and shape-preserving path editing                                                                                                                                                                                                                     |
+| `dashes(path, onmm, offmm[, phasemm])`                             | arc-length dash segments; optional phase enters the repeating dash/gap cycle                                                                                                                                                                                                                 |
 | `ispoint(v)` · `ispath(v)` · `iscurvespec(v)`                      | non-throwing structural predicates                                                                                                                                                                                                                                                           |
 | `chaikin(path, n)`                                                 | corner-cut smoothing, n iterations 1–6                                                                                                                                                                                                                                                       |
 | `catmull(points, mm)`                                              | Catmull-Rom spline through control points, resampled                                                                                                                                                                                                                                         |
@@ -956,6 +957,11 @@ Annotate `let`/`make`/bare declarations to expose live controls in the playgroun
 | `let c = [[0,0],[[10,0],[-2,0],[2,0]]] // [curve]`                                                                                    | editable relative-handle cubic spec control              |
 | `// --- Section ---`                                                                                                                  | section divider                                          |
 | `// @preset Name : a=1, b=2, p=[x,y]`                                                                                                 | named preset (alias `@snapshot`); nested lists supported |
+
+Path and curve controls support structural editing directly on the stage: double-click a segment
+to insert, Alt-click an anchor to delete (down to `min`), and drag a segment body to move the whole
+shape within its constraint. Double-click a curve anchor to toggle smooth/corner behavior. Dragging
+a tangent on a smooth anchor keeps the opposite tangent collinear; Alt-drag breaks the pair.
 
 ---
 

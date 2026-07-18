@@ -83,6 +83,20 @@ export default function GlobalToolbar({ doc, update }: Props) {
         />
       </label>
 
+      <label
+        className="flex items-center gap-2"
+        title="Keep SVG path curves as draggable NeedleScript specs"
+      >
+        <span className="uppercase tracking-[0.1em] text-muted-foreground">editable curves</span>
+        <Switch
+          checked={doc.editableCurves ?? false}
+          onCheckedChange={(checked) =>
+            update((current) => setGlobal(current, { editableCurves: checked }))
+          }
+          aria-label="import curves as editable specs"
+        />
+      </label>
+
       {/* resample */}
       <Popover>
         <PopoverTrigger render={<Button variant="outline" size="sm" className="h-7 text-[11px]" />}>

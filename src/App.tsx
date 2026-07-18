@@ -30,11 +30,18 @@ import { EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, MACHINES } from './data.ts'
 import type { HoopConfig, MachineHoop, MachinePreset } from './data.ts';
 import type { ExportFormat } from './components/Header.tsx';
 import {
+  deletePathParameterVertex,
+  insertPathParameterVertex,
+  isSmoothCurveAnchor,
   parseParameters,
+  projectPoint,
+  toggleCurveAnchorSmooth,
+  translatePathParameterValue,
   updatePathParameterPoint,
+  updatePathParameterValue,
   updatePointParameter,
 } from './lib/parse-parameters.ts';
-import type { ParamItem, PointParamDef } from './lib/parse-parameters.ts';
+import type { ParamItem, PathParamDef, PointParamDef } from './lib/parse-parameters.ts';
 import { usePanelSplit } from './hooks/usePanelSplit.ts';
 import { useSvgImport } from './hooks/useSvgImport.ts';
 import { useBitmapImport } from './hooks/useBitmapImport.ts';
@@ -43,6 +50,38 @@ import { useAI } from './hooks/useAI.ts';
 import { useReplCommands } from './hooks/useReplCommands.ts';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
+
+function constrainPathTranslation(
+  def: PathParamDef,
+  requestedX: number,
+  requestedY: number,
+): { x: number; y: number } {
+  let dx = requestedX;
+  let dy = requestedY;
+  if (def.snap) {
+    dx = Math.round(dx / def.snap) * def.snap;
+    dy = Math.round(dy / def.snap) * def.snap;
+  }
+  const positions = def.value.map((entry) => {
+    const point = Array.isArray(entry[0]) ? (entry[0] as number[]) : (entry as number[]);
+    return { x: point[0], y: point[1] };
+  });
+  const fits = (amount: number) =>
+    positions.every((point) => {
+      const candidate = { x: point.x + dx * amount, y: point.y + dy * amount };
+      const projected = projectPoint(candidate, def.region);
+      return Math.hypot(projected.x - candidate.x, projected.y - candidate.y) < 1e-7;
+    });
+  if (fits(1)) return { x: dx, y: dy };
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 30; i++) {
+    const middle = (low + high) / 2;
+    if (fits(middle)) low = middle;
+    else high = middle;
+  }
+  return { x: dx * low, y: dy * low };
+}
 import StagePane from './components/StagePane.tsx';
 import Splitter from './components/Splitter.tsx';
 const EditorPane = lazy(() => import('./components/MonacoEditorPane.tsx'));
@@ -337,6 +376,13 @@ export default function App() {
       });
     });
   }, [parameterItems]);
+  const pathParamDefs = useMemo<PathParamDef[]>(
+    () =>
+      parameterItems.flatMap((item) =>
+        item.kind === 'path' || item.kind === 'curve' ? [item.def] : [],
+      ),
+    [parameterItems],
+  );
 
   // ── Panel split, SVG import, and share ───────────────────────────────────
   const { leftWidth, isMobile, mainRef, handleHorizDrag, handleHorizReset } = usePanelSplit();
@@ -463,10 +509,17 @@ export default function App() {
   const xySourceRef = useRef<string | null>(null);
 
   const updateStageHandle = useCallback(
-    (base: string, name: string, line: number, x: number, y: number) => {
+    (
+      base: string,
+      name: string,
+      line: number,
+      x: number,
+      y: number,
+      options?: { breakPair: boolean },
+    ) => {
       const handle = pointParamDefs.find((point) => point.name === name);
       if (!handle?.pathHandle) return updatePointParameter(base, line, name, x, y);
-      const item = parameterItems.find(
+      const item = parseParameters(base).find(
         (candidate) =>
           (candidate.kind === 'path' || candidate.kind === 'curve') &&
           candidate.def.name === handle.pathHandle?.controlName,
@@ -479,6 +532,27 @@ export default function App() {
         const pos = Array.isArray(raw?.[0]) ? (raw[0] as number[]) : (raw as number[]);
         valueX -= pos[0];
         valueY -= pos[1];
+        if (
+          item.kind === 'curve' &&
+          Array.isArray(raw?.[0]) &&
+          isSmoothCurveAnchor(raw as number[][]) &&
+          !options?.breakPair
+        ) {
+          const value = JSON.parse(JSON.stringify(item.def.value)) as PathParamDef['value'];
+          const full = value[handle.pathHandle.anchor] as number[][];
+          const slot = handle.pathHandle.role === 'hin' ? 1 : 2;
+          const opposite = slot === 1 ? 2 : 1;
+          const oppositeLen = Math.hypot(full[opposite][0], full[opposite][1]);
+          const movedLen = Math.hypot(valueX, valueY);
+          full[slot] = [valueX, valueY];
+          if (movedLen > 1e-9) {
+            full[opposite] = [
+              (-valueX / movedLen) * oppositeLen,
+              (-valueY / movedLen) * oppositeLen,
+            ];
+          }
+          return updatePathParameterValue(base, item.def, value);
+        }
       }
       return updatePathParameterPoint(
         base,
@@ -489,13 +563,13 @@ export default function App() {
         valueY,
       );
     },
-    [parameterItems, pointParamDefs],
+    [pointParamDefs],
   );
 
   const handleXYHandleDrag = useCallback(
-    (name: string, line: number, x: number, y: number) => {
+    (name: string, line: number, x: number, y: number, options?: { breakPair: boolean }) => {
       const base = xySourceRef.current ?? sourceRef.current;
-      const updated = updateStageHandle(base, name, line, x, y);
+      const updated = updateStageHandle(base, name, line, x, y, options);
       xySourceRef.current = updated;
       setSource(updated);
 
@@ -510,9 +584,9 @@ export default function App() {
   );
 
   const handleXYHandleCommit = useCallback(
-    (name: string, line: number, x: number, y: number) => {
+    (name: string, line: number, x: number, y: number, options?: { breakPair: boolean }) => {
       const base = xySourceRef.current ?? sourceRef.current;
-      const updated = updateStageHandle(base, name, line, x, y);
+      const updated = updateStageHandle(base, name, line, x, y, options);
       xySourceRef.current = null; // reset pending source after final commit
       setSource(updated);
       if (xyDragRafRef.current !== null) {
@@ -522,6 +596,66 @@ export default function App() {
       runProgram(updated, design.name);
     },
     [design.name, runProgram, updateStageHandle],
+  );
+
+  const commitPathValue = useCallback(
+    (name: string, makeValue: (def: PathParamDef) => PathParamDef['value']) => {
+      const base = sourceRef.current;
+      const item = parseParameters(base).find(
+        (item) => (item.kind === 'path' || item.kind === 'curve') && item.def.name === name,
+      );
+      if (!item || (item.kind !== 'path' && item.kind !== 'curve')) return;
+      const def = item.def;
+      const updated = updatePathParameterValue(base, def, makeValue(def));
+      setSource(updated);
+      runProgram(updated, design.name);
+    },
+    [design.name, runProgram],
+  );
+
+  const handlePathInsert = useCallback(
+    (name: string, segment: number, t: number) =>
+      commitPathValue(name, (def) => insertPathParameterVertex(def, segment, t)),
+    [commitPathValue],
+  );
+  const handlePathDelete = useCallback(
+    (name: string, anchor: number) =>
+      commitPathValue(name, (def) => deletePathParameterVertex(def, anchor)),
+    [commitPathValue],
+  );
+  const handleCurveToggleSmooth = useCallback(
+    (name: string, anchor: number) =>
+      commitPathValue(name, (def) => toggleCurveAnchorSmooth(def, anchor)),
+    [commitPathValue],
+  );
+
+  const pathTranslateRef = useRef<{ base: string; def: PathParamDef } | null>(null);
+  const handlePathTranslate = useCallback(
+    (name: string, dx: number, dy: number, commit: boolean) => {
+      let drag = pathTranslateRef.current;
+      if (!drag || drag.def.name !== name) {
+        const base = sourceRef.current;
+        const item = parseParameters(base).find(
+          (item) => (item.kind === 'path' || item.kind === 'curve') && item.def.name === name,
+        );
+        if (!item || (item.kind !== 'path' && item.kind !== 'curve')) return;
+        const def = item.def;
+        drag = { base, def };
+        pathTranslateRef.current = drag;
+      }
+      const delta = constrainPathTranslation(drag.def, dx, dy);
+      const updated = updatePathParameterValue(
+        drag.base,
+        drag.def,
+        translatePathParameterValue(drag.def, delta.x, delta.y),
+      );
+      setSource(updated);
+      if (commit) {
+        pathTranslateRef.current = null;
+        runProgram(updated, design.name);
+      }
+    },
+    [design.name, runProgram],
   );
 
   // When the source changes from outside (editor, example, share), clear the
@@ -924,6 +1058,7 @@ export default function App() {
           hideJumps={hideJumps}
           onToggleHideJumps={() => setHideJumps((v) => !v)}
           pointParams={pointParamDefs}
+          pathParams={pathParamDefs}
           chalkControl={{
             visible: showChalk,
             toggle: () => setShowChalk((value) => !value),
@@ -936,6 +1071,10 @@ export default function App() {
           lockedHandles={lockedParams}
           onHandleDrag={handleXYHandleDrag}
           onHandleCommit={handleXYHandleCommit}
+          onPathInsert={handlePathInsert}
+          onPathDelete={handlePathDelete}
+          onCurveToggleSmooth={handleCurveToggleSmooth}
+          onPathTranslate={handlePathTranslate}
           onMachineContextMenu={(x, y) => setMachineContextMenu({ x, y })}
           machine={selectedMachine}
         />

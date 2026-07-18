@@ -157,25 +157,25 @@ To place or transform a returned path, use geometry built-ins such as `xlate`, `
 
 ## 5. `std.pathops` — polyline queries and operations
 
-`pointat`, `headingat`, `paramof`, and `subpath` are also Library-tier built-ins. These exports
+`pointat`, `headingat`, `paramof`, `subpath`, and `dashes` are also Library-tier built-ins. These exports
 remain as compatibility wrappers, so existing imports keep their pinned behavior.
 
 Normalized parameters are based on total arc length rather than vertex index. Unless noted, `t`
 values are clamped to 0…1. Query functions expect at least one point; segment-based functions are
 most meaningful with at least two.
 
-| Import path                | Signature and result                                                                                                                                                                                                             |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `std.pathops.pointat`      | `pointat(path, t) -> point`. Point at normalized arc length `t`. A one-point path returns that point; repeated zero-length segments are tolerated.                                                                               |
-| `std.pathops.headingat`    | `headingat(path, t) -> heading`. Heading of the non-zero segment containing `t`. At an exact vertex it selects the preceding segment. If no non-zero segment exists, returns 0.                                                  |
-| `std.pathops.paramof`      | `paramof(p, path) -> number`. Normalized arc-length position of the closest point on the polyline. Ties keep the earlier segment; a zero-length path returns 0.                                                                  |
-| `std.pathops.subpath`      | `subpath(path, t0, t1) -> path`. Extracts a section, including interpolated endpoints and interior original vertices. If `t1 < t0`, returns the forward extraction reversed. Equal parameters return two equal endpoints.        |
-| `std.pathops.dashes`       | `dashes(path, onmm, offmm) -> list of paths`. Splits an arc-length route into on-segments beginning at distance 0. Use `onmm >= 0`, `offmm >= 0`, and a positive sum. A trailing dash is clipped to the path end.                |
-| `std.pathops.simplifypath` | `simplifypath(path, tol) -> path`. Ramer–Douglas–Peucker simplification using perpendicular segment distance. Negative tolerance becomes 0; endpoints are preserved.                                                             |
-| `std.pathops.smoothclosed` | `smoothclosed(ring, n) -> closed path`. Applies 0…6 rounded Chaikin corner-cutting passes. An existing duplicate closing point is removed first, then one closing point is appended. Each pass doubles the unique point count.   |
-| `std.pathops.morphpaths`   | `morphpaths(a, b, t) -> path`. Arc-length-resamples both paths to the larger unique-point count and linearly interpolates corresponding points. `t` is not clamped. The result is closed only if both inputs are closed.         |
-| `std.pathops.pathisects`   | `pathisects(a, b) -> list of points`. Returns unique segment intersections in nested segment order. Collinear overlap behavior follows core `segisect`.                                                                          |
-| `std.pathops.offsetopen`   | `offsetopen(path, mm) -> path`. Approximate mitered offset of an open polyline. Positive `mm` offsets to the path's Cartesian left; negative offsets right. Near-180° joins use a bounded denominator to avoid division by zero. |
+| Import path                | Signature and result                                                                                                                                                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `std.pathops.pointat`      | `pointat(path, t) -> point`. Point at normalized arc length `t`. A one-point path returns that point; repeated zero-length segments are tolerated.                                                                                    |
+| `std.pathops.headingat`    | `headingat(path, t) -> heading`. Heading of the non-zero segment containing `t`. At an exact vertex it selects the preceding segment. If no non-zero segment exists, returns 0.                                                       |
+| `std.pathops.paramof`      | `paramof(p, path) -> number`. Normalized arc-length position of the closest point on the polyline. Ties keep the earlier segment; a zero-length path returns 0.                                                                       |
+| `std.pathops.subpath`      | `subpath(path, t0, t1) -> path`. Extracts a section, including interpolated endpoints and interior original vertices. If `t1 < t0`, returns the forward extraction reversed. Equal parameters return two equal endpoints.             |
+| `std.pathops.dashes`       | `dashes(path, onmm, offmm[, phasemm]) -> list of paths`. Splits an arc-length route into on-segments. `phasemm` enters that far into the repeating cycle and may begin in a dash or gap. Use non-negative lengths and a positive sum. |
+| `std.pathops.simplifypath` | `simplifypath(path, tol) -> path`. Ramer–Douglas–Peucker simplification using perpendicular segment distance. Negative tolerance becomes 0; endpoints are preserved.                                                                  |
+| `std.pathops.smoothclosed` | `smoothclosed(ring, n) -> closed path`. Applies 0…6 rounded Chaikin corner-cutting passes. An existing duplicate closing point is removed first, then one closing point is appended. Each pass doubles the unique point count.        |
+| `std.pathops.morphpaths`   | `morphpaths(a, b, t) -> path`. Arc-length-resamples both paths to the larger unique-point count and linearly interpolates corresponding points. `t` is not clamped. The result is closed only if both inputs are closed.              |
+| `std.pathops.pathisects`   | `pathisects(a, b) -> list of points`. Returns unique segment intersections in nested segment order. Collinear overlap behavior follows core `segisect`.                                                                               |
+| `std.pathops.offsetopen`   | `offsetopen(path, mm) -> path`. Approximate mitered offset of an open polyline. Positive `mm` offsets to the path's Cartesian left; negative offsets right. Near-180° joins use a bounded denominator to avoid division by zero.      |
 
 ```text
 import std.pathops.subpath as subpath

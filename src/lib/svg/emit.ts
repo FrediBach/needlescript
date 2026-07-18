@@ -8,6 +8,7 @@
 // ============================================================
 
 import type { ElementModel, Point, StagedDocument } from './model.ts';
+import type { SvgCurveSpec } from './svg-path.ts';
 import { STRATEGIES, type EmitContext } from './strategies.ts';
 
 export interface EmitOptions {
@@ -130,6 +131,15 @@ function formatPathLiteral(points: Point[]): string {
   return lines.join('\n');
 }
 
+function formatCurveLiteral(spec: SvgCurveSpec): string {
+  const anchors = spec.anchors.map(
+    ([position, incoming, outgoing]) =>
+      `[${formatPathLiteral([position]).slice(1, -1)}, ${formatPathLiteral([incoming]).slice(1, -1)}, ${formatPathLiteral([outgoing]).slice(1, -1)}]`,
+  );
+  if (anchors.length <= 3) return `[${anchors.join(', ')}]`;
+  return `[\n${anchors.map((anchor) => `  ${anchor},`).join('\n')}\n]`;
+}
+
 /** Naming for an element's rings: outer / hole{n} / ring{n}. */
 function ringNames(base: string, el: ElementModel): string[] {
   if (el.rings.length === 1) return [base];
@@ -179,8 +189,19 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
     const names = ringNames(base, el);
     elNames.set(el.id, names);
     el.rings.forEach((ring, i) => {
-      const resampled = resampleRing(ring, doc.resampleMM);
-      lines.push(`let ${names[i]} = ${formatPathLiteral(resampled)}`);
+      const curve = doc.editableCurves ? el.curveSpecs?.[i] : undefined;
+      if (curve) {
+        const specName = `${names[i]}_spec`;
+        usedNames.add(specName);
+        const annotation = curve.closed ? '[curve: closed]' : '[curve]';
+        lines.push(`let ${specName} = ${formatCurveLiteral(curve)} // ${annotation}`);
+        lines.push(
+          `let ${names[i]} = curvepath(${specName}, ${fmt(doc.resampleMM)}${curve.closed ? ", 'closed'" : ''})`,
+        );
+      } else {
+        const resampled = resampleRing(ring, doc.resampleMM);
+        lines.push(`let ${names[i]} = ${formatPathLiteral(resampled)}`);
+      }
     });
   }
   lines.push('');

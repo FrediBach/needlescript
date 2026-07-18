@@ -161,6 +161,17 @@ export function setScale(doc: StagedDocument, newFactor: number): StagedDocument
     const rings = el.rings.map((ring) =>
       ring.map(([x, y]) => [x * ratio, y * ratio] as [number, number]),
     );
+    const curveSpecs = el.curveSpecs?.map((spec) => ({
+      ...spec,
+      anchors: spec.anchors.map(
+        ([position, incoming, outgoing]) =>
+          [
+            [position[0] * ratio, position[1] * ratio],
+            [incoming[0] * ratio, incoming[1] * ratio],
+            [outgoing[0] * ratio, outgoing[1] * ratio],
+          ] as [[number, number], [number, number], [number, number]],
+      ),
+    }));
     const scaledBbox: BBox = {
       minX: el.bbox.minX * ratio,
       minY: el.bbox.minY * ratio,
@@ -194,7 +205,7 @@ export function setScale(doc: StagedDocument, newFactor: number): StagedDocument
       );
     }
 
-    return { ...el, rings, bbox: scaledBbox, areaMm2, flags, include, strategy };
+    return { ...el, rings, curveSpecs, bbox: scaledBbox, areaMm2, flags, include, strategy };
   };
   return { ...mapElements(doc, scaleEl), scaleFactor: newFactor };
 }

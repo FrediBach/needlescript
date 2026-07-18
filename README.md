@@ -84,7 +84,7 @@ src/
 - **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch, meadow, echo, shatter).
 - **Parameters** — annotate any variable declaration with a comment to expose it as a live control in the Parameters panel below the editor: `// [min:max]` for sliders, `// [switch]` for toggles, or `// [xy]` on a two-element list literal for a **draggable point handle** rendered directly on the stage. Drag sliders or handles, lock individual parameters, randomize unlocked ones with the shuffle button, and pick named presets — all without editing the source. See [Customizer](#customizer) below.
 - **Download .DST** — export the current design as a Tajima stitch file.
-- **Import SVG** — convert an SVG (button or drag & drop) into _editable_ NeedleScript code: filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, colours map to the nearest thread. Supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, groups and transforms.
+- **Import SVG** — convert an SVG (button or drag & drop) into _editable_ NeedleScript code: filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, colours map to the nearest thread. Supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, groups and transforms. “Import with options” can preserve SVG path commands as draggable `// [curve]` specs; the default flattened output remains unchanged.
 
 ---
 

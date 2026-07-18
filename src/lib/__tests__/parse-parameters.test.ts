@@ -5,13 +5,18 @@ import {
   updateTextParameter,
   updatePointParameter,
   updatePathParameterPoint,
+  deletePathParameterVertex,
+  insertPathParameterVertex,
+  isSmoothCurveAnchor,
+  toggleCurveAnchorSmooth,
+  translatePathParameterValue,
   updatePaletteParameter,
   parsePresets,
   snapValue,
   projectPoint,
   sampleRegion,
 } from '../parse-parameters.ts';
-import type { PointParamDef, XYRegion } from '../parse-parameters.ts';
+import type { PathParamDef, PointParamDef, XYRegion } from '../parse-parameters.ts';
 
 // ── parseParameters ────────────────────────────────────────────────────────
 
@@ -207,6 +212,79 @@ describe('parseParameters', () => {
     );
     const items = parseParameters(src);
     expect(items.map((i) => i.kind)).toEqual(['section', 'param', 'section', 'param']);
+  });
+});
+
+describe('editable path operations', () => {
+  const pathDef: PathParamDef = {
+    name: 'route',
+    value: [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+    ],
+    line: 1,
+    region: { kind: 'free' },
+    closed: false,
+    min: 2,
+    max: 4,
+    controlType: 'path',
+  };
+  const curveDef: PathParamDef = {
+    ...pathDef,
+    name: 'spine',
+    value: [
+      [
+        [0, 0],
+        [0, 0],
+        [3, 6],
+      ],
+      [
+        [10, 0],
+        [-3, 6],
+        [0, 0],
+      ],
+    ],
+    controlType: 'curve',
+  };
+
+  it('inserts and deletes path vertices within declared count bounds', () => {
+    const inserted = insertPathParameterVertex(pathDef, 0, 0.25);
+    expect(inserted).toEqual([
+      [0, 0],
+      [2.5, 0],
+      [10, 0],
+      [10, 10],
+    ]);
+    expect(deletePathParameterVertex({ ...pathDef, value: inserted }, 1)).toEqual(pathDef.value);
+    expect(
+      deletePathParameterVertex(
+        {
+          ...pathDef,
+          value: [
+            [0, 0],
+            [1, 0],
+          ],
+        },
+        0,
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('splits a cubic without changing its control polygon endpoints', () => {
+    const split = insertPathParameterVertex(curveDef, 0, 0.5) as number[][][];
+    expect(split).toHaveLength(3);
+    expect(split[0][0]).toEqual([0, 0]);
+    expect(split[2][0]).toEqual([10, 0]);
+    expect(split[1][0]).toEqual([5, 4.5]);
+  });
+
+  it('toggles corner/smooth derivation and translates only anchor positions', () => {
+    const smoothed = toggleCurveAnchorSmooth(curveDef, 0) as number[][][];
+    expect(isSmoothCurveAnchor(smoothed[0])).toBe(true);
+    const translated = translatePathParameterValue(curveDef, 2, -1) as number[][][];
+    expect(translated[0][0]).toEqual([2, -1]);
+    expect(translated[0][2]).toEqual([3, 6]);
   });
 });
 
