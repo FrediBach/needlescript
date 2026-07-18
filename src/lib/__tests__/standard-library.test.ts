@@ -438,6 +438,135 @@ describe('standard-library modules', () => {
     expect(eyelet.events.some((event) => event.t === 'stitch')).toBe(true);
   });
 
+  it('preserves appliquesteps stitch geometry and stage order exactly', () => {
+    const imported = run(`
+      import std.stitchcraft.appliquesteps as appliquesteps
+      lock 0 underlay 'off'
+      appliquesteps([[-5, -5], [5, -5], [5, 5], [-5, 5]], 2)
+    `);
+    const direct = run(`
+      lock 0 underlay 'off'
+      let ring = closepath([[-5, -5], [5, -5], [5, 5], [-5, 5]])
+      up setpos(first(ring)) down sewpath(resample(ring, 2.5))
+      stop
+      up setpos(first(ring)) down satin 0.8 sewpath(ring) satin 0
+      stop
+      up setpos(first(ring)) down satin 2 sewpath(ring) satin 0
+    `);
+    const construction = (result: typeof imported) =>
+      result.events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u }));
+    expect(construction(imported)).toEqual(construction(direct));
+  });
+
+  it('sews fleece knockdown as a sparse running-stitch foundation', () => {
+    const result = run(`
+      import std.stitchcraft.knockdown as knockdown
+      fabric 'fleece'
+      lock 0
+      satin 4
+      knockdown([[-18, -12], [18, -12], [18, 12], [-18, 12]], 25, 3)
+      fd 5
+    `);
+    expect(result.events.some((event) => event.t === 'stitch')).toBe(true);
+    expect(result.events.some((event) => event.u === 1)).toBe(false);
+    expect(result.density.peak).toBeLessThan(2.6);
+    expect(result.warnings.some((warning) => warning.includes('layers of thread'))).toBe(false);
+    expect(result.events.at(-1)).toMatchObject({ t: 'stitch' });
+
+    expect(() =>
+      run(`
+        import std.stitchcraft.knockdown as knockdown
+        knockdown([[-5, -5], [5, -5], [5, 5], [-5, 5]], 0, 0.5)
+      `),
+    ).toThrow(/knockdown spacing must be from 1 to 5 mm/);
+  });
+
+  it('calculates predictable fill inset and border centerlines for compound regions', () => {
+    const result = run(`
+      import std.stitchcraft.fillbordergeometry as fillbordergeometry
+      seed 321
+      let outer = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+      let hole = [[-4, -4], [4, -4], [4, 4], [-4, 4]]
+      let geometry = fillbordergeometry([outer, hole], 2, 0.4)
+      print geometry[2]
+      print len(geometry[0])
+      print bbox(geometry[0][0])
+      print bbox(geometry[0][1])
+      print [len(geometry[1]), first(geometry[1][0]) = last(geometry[1][0]), first(geometry[1][1]) = last(geometry[1][1])]
+      print random(1)
+    `);
+    const baseline = run('seed 321 print random(1)');
+    expect(result.printed).toEqual([
+      '0.6',
+      '2',
+      '[-9.4, -9.4, 9.4, 9.4]',
+      '[-4.6, -4.6, 4.6, 4.6]',
+      '[2, 1, 1]',
+      baseline.printed[0],
+    ]);
+    expect(result.events).toHaveLength(0);
+  });
+
+  it('keeps concave fill-border inset geometry inside its source region', () => {
+    const result = run(`
+      import std.stitchcraft.fillbordergeometry as fillbordergeometry
+      let concave = [[-10, -10], [10, -10], [10, -2], [2, -2], [2, 10], [-10, 10]]
+      let geometry = fillbordergeometry(concave, 2.4, 0.4)
+      let outside = 0
+      for ring in geometry[0] [
+        for p in ring [ if inpath(p, concave) = 0 [ outside = 1 ] ]
+      ]
+      print [geometry[2], len(geometry[0]), outside]
+    `);
+    expect(result.printed).toEqual(['[0.8, 1, 0]']);
+  });
+
+  it('sews fill and border as two explicit stages with a safe default overlap', () => {
+    const defaultRecipe = run(`
+      import std.stitchcraft.fillandborder as fillandborder
+      lock 0 underlay 'off' density 1
+      fillandborder([[-8, -6], [8, -6], [8, 6], [-8, 6]], 20, 1.2, 2)
+    `);
+    const explicitRecipe = run(`
+      import std.stitchcraft.fillandborderwith as fillandborderwith
+      lock 0 underlay 'off' density 1
+      fillandborderwith([[-8, -6], [8, -6], [8, 6], [-8, 6]], 20, 1.2, 2, 0.4)
+    `);
+    const construction = (result: typeof defaultRecipe) =>
+      result.events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u }));
+    expect(construction(defaultRecipe)).toEqual(construction(explicitRecipe));
+    expect(defaultRecipe.events.filter((event) => event.t === 'color')).toHaveLength(1);
+    const stitchColors = new Set(
+      defaultRecipe.events.filter((event) => event.t === 'stitch').map((event) => event.c),
+    );
+    expect(stitchColors).toEqual(new Set([0, 1]));
+  });
+
+  it('provides configurable appliqué insets and explicit stage stops', () => {
+    const staged = run(`
+      import std.stitchcraft.appliquewith as appliquewith
+      lock 0 underlay 'off' density 1
+      appliquewith([[-8, -6], [8, -6], [8, 6], [-8, 6]], 0.4, 0.8, 2, [1, 1])
+    `);
+    expect(staged.events.filter((event) => event.t === 'color')).toHaveLength(2);
+    expect(
+      new Set(staged.events.filter((event) => event.t === 'stitch').map((event) => event.c)),
+    ).toEqual(new Set([0, 1, 2]));
+
+    const oneStop = run(`
+      import std.stitchcraft.appliquewith as appliquewith
+      lock 0 underlay 'off' density 1
+      appliquewith([[-8, -6], [8, -6], [8, 6], [-8, 6]], 0, 0.8, 2, [0, 1])
+    `);
+    expect(oneStop.events.filter((event) => event.t === 'color')).toHaveLength(1);
+    expect(() =>
+      run(`
+        import std.stitchcraft.appliquewith as appliquewith
+        appliquewith([[-2, -2], [2, -2], [2, 2], [-2, 2]], 0, 0.5, 2, [1])
+      `),
+    ).toThrow(/appliquewith stops must be/);
+  });
+
   it('provides gradientbands and two-color threadblend', () => {
     const bands = run(`
       import std.stitchcraft.gradientbands as gradientbands

@@ -1,0 +1,27 @@
+hoop '4x4'
+
+import std.stitchcraft.fillandborder as fillandborder
+
+let angle = 25     // [0:5:175] fill row angle (degrees)
+let spacing = 0.8  // [0.4:0.05:1.5] fill row spacing (mm)
+let cover = 2.4    // [1.2:0.2:5] satin border width (mm)
+
+palette ['#2f7d8c', '#f4d35e']
+background '#f7f1df'
+fabric 'woven'
+underlay 'off'
+density 0.5
+
+// Concavity demonstrates that the fill is inset before the original boundary
+// becomes the satin centerline. The recipe stops between its two colors.
+let patch = [
+  [-32, -22],
+  [32, -22],
+  [32, -4],
+  [12, -4],
+  [12, 22],
+  [-32, 22]
+]
+
+fillandborder(patch, angle, spacing, cover)
+trim

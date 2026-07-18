@@ -292,19 +292,24 @@ Unlike geometry helpers, these procedures can emit stitches and change machine m
 arguments contain point coordinates rather than turtle-relative distances because they ultimately
 call `sewpath`/`setpos`.
 
-| Import path                      | Signature and effect                                                                                                                                                                                                                                                                                                                           |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `std.stitchcraft.sewrun`         | `sewrun(path, mm)`. Resamples `path` at spacing `mm`, then sews it with the current stitch mode and thread. Equivalent to `sewpath(resample(path, mm))`.                                                                                                                                                                                       |
-| `std.stitchcraft.satinalong`     | `satinalong(path, w)`. Enables satin width `w`, sews `path`, then sets satin width to 0. The final satin state is always off, not restored to a prior width. Other satin settings still apply.                                                                                                                                                 |
-| `std.stitchcraft.beanoutline`    | `beanoutline(region, n)`. Enables bean repeat `n`, sews the logically closed region, then sets bean repeat to 1. The prior bean setting is not restored.                                                                                                                                                                                       |
-| `std.stitchcraft.appliquesteps`  | `appliquesteps(region, w)`. Performs a 2.5 mm running placement line, a narrow satin tack-down at `max(0.8, 0.35w)`, and a final satin cover at `w`. Inserts `stop` events between the three stages so fabric can be placed/trimmed. Each stage travels with needle up to the ring start. Ends at the closed ring's end with satin turned off. |
-| `std.stitchcraft.eyelet`         | `eyelet(r)`. Sews a resampled satin circle centered at the current needle position. Radius must be positive; satin width is `clamp(0.55r, 0.6, 1.5)`. A `push`/`pop` pair restores needle position, heading, and pen state after sewing; satin ends off.                                                                                       |
-| `std.stitchcraft.gradientbands`  | `gradientbands(region, deg, n) -> list of regions`. Geometry-only helper: slices a region into `max(1, round(n))` parallel bands oriented at heading/angle `deg` and returns all clipped pieces in band order. Concavity can yield more pieces than requested bands.                                                                           |
-| `std.stitchcraft.gradientrows`   | `gradientrows(region, deg, pitch, amount) -> [rowsA, rowsB]`. Geometry-only, density-neutral two-color blend. See below.                                                                                                                                                                                                                       |
-| `std.stitchcraft.gradientrowsn`  | `gradientrowsn(region, deg, pitch, weights) -> list of row groups`. Geometry-only, density-neutral blend across 2–8 colors. See below.                                                                                                                                                                                                         |
-| `std.stitchcraft.serpentinerows` | `serpentinerows(rows, reversed) -> routed rows`. Greedily routes parallel row paths with endpoint reversal enabled, beginning from the first row when `reversed` is false or the last row when true. Returns `[]` for empty input and does not mutate `rows`.                                                                                  |
-| `std.stitchcraft.threadblend`    | `threadblend(region, deg)`. Creates 1.2 mm fill rows at `deg`, sews even rows in the current color, advances once to the next color, then sews odd rows. Rows are resampled at 2.5 mm. Ends in the second color and does not restore needle position.                                                                                          |
-| `std.stitchcraft.stipple`        | `stipple(region, mindist)`. Scatters candidate points and sews a small circular mark only where coverage within `mindist/3` is below one layer. `mindist` must be positive. Each mark restores turtle state with `push`/`pop`. Consumes exactly **1 main-stream RNG draw** through `scatter`.                                                  |
+| Import path                          | Signature and effect                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `std.stitchcraft.sewrun`             | `sewrun(path, mm)`. Resamples `path` at spacing `mm`, then sews it with the current stitch mode and thread. Equivalent to `sewpath(resample(path, mm))`.                                                                                                                                                                                       |
+| `std.stitchcraft.satinalong`         | `satinalong(path, w)`. Enables satin width `w`, sews `path`, then sets satin width to 0. The final satin state is always off, not restored to a prior width. Other satin settings still apply.                                                                                                                                                 |
+| `std.stitchcraft.beanoutline`        | `beanoutline(region, n)`. Enables bean repeat `n`, sews the logically closed region, then sets bean repeat to 1. The prior bean setting is not restored.                                                                                                                                                                                       |
+| `std.stitchcraft.appliquesteps`      | `appliquesteps(region, w)`. Performs a 2.5 mm running placement line, a narrow satin tack-down at `max(0.8, 0.35w)`, and a final satin cover at `w`. Inserts `stop` events between the three stages so fabric can be placed/trimmed. Each stage travels with needle up to the ring start. Ends at the closed ring's end with satin turned off. |
+| `std.stitchcraft.appliquewith`       | `appliquewith(region, placementInset, tackdownInset, coverWidth, stops)`. Configurable three-stage appliqué construction. See below.                                                                                                                                                                                                           |
+| `std.stitchcraft.eyelet`             | `eyelet(r)`. Sews a resampled satin circle centered at the current needle position. Radius must be positive; satin width is `clamp(0.55r, 0.6, 1.5)`. A `push`/`pop` pair restores needle position, heading, and pen state after sewing; satin ends off.                                                                                       |
+| `std.stitchcraft.fillbordergeometry` | `fillbordergeometry(region, coverWidth, overlap) -> [fillRings, borderPaths, inset]`. Pure fill-and-border construction geometry. See below.                                                                                                                                                                                                   |
+| `std.stitchcraft.fillandborder`      | `fillandborder(region, deg, spacing, coverWidth)`. Sews inset fill rows, inserts a `stop`, then sews the satin border. Uses the standard 0.4 mm overlap.                                                                                                                                                                                       |
+| `std.stitchcraft.fillandborderwith`  | `fillandborderwith(region, deg, spacing, coverWidth, overlap)`. Explicit-overlap form of `fillandborder`.                                                                                                                                                                                                                                      |
+| `std.stitchcraft.gradientbands`      | `gradientbands(region, deg, n) -> list of regions`. Geometry-only helper: slices a region into `max(1, round(n))` parallel bands oriented at heading/angle `deg` and returns all clipped pieces in band order. Concavity can yield more pieces than requested bands.                                                                           |
+| `std.stitchcraft.gradientrows`       | `gradientrows(region, deg, pitch, amount) -> [rowsA, rowsB]`. Geometry-only, density-neutral two-color blend. See below.                                                                                                                                                                                                                       |
+| `std.stitchcraft.gradientrowsn`      | `gradientrowsn(region, deg, pitch, weights) -> list of row groups`. Geometry-only, density-neutral blend across 2–8 colors. See below.                                                                                                                                                                                                         |
+| `std.stitchcraft.serpentinerows`     | `serpentinerows(rows, reversed) -> routed rows`. Greedily routes parallel row paths with endpoint reversal enabled, beginning from the first row when `reversed` is false or the last row when true. Returns `[]` for empty input and does not mutate `rows`.                                                                                  |
+| `std.stitchcraft.knockdown`          | `knockdown(region, deg, spacing)`. Sparse running-stitch foundation for fleece, terry, and other high-pile fabrics. See below.                                                                                                                                                                                                                 |
+| `std.stitchcraft.threadblend`        | `threadblend(region, deg)`. Creates 1.2 mm fill rows at `deg`, sews even rows in the current color, advances once to the next color, then sews odd rows. Rows are resampled at 2.5 mm. Ends in the second color and does not restore needle position.                                                                                          |
+| `std.stitchcraft.stipple`            | `stipple(region, mindist)`. Scatters candidate points and sews a small circular mark only where coverage within `mindist/3` is below one layer. `mindist` must be positive. Each mark restores turtle state with `push`/`pop`. Consumes exactly **1 main-stream RNG draw** through `scatter`.                                                  |
 
 `threadblend` assumes a second usable thread slot. Numeric `color` selection and `colorindex()` differ
 by one internally; the helper accounts for that when it advances to the next slot.
@@ -379,6 +384,64 @@ for channel = 0 to 2 [
   trim
 ]
 ```
+
+### Production construction recipes
+
+`knockdown(region, deg, spacing)` lays one clipped pass of sparse running-stitch rows beneath later
+embroidery. `region` accepts a simple ring or compound even-odd rings. Spacing is restricted to
+1–5 mm so the helper remains a foundation rather than a topping fill; 2.5–4 mm is typical for
+fleece or terry. Rows are routed serpentine and resampled at 3.5 mm. No fill or satin underlay is
+added, and the helper consumes no RNG draws. It turns satin and E-stitch off, resets bean to one,
+and ends in running-stitch mode.
+
+```text
+import std.stitchcraft.knockdown as knockdown
+
+fabric 'fleece'
+color '#d8c8b8'
+knockdown([[-24, -16], [24, -16], [24, 16], [-24, 16]], 30, 3)
+```
+
+`fillbordergeometry(region, coverWidth, overlap)` is the pure planning layer for bordered fills.
+The border centerline follows each original boundary. The fill inset is
+`coverWidth / 2 - overlap`: a 2 mm border and 0.4 mm overlap therefore inset the fill by 0.6 mm.
+`coverWidth` must be 0.8–8 mm and overlap must be from zero through half the cover width. Outer
+boundaries shrink while hole boundaries grow, preserving the compound even-odd exclusion. Insets
+may split concave regions or collapse narrow ones. Border paths explicitly repeat their first point.
+
+`fillandborder(region, deg, spacing, coverWidth)` sews that geometry with the recommended 0.4 mm
+overlap. `fillandborderwith(..., overlap)` exposes the overlap explicitly. The fill stage uses
+clipped, serpentine rows resampled at 2.5 mm without fill underlay or pull compensation. A `stop`
+then advances to the border color, and the original centerlines are sewn as satin using the current
+satin density, underlay, and pull-compensation settings. Both forms end with satin off in the border
+color. They error if the inset eliminates the fill stage.
+
+```text
+import std.stitchcraft.fillandborder as fillandborder
+
+palette ['#2f7d8c', '#f4d35e']
+underlay 'off'
+fillandborder([[-20, -12], [20, -12], [20, 12], [-20, 12]], 25, 0.8, 2.4)
+```
+
+`appliquewith(region, placementInset, tackdownInset, coverWidth, stops)` adds configurable placement,
+tack-down, and satin-cover stages without changing legacy `appliquesteps`. Insets are non-negative;
+the cover width is 0.8–8 mm. `stops` is `[afterPlacement, afterTackdown]`, so `[1, 1]` exposes both
+fabric-handling pauses while `[0, 1]` only pauses before the cover. The placement is a 2.5 mm running
+outline; tack-down width is `max(0.8, coverWidth * 0.35)`; the cover follows the original boundary.
+Compound rings and holes use the same parity-aware inset behavior. The procedure ends with satin
+off, in the color reached by its enabled stops. Collapsed placement or tack-down geometry is an
+error.
+
+```text
+import std.stitchcraft.appliquewith as appliquewith
+
+appliquewith([[-18, -12], [18, -12], [18, 12], [-18, 12]], 0.3, 0.8, 2.5, [1, 1])
+```
+
+All three sewing recipes force plain running mode for their running stages by turning satin and
+E-stitch off and resetting bean to one. They do not restore prior construction settings; callers
+should set any desired follow-on modes explicitly.
 
 ---
 

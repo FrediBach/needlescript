@@ -1,0 +1,18 @@
+hoop '4x4'
+
+import std.stitchcraft.appliquewith as appliquewith
+
+let placementinset = 0.3  // [0:0.1:1.5] placement line inset (mm)
+let tackdowninset = 0.8   // [0:0.1:2] tack-down inset (mm)
+let cover = 2.5           // [1.2:0.1:5] final satin width (mm)
+
+palette ['#6d597a', '#b56576', '#e56b6f']
+background '#f3e9dc'
+underlay 'off'
+density 0.5
+
+let patch = [[-28, -18], [28, -18], [28, 18], [-28, 18]]
+
+// Stop after placement to position fabric, then after tack-down to trim it.
+appliquewith(patch, placementinset, tackdowninset, cover, [1, 1])
+trim

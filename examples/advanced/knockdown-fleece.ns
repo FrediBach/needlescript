@@ -1,0 +1,24 @@
+hoop '4x4'
+
+import std.stitchcraft.knockdown as knockdown
+
+let w = 72       // [40:90] foundation width (mm)
+let h = 50       // [24:70] foundation height (mm)
+let angle = 30   // [0:5:175] row angle (degrees)
+let spacing = 3  // [1.5:0.25:5] sparse row spacing (mm)
+
+palette ['#d8c8b8']
+background '#eee6dc'
+fabric 'fleece'
+lock 0.6
+
+let patch = [
+  [0 - w / 2, 0 - h / 2],
+  [w / 2, 0 - h / 2],
+  [w / 2, h / 2],
+  [0 - w / 2, h / 2]
+]
+
+color '#d8c8b8'
+knockdown(patch, angle, spacing)
+trim

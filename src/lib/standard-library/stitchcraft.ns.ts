@@ -228,4 +228,125 @@ export def stipple(region, mindist) [
     ]
   ]
 ]
+
+def stitchcraftrings(region, label) [
+  if ispath(region) [ return [region] ]
+  assert(islist(region) and len(region) > 0, concat(label, ' region must be a ring or compound ring list'))
+  for ring in region [
+    assert(ispath(ring) and len(ring) >= 3, concat(label, ' region entries must be rings of at least 3 points'))
+  ]
+  return copy(region)
+]
+
+def stitchcraftclosedring(ring) [
+  if first(ring) = last(ring) [ return copy(ring) ]
+  return closepath(ring)
+]
+
+def stitchcraftclosed(rings) [
+  let out = []
+  for ring in rings [ append(out, stitchcraftclosedring(ring)) ]
+  return out
+]
+
+def stitchcraftringdepth(ring, rings) [
+  let depth = 0
+  let sample = first(ring)
+  for other in rings [
+    if ring != other and inpath(sample, other) [ depth += 1 ]
+  ]
+  return depth
+]
+
+def stitchcraftinset(rings, inset) [
+  if inset < 0.000001 [ return copy(rings) ]
+  let out = []
+  let delta = 0
+  let pieces = []
+  for ring in rings [
+    if mod(stitchcraftringdepth(ring, rings), 2) = 0 [ delta = 0 - inset ] else [ delta = inset ]
+    pieces = offsetpath(ring, delta)
+    for piece in pieces [ append(out, piece) ]
+  ]
+  return out
+]
+
+def stitchcraftsewrows(region, deg, spacing, mm) [
+  let rows = serpentinerows(fillrows(region, spacing, deg), false)
+  for row in rows [ startpath(row) sewrun(row, mm) ]
+]
+
+def stitchcraftsewrings(rings, mm) [
+  for ring in rings [
+    let closed = stitchcraftclosedring(ring)
+    startpath(closed)
+    sewrun(closed, mm)
+  ]
+]
+
+def stitchcraftsatinrings(rings, width) [
+  for ring in rings [
+    let closed = stitchcraftclosedring(ring)
+    startpath(closed)
+    satinalong(closed, width)
+  ]
+]
+
+export def knockdown(region, deg, spacing) [
+  assert(spacing >= 1 and spacing <= 5, 'knockdown spacing must be from 1 to 5 mm')
+  // Foundation rows are always plain running stitch; no fill/satin underlay is added.
+  satin 0
+  estitch 0
+  bean 1
+  stitchcraftsewrows(region, deg, spacing, 3.5)
+]
+
+export def fillbordergeometry(region, coverwidth, overlap) [
+  assert(coverwidth >= 0.8 and coverwidth <= 8, 'fillbordergeometry cover width must be from 0.8 to 8 mm')
+  assert(overlap >= 0 and overlap <= coverwidth / 2, 'fillbordergeometry overlap must be from 0 to half the cover width')
+  let rings = stitchcraftrings(region, 'fillbordergeometry')
+  let inset = coverwidth / 2 - overlap
+  let fillrings = stitchcraftinset(rings, inset)
+  let borders = stitchcraftclosed(rings)
+  return [fillrings, borders, inset]
+]
+
+export def fillandborderwith(region, deg, spacing, coverwidth, overlap) [
+  assert(spacing >= 0.25 and spacing <= 5, 'fillandborderwith spacing must be from 0.25 to 5 mm')
+  let geometry = fillbordergeometry(region, coverwidth, overlap)
+  assert(len(geometry[0]) > 0, 'fillandborderwith inset collapsed the fill region — reduce cover width or increase overlap')
+
+  satin 0
+  estitch 0
+  bean 1
+  stitchcraftsewrows(geometry[0], deg, spacing, 2.5)
+  stop
+  stitchcraftsatinrings(geometry[1], coverwidth)
+]
+
+export def fillandborder(region, deg, spacing, coverwidth) [
+  fillandborderwith(region, deg, spacing, coverwidth, 0.4)
+]
+
+export def appliquewith(region, placementinset, tackdowninset, coverwidth, stops) [
+  assert(placementinset >= 0, 'appliquewith placement inset must be non-negative')
+  assert(tackdowninset >= 0, 'appliquewith tackdown inset must be non-negative')
+  assert(coverwidth >= 0.8 and coverwidth <= 8, 'appliquewith cover width must be from 0.8 to 8 mm')
+  assert(islist(stops) and len(stops) = 2, 'appliquewith stops must be [afterPlacement, afterTackdown]')
+
+  let rings = stitchcraftrings(region, 'appliquewith')
+  let placementrings = stitchcraftinset(rings, placementinset)
+  let tackdownrings = stitchcraftinset(rings, tackdowninset)
+  assert(len(placementrings) > 0, 'appliquewith placement inset collapsed the region')
+  assert(len(tackdownrings) > 0, 'appliquewith tackdown inset collapsed the region')
+
+  satin 0
+  estitch 0
+  bean 1
+  stitchcraftsewrings(placementrings, 2.5)
+  if stops[0] [ stop ]
+  stitchcraftsatinrings(tackdownrings, max(0.8, coverwidth * 0.35))
+  if stops[1] [ stop ]
+  stitchcraftsatinrings(rings, coverwidth)
+]
 `;

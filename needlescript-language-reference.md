@@ -315,7 +315,8 @@ Bundled modules currently include:
   uniform path fitting. Placements have the form `[[x, y], heading]`.
 - `std.stitchcraft` — running, satin, bean, appliqué, eyelet, gradient-band,
   density-neutral two- and N-color gradient rows with reversible serpentine routing, fixed two-color
-  row-blend, and coverage-aware stipple rituals. `stipple` consumes exactly
+  row-blend, fleece knockdown, bordered-fill and configurable appliqué recipes, and coverage-aware
+  stipple rituals. `stipple` consumes exactly
   one main-stream draw through `scatter`; the other helpers are drawless.
 - `std.textures` — drawless direction fields (`radialdir(p)`, `curldir(p)`), configured
   field factories (`griddir(deg)`, `radialdirfrom(cx, cy)`, `curldirwith(scale)`), fill
