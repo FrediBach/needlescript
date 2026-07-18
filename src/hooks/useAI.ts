@@ -163,7 +163,7 @@ export function useAI({
       setSelectedModelState(modelId);
       addMsg(`model → ${modelLabel}`, 'ok');
     },
-    [aiModels, addMsg],
+    [aiModels, addMsg, selectedModel],
   );
 
   // ── Command: reset ─────────────────────────────────────────────

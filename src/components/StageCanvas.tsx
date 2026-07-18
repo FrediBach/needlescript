@@ -47,6 +47,7 @@ export default function StageCanvas({
   const transformRef = useRef<RenderTransform | null>(null);
 
   const [viewport, setViewport] = useState<Viewport | null>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [sampleContextMenu, setSampleContextMenu] = useState<SampleContextMenu | null>(null);
 
@@ -98,6 +99,7 @@ export default function StageCanvas({
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.max(1, Math.round(box.width * dpr));
     canvas.height = Math.max(1, Math.round(box.height * dpr));
+    setCanvasSize({ width: canvas.width, height: canvas.height });
     transformRef.current = draw(
       canvas,
       design,
@@ -156,6 +158,7 @@ export default function StageCanvas({
       const dpr = window.devicePixelRatio || 1;
       canvas.width = Math.max(1, Math.round(box.width * dpr));
       canvas.height = Math.max(1, Math.round(box.height * dpr));
+      setCanvasSize({ width: canvas.width, height: canvas.height });
       transformRef.current = draw(
         canvas,
         design,
@@ -562,13 +565,12 @@ export default function StageCanvas({
   // ── derive zoom level for indicator ─────────────────────────────────────
   const zoomLevel = (() => {
     if (!viewport) return null;
-    const canvas = canvasRef.current;
-    if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
-    const autoFit = computeAutoFitScale(canvas.width, canvas.height, design, hoop);
+    if (canvasSize.width === 0 || canvasSize.height === 0) return null;
+    const autoFit = computeAutoFitScale(canvasSize.width, canvasSize.height, design, hoop);
     if (autoFit === 0) return null;
     const zoomed = Math.min(
-      canvas.width / (2 * viewport.halfW),
-      canvas.height / (2 * viewport.halfH),
+      canvasSize.width / (2 * viewport.halfW),
+      canvasSize.height / (2 * viewport.halfH),
     );
     return zoomed / autoFit;
   })();

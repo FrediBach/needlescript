@@ -24,6 +24,8 @@ import type { StitchEvent } from './engine.ts';
 const MAX_DELTA = 127;
 
 export function toEXP(events: StitchEvent[], _label?: string): Uint8Array {
+  // Retained for compatibility with the other exporters, which accept a name.
+  void _label;
   const bytes: number[] = [];
   let cx = 0,
     cy = 0; // current position in 0.1 mm units

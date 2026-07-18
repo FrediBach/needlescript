@@ -7,7 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'dist-lib']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -19,6 +19,22 @@ export default defineConfig([
     ],
     languageOptions: {
       globals: globals.browser,
+    },
+  },
+  // These component modules intentionally export their class-variance helpers
+  // for composition by neighbouring UI primitives.
+  {
+    files: ['src/components/ui/{badge,button,tabs,toggle}.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  // TanStack Virtual's hook returns imperative helpers, so React Compiler
+  // deliberately skips this component. The hook is otherwise used correctly.
+  {
+    files: ['src/components/svg-staging/ElementList.tsx'],
+    rules: {
+      'react-hooks/incompatible-library': 'off',
     },
   },
 ]);

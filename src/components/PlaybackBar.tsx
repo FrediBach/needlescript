@@ -43,7 +43,9 @@ export default function PlaybackBar({
 
   const [speed, setSpeed] = useState(1);
   const speedRef = useRef(speed);
-  speedRef.current = speed;
+  useEffect(() => {
+    speedRef.current = speed;
+  }, [speed]);
 
   const stopPlay = useCallback(() => {
     setPlayingForTotal(null);
