@@ -72,6 +72,19 @@ def gradientrowaxis(path, deg) [
   return 0 - p[0] * sin(deg) + p[1] * cos(deg)
 ]
 
+def gradientnmessage(row, detail) [
+  return concat(concat(concat('gradientrowsn @weights row ', str(row)), ': '), detail)
+]
+
+export def serpentinerows(rows, reversed) [
+  if len(rows) = 0 [ return [] ]
+  if reversed [
+    return routesort(rows, last(last(rows)), 'both')
+  ] else [
+    return routesort(rows, first(first(rows)), 'both')
+  ]
+]
+
 export def gradientrows(region, deg, pitch, amount) [
   assert(pitch >= 0.25 and pitch <= 5, 'gradientrows pitch must be from 0.25 to 5 mm')
   assert(isref(amount), 'gradientrows amount must be a one-argument reporter reference')
@@ -113,6 +126,77 @@ export def gradientrows(region, deg, pitch, amount) [
     rowstart = rowend
   ]
   return [rowsa, rowsb]
+]
+
+export def gradientrowsn(region, deg, pitch, weights) [
+  assert(pitch >= 0.25 and pitch <= 5, 'gradientrowsn pitch must be from 0.25 to 5 mm')
+  assert(isref(weights), 'gradientrowsn weights must be a one-argument reporter reference')
+
+  let rows = fillrows(region, pitch, deg)
+  if len(rows) = 0 [ return [] ]
+
+  let axisof = def(path) [ return gradientrowaxis(path, deg) ]
+  let ordered = sortby(rows, axisof)
+  let axes = map(ordered, axisof)
+  let lo = first(axes)
+  let span = last(axes) - lo
+  let groups = []
+  let errors = []
+  let channelcount = 0
+  let candidate = 0
+  let rowstart = 0
+  let rowend = 0
+  let axis = 0
+  let v = 0
+  let raw = []
+  let total = 0
+  let weight = 0
+  let message = ''
+  let chosen = 0
+  let best = 0
+
+  while rowstart < len(ordered) [
+    axis = axes[rowstart]
+    rowend = rowstart + 1
+    while rowend < len(ordered) and abs(axes[rowend] - axis) < 0.000001 [ rowend += 1 ]
+
+    if abs(span) < 0.000001 [ v = 0.5 ] else [ v = (axis - lo) / span ]
+    raw = weights(v)
+    assert(islist(raw), gradientnmessage(candidate, 'must return a weight list'))
+    if channelcount = 0 [
+      assert(len(raw) >= 2 and len(raw) <= 8, gradientnmessage(candidate, 'must return 2 to 8 weights'))
+      channelcount = len(raw)
+      repeat channelcount [ append(groups, []) append(errors, 0) ]
+    ] else [
+      message = concat('must keep list length fixed at ', str(channelcount))
+      assert(len(raw) = channelcount, gradientnmessage(candidate, message))
+    ]
+
+    total = 0
+    for channel = 0 to channelcount - 1 [
+      weight = raw[channel]
+      message = concat(concat('weight ', str(channel)), ' must be a number')
+      assert(islist(weight) = 0 and isstring(weight) = 0 and isref(weight) = 0, gradientnmessage(candidate, message))
+      message = concat(concat('weight ', str(channel)), ' must be non-negative')
+      assert(weight >= 0, gradientnmessage(candidate, message))
+      total += weight
+    ]
+    assert(total > 0, gradientnmessage(candidate, 'weights must contain at least one positive value'))
+
+    // Deficit = normalized desired prefix count minus assigned prefix count.
+    for channel = 0 to channelcount - 1 [ errors[channel] += raw[channel] / total ]
+    chosen = 0
+    best = errors[0]
+    for channel = 1 to channelcount - 1 [
+      if errors[channel] > best + 0.000000001 [ chosen = channel best = errors[channel] ]
+    ]
+    errors[chosen] -= 1
+    for i = rowstart to rowend - 1 [ append(groups[chosen], ordered[i]) ]
+
+    rowstart = rowend
+    candidate += 1
+  ]
+  return groups
 ]
 
 export def threadblend(region, deg) [

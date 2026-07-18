@@ -566,6 +566,162 @@ describe('standard-library modules', () => {
     ).toThrow(/gradientrows amount must return a number from 0 to 1/);
   });
 
+  it('keeps aggregate density invariant for two through eight gradient channels', () => {
+    const result = run(`
+      import std.stitchcraft.gradientrowsn as gradientrowsn
+      let channels = 2
+      def equalweights(v) [
+        let out = []
+        repeat channels [ append(out, 1) ]
+        return out
+      ]
+      let square = [[-12, -12], [12, -12], [12, 12], [-12, 12]]
+      let groups = []
+      let assigned = 0
+      for count = 2 to 8 [
+        channels = count
+        groups = gradientrowsn(square, 0, 1, @equalweights)
+        assigned = 0
+        for group in groups [ assigned += len(group) ]
+        print [len(groups), assigned, map(groups, @len)]
+      ]
+    `);
+    expect(result.printed).toEqual([
+      '[2, 24, [12, 12]]',
+      '[3, 24, [8, 8, 8]]',
+      '[4, 24, [6, 6, 6, 6]]',
+      '[5, 24, [5, 5, 5, 5, 4]]',
+      '[6, 24, [4, 4, 4, 4, 4, 4]]',
+      '[7, 24, [4, 4, 4, 3, 3, 3, 3]]',
+      '[8, 24, [3, 3, 3, 3, 3, 3, 3, 3]]',
+    ]);
+  });
+
+  it('bounds multichannel prefix error while weights vary across the gradient', () => {
+    const result = run(`
+      import std.stitchcraft.gradientrowsn as gradientrowsn
+      def blend3(v) [ return [1 - v, 1, v] ]
+      let square = [[-20, -20], [20, -20], [20, 20], [-20, 20]]
+      let groups = gradientrowsn(square, 0, 1, @blend3)
+      let expected = [0, 0, 0]
+      let actual = [0, 0, 0]
+      let worst = 0
+      let v = 0
+      let axis = 0
+      let found = 0
+      for candidate = 0 to 39 [
+        v = candidate / 39
+        expected[0] += (1 - v) / 2
+        expected[1] += 0.5
+        expected[2] += v / 2
+        axis = -19.5 + candidate
+        found = 0
+        for channel = 0 to 2 [
+          for row in groups[channel] [
+            if abs(row[0][1] - axis) < 0.000001 [ actual[channel] += 1 found += 1 ]
+          ]
+        ]
+        assert(found = 1, 'every candidate row must have exactly one channel')
+        for channel = 0 to 2 [ worst = max(worst, abs(expected[channel] - actual[channel])) ]
+      ]
+      print map(groups, @len)
+      print round(worst * 1000) / 1000
+    `);
+    expect(result.printed).toEqual(['[10, 20, 10]', '0.5']);
+  });
+
+  it('keeps compound scanline fragments together in N-color groups', () => {
+    const result = run(`
+      import std.stitchcraft.gradientrowsn as gradientrowsn
+      let calls = 0
+      def equal3(v) [ calls += 1 return [1, 1, 1] ]
+      let outer = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+      let hole = [[-4, -4], [4, -4], [4, 4], [-4, 4]]
+      let region = [outer, hole]
+      let base = fillrows(region, 2, 0)
+      let groups = gradientrowsn(region, 0, 2, @equal3)
+      let combined = concat(concat(groups[0], groups[1]), groups[2])
+      let retained = 0
+      let splitrow = 0
+      for row in base [ if contains(combined, row) [ retained += 1 ] ]
+      for groupa = 0 to 1 [
+        for groupb = groupa + 1 to 2 [
+          for a in groups[groupa] [
+            for b in groups[groupb] [
+              if abs(a[0][1] - b[0][1]) < 0.000001 [ splitrow = 1 ]
+            ]
+          ]
+        ]
+      ]
+      print calls
+      print [len(base), map(groups, @len), retained]
+      print splitrow
+    `);
+    expect(result.printed).toEqual(['10', '[14, [6, 4, 4], 14]', '0']);
+  });
+
+  it('routes gradient groups serpentine from either seeding-axis end', () => {
+    const result = run(`
+      import std.stitchcraft.serpentinerows as serpentinerows
+      let rows = [
+        [[-5, -2], [5, -2]],
+        [[-5, 0], [5, 0]],
+        [[-5, 2], [5, 2]]
+      ]
+      let routedforward = serpentinerows(rows, false)
+      let routedbackward = serpentinerows(rows, true)
+      print map(routedforward, @first)
+      print map(routedbackward, @first)
+      print serpentinerows([], false)
+    `);
+    expect(result.printed).toEqual([
+      '[[-5, -2], [5, 0], [-5, 2]]',
+      '[[5, 2], [-5, 0], [5, -2]]',
+      '[]',
+    ]);
+  });
+
+  it('keeps gradientrowsn drawless and reports malformed weights with their row', () => {
+    const source = (seed: number) => `
+      import std.stitchcraft.gradientrowsn as gradientrowsn
+      seed ${seed}
+      def blend3(v) [ return [1 - v, 1, v] ]
+      let square = [[-10, -10], [10, -10], [10, 10], [-10, 10]]
+      print gradientrowsn(square, 15, 2, @blend3)
+      print random(1)
+    `;
+    const first = run(source(246));
+    const differentSeed = run(source(864));
+    const baseline = run('seed 246 print random(1)');
+    expect(first.printed[0]).toBe(differentSeed.printed[0]);
+    expect(first.printed[1]).toBe(baseline.printed[0]);
+
+    const call = (body: string) =>
+      run(`
+        import std.stitchcraft.gradientrowsn as gradientrowsn
+        ${body}
+        gradientrowsn([[-2, -2], [2, -2], [2, 2], [-2, 2]], 0, 1, @badweights)
+      `);
+    expect(() => call('def badweights(v) [ return 1 ]')).toThrow(
+      /gradientrowsn @weights row 0: must return a weight list/,
+    );
+    expect(() => call('def badweights(v) [ return [1] ]')).toThrow(
+      /gradientrowsn @weights row 0: must return 2 to 8 weights/,
+    );
+    expect(() => call("def badweights(v) [ return ['heavy', 1] ]")).toThrow(
+      /gradientrowsn @weights row 0: weight 0 must be a number/,
+    );
+    expect(() => call('def badweights(v) [ return [-1, 2] ]')).toThrow(
+      /gradientrowsn @weights row 0: weight 0 must be non-negative/,
+    );
+    expect(() => call('def badweights(v) [ return [0, 0] ]')).toThrow(
+      /gradientrowsn @weights row 0: weights must contain at least one positive value/,
+    );
+    expect(() =>
+      call('def badweights(v) [ if v = 0 [ return [1, 1] ] else [ return [1, 1, 1] ] ]'),
+    ).toThrow(/gradientrowsn @weights row 1: must keep list length fixed at 2/);
+  });
+
   it('provides deterministic, coverage-aware stipple with one main-stream draw', () => {
     const source = `
       import std.stitchcraft.stipple as stipple

@@ -1,0 +1,44 @@
+hoop '4x4'
+seed 7
+
+import std.stitchcraft.gradientrowsn as gradientrowsn
+import std.stitchcraft.serpentinerows as serpentinerows
+
+let w = 76       // [40:90] band width (mm)
+let h = 57       // [20:80] band height (mm)
+let pitch = 0.4  // [0.4:0.05:1.4] combined line spacing (mm)
+let curve = 1.6  // [0.5:0.1:2.5] end-color falloff
+let middle = 4   // [0:0.25:8] middle-color emphasis
+let wobble = 0   // [0:0.05:0.6] hand-stitch jitter (mm)
+
+let inks = ['#1464a0', '#d63f78', '#f2b134']
+palette inks
+background '#f4efe6'
+fabric 'woven'
+stitchlen 2.5
+
+def sunset(v) [
+  return [pow(1 - v, curve), middle * v * (1 - v), pow(v, curve)]
+]
+
+def sewrows(rows) [
+  for row in rows [
+    up setpos(first(row)) down
+    sewpath(resample(row, 2.5))
+  ]
+]
+
+let region = [
+  [0 - w / 2, 0 - h / 2],
+  [w / 2, 0 - h / 2],
+  [w / 2, h / 2],
+  [0 - w / 2, h / 2]
+]
+let groups = gradientrowsn(region, 90, pitch, @sunset)
+
+for channel = 0 to 2 [
+  color inks[channel]
+  // Alternate the entry end so each color starts near the previous one's finish.
+  humanize wobble [ sewrows(serpentinerows(groups[channel], mod(channel, 2))) ]
+  trim
+]

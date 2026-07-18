@@ -292,22 +292,24 @@ Unlike geometry helpers, these procedures can emit stitches and change machine m
 arguments contain point coordinates rather than turtle-relative distances because they ultimately
 call `sewpath`/`setpos`.
 
-| Import path                     | Signature and effect                                                                                                                                                                                                                                                                                                                           |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `std.stitchcraft.sewrun`        | `sewrun(path, mm)`. Resamples `path` at spacing `mm`, then sews it with the current stitch mode and thread. Equivalent to `sewpath(resample(path, mm))`.                                                                                                                                                                                       |
-| `std.stitchcraft.satinalong`    | `satinalong(path, w)`. Enables satin width `w`, sews `path`, then sets satin width to 0. The final satin state is always off, not restored to a prior width. Other satin settings still apply.                                                                                                                                                 |
-| `std.stitchcraft.beanoutline`   | `beanoutline(region, n)`. Enables bean repeat `n`, sews the logically closed region, then sets bean repeat to 1. The prior bean setting is not restored.                                                                                                                                                                                       |
-| `std.stitchcraft.appliquesteps` | `appliquesteps(region, w)`. Performs a 2.5 mm running placement line, a narrow satin tack-down at `max(0.8, 0.35w)`, and a final satin cover at `w`. Inserts `stop` events between the three stages so fabric can be placed/trimmed. Each stage travels with needle up to the ring start. Ends at the closed ring's end with satin turned off. |
-| `std.stitchcraft.eyelet`        | `eyelet(r)`. Sews a resampled satin circle centered at the current needle position. Radius must be positive; satin width is `clamp(0.55r, 0.6, 1.5)`. A `push`/`pop` pair restores needle position, heading, and pen state after sewing; satin ends off.                                                                                       |
-| `std.stitchcraft.gradientbands` | `gradientbands(region, deg, n) -> list of regions`. Geometry-only helper: slices a region into `max(1, round(n))` parallel bands oriented at heading/angle `deg` and returns all clipped pieces in band order. Concavity can yield more pieces than requested bands.                                                                           |
-| `std.stitchcraft.gradientrows`  | `gradientrows(region, deg, pitch, amount) -> [rowsA, rowsB]`. Geometry-only, density-neutral two-color blend. See below.                                                                                                                                                                                                                       |
-| `std.stitchcraft.threadblend`   | `threadblend(region, deg)`. Creates 1.2 mm fill rows at `deg`, sews even rows in the current color, advances once to the next color, then sews odd rows. Rows are resampled at 2.5 mm. Ends in the second color and does not restore needle position.                                                                                          |
-| `std.stitchcraft.stipple`       | `stipple(region, mindist)`. Scatters candidate points and sews a small circular mark only where coverage within `mindist/3` is below one layer. `mindist` must be positive. Each mark restores turtle state with `push`/`pop`. Consumes exactly **1 main-stream RNG draw** through `scatter`.                                                  |
+| Import path                      | Signature and effect                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `std.stitchcraft.sewrun`         | `sewrun(path, mm)`. Resamples `path` at spacing `mm`, then sews it with the current stitch mode and thread. Equivalent to `sewpath(resample(path, mm))`.                                                                                                                                                                                       |
+| `std.stitchcraft.satinalong`     | `satinalong(path, w)`. Enables satin width `w`, sews `path`, then sets satin width to 0. The final satin state is always off, not restored to a prior width. Other satin settings still apply.                                                                                                                                                 |
+| `std.stitchcraft.beanoutline`    | `beanoutline(region, n)`. Enables bean repeat `n`, sews the logically closed region, then sets bean repeat to 1. The prior bean setting is not restored.                                                                                                                                                                                       |
+| `std.stitchcraft.appliquesteps`  | `appliquesteps(region, w)`. Performs a 2.5 mm running placement line, a narrow satin tack-down at `max(0.8, 0.35w)`, and a final satin cover at `w`. Inserts `stop` events between the three stages so fabric can be placed/trimmed. Each stage travels with needle up to the ring start. Ends at the closed ring's end with satin turned off. |
+| `std.stitchcraft.eyelet`         | `eyelet(r)`. Sews a resampled satin circle centered at the current needle position. Radius must be positive; satin width is `clamp(0.55r, 0.6, 1.5)`. A `push`/`pop` pair restores needle position, heading, and pen state after sewing; satin ends off.                                                                                       |
+| `std.stitchcraft.gradientbands`  | `gradientbands(region, deg, n) -> list of regions`. Geometry-only helper: slices a region into `max(1, round(n))` parallel bands oriented at heading/angle `deg` and returns all clipped pieces in band order. Concavity can yield more pieces than requested bands.                                                                           |
+| `std.stitchcraft.gradientrows`   | `gradientrows(region, deg, pitch, amount) -> [rowsA, rowsB]`. Geometry-only, density-neutral two-color blend. See below.                                                                                                                                                                                                                       |
+| `std.stitchcraft.gradientrowsn`  | `gradientrowsn(region, deg, pitch, weights) -> list of row groups`. Geometry-only, density-neutral blend across 2–8 colors. See below.                                                                                                                                                                                                         |
+| `std.stitchcraft.serpentinerows` | `serpentinerows(rows, reversed) -> routed rows`. Greedily routes parallel row paths with endpoint reversal enabled, beginning from the first row when `reversed` is false or the last row when true. Returns `[]` for empty input and does not mutate `rows`.                                                                                  |
+| `std.stitchcraft.threadblend`    | `threadblend(region, deg)`. Creates 1.2 mm fill rows at `deg`, sews even rows in the current color, advances once to the next color, then sews odd rows. Rows are resampled at 2.5 mm. Ends in the second color and does not restore needle position.                                                                                          |
+| `std.stitchcraft.stipple`        | `stipple(region, mindist)`. Scatters candidate points and sews a small circular mark only where coverage within `mindist/3` is below one layer. `mindist` must be positive. Each mark restores turtle state with `push`/`pop`. Consumes exactly **1 main-stream RNG draw** through `scatter`.                                                  |
 
 `threadblend` assumes a second usable thread slot. Numeric `color` selection and `colorindex()` differ
 by one internally; the helper accounts for that when it advances to the next slot.
 
-### Density-neutral two-color gradient rows
+### Density-neutral gradient rows
 
 `gradientrows` accepts either one ring or a compound list of rings. Compound geometry uses the
 even-odd rule, so inner rings form holes and concave scanlines can produce multiple path fragments.
@@ -336,6 +338,46 @@ for row in groups[0] [ up setpos(first(row)) down sewpath(resample(row, 2.5)) ]
 trim
 color '#e94560'
 for row in reverse(groups[1]) [ up setpos(first(row)) down sewpath(resample(row, 2.5)) ]
+```
+
+`gradientrowsn` generalizes the same candidate set to 2–8 color channels. Its one-argument
+`weights(v)` reporter returns a fixed-length list of non-negative numeric weights. The helper
+normalizes the list at every candidate scanline, so `[1, 2, 1]` and `[0.25, 0.5, 0.25]` are
+equivalent. At least one weight must be positive on every row. The result contains one row group per
+weight, in weight-list order; empty groups are valid. If the region produces no candidate scanlines,
+the helper returns `[]` without invoking the reporter because no weight-list length is available.
+
+Normalized weights accumulate as channel deficits. Each scanline goes wholly to the channel with
+the largest deficit, then one is subtracted from that channel. Stable ties choose the lower channel
+index. This deterministic multichannel error diffusion keeps aggregate pitch unchanged and keeps
+prefix quantization error bounded instead of accumulating independent rounding error. Compound
+scanline fragments remain together. The reporter runs once per candidate scanline.
+
+Malformed results identify `gradientrowsn @weights` and the zero-based candidate row. Errors cover
+non-list results, list-length changes, lengths outside 2–8, non-numeric or negative entries, and
+all-zero weights. The helper consumes no RNG draws beyond any draws deliberately made by the
+reporter.
+
+Partitioning can interrupt the alternating direction inherited from `fillrows`. Pass each group to
+`serpentinerows(group, false)` to route from the low end of the seeding axis, or use `true` to enter
+from the opposite end. The helper uses `routesort(..., 'both')`, so paths may be reversed to reach
+the nearer endpoint. Callers still own color order, trims, stitch subdivision, and palette.
+
+```text
+import std.stitchcraft.gradientrowsn as gradientrowsn
+import std.stitchcraft.serpentinerows as serpentinerows
+
+def sunset(v) [ return [pow(1 - v, 1.5), 4 * v * (1 - v), pow(v, 1.5)] ]
+let groups = gradientrowsn([[-20, -12], [20, -12], [20, 12], [-20, 12]], 90, 0.5, @sunset)
+let inks = ['#1464a0', '#d63f78', '#f2b134']
+
+for channel = 0 to 2 [
+  color inks[channel]
+  for row in serpentinerows(groups[channel], mod(channel, 2)) [
+    up setpos(first(row)) down sewpath(resample(row, 2.5))
+  ]
+  trim
+]
 ```
 
 ---
