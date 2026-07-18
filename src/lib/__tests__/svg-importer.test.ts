@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { svgToCode, convertShapes } from '../svg-importer.ts';
+import { svgToCode, convertShapes } from '../../svg-import/import-policy.ts';
 import { run } from '../engine.ts';
 
 // ── SVG test fixtures ──────────────────────────────────────────────────────
@@ -111,12 +111,12 @@ describe('svgToCode', () => {
   describe('supported shapes', () => {
     it('converts <line>', () => {
       const { code } = svgToCode(simpleLine);
-      expect(code).toContain('fd');
+      expect(code).toContain('sewpath');
     });
 
     it('converts <rect> with stroke', () => {
       const { code } = svgToCode(strokedRect);
-      expect(code).toContain('fd');
+      expect(code).toContain('sewpath');
     });
 
     it('converts <rect> with fill → beginfill/endfill', () => {
@@ -127,7 +127,7 @@ describe('svgToCode', () => {
 
     it('converts <circle>', () => {
       const { code } = svgToCode(circle);
-      expect(code).toContain('fd');
+      expect(code).toContain('sewpath');
     });
 
     it('converts filled <circle> → fill block', () => {
@@ -137,32 +137,32 @@ describe('svgToCode', () => {
 
     it('converts <ellipse>', () => {
       const { code } = svgToCode(ellipse);
-      expect(code).toContain('fd');
+      expect(code).toContain('sewpath');
     });
 
     it('converts <polygon>', () => {
       const { code } = svgToCode(polygon);
-      expect(code).toContain('fd');
+      expect(code).toContain('sewpath');
     });
 
     it('converts <polyline>', () => {
       const { code } = svgToCode(polyline);
-      expect(code).toContain('fd');
+      expect(code).toContain('sewpath');
     });
 
     it('converts <path> with line commands (L, Z)', () => {
       const { code } = svgToCode(pathRect);
-      expect(code).toContain('fd');
+      expect(code).toContain('sewpath');
     });
 
     it('converts <path> with cubic bezier (C)', () => {
       const { code } = svgToCode(pathCubic);
-      expect(code).toContain('fd');
+      expect(code).toContain('sewpath');
     });
 
     it('converts <path> with arc (A)', () => {
       const { code } = svgToCode(pathArc);
-      expect(code).toContain('fd');
+      expect(code).toContain('sewpath');
     });
   });
 
@@ -170,7 +170,7 @@ describe('svgToCode', () => {
   describe('transforms', () => {
     it('applies translate transform', () => {
       const { code } = svgToCode(groupWithTransform);
-      expect(code).toContain('fd');
+      expect(code).toContain('sewpath');
     });
 
     it('transform attribute is applied: rotated shape differs from unrotated', () => {
@@ -220,8 +220,8 @@ describe('svgToCode', () => {
     it('generates a procedure for shapes with both fill and stroke', () => {
       const { code } = svgToCode(fillAndStroke);
       expect(code).toContain('beginfill');
-      // Both fill and stroke use the same procedure
-      expect(code).toMatch(/def shape_\d\(\)/);
+      // Both paint operations reference one shared geometry declaration.
+      expect(code.match(/let rect_1 =/g)).toHaveLength(1);
     });
   });
 
@@ -273,6 +273,13 @@ describe('svgToCode', () => {
 
     it('throws on non-SVG root element', () => {
       expect(() => svgToCode('<html><body></body></html>')).toThrow();
+    });
+
+    it('throws on an unresolved paint instead of substituting gray', () => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <rect x="10" y="10" width="80" height="80" fill="url(#gradient)"/>
+      </svg>`;
+      expect(() => svgToCode(svg)).toThrow(/representative thread color/);
     });
   });
 
@@ -397,7 +404,7 @@ describe('convertShapes', () => {
   it('stroke shape produces trace commands without beginfill', () => {
     const { code } = convertShapes([square]);
     expect(code).not.toContain('beginfill');
-    expect(code).toContain('fd');
+    expect(code).toContain('sewpath');
   });
 
   it('custom palette is used for thread color mapping', () => {

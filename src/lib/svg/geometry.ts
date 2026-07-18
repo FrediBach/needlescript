@@ -79,30 +79,77 @@ function representativePoint(ring: Point[]): Point {
  * nonzero or evenodd fill rule. NeedleScript fills by even-odd ring nesting:
  * a ring at odd depth cuts a hole, a ring at even depth is solid.
  */
-export function computeHoleMap(rings: Point[][]): RingHole[] {
+export function computeHoleMap(
+  rings: Point[][],
+  fillRule: 'nonzero' | 'evenodd' = 'evenodd',
+): RingHole[] {
   const reps = rings.map(representativePoint);
   return rings.map((ring, i) => {
-    let depth = 0;
+    const containers: number[] = [];
     for (let j = 0; j < rings.length; j++) {
       if (j === i) continue;
-      // only closed rings can contain another ring
       if (rings[j].length < 3) continue;
-      if (pointInPolygon(reps[i], rings[j])) depth++;
+      if (pointInPolygon(reps[i], rings[j])) containers.push(j);
+    }
+    const parent = containers.reduce<number | null>((nearest, candidate) => {
+      if (nearest === null) return candidate;
+      return ringArea(rings[candidate]) < ringArea(rings[nearest]) ? candidate : nearest;
+    }, null);
+    let hole: boolean;
+    if (fillRule === 'evenodd') {
+      hole = containers.length % 2 === 1;
+    } else {
+      const winding = [i, ...containers].reduce(
+        (sum, index) => sum + (orientationOf(rings[index]) === 'ccw' ? 1 : -1),
+        0,
+      );
+      hole = winding === 0;
     }
     return {
-      depth,
-      hole: depth % 2 === 1,
+      depth: containers.length,
+      hole,
       orientation: orientationOf(ring),
+      parent,
     };
   });
+}
+
+/**
+ * Lower requested solid/hole interiors into even-odd fill groups.
+ * Boundaries that do not change the fill state (for example a same-winding
+ * nested ring under nonzero) are omitted. A solid island inside a hole starts
+ * a separate group, so manual Hole/Solid edits affect emitted topology.
+ */
+export function normalizedFillGroups(holeMap: RingHole[]): number[][] {
+  const changesState = holeMap.map((entry) => {
+    const outsideFilled = entry.parent === null ? false : !holeMap[entry.parent].hole;
+    return outsideFilled !== !entry.hole;
+  });
+  const groups: number[][] = [];
+  for (let i = 0; i < holeMap.length; i++) {
+    if (!changesState[i] || holeMap[i].hole) continue;
+    const holes: number[] = [];
+    for (let j = 0; j < holeMap.length; j++) {
+      if (!changesState[j] || !holeMap[j].hole) continue;
+      let parent = holeMap[j].parent;
+      while (parent !== null && !changesState[parent]) parent = holeMap[parent].parent;
+      if (parent === i) holes.push(j);
+    }
+    groups.push([i, ...holes]);
+  }
+  return groups;
 }
 
 /** Net stitched area: outer rings minus holes (for ordering / eligibility). */
 export function netFillArea(rings: Point[][], holeMap: RingHole[]): number {
   let area = 0;
   for (let i = 0; i < rings.length; i++) {
+    const parent = holeMap[i]?.parent ?? null;
+    const outsideFilled = parent === null ? false : !holeMap[parent].hole;
+    const insideFilled = !holeMap[i]?.hole;
+    if (outsideFilled === insideFilled) continue;
     const a = ringArea(rings[i]);
-    area += holeMap[i]?.hole ? -a : a;
+    area += insideFilled ? a : -a;
   }
   return Math.max(0, area);
 }

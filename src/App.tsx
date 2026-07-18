@@ -687,7 +687,18 @@ export default function App() {
     cancelChooser,
     stagingDoc,
     closeStaging,
-  } = useSvgImport({ fitMM, runProgram, setSource, addMsg, onBitmapFile: openBitmapFile });
+  } = useSvgImport({
+    fitMM,
+    field: {
+      shape: selectedHoop.shape,
+      widthMM: selectedHoop.widthMM - 6,
+      heightMM: selectedHoop.heightMM - 6,
+    },
+    runProgram,
+    setSource,
+    addMsg,
+    onBitmapFile: openBitmapFile,
+  });
 
   const { handleShare } = useShare({
     source,
@@ -847,16 +858,6 @@ export default function App() {
     setSource(next);
     runProgram(next, design.name);
   }, [design.name, runProgram]);
-
-  // `@`-referenceable reporters defined in the current editor program, for the
-  // staging workspace's directional-fill field picker.
-  const svgReporters = useMemo(() => {
-    const out: string[] = [];
-    const re = /\bdef\s+([A-Za-z_]\w*)\s*\(/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(source)) !== null) out.push(m[1]);
-    return out;
-  }, [source]);
 
   const handleStagingCommit = useCallback(
     (code: string, mode: 'replace' | 'append') => {
@@ -1136,7 +1137,6 @@ export default function App() {
             }}
             initialDoc={stagingDoc}
             hoop={selectedHoop}
-            reporters={svgReporters}
             onCommit={handleStagingCommit}
           />
         )}

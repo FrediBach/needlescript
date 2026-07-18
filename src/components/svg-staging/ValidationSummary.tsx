@@ -22,15 +22,22 @@ export default function ValidationSummary({ doc, design, onSelect }: Props) {
 
   const findings = useMemo<Finding[]>(() => {
     const out: Finding[] = [];
-    for (const el of doc.elements) {
-      if (el.flags.outsideHoop) out.push({ id: el.id, name: el.name, reason: 'outside hoop' });
-      if (el.flags.degenerate) out.push({ id: el.id, name: el.name, reason: 'degenerate' });
-      if (el.flags.unsupported) out.push({ id: el.id, name: el.name, reason: 'unsupported' });
-      if (el.flags.selfIntersect)
-        out.push({ id: el.id, name: el.name, reason: 'self-intersecting' });
+    for (const operation of doc.operations) {
+      for (const finding of operation.findings) {
+        out.push({ id: operation.id, name: operation.name, reason: finding.message });
+      }
+    }
+    const sourcesWithOperations = new Set(
+      doc.operations.map((operation) => operation.sourceObjectId),
+    );
+    for (const sourceObject of doc.sourceObjects) {
+      if (sourcesWithOperations.has(sourceObject.id)) continue;
+      for (const finding of sourceObject.findings) {
+        out.push({ id: sourceObject.id, name: sourceObject.name, reason: finding.message });
+      }
     }
     return out;
-  }, [doc.elements]);
+  }, [doc.operations, doc.sourceObjects]);
 
   const peak = design.density?.peak ?? 0;
   const coverageVariant: 'secondary' | 'outline' | 'destructive' =
@@ -65,9 +72,9 @@ export default function ValidationSummary({ doc, design, onSelect }: Props) {
           <AlertTitle>Validation</AlertTitle>
           <AlertDescription>
             <div className="flex flex-col gap-1">
-              {findings.map((f, i) => (
+              {findings.map((f) => (
                 <Button
-                  key={`${f.id}-${i}`}
+                  key={`${f.id}-${f.reason}`}
                   variant="ghost"
                   size="sm"
                   className="h-6 justify-start text-[11px]"

@@ -42,26 +42,26 @@ export default function PreviewPane({
   const overlays = useMemo<CanvasOverlay[]>(() => {
     const out: CanvasOverlay[] = [];
     if (showOverlay) {
-      for (const el of doc.elements) {
+      for (const el of doc.operations) {
         if (el.rings.length) out.push({ rings: el.rings, kind: 'overlay' });
       }
     }
     if (showSkipped) {
-      for (const el of doc.elements) {
+      for (const el of doc.operations) {
         if ((!el.include || el.strategy.kind === 'skip') && el.rings.length)
           out.push({ rings: el.rings, kind: 'excluded' });
       }
     }
-    for (const el of doc.elements) {
+    for (const el of doc.operations) {
       if (selectedIds.has(el.id) && el.rings.length)
         out.push({ rings: el.rings, kind: 'highlight' });
     }
     return out;
-  }, [doc.elements, selectedIds, showOverlay, showSkipped]);
+  }, [doc.operations, selectedIds, showOverlay, showSkipped]);
 
   const handlePick = (mm: { x: number; y: number }) => {
     // topmost (latest in sew order) included element whose outer ring contains the point
-    const hit = doc.elements
+    const hit = doc.operations
       .filter((e) => e.include && e.rings.length)
       .sort((a, b) => b.order - a.order)
       .find((e) => pointInPolygon([mm.x, mm.y], e.rings[0]));

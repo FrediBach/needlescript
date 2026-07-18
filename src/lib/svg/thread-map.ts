@@ -1,10 +1,12 @@
 // ============================================================
 // SVG-import thread mapping (pure, DOM-free).
 //
-// Maps source SVG colours to palette slots by nearest-RGB match, and
+// Maps source SVG colours to palette slots by perceptual OKLab distance, and
 // maintains the document-wide source→slot map plus per-element overrides
 // (spec §10.1). Colour parsing mirrors the importer's parser.
 // ============================================================
+
+import { colorDist, parseColor } from '../colormath.ts';
 
 const SVG_NAMED: Record<string, string> = {
   black: '#000000',
@@ -65,16 +67,21 @@ export function rgbToHex(rgb: number[]): string {
   );
 }
 
-/** Index of the nearest palette thread by squared RGB distance. */
+/** Index of the nearest palette thread by native NeedleScript OKLab distance. */
 export function nearestThread(rgb: number[], palette: string[]): number {
-  let best = 0,
-    bd = Infinity;
+  const source = rgbToHex(rgb);
+  let best = 0;
+  let bestDistance = Infinity;
   for (let i = 0; i < palette.length; i++) {
-    const p = parseColorStr(palette[i]) as number[];
-    if (!p) continue;
-    const d = (rgb[0] - p[0]) ** 2 + (rgb[1] - p[1]) ** 2 + (rgb[2] - p[2]) ** 2;
-    if (d < bd) {
-      bd = d;
+    let candidate: string;
+    try {
+      candidate = parseColor(palette[i]);
+    } catch {
+      continue;
+    }
+    const distance = colorDist(source, candidate);
+    if (distance < bestDistance) {
+      bestDistance = distance;
       best = i;
     }
   }

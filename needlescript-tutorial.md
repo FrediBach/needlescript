@@ -1845,7 +1845,7 @@ These protect the browser tab and catch runaway programs early. They can be rais
 
 When a design is ready, **Download .DST** produces a standard Tajima file: 3-byte ternary delta records, moves longer than 12.1 mm split automatically, colour changes as stop records, trims as triple jumps, and a correct 512-byte header. Load it onto any machine, or into commercial software for a final check.
 
-You can also bring artwork _in_: **Import SVG** (a button, or drag and drop) converts an SVG into _editable_ NeedleScript code. Filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, and colours map to the nearest thread. It supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, plus groups and transforms — a great way to start from a logo and then make it generative.
+You can also bring artwork _in_: **Import SVG** (a button, or drag and drop) converts SVG structure into _editable_ NeedleScript code. Quick import and **Import with options** use the same conversion pipeline. Fill and stroke become separate operations over one shared named geometry, compound paths honor SVG `evenodd` and `nonzero` winding, and nested groups, inherited paint, transforms, physical stroke widths, and the selected hoop field are retained. It supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon. Unknown paints and unsupported elements are shown as findings rather than changed to a guessed color. In the options workspace, curve paths can remain editable `// [curve]` specs flattened at runtime with `curveflat` — a useful handoff from a logo into generative code.
 
 ---
 

@@ -241,8 +241,8 @@ export default function ElementList({
   update,
 }: Props) {
   const ordered = useMemo(
-    () => doc.elements.slice().sort((a, b) => a.order - b.order),
-    [doc.elements],
+    () => doc.operations.slice().sort((a, b) => a.order - b.order),
+    [doc.operations],
   );
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();

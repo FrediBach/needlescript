@@ -1,116 +1,62 @@
-// ============================================================
-// SVG-import emitter (pure, DOM-free).
-//
-// Walks committed element rows in sew order and produces a readable,
-// generative-ready NeedleScript program (spec §13): provenance header,
-// document setup, named `let` path bindings (resampled rings), then
-// sew blocks grouped by thread with `color` changes and `trim`s.
-// ============================================================
+// Dependency-aware SVG import emitter. Geometry bindings are emitted once and
+// referenced by independently ordered fill/stroke operations.
 
-import type { ElementModel, Point, StagedDocument } from './model.ts';
+import type { ImportOperation, Point, SourceGeometry, StagedDocument } from './model.ts';
 import type { SvgCurveSpec } from './svg-path.ts';
+import { normalizedFillGroups } from './geometry.ts';
 import { STRATEGIES, type EmitContext } from './strategies.ts';
+import { RESERVED } from '../commands.ts';
 
 export interface EmitOptions {
-  /** 'replace' starts a fresh program; 'append' prepends nothing special. */
   mode?: 'replace' | 'append';
-  /** ISO date string for the provenance header (injected for testability). */
   date?: string;
 }
 
 export interface EmitResult {
   code: string;
-  /** element id → 1-based inclusive line range of its sew block, for canvas linking. */
+  imports: string[];
+  preamble: string[];
+  body: string[];
   sewSpans: Record<string, { start: number; end: number }>;
 }
 
-const RESERVED = new Set([
-  'fd',
-  'bk',
-  'rt',
-  'lt',
-  'up',
-  'down',
-  'seth',
-  'setpos',
-  'setxy',
-  'color',
-  'satin',
-  'fill',
-  'dir',
-  'shape',
-  'beginfill',
-  'endfill',
-  'sewpath',
-  'trim',
-  'fabric',
-  'seed',
-  'let',
-  'def',
-  'return',
-  'if',
-  'else',
-  'for',
-  'in',
-  'repeat',
-  'while',
-  'first',
-  'last',
-  'bean',
-  'estitch',
-  'underlay',
-  'density',
-  'fillangle',
-  'fillspacing',
-  'filllen',
-  'fillunderlay',
-  'stitchlen',
-]);
-
-function fmt(v: number): string {
-  const r = Math.round(v * 100) / 100;
-  return Object.is(r, -0) ? '0' : String(r);
+function fmt(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return Object.is(rounded, -0) ? '0' : String(rounded);
 }
 
-/** Make a safe, unique identifier base from an element name. */
 function sanitizeBase(name: string, used: Set<string>): string {
   let base = name
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
-  if (!base || /^[0-9]/.test(base)) base = 'shape_' + base;
-  if (RESERVED.has(base)) base = base + '_';
+  if (!base || /^[0-9]/.test(base)) base = `shape_${base}`;
+  if (RESERVED.has(base)) base += '_';
   let candidate = base;
-  let n = 2;
-  while (used.has(candidate)) candidate = `${base}_${n++}`;
+  let suffix = 2;
+  while (used.has(candidate)) candidate = `${base}_${suffix++}`;
   used.add(candidate);
   return candidate;
 }
 
-/**
- * Resample a polyline to ~`spacing` mm between points, preserving endpoints.
- * Keeps the program editable and matches physical stitch spacing (spec §10.4).
- */
+/** Kept as a public geometry utility for callers that explicitly need samples. */
 export function resampleRing(ring: Point[], spacing: number): Point[] {
   if (ring.length < 2 || spacing <= 0) return ring.slice();
   const out: Point[] = [ring[0]];
-  // distance carried over from the previous segment toward the next sample
   let carry = 0;
   for (let i = 1; i < ring.length; i++) {
     const a = ring[i - 1];
     const b = ring[i];
-    const segLen = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    if (segLen < 1e-9) continue;
-    // first sample on this segment falls at (spacing - carry) from `a`
-    let d = spacing - carry;
-    while (d <= segLen + 1e-9) {
-      const t = d / segLen;
+    const segmentLength = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (segmentLength < 1e-9) continue;
+    let distance = spacing - carry;
+    while (distance <= segmentLength + 1e-9) {
+      const t = distance / segmentLength;
       out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
-      d += spacing;
+      distance += spacing;
     }
-    // leftover from the last placed sample to `b`
-    carry = segLen - (d - spacing);
+    carry = segmentLength - (distance - spacing);
   }
   const last = ring[ring.length - 1];
   const tail = out[out.length - 1];
@@ -119,13 +65,11 @@ export function resampleRing(ring: Point[], spacing: number): Point[] {
 }
 
 function formatPathLiteral(points: Point[]): string {
-  const pts = points.map((p) => `[ ${fmt(p[0])}, ${fmt(p[1])} ]`);
-  if (pts.length <= 6) return `[${pts.join(', ')}]`;
-  // wrap for readability: 6 points per line
-  const lines: string[] = ['['];
-  for (let i = 0; i < pts.length; i += 6) {
-    const chunk = pts.slice(i, i + 6).join(', ');
-    lines.push(`  ${chunk}${i + 6 < pts.length ? ',' : ''}`);
+  const formatted = points.map((point) => `[ ${fmt(point[0])}, ${fmt(point[1])} ]`);
+  if (formatted.length <= 6) return `[${formatted.join(', ')}]`;
+  const lines = ['['];
+  for (let i = 0; i < formatted.length; i += 6) {
+    lines.push(`  ${formatted.slice(i, i + 6).join(', ')}${i + 6 < formatted.length ? ',' : ''}`);
   }
   lines.push(']');
   return lines.join('\n');
@@ -140,93 +84,105 @@ function formatCurveLiteral(spec: SvgCurveSpec): string {
   return `[\n${anchors.map((anchor) => `  ${anchor},`).join('\n')}\n]`;
 }
 
-/** Naming for an element's rings: outer / hole{n} / ring{n}. */
-function ringNames(base: string, el: ElementModel): string[] {
-  if (el.rings.length === 1) return [base];
-  let holeN = 0;
-  let solidN = 0;
-  return el.rings.map((_, i) => {
-    if (i === 0) return `${base}_outer`;
-    if (el.holeMap[i]?.hole) return `${base}_hole${holeN++}`;
-    return `${base}_ring${++solidN}`;
-  });
+function included(operation: ImportOperation): boolean {
+  return operation.include && operation.strategy.kind !== 'skip';
 }
 
-function included(el: ElementModel): boolean {
-  return el.include && el.strategy.kind !== 'skip';
+function namesForGeometry(base: string, geometry: SourceGeometry): string[] {
+  if (geometry.paths.length === 1) return [base];
+  return geometry.paths.map((_, index) => `${base}_path${index + 1}`);
+}
+
+function operationColor(operation: ImportOperation): string | null {
+  return operation.role === 'fill' ? operation.sourceFill : operation.sourceStroke;
 }
 
 export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
+  const mode = opts.mode ?? 'replace';
   const date = opts.date ?? new Date().toISOString().slice(0, 10);
-  const sewSpans: Record<string, { start: number; end: number }> = {};
-  const lines: string[] = [];
-
-  const rows = doc.elements
+  const operations = doc.operations
     .filter(included)
     .slice()
     .sort((a, b) => a.order - b.order);
-
-  // 1. provenance header
-  lines.push(`// imported from ${doc.name}.svg — ${date}`);
-  lines.push(
-    `// fabric "${doc.fabric}", resample ${fmt(doc.resampleMM)} mm` +
+  const requiredGeometryIds = new Set(operations.flatMap((operation) => operation.geometryIds));
+  const geometries = doc.geometries.filter((geometry) => requiredGeometryIds.has(geometry.id));
+  const preamble: string[] = [`// imported from ${doc.name}.svg — ${date}`];
+  preamble.push(
+    `// fabric "${doc.fabric}", geometry tolerance ${fmt(doc.geometryToleranceMM)} mm` +
       (doc.scaleFactor !== 1 ? `, scale ${fmt(doc.scaleFactor)}×` : '') +
-      `, ${rows.length} element${rows.length === 1 ? '' : 's'}, seed ${doc.seed}`,
+      `, ${operations.length} operation${operations.length === 1 ? '' : 's'}, seed ${doc.seed}`,
   );
-  lines.push('');
+  if (mode === 'replace') {
+    preamble.push('', `seed ${doc.seed}`, `fabric "${doc.fabric}"`);
+  }
 
-  // 2. document setup
-  lines.push(`seed ${doc.seed}`);
-  lines.push(`fabric "${doc.fabric}"`);
-  lines.push('');
-
-  // 3. named path bindings (resampled)
+  const body: string[] = ['', '// --- geometry ---'];
   const usedNames = new Set<string>();
-  const elNames = new Map<string, string[]>();
-  lines.push('// --- paths ---');
-  for (const el of rows) {
-    const base = sanitizeBase(el.name, usedNames);
-    const names = ringNames(base, el);
-    elNames.set(el.id, names);
-    el.rings.forEach((ring, i) => {
-      const curve = doc.editableCurves ? el.curveSpecs?.[i] : undefined;
-      if (curve) {
-        const specName = `${names[i]}_spec`;
-        usedNames.add(specName);
-        const annotation = curve.closed ? '[curve: closed]' : '[curve]';
-        lines.push(`let ${specName} = ${formatCurveLiteral(curve)} // ${annotation}`);
-        lines.push(
-          `let ${names[i]} = curvepath(${specName}, ${fmt(doc.resampleMM)}${curve.closed ? ", 'closed'" : ''})`,
-        );
-      } else {
-        const resampled = resampleRing(ring, doc.resampleMM);
-        lines.push(`let ${names[i]} = ${formatPathLiteral(resampled)}`);
+  const geometryNames = new Map<string, string[]>();
+  const geometryBases = new Map<string, string>();
+  for (const geometry of geometries) {
+    const base = sanitizeBase(geometry.name, usedNames);
+    const names = namesForGeometry(base, geometry);
+    geometryNames.set(geometry.id, names);
+    geometryBases.set(geometry.id, base);
+    geometry.paths.forEach((path, index) => {
+      const curve = doc.editableCurves ? geometry.curveSpecs?.[index] : undefined;
+      if (!curve) {
+        body.push(`let ${names[index]} = ${formatPathLiteral(path)}`);
+        return;
       }
+      const specName = `${names[index]}_spec`;
+      usedNames.add(specName);
+      body.push(
+        `let ${specName} = ${formatCurveLiteral(curve)} // ${curve.closed ? '[curve: closed]' : '[curve]'}`,
+      );
+      body.push(
+        `let ${names[index]} = curveflat(${specName}, ${fmt(doc.geometryToleranceMM)}${curve.closed ? ", 'closed'" : ''})`,
+      );
     });
   }
-  lines.push('');
 
-  // 4. sew blocks, grouped by current order; color emitted on change, trim between motifs.
-  lines.push('// --- sew ---');
-  let currentColor: number | null = null;
-  for (const el of rows) {
-    const names = elNames.get(el.id)!;
-    const ctx: EmitContext = { ringNames: names, holeMap: el.holeMap };
-    const body = STRATEGIES[el.strategy.kind].emit(el, ctx);
-    if (body.length === 0) continue;
+  body.push('', '// --- sew ---');
+  const spansRelative: Record<string, { start: number; end: number }> = {};
+  let currentColor: number | string | null = null;
+  for (const operation of operations) {
+    const geometryId = operation.geometryIds[0];
+    const allNames = geometryNames.get(geometryId);
+    if (!allNames) continue;
+    const ringNames = operation.pathIndices.map((index) => allNames[index]);
+    const base = geometryBases.get(geometryId) ?? 'imported';
+    const context: EmitContext = {
+      ringNames,
+      holeMap: operation.holeMap,
+      fillGroups:
+        operation.role === 'fill'
+          ? normalizedFillGroups(operation.holeMap)
+          : operation.rings.map((_, index) => [index]),
+      scaffoldName: sanitizeBase(`${base}_grain`, usedNames),
+    };
+    const operationBody = STRATEGIES[operation.strategy.kind].emit(operation, context);
+    if (operationBody.length === 0) continue;
 
-    if (el.threadIndex !== currentColor) {
-      lines.push('');
-      lines.push(`color ${el.threadIndex}`);
-      currentColor = el.threadIndex;
-    } else {
-      lines.push('');
+    const color =
+      mode === 'append' ? (operationColor(operation) ?? '#000000') : operation.threadIndex;
+    body.push('');
+    if (color !== currentColor) {
+      body.push(typeof color === 'number' ? `color ${color}` : `color '${color}'`);
+      currentColor = color;
     }
-    const start = lines.length + 1;
-    lines.push(...body);
-    lines.push('trim');
-    sewSpans[el.id] = { start, end: lines.length };
+    const start = body.length + 1;
+    body.push(...operationBody, 'trim');
+    spansRelative[operation.id] = { start, end: body.length };
   }
 
-  return { code: lines.join('\n'), sewSpans };
+  const imports: string[] = [];
+  const lines = [...imports, ...preamble, ...body];
+  const lineOffset = imports.length + preamble.length;
+  const sewSpans = Object.fromEntries(
+    Object.entries(spansRelative).map(([id, span]) => [
+      id,
+      { start: span.start + lineOffset, end: span.end + lineOffset },
+    ]),
+  );
+  return { code: lines.join('\n'), imports, preamble, body, sewSpans };
 }

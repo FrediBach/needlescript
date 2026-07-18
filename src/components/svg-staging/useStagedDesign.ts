@@ -67,8 +67,12 @@ export function useStagedDesign(initial: StagedDocument): StagedPreview {
       let response;
       try {
         response = await compile(code, doc.seed);
-      } catch {
-        response = null;
+      } catch (caught) {
+        if (!liveRef.current) return;
+        setCompiling(false);
+        setError(caught instanceof Error ? caught.message : String(caught));
+        setDesign((current) => ({ ...current, ok: false }));
+        return;
       }
       if (!liveRef.current) return;
       setCompiling(false);

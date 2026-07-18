@@ -9,7 +9,7 @@
 
 import type { ElementModel, GeomType, RingHole, Strategy, StrategyKind } from './model.ts';
 import { defaultStrategy } from './model.ts';
-import { perimeterToAreaRatio, isClosedRing } from './geometry.ts';
+import { isClosedRing } from './geometry.ts';
 
 // ---------- parameter schema ----------
 
@@ -34,9 +34,12 @@ export type ParamControl =
   | { kind: 'switch'; key: string; label: string; tooltip: string };
 
 export interface EmitContext {
-  /** binding name per ring index (already-resampled `let` paths). */
+  /** binding name per operation-local path index. */
   ringNames: string[];
   holeMap: RingHole[];
+  /** Operation-local ring indices grouped for even-odd beginfill blocks. */
+  fillGroups: number[][];
+  scaffoldName: string;
 }
 
 export interface StrategyDef {
@@ -84,17 +87,20 @@ function startRing(name: string): string {
 
 /** beginfill/endfill over outer + hole rings (shared by tatami & directional). */
 function fillBody(ctx: EmitContext, indent = '  '): string[] {
-  const lines: string[] = ['beginfill'];
-  ctx.ringNames.forEach((name, i) => {
-    if (i === 0) {
+  const lines: string[] = [];
+  for (const group of ctx.fillGroups) {
+    const first = ctx.ringNames[group[0]];
+    if (!first) continue;
+    lines.push(startRing(first));
+    lines.push('beginfill');
+    group.forEach((index, position) => {
+      const name = ctx.ringNames[index];
+      if (!name) return;
+      if (position > 0) lines.push(`${indent}${startRing(name)}`);
       lines.push(`${indent}sewpath(${name})`);
-    } else {
-      const tag = ctx.holeMap[i]?.hole ? '   // new ring → hole by even-odd' : '';
-      lines.push(`${indent}${startRing(name)}${tag}`);
-      lines.push(`${indent}sewpath(${name})`);
-    }
-  });
-  lines.push('endfill');
+    });
+    lines.push('endfill');
+  }
   return lines;
 }
 
@@ -196,6 +202,7 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
       const p = (el.strategy as Extract<Strategy, { kind: 'satinBorder' }>).params;
       const lines: string[] = [];
       if (p.underlay !== 'auto') lines.push(`underlay "${p.underlay}"`);
+      lines.push(`shortstitch ${p.shortstitch ? 1 : 0}`);
       lines.push(`density ${fmt(p.density)}`);
       lines.push(`satin ${fmt(p.width)}`);
       ctx.ringNames.forEach((name) => {
@@ -203,6 +210,8 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
         lines.push(`sewpath(${name})`);
       });
       lines.push('satin 0');
+      if (!p.shortstitch) lines.push('shortstitch 1');
+      if (p.underlay !== 'auto') lines.push('underlay "auto"');
       return lines;
     },
   },
@@ -257,7 +266,6 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
       lines.push(`fillangle ${fmt(p.fillangle)}`);
       lines.push(`fillspacing ${fmt(p.fillspacing)}`);
       lines.push(`filllen ${fmt(p.filllen)}`);
-      lines.push(startRing(ctx.ringNames[0]));
       lines.push(...fillBody(ctx));
       return lines;
     },
@@ -288,18 +296,16 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
     ],
     emit: (el, ctx) => {
       const p = (el.strategy as Extract<Strategy, { kind: 'directionalFill' }>).params;
-      // No field chosen → emit a commented scaffold the user fleshes out.
       if (!p.field) {
-        const ring = ctx.ringNames[0];
         return [
-          '// def grain(p) [ return snoise2(p[0] / 20, p[1] / 20) * 180 ]',
-          '// fill dir @grain',
-          `// beginfill sewpath(${ring}) endfill`,
+          `def ${ctx.scaffoldName}(p) [ return 45 ]`,
+          `fillspacing ${fmt(p.fillspacing)}`,
+          `fill dir @${ctx.scaffoldName}`,
+          ...fillBody(ctx),
         ];
       }
       const lines: string[] = [`fillspacing ${fmt(p.fillspacing)}`];
       lines.push(`fill dir @${p.field}`);
-      lines.push(startRing(ctx.ringNames[0]));
       lines.push(...fillBody(ctx));
       return lines;
     },
@@ -374,9 +380,8 @@ export function eligibleStrategies(g: GeomType): StrategyKind[] {
 }
 
 /**
- * Stage-2 auto-suggestion (spec §9): filled closed shapes → tatami; thin filled
- * slivers → satin; stroked-only shapes → satin (width seeded from stroke-width);
- * open paths → running motif.
+ * Conservative default policy: fills remain fills; strokes use satin only when
+ * their physical hoop-space width is known to be in the safe 2–8 mm range.
  */
 export function autoSuggest(
   geomType: GeomType,
@@ -390,15 +395,14 @@ export function autoSuggest(
   const closed = isClosedGeom(geomType);
 
   if (hasFill && closed) {
-    const ratio = perimeterToAreaRatio(rings, true);
-    // very high perimeter²/area ⇒ a thin sliver: stitch as a satin border
-    if (ratio > 260) return seedSatin(sourceStrokeWidth);
     return defaultStrategy('tatamiFill');
   }
   if (!closed && rings.some((r) => !isClosedRing(r))) {
     return defaultStrategy('runningMotif');
   }
-  if (hasStroke) return seedSatin(sourceStrokeWidth);
+  if (hasStroke && sourceStrokeWidth !== null && sourceStrokeWidth >= 2 && sourceStrokeWidth <= 8)
+    return seedSatin(sourceStrokeWidth);
+  if (hasStroke) return defaultStrategy('outline');
   if (hasFill) return defaultStrategy('tatamiFill');
   return defaultStrategy('outline');
 }

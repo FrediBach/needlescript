@@ -28,35 +28,37 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   initialDoc: StagedDocument;
   hoop: HoopConfig;
-  /** `@`-referenceable reporters defined in the current editor program. */
-  reporters: string[];
   onCommit: (code: string, mode: 'replace' | 'append') => void;
 }
 
-export default function StagingDialog({
-  open,
-  onOpenChange,
-  initialDoc,
-  hoop,
-  reporters,
-  onCommit,
-}: Props) {
-  const { doc, update, design, compiling, emitCode } = useStagedDesign(initialDoc);
+export default function StagingDialog({ open, onOpenChange, initialDoc, hoop, onCommit }: Props) {
+  const { doc, update, design, compiling, error, emitCode } = useStagedDesign(initialDoc);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
-  const [mode, setMode] = useState<'replace' | 'append'>('replace');
-
   const [showDensity, setShowDensity] = useState(false);
   const [showSkipped, setShowSkipped] = useState(true);
   const [showOverlay, setShowOverlay] = useState(false);
   const [hideJumps, setHideJumps] = useState(true);
 
   const ordered = useMemo(
-    () => doc.elements.slice().sort((a, b) => a.order - b.order),
-    [doc.elements],
+    () => doc.operations.slice().sort((a, b) => a.order - b.order),
+    [doc.operations],
   );
+  const hasIncludedOperation = doc.operations.some(
+    (operation) => operation.include && operation.strategy.kind !== 'skip',
+  );
+  const hasBlockingFinding =
+    doc.sourceObjects.some((sourceObject) =>
+      sourceObject.findings.some((finding) => finding.severity === 'error'),
+    ) ||
+    doc.operations.some(
+      (operation) =>
+        operation.include && operation.findings.some((finding) => finding.severity === 'error'),
+    );
+  const canCommit =
+    design.ok && !compiling && error === null && hasIncludedOperation && !hasBlockingFinding;
 
   const select = useCallback((id: string, additive: boolean) => {
     setFocusedId(id);
@@ -84,9 +86,10 @@ export default function StagingDialog({
   }, []);
 
   const commit = useCallback(() => {
-    onCommit(emitCode(), mode);
+    if (!canCommit) return;
+    onCommit(emitCode(), 'replace');
     onOpenChange(false);
-  }, [emitCode, mode, onCommit, onOpenChange]);
+  }, [canCommit, emitCode, onCommit, onOpenChange]);
 
   // keyboard shortcuts (spec §15)
   const onKeyDown = useCallback(
@@ -110,14 +113,14 @@ export default function StagingDialog({
         if (prev) select(prev.id, false);
       } else if (e.key === ' ' && focusedId) {
         e.preventDefault();
-        const el = doc.elements.find((x) => x.id === focusedId);
+        const el = doc.operations.find((x) => x.id === focusedId);
         if (el) update((d) => setInclude(d, focusedId, !el.include));
       } else if (/^[1-6]$/.test(e.key) && selectedIds.size > 0) {
         const kind: StrategyKind = STRATEGY_ORDER[Number(e.key) - 1];
         update((d) => setElementStrategy(d, selectedIds, kind));
       }
     },
-    [commit, doc.elements, focusedId, ordered, select, selectedIds, update],
+    [commit, doc.operations, focusedId, ordered, select, selectedIds, update],
   );
 
   return (
@@ -175,31 +178,34 @@ export default function StagingDialog({
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={18} minSize={12}>
             <div className="h-full overflow-auto">
-              <Inspector
-                doc={doc}
-                selectedIds={selectedIds}
-                reporters={reporters}
-                update={update}
-              />
+              <Inspector doc={doc} selectedIds={selectedIds} reporters={[]} update={update} />
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
 
         <DialogFooter className="mx-0 mb-0 flex flex-row items-center justify-between gap-4 border-t border-foreground/10 p-3">
-          <ValidationSummary doc={doc} design={design} onSelect={(id) => pickElement(id)} />
+          <div className="flex min-w-0 items-center gap-3">
+            <ValidationSummary doc={doc} design={design} onSelect={(id) => pickElement(id)} />
+            {error && (
+              <span className="max-w-[40vw] truncate text-[11px] text-destructive" title={error}>
+                Preview failed: {error}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-[11px]">
-              <Checkbox
-                checked={mode === 'append'}
-                onCheckedChange={(c: boolean) => setMode(c ? 'append' : 'replace')}
-                aria-label="append to program"
-              />
-              <Label className="text-[11px]">Append (don’t replace)</Label>
+              <Checkbox checked={false} disabled aria-label="append to program unavailable" />
+              <Label
+                className="text-[11px] text-muted-foreground"
+                title="Safe program merging is not available yet"
+              >
+                Append unavailable
+              </Label>
             </label>
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button size="sm" onClick={commit}>
+            <Button size="sm" onClick={commit} disabled={!canCommit}>
               Insert as code
             </Button>
           </div>

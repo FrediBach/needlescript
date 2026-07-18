@@ -1,18 +1,17 @@
-// ============================================================
-// SVG-import staging model.
+// Platform-neutral staging model for the SVG importer.
 //
-// The element model is the single source of truth for the staging
-// workspace: the parser produces it, every panel reads/edits it, and
-// the emitter walks it to produce NeedleScript. Everything here is in
-// hoop-space millimetres (transforms already resolved) and DOM-free.
-// ============================================================
+// Source geometry is stored once and referenced by independently editable paint
+// operations. All coordinates and physical paint values are hoop-space mm.
 
 import type { Pt } from '../genmath.ts';
 import type { SvgCurveSpec } from './svg-path.ts';
 
-export type Point = Pt; // [number, number], hoop-space mm
+export type Point = Pt;
+export type SourceGeometryKind =
+  'path' | 'rect' | 'circle' | 'ellipse' | 'line' | 'polyline' | 'polygon';
+export type GeometryOutputMode = 'semantic' | 'curve' | 'path' | 'compact';
 
-/** SVG primitive classification, used for strategy eligibility. */
+/** Operation classification retained for the existing recipe catalogue. */
 export type GeomType =
   'closedPath' | 'openPath' | 'rect' | 'circle' | 'ellipse' | 'polyline' | 'polygon';
 
@@ -28,8 +27,6 @@ export interface BBox {
   maxX: number;
   maxY: number;
 }
-
-// ---------- strategy parameters ----------
 
 interface OutlineParams {
   stitchlen: number;
@@ -49,7 +46,6 @@ interface TatamiFillParams {
   fillunderlay: FillUnderlay;
 }
 interface DirectionalFillParams {
-  /** name of an `@`-referenceable reporter in the editor, or null = scaffold */
   field: string | null;
   fillspacing: number;
 }
@@ -60,7 +56,6 @@ interface RunningMotifParams {
   estitchLen: number;
 }
 
-/** Discriminated union: the assigned strategy plus its own parameter object. */
 export type Strategy =
   | { kind: 'skip' }
   | { kind: 'outline'; params: OutlineParams }
@@ -69,18 +64,80 @@ export type Strategy =
   | { kind: 'directionalFill'; params: DirectionalFillParams }
   | { kind: 'runningMotif'; params: RunningMotifParams };
 
-// ---------- per-ring hole decision ----------
-
 export interface RingHole {
-  /** true ⇒ this ring cuts a hole; false ⇒ solid (stacked) ring. */
+  /** true means the interior of this ring is unfilled. */
   hole: boolean;
-  /** nesting depth (0 = outermost). */
   depth: number;
-  /** winding orientation of the ring. */
   orientation: 'cw' | 'ccw';
+  /** Immediate containing ring, or null for a top-level ring. */
+  parent: number | null;
 }
 
-// ---------- validation findings ----------
+export type FindingSeverity = 'info' | 'warning' | 'error';
+export type FindingCode =
+  | 'outside-field'
+  | 'degenerate'
+  | 'unsupported-element'
+  | 'unsupported-paint'
+  | 'self-intersection'
+  | 'unsafe-satin-width'
+  | 'ambiguous-topology';
+
+export interface OperationFinding {
+  code: FindingCode;
+  severity: FindingSeverity;
+  message: string;
+  sourceObjectId?: string;
+  operationId?: string;
+  suggestedRecipe?: StrategyKind;
+}
+
+export interface GeometryFlags {
+  outsideField?: boolean;
+  degenerate?: boolean;
+  selfIntersect?: boolean;
+}
+
+export interface SourceGeometry {
+  id: string;
+  sourceObjectId: string;
+  name: string;
+  kind: SourceGeometryKind;
+  groupPath: string[];
+  /** Simplified logical geometry used by emission and preview. */
+  paths: Point[][];
+  /** Unsimplified hoop-space geometry used when tolerance changes. */
+  sourcePaths: Point[][];
+  curveSpecs?: SvgCurveSpec[];
+  closed: boolean[];
+  bbox: BBox;
+  outputMode: GeometryOutputMode;
+  flags: GeometryFlags;
+}
+
+export interface SourcePaint {
+  fill: string | null;
+  stroke: string | null;
+  strokeWidthMM: number | null;
+  fillRule: 'nonzero' | 'evenodd';
+  lineCap: 'butt' | 'round' | 'square';
+  lineJoin: 'miter' | 'round' | 'bevel';
+  dashArrayMM: number[] | null;
+  dashOffsetMM: number;
+  visible: boolean;
+}
+
+export interface SourceObject {
+  id: string;
+  name: string;
+  geometryId: string | null;
+  groupPath: string[];
+  sourceIndex: number;
+  paint: SourcePaint;
+  findings: OperationFinding[];
+}
+
+export type OperationRole = 'fill' | 'stroke' | 'guide' | 'relation';
 
 export interface ElementFlags {
   outsideHoop?: boolean;
@@ -90,69 +147,66 @@ export interface ElementFlags {
   densityHot?: boolean;
 }
 
-export interface ElementModel {
-  /** stable key for selection / linking. */
+export interface ImportOperation {
   id: string;
-  /** user-editable label, defaulted from SVG id/class or `path #3`. */
+  sourceObjectId: string;
+  geometryIds: string[];
+  /** Indices into the first referenced geometry. */
+  pathIndices: number[];
   name: string;
+  role: OperationRole;
   geomType: GeomType;
-  /** subpaths in hoop-space mm, transform-resolved. */
+  /** Shared references into SourceGeometry.paths, retained for UI compatibility. */
   rings: Point[][];
-  /** Original cubic geometry for SVG path subpaths, when it can be round-tripped. */
   curveSpecs?: SvgCurveSpec[];
   bbox: BBox;
   areaMm2: number;
   sourceFill: string | null;
   sourceStroke: string | null;
-  /** stroke-width in hoop-space mm, if the source had a stroke. */
   sourceStrokeWidth: number | null;
   fillRule: 'nonzero' | 'evenodd';
   strategy: Strategy;
-  /** resolved palette slot. */
   threadIndex: number;
-  /** per-ring Hole/Solid decision (index-aligned with `rings`). */
   holeMap: RingHole[];
-  /** sew position (= row position in the list). */
+  sourceOrder: number;
   order: number;
-  /** false ⇒ Skip; excluded from emit. */
   include: boolean;
   flags: ElementFlags;
-  /** id of the enclosing SVG `<g>`, for grouping; null at top level. */
+  findings: OperationFinding[];
+  groupPath: string[];
+  /** Compatibility label for older UI code; full groupPath is authoritative. */
   groupId: string | null;
 }
 
+/** Compatibility alias while component names migrate from element to operation. */
+export type ElementModel = ImportOperation;
+
 export type Fabric = 'woven' | 'knit' | 'stretch' | 'denim' | 'canvas' | 'fleece';
-export type SewOrderKey = 'depth' | 'color' | 'manual';
+export type SewOrderKey = 'depth' | 'color' | 'svg' | 'manual';
+
+export interface ImportField {
+  shape: 'circle' | 'oval' | 'rectangle';
+  widthMM: number;
+  heightMM: number;
+}
 
 export interface StagedDocument {
-  /** filename without extension. */
   name: string;
   fabric: Fabric;
   sewOrderKey: SewOrderKey;
-  /** keep `<g>` groups contiguous when auto-ordering. */
   keepGroups: boolean;
-  /** mm spacing every curve is resampled to before sewing. */
-  resampleMM: number;
-  /** Emit SVG path curves as annotated editable specs instead of flattened literals. */
+  geometryToleranceMM: number;
   editableCurves?: boolean;
-  /**
-   * Uniform scale applied on top of the parser's initial fit-to-hoop scale.
-   * 1.0 = no change; 2.0 = twice as large. Applied in-place to all ring
-   * coordinates so every consumer (emit, overlays, hit-test) sees the
-   * correct geometry without extra wiring.
-   */
   scaleFactor: number;
   seed: number;
-  /** palette hex colours, indexed by threadIndex. */
   palette: string[];
-  /** source-colour hex → palette slot (document-wide thread mapping). */
   threadMap: Record<string, number>;
-  elements: ElementModel[];
+  activeField: ImportField;
+  sourceObjects: SourceObject[];
+  geometries: SourceGeometry[];
+  operations: ImportOperation[];
 }
 
-// ---------- defaults ----------
-
-/** A fresh strategy of the given kind with sensible default parameters. */
 export function defaultStrategy(kind: StrategyKind): Strategy {
   switch (kind) {
     case 'skip':
@@ -180,32 +234,46 @@ export function defaultStrategy(kind: StrategyKind): Strategy {
 }
 
 export function bboxOf(rings: Point[][]): BBox {
-  let minX = Infinity,
-    minY = Infinity,
-    maxX = -Infinity,
-    maxY = -Infinity;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
   for (const ring of rings) {
     for (const [x, y] of ring) {
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
     }
   }
-  if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  return { minX, minY, maxX, maxY };
+  return Number.isFinite(minX)
+    ? { minX, minY, maxX, maxY }
+    : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 }
 
-/** True when every ring's bbox corner lies within the sewable disc. */
+export function pointInField(point: Point, field: ImportField): boolean {
+  const halfWidth = field.widthMM / 2;
+  const halfHeight = field.heightMM / 2;
+  if (field.shape === 'rectangle') {
+    return Math.abs(point[0]) <= halfWidth && Math.abs(point[1]) <= halfHeight;
+  }
+  const nx = halfWidth > 0 ? point[0] / halfWidth : Infinity;
+  const ny = halfHeight > 0 ? point[1] / halfHeight : Infinity;
+  return nx * nx + ny * ny <= 1 + 1e-9;
+}
+
+export function geometryOutsideField(rings: Point[][], field: ImportField): boolean {
+  return rings.some((ring) => ring.some((point) => !pointInField(point, field)));
+}
+
+/** Retained for downstream callers that still validate a round field. */
 export function bboxOutsideDisc(bbox: BBox, radius: number): boolean {
-  const corners: Point[] = [
+  return [
     [bbox.minX, bbox.minY],
     [bbox.maxX, bbox.minY],
     [bbox.maxX, bbox.maxY],
     [bbox.minX, bbox.maxY],
-  ];
-  return corners.some(([x, y]) => Math.hypot(x, y) > radius);
+  ].some(([x, y]) => Math.hypot(x, y) > radius);
 }
 
-/** Sewable disc radius in mm — matches machine.ts LIMITS.sewableRadius. */
 export const SEWABLE_RADIUS = 47;

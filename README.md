@@ -65,8 +65,8 @@ src/
 │   ├── machine.ts        stitch machine: satin, fills, underlay, limits
 │   ├── postprocess.ts    locks, autotrim, density analysis, stats
 │   ├── dst.ts            Tajima .DST binary encoder
-│   ├── svg-importer.ts   SVG → NeedleScript source converter
 │   └── __tests__/        Vitest suites (the de-facto behavioural spec)
+├── svg-import/           browser SVG adapter and Quick-import policy
 ├── components/           playground UI (editor, stage, playback, reference)
 ├── data.ts               thread palette, hoop constants, bundled examples
 └── App.tsx               run pipeline, DST export, SVG import, drag & drop
@@ -84,7 +84,7 @@ src/
 - **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch, meadow, echo, shatter).
 - **Parameters** — annotate any variable declaration with a comment to expose it as a live control in the Parameters panel below the editor: `// [min:max]` for sliders, `// [switch]` for toggles, or `// [xy]` on a two-element list literal for a **draggable point handle** rendered directly on the stage. Drag sliders or handles, lock individual parameters, randomize unlocked ones with the shuffle button, and pick named presets — all without editing the source. See [Customizer](#customizer) below.
 - **Download .DST** — export the current design as a Tajima stitch file.
-- **Import SVG** — convert an SVG (button or drag & drop) into _editable_ NeedleScript code: filled shapes become `beginfill` blocks (subpaths become holes), strokes become outlines, colours map to the nearest thread. Supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon, groups and transforms. “Import with options” can preserve SVG path commands as draggable `// [curve]` specs; the default flattened output remains unchanged.
+- **Import SVG** — convert SVG vector structure into _editable_ NeedleScript code. Quick import and “Import with options” share one parser, operation model, and emitter. A shape with both fill and stroke becomes two independently configurable operations that reference one named geometry; `evenodd`/`nonzero` topology, nested groups, inherited presentation attributes, transforms, physical stroke widths, and the active round/oval/rectangular field are preserved. Supported geometry is `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon. Unknown paints, text, images, `<use>`, masks, filters, and other deferred SVG features are reported instead of silently approximated. Curve output can use editable `// [curve]` specs with `curveflat`. Append is temporarily unavailable until imports and declarations can be merged safely.
 
 ---
 

@@ -6,9 +6,21 @@ order: 2
 subtitle: 'Vector staging, raster thresholding, cropping, tracing, and production cleanup'
 ---
 
-_Content coming soon._ SVG import remains the vector route; bitmap import adds crop and
-threshold controls that generate editable path code. Both workflows end with simplification,
-resampling, stitch-mode choice, travel review, and a real sewability check.
+SVG import is the vector route. Quick import and the staging workspace share one conversion
+pipeline, so the preview is compiled from the same NeedleScript that will be inserted. Source
+geometry stays named and editable; a shape's fill and stroke become separate construction
+operations that reference that geometry once. Compound paths honor both SVG fill rules, and nested
+groups, inherited paint, transforms, physical stroke widths, and the active hoop field survive the
+handoff.
+
+The options workspace assigns conservative recipes: closed fills start as tatami, narrow or unknown
+strokes as running outlines, and only known 2–8 mm strokes start as satin. Unsupported paint or
+elements appear as findings instead of being silently approximated. Editable SVG curves are emitted
+as `// [curve]` anchor specs and converted to logical geometry with `curveflat`; recipe stitch length
+and density remain separate from that geometry tolerance.
+
+Bitmap import adds crop and threshold controls that generate editable path code. Both workflows end
+with a real NeedleScript program and a sewability check, rather than a private stitch-object format.
 
 <Run>{`import std.pathops.simplifypath as simplify
 
@@ -17,4 +29,7 @@ let outline = trace [ repeat 4 [ fd 20 rt 90 ] ]
 let clean = simplify(resample(outline, 1), 0.5)
 sewpath(clean)`}</Run>
 
-<Checkpoint chapterId="ch-60">Chapter content coming soon.</Checkpoint>
+<Checkpoint chapterId="ch-60">
+  Import a small SVG containing one shape with both fill and stroke. Confirm that staging shows two
+  operations and that the inserted program declares their geometry only once.
+</Checkpoint>

@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
-import { svgToCode } from '../lib/svg-importer.ts';
-import { parseSvgToModel } from '../lib/svg/parse.ts';
-import type { StagedDocument } from '../lib/engine.ts';
+import { svgToCode } from '../svg-import/import-policy.ts';
+import { parseSvgToModel } from '../svg-import/parse-svg-dom.ts';
+import type { ImportField, StagedDocument } from '../lib/engine.ts';
 import { THREADS } from '../data.ts';
 
 type AddMsg = (text: string, type?: 'info' | 'ok' | 'err' | 'print' | 'warn' | 'time') => void;
@@ -13,6 +13,7 @@ const PREF_KEY = 'ns-svg-import-pref';
 interface UseSvgImportOptions {
   /** Max dimension (mm) to fit imported SVG into the current hoop. */
   fitMM: number;
+  field: ImportField;
   runProgram: (src: string, name: string) => void;
   setSource: (src: string) => void;
   addMsg: AddMsg;
@@ -26,6 +27,7 @@ interface UseSvgImportOptions {
  */
 export function useSvgImport({
   fitMM,
+  field,
   runProgram,
   setSource,
   addMsg,
@@ -43,7 +45,13 @@ export function useSvgImport({
   const quickImport = useCallback(
     (text: string, filename: string) => {
       try {
-        const res = svgToCode(text, { fitMM, palette: THREADS, name: filename, maxSegments: 1400 });
+        const res = svgToCode(text, {
+          fitMM,
+          field,
+          palette: THREADS,
+          name: filename,
+          maxSegments: 1400,
+        });
         const name = filename.replace(/\.svg$/i, '') || 'import';
         setSource(res.code);
         const rep = res.report;
@@ -63,19 +71,24 @@ export function useSvgImport({
         addMsg(`SVG import failed: ${err instanceof Error ? err.message : err}`, 'err');
       }
     },
-    [fitMM, runProgram, setSource, addMsg],
+    [fitMM, field, runProgram, setSource, addMsg],
   );
 
   const openStaging = useCallback(
     (text: string, filename: string) => {
       try {
-        const { doc } = parseSvgToModel(text, { palette: THREADS, name: filename, fitMM });
+        const { doc } = parseSvgToModel(text, {
+          palette: THREADS,
+          name: filename,
+          fitMM,
+          field,
+        });
         setStagingDoc(doc);
       } catch (err) {
         addMsg(`SVG import failed: ${err instanceof Error ? err.message : err}`, 'err');
       }
     },
-    [fitMM, addMsg],
+    [fitMM, field, addMsg],
   );
 
   const process = useCallback(

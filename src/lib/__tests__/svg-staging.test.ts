@@ -7,13 +7,18 @@ import {
   netFillArea,
   perimeterToAreaRatio,
   selfIntersects,
+  normalizedFillGroups,
 } from '../svg/geometry.ts';
 import { STRATEGIES, eligibleStrategies, isClosedGeom, autoSuggest } from '../svg/strategies.ts';
 import { emit, resampleRing } from '../svg/emit.ts';
-import { parseSvgToModel } from '../svg/parse.ts';
+import { orderOperations } from '../svg/ordering.ts';
+import { parseSvgToModel } from '../../svg-import/parse-svg-dom.ts';
 import { pathToCurveSpecs } from '../svg/svg-path.ts';
 import { defaultStrategy, type StagedDocument, type ElementModel } from '../svg/model.ts';
 import { run } from '../interpreter.ts';
+import fillAndStrokeFixture from './fixtures/svg/fill-and-stroke.svg?raw';
+import compoundNonzeroFixture from './fixtures/svg/compound-nonzero.svg?raw';
+import nestedGroupsFixture from './fixtures/svg/nested-groups.svg?raw';
 
 const PALETTE = ['#C8472F', '#31604F', '#3A4E8C', '#D9A441', '#8C4A6B', '#2B2B2B'];
 
@@ -60,6 +65,18 @@ describe('svg geometry', () => {
     expect(netFillArea([SQUARE, HOLE], hm)).toBeCloseTo(364, 0);
   });
 
+  it('honors nonzero winding and lowers solid nested rings without a false hole', () => {
+    const sameWinding = [SQUARE, HOLE.slice().reverse()];
+    const same = computeHoleMap(sameWinding, 'nonzero');
+    expect(same[1].hole).toBe(false);
+    expect(normalizedFillGroups(same)).toEqual([[0]]);
+    expect(netFillArea(sameWinding, same)).toBeCloseTo(400, 0);
+
+    const opposite = computeHoleMap([SQUARE, HOLE], 'nonzero');
+    expect(opposite[1].hole).toBe(true);
+    expect(normalizedFillGroups(opposite)).toEqual([[0, 1]]);
+  });
+
   it('perimeterToAreaRatio is high for slivers', () => {
     const blob = perimeterToAreaRatio([SQUARE], true);
     const sliver: [number, number][] = [
@@ -99,7 +116,7 @@ describe('strategy catalogue', () => {
     expect(s.kind).toBe('tatamiFill');
   });
 
-  it('auto-suggest: stroked-only → satin, seeded from stroke width', () => {
+  it('auto-suggest: safe physical stroke → satin, seeded from stroke width', () => {
     const s = autoSuggest('openPath', [SQUARE], null, '#000000', 2.4);
     expect(s.kind).toBe('satinBorder');
     if (s.kind === 'satinBorder') expect(s.params.width).toBeCloseTo(2.4, 1);
@@ -110,7 +127,12 @@ describe('strategy catalogue', () => {
       rings: [SQUARE, HOLE],
       strategy: defaultStrategy('tatamiFill'),
     });
-    const ctx = { ringNames: ['crest_outer', 'crest_hole0'], holeMap: el.holeMap };
+    const ctx = {
+      ringNames: ['crest_outer', 'crest_hole0'],
+      holeMap: el.holeMap,
+      fillGroups: normalizedFillGroups(el.holeMap),
+      scaffoldName: 'crest_grain',
+    };
     const lines = STRATEGIES.tatamiFill.emit(el, ctx);
     expect(lines).toContain('beginfill');
     expect(lines).toContain('endfill');
@@ -120,18 +142,96 @@ describe('strategy catalogue', () => {
 
   it('satin emit brackets the path with satin width / 0', () => {
     const el = mkElement({ rings: [SQUARE], strategy: defaultStrategy('satinBorder') });
-    const lines = STRATEGIES.satinBorder.emit(el, { ringNames: ['edge'], holeMap: el.holeMap });
+    const lines = STRATEGIES.satinBorder.emit(el, {
+      ringNames: ['edge'],
+      holeMap: el.holeMap,
+      fillGroups: [[0]],
+      scaffoldName: 'edge_grain',
+    });
     expect(lines.some((l) => /^satin \d/.test(l))).toBe(true);
     expect(lines).toContain('satin 0');
   });
 
-  it('directional fill with no field emits a commented scaffold', () => {
-    const el = mkElement({ rings: [SQUARE], strategy: defaultStrategy('directionalFill') });
+  it('directional fill with no field emits an active scaffold', () => {
+    const el = mkElement({
+      rings: [SQUARE],
+      strategy: { kind: 'directionalFill', params: { field: null, fillspacing: 0.73 } },
+    });
     const lines = STRATEGIES.directionalFill.emit(el, {
       ringNames: ['petal'],
       holeMap: el.holeMap,
+      fillGroups: [[0]],
+      scaffoldName: 'petal_grain',
     });
-    expect(lines.every((l) => l.startsWith('//'))).toBe(true);
+    expect(lines).toContain('def petal_grain(p) [ return 45 ]');
+    expect(lines).toContain('fillspacing 0.73');
+    expect(lines).toContain('fill dir @petal_grain');
+    expect(run(emit(mkDoc([el]), { date: '2026-01-01' }).code).events.length).toBeGreaterThan(0);
+  });
+
+  it('observes every non-default strategy control in emitted code', () => {
+    const context = {
+      ringNames: ['shape'],
+      holeMap: computeHoleMap([SQUARE]),
+      fillGroups: [[0]],
+      scaffoldName: 'shape_grain',
+    };
+    const outline = mkElement({
+      rings: [SQUARE],
+      strategy: { kind: 'outline', params: { stitchlen: 3.2, bean: true, beanCount: 5 } },
+    });
+    expect(STRATEGIES.outline.emit(outline, context)).toEqual(
+      expect.arrayContaining(['stitchlen 3.2', 'bean 5', 'bean 0']),
+    );
+
+    const satin = mkElement({
+      rings: [SQUARE],
+      strategy: {
+        kind: 'satinBorder',
+        params: { width: 3.4, density: 0.55, underlay: 'edge', shortstitch: false },
+      },
+    });
+    expect(STRATEGIES.satinBorder.emit(satin, context)).toEqual(
+      expect.arrayContaining([
+        'underlay "edge"',
+        'shortstitch 0',
+        'density 0.55',
+        'satin 3.4',
+        'shortstitch 1',
+        'underlay "auto"',
+      ]),
+    );
+
+    const tatami = mkElement({
+      rings: [SQUARE],
+      strategy: {
+        kind: 'tatamiFill',
+        params: { fillangle: 30, fillspacing: 0.65, filllen: 3.3, fillunderlay: 'off' },
+      },
+    });
+    expect(STRATEGIES.tatamiFill.emit(tatami, context)).toEqual(
+      expect.arrayContaining([
+        'fillunderlay "off"',
+        'fillangle 30',
+        'fillspacing 0.65',
+        'filllen 3.3',
+      ]),
+    );
+
+    const running = mkElement({
+      rings: [SQUARE],
+      strategy: {
+        kind: 'runningMotif',
+        params: { stitchlen: 2.8, bean: false, estitch: true, estitchLen: 4.2 },
+      },
+    });
+    expect(STRATEGIES.runningMotif.emit(running, context)).toEqual(
+      expect.arrayContaining(['stitchlen 2.8', 'estitch 4.2', 'estitch 0']),
+    );
+
+    for (const operation of [outline, satin, tatami, running]) {
+      expect(() => run(emit(mkDoc([operation]), { date: '2026-01-01' }).code)).not.toThrow();
+    }
   });
 });
 
@@ -171,8 +271,8 @@ describe('emit → run integration', () => {
     expect(code).toContain('// imported from logo.svg — 2026-01-01');
     expect(code).toContain('seed 1');
     expect(code).toContain('fabric "woven"');
-    expect(code).toContain('let crest_outer =');
-    expect(code).toContain('let crest_hole0 =');
+    expect(code).toContain('let crest_path1 =');
+    expect(code).toContain('let crest_path2 =');
     expect(code).toContain('color 2');
     expect(code).toContain('color 1');
     expect(code).toContain('trim');
@@ -205,6 +305,74 @@ describe('emit → run integration', () => {
     expect(code).not.toContain('let drop =');
     expect(code).not.toContain('let off =');
   });
+
+  it('manual Solid/Hole edits change the emitted fill topology', () => {
+    const operation = mkElement({
+      id: 'crest',
+      name: 'crest',
+      rings: [SQUARE, HOLE],
+      strategy: defaultStrategy('tatamiFill'),
+    });
+    const withHole = emit(mkDoc([operation]), { date: '2026-01-01' }).code;
+    expect(withHole).toContain('sewpath(crest_path2)');
+    const solidMap = operation.holeMap.map((entry, index) =>
+      index === 1 ? { ...entry, hole: false } : entry,
+    );
+    const solid = emit(mkDoc([{ ...operation, holeMap: solidMap }]), {
+      date: '2026-01-01',
+    }).code;
+    expect(solid).not.toContain('sewpath(crest_path2)');
+  });
+
+  it('emits an append fragment without once-only setup and with a color literal', () => {
+    const operation = mkElement({
+      id: 'append',
+      rings: [SQUARE],
+      sourceFill: '#ff0000',
+      strategy: defaultStrategy('tatamiFill'),
+    });
+    const fragment = emit(mkDoc([operation]), { mode: 'append', date: '2026-01-01' }).code;
+    expect(fragment).not.toMatch(/^seed /m);
+    expect(fragment).not.toMatch(/^fabric /m);
+    expect(fragment).toContain("color '#ff0000'");
+    expect(run(fragment).events.length).toBeGreaterThan(0);
+  });
+});
+
+describe('operation ordering', () => {
+  it('keeps top-level SVG groups contiguous when requested', () => {
+    const a = mkElement({
+      id: 'a',
+      rings: [SQUARE],
+      threadIndex: 0,
+      sourceOrder: 0,
+      groupPath: ['group-a'],
+    });
+    const b = mkElement({
+      id: 'b',
+      rings: [SQUARE],
+      threadIndex: 2,
+      sourceOrder: 1,
+      groupPath: ['group-a'],
+    });
+    const c = mkElement({
+      id: 'c',
+      rings: [SQUARE],
+      threadIndex: 1,
+      sourceOrder: 2,
+      groupPath: ['group-b'],
+    });
+    expect(orderOperations([a, b, c], 'color', true).map((operation) => operation.id)).toEqual([
+      'a',
+      'b',
+      'c',
+    ]);
+    expect(orderOperations([a, b, c], 'color', false).map((operation) => operation.id)).toEqual([
+      'a',
+      'c',
+      'b',
+    ]);
+  });
 });
 
 describe('parseSvgToModel', () => {
@@ -216,12 +384,105 @@ describe('parseSvgToModel', () => {
   it('builds an element model in hoop mm and auto-suggests strategies', () => {
     const { doc } = parseSvgToModel(SVG, { palette: PALETTE, name: 'logo.svg', fitMM: 50 });
     expect(doc.name).toBe('logo');
-    expect(doc.elements.length).toBe(2);
-    const rect = doc.elements.find((e) => e.geomType === 'rect')!;
+    expect(doc.operations.length).toBe(2);
+    const rect = doc.operations.find((e) => e.geomType === 'rect')!;
     expect(rect.strategy.kind).toBe('tatamiFill');
-    const circ = doc.elements.find((e) => e.geomType === 'circle')!;
+    const circ = doc.operations.find((e) => e.geomType === 'circle')!;
     expect(circ.sourceFill).toBeNull();
-    expect(circ.strategy.kind).toBe('satinBorder');
+    expect(circ.strategy.kind).toBe('outline');
+  });
+
+  it('derives adjacent fill and stroke operations that share one geometry', () => {
+    const { doc } = parseSvgToModel(fillAndStrokeFixture, { palette: PALETTE, fitMM: 50 });
+    expect(doc.sourceObjects).toHaveLength(1);
+    expect(doc.geometries).toHaveLength(1);
+    expect(doc.operations.map((operation) => operation.role)).toEqual(['fill', 'stroke']);
+    expect(doc.operations[0].geometryIds).toEqual(doc.operations[1].geometryIds);
+    const code = emit(doc, { date: '2026-01-01' }).code;
+    expect(code.match(/let badge =/g)).toHaveLength(1);
+    expect(code).toContain('beginfill');
+    expect(code).toContain('satin ');
+  });
+
+  it('resolves inherited paint, nested group paths, and physical stroke width', () => {
+    const { doc } = parseSvgToModel(nestedGroupsFixture, {
+      palette: PALETTE,
+      fitMM: 60,
+    });
+    expect(doc.operations.map((operation) => operation.role)).toEqual(['fill', 'stroke']);
+    expect(doc.operations[0].groupPath).toEqual(['logo', 'details']);
+    expect(doc.operations[1].sourceStrokeWidth).toBeCloseTo(6, 4);
+    expect(doc.operations[1].strategy.kind).toBe('satinBorder');
+  });
+
+  it('retains physical dash, cap, join, and offset metadata', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20">
+      <g stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"
+        stroke-linejoin="bevel" stroke-dasharray="10 5" stroke-dashoffset="2">
+        <line id="route" x1="0" y1="10" x2="100" y2="10"/>
+      </g>
+    </svg>`;
+    const { doc } = parseSvgToModel(svg, { palette: PALETTE, fitMM: 50 });
+    expect(doc.sourceObjects[0].paint).toMatchObject({
+      strokeWidthMM: 2,
+      lineCap: 'round',
+      lineJoin: 'bevel',
+      dashArrayMM: [5, 2.5],
+      dashOffsetMM: 1,
+    });
+  });
+
+  it('normalizes same- and opposite-winding nonzero compound paths', () => {
+    const { doc } = parseSvgToModel(compoundNonzeroFixture, { palette: PALETTE, fitMM: 70 });
+    const same = doc.operations.find((operation) => operation.name.startsWith('same-winding'))!;
+    const opposite = doc.operations.find((operation) =>
+      operation.name.startsWith('opposite-winding'),
+    )!;
+    expect(same.holeMap.map((entry) => entry.hole)).toEqual([false, false]);
+    expect(opposite.holeMap.map((entry) => entry.hole)).toEqual([false, true]);
+    expect(normalizedFillGroups(same.holeMap)).toEqual([[0]]);
+    expect(normalizedFillGroups(opposite.holeMap)).toEqual([[0, 1]]);
+  });
+
+  it('keeps mixed open/closed subpaths on shared geometry but fills only closed paths', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <path id="mixed" d="M10 10 H40 V40 H10 Z M60 10 L90 40"
+        fill="#c8472f" stroke="#2b2b2b"/>
+    </svg>`;
+    const { doc } = parseSvgToModel(svg, { palette: PALETTE, fitMM: 70 });
+    const fill = doc.operations.find((operation) => operation.role === 'fill')!;
+    const stroke = doc.operations.find((operation) => operation.role === 'stroke')!;
+    expect(fill.pathIndices).toEqual([0]);
+    expect(stroke.pathIndices).toEqual([0, 1]);
+    expect(stroke.geomType).toBe('openPath');
+  });
+
+  it('fits and validates against an oval sewable field', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="45" fill="#c8472f"/>
+    </svg>`;
+    const { doc } = parseSvgToModel(svg, {
+      palette: PALETTE,
+      fitMM: 90,
+      field: { shape: 'oval', widthMM: 114, heightMM: 69 },
+    });
+    expect(doc.operations[0].flags.outsideHoop).toBeUndefined();
+    expect(doc.operations[0].bbox.maxY - doc.operations[0].bbox.minY).toBeLessThanOrEqual(69.01);
+  });
+
+  it('reports unsupported paints instead of silently substituting gray', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <defs><linearGradient id="g"><stop stop-color="red"/></linearGradient></defs>
+      <rect id="gradient" x="10" y="10" width="80" height="80" fill="url(#g)"/>
+    </svg>`;
+    const { doc } = parseSvgToModel(svg, { palette: PALETTE });
+    expect(doc.operations).toHaveLength(0);
+    expect(doc.sourceObjects[0].findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'unsupported-paint', severity: 'error' }),
+      ]),
+    );
+    expect(doc.threadMap).not.toHaveProperty('#808080');
   });
 
   it('parse → emit → run round-trips to real stitches', () => {
@@ -236,9 +497,20 @@ describe('parseSvgToModel', () => {
       <rect x="10" y="10" width="80" height="80" fill="#ff0000"/>
       <text x="10" y="50">hi</text></svg>`;
     const { doc } = parseSvgToModel(svg, { palette: PALETTE, name: 'x.svg' });
-    const unsup = doc.elements.find((e) => e.flags.unsupported);
-    expect(unsup).toBeTruthy();
-    expect(unsup!.include).toBe(false);
+    const unsupported = doc.sourceObjects.find((object) =>
+      object.findings.some((finding) => finding.code === 'unsupported-element'),
+    );
+    expect(unsupported?.name).toBe('text #1');
+  });
+
+  it('keeps a text-only SVG openable as findings without fabricating an operation', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <text id="caption" x="10" y="50">hello</text>
+    </svg>`;
+    const { doc } = parseSvgToModel(svg, { palette: PALETTE });
+    expect(doc.operations).toHaveLength(0);
+    expect(doc.sourceObjects[0]).toMatchObject({ name: 'caption', geometryId: null });
+    expect(doc.sourceObjects[0].findings[0].code).toBe('unsupported-element');
   });
 
   it('retains C/Q/A/Z geometry as editable cubic specs and emits it opt-in', () => {
@@ -246,13 +518,13 @@ describe('parseSvgToModel', () => {
       <path d="M10 50 C20 10 40 10 50 50 Q70 90 90 50 A10 10 0 0 1 10 50 Z"
         fill="none" stroke="#000"/></svg>`;
     const { doc } = parseSvgToModel(svg, { palette: PALETTE, name: 'curves.svg', fitMM: 60 });
-    expect(doc.elements[0].curveSpecs?.[0].closed).toBe(true);
-    expect(doc.elements[0].curveSpecs?.[0].anchors.length).toBeGreaterThan(3);
+    expect(doc.geometries[0].curveSpecs?.[0].closed).toBe(true);
+    expect(doc.geometries[0].curveSpecs?.[0].anchors.length).toBeGreaterThan(3);
     const legacy = emit(doc, { date: '2026-01-01' }).code;
     expect(legacy).not.toContain('// [curve');
     const editable = emit({ ...doc, editableCurves: true }, { date: '2026-01-01' }).code;
     expect(editable).toContain('// [curve: closed]');
-    expect(editable).toContain('curvepath(');
+    expect(editable).toContain('curveflat(');
     expect(run(editable).events.length).toBeGreaterThan(0);
   });
 });
@@ -271,10 +543,15 @@ describe('pathToCurveSpecs', () => {
 
 function mkElement(partial: Partial<ElementModel> & { rings: [number, number][][] }): ElementModel {
   const rings = partial.rings;
-  const holeMap = computeHoleMap(rings);
+  const holeMap = computeHoleMap(rings, partial.fillRule ?? 'nonzero');
+  const id = partial.id ?? 'el';
   return {
-    id: 'el',
+    id,
+    sourceObjectId: `source-${id}`,
+    geometryIds: [`geometry-${id}`],
+    pathIndices: rings.map((_, index) => index),
     name: 'el',
+    role: 'fill',
     geomType: 'closedPath',
     bbox: { minX: -10, minY: -10, maxX: 10, maxY: 10 },
     areaMm2: netFillArea(rings, holeMap),
@@ -285,26 +562,66 @@ function mkElement(partial: Partial<ElementModel> & { rings: [number, number][][
     strategy: defaultStrategy('tatamiFill'),
     threadIndex: 0,
     holeMap,
+    sourceOrder: 0,
     order: 0,
     include: true,
     flags: {},
+    findings: [],
+    groupPath: [],
     groupId: null,
     ...partial,
   };
 }
 
-function mkDoc(elements: ElementModel[]): StagedDocument {
-  elements.forEach((el, i) => (el.order = i));
+function mkDoc(operations: ElementModel[]): StagedDocument {
+  operations.forEach((operation, index) => {
+    operation.order = index;
+    operation.sourceOrder = index;
+  });
   return {
     name: 'logo',
     fabric: 'woven',
     sewOrderKey: 'depth',
     keepGroups: true,
-    resampleMM: 2.5,
+    geometryToleranceMM: 0.2,
     scaleFactor: 1,
     seed: 1,
     palette: PALETTE,
     threadMap: {},
-    elements,
+    activeField: { shape: 'circle', widthMM: 94, heightMM: 94 },
+    sourceObjects: operations.map((operation) => ({
+      id: operation.sourceObjectId,
+      name: operation.name,
+      geometryId: operation.geometryIds[0],
+      groupPath: operation.groupPath,
+      sourceIndex: operation.sourceOrder,
+      paint: {
+        fill: operation.sourceFill,
+        stroke: operation.sourceStroke,
+        strokeWidthMM: operation.sourceStrokeWidth,
+        fillRule: operation.fillRule,
+        lineCap: 'butt',
+        lineJoin: 'miter',
+        dashArrayMM: null,
+        dashOffsetMM: 0,
+        visible: true,
+      },
+      findings: [],
+    })),
+    geometries: operations.map((operation) => ({
+      id: operation.geometryIds[0],
+      sourceObjectId: operation.sourceObjectId,
+      name: operation.name,
+      kind: 'path',
+      groupPath: operation.groupPath,
+      paths: operation.rings,
+      sourcePaths: operation.rings,
+      curveSpecs: operation.curveSpecs,
+      closed: operation.rings.map(() => true),
+      bbox: operation.bbox,
+      outputMode: 'compact',
+      flags: {},
+    })),
+    operations,
   };
 }

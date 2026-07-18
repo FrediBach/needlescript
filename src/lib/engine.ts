@@ -135,9 +135,14 @@ export type {
   ProcessedBitmap,
 } from './bitmap-importer.ts';
 
-// SVG-import staging (pure modules; the DOM parser lives in svg/parse.ts).
+// SVG-import staging (pure modules; the DOM adapter lives in src/svg-import/).
 export type {
   ElementModel,
+  ImportOperation,
+  SourceGeometry,
+  SourceObject,
+  SourcePaint,
+  OperationFinding,
   StagedDocument,
   Strategy,
   StrategyKind,
@@ -147,8 +152,16 @@ export type {
   Fabric,
   SewOrderKey,
   BBox,
+  ImportField,
 } from './svg/model.ts';
-export { defaultStrategy, bboxOf, bboxOutsideDisc, SEWABLE_RADIUS } from './svg/model.ts';
+export {
+  defaultStrategy,
+  bboxOf,
+  bboxOutsideDisc,
+  geometryOutsideField,
+  pointInField,
+  SEWABLE_RADIUS,
+} from './svg/model.ts';
 export {
   computeHoleMap,
   netFillArea,
@@ -158,6 +171,7 @@ export {
   orientationOf,
   pointInPolygon,
   isClosedRing,
+  normalizedFillGroups,
 } from './svg/geometry.ts';
 export {
   STRATEGIES,
@@ -169,4 +183,5 @@ export {
   type StrategyDef,
 } from './svg/strategies.ts';
 export { emit, resampleRing, type EmitResult, type EmitOptions } from './svg/emit.ts';
+export { orderOperations } from './svg/ordering.ts';
 export { parseColorStr, nearestThread, threadForColor, buildThreadMap } from './svg/thread-map.ts';

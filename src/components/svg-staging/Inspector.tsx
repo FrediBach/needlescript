@@ -28,7 +28,7 @@ import {
   setParamsForSelection,
   setHole,
 } from './staging-actions';
-import { computeHoleMap } from '@/lib/engine';
+import { computeHoleMap, netFillArea } from '@/lib/engine';
 
 interface Props {
   doc: StagedDocument;
@@ -181,9 +181,11 @@ function HolePanel({ el, update }: { el: ElementModel; update: Props['update'] }
               onClick={() =>
                 update((d) => ({
                   ...d,
-                  elements: d.elements.map((e) =>
-                    e.id === el.id ? { ...e, holeMap: computeHoleMap(e.rings) } : e,
-                  ),
+                  operations: d.operations.map((e) => {
+                    if (e.id !== el.id) return e;
+                    const holeMap = computeHoleMap(e.rings, e.fillRule);
+                    return { ...e, holeMap, areaMm2: netFillArea(e.rings, holeMap) };
+                  }),
                 }))
               }
             >
@@ -225,8 +227,8 @@ function StrategySelect({
 
 export default function Inspector({ doc, selectedIds, reporters, update }: Props) {
   const selected = useMemo(
-    () => doc.elements.filter((e) => selectedIds.has(e.id)),
-    [doc.elements, selectedIds],
+    () => doc.operations.filter((operation) => selectedIds.has(operation.id)),
+    [doc.operations, selectedIds],
   );
 
   // Nothing selected → document defaults hint.
@@ -234,8 +236,8 @@ export default function Inspector({ doc, selectedIds, reporters, update }: Props
     return (
       <div className="p-3 text-[12px] text-muted-foreground">
         Select an element to edit its stitch strategy. Document defaults: fabric{' '}
-        <span className="font-mono">{doc.fabric}</span>, resample{' '}
-        <span className="font-mono">{doc.resampleMM} mm</span>.
+        <span className="font-mono">{doc.fabric}</span>, geometry tolerance{' '}
+        <span className="font-mono">{doc.geometryToleranceMM} mm</span>.
       </div>
     );
   }

@@ -20,7 +20,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { setGlobal, autoOrder, remapSourceColor, setScale } from './staging-actions';
+import {
+  setGlobal,
+  autoOrder,
+  remapSourceColor,
+  setGeometryTolerance,
+  setScale,
+} from './staging-actions';
 
 const FABRICS: Fabric[] = ['woven', 'knit', 'stretch', 'denim', 'canvas', 'fleece'];
 
@@ -69,6 +75,7 @@ export default function GlobalToolbar({ doc, update }: Props) {
           <SelectContent>
             <SelectItem value="depth">Depth (area)</SelectItem>
             <SelectItem value="color">Colour</SelectItem>
+            <SelectItem value="svg">SVG order</SelectItem>
             <SelectItem value="manual">Manual</SelectItem>
           </SelectContent>
         </Select>
@@ -97,26 +104,29 @@ export default function GlobalToolbar({ doc, update }: Props) {
         />
       </label>
 
-      {/* resample */}
+      {/* logical geometry detail */}
       <Popover>
         <PopoverTrigger render={<Button variant="outline" size="sm" className="h-7 text-[11px]" />}>
-          resample {doc.resampleMM.toFixed(2)} mm
+          detail {doc.geometryToleranceMM.toFixed(2)} mm
         </PopoverTrigger>
         <PopoverContent className="w-56">
           <Label className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
-            Resample spacing
+            Geometry tolerance
           </Label>
           <Slider
             className="mt-2"
-            min={0.5}
-            max={6}
-            step={0.1}
-            value={[doc.resampleMM]}
+            min={0.05}
+            max={2.2}
+            step={0.05}
+            value={[doc.geometryToleranceMM]}
             onValueChange={(vals) => {
               const raw = Array.isArray(vals) ? vals[0] : (vals as number);
-              update((d) => setGlobal(d, { resampleMM: raw }));
+              update((d) => setGeometryTolerance(d, raw));
             }}
           />
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Boundary detail only; stitch spacing stays recipe-specific.
+          </p>
         </PopoverContent>
       </Popover>
 

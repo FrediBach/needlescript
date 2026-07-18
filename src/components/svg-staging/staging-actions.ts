@@ -1,18 +1,38 @@
-// Pure update helpers for the staged document. Each returns a new
-// StagedDocument so the staging hook can drive React state immutably.
+// Pure immutable updates for the canonical SVG source/geometry/operation model.
 
 import type {
+  BBox,
   ElementModel,
   StagedDocument,
   Strategy,
   StrategyKind,
   SewOrderKey,
-  BBox,
 } from '@/lib/engine';
-import { defaultStrategy, bboxOutsideDisc, SEWABLE_RADIUS, autoSuggest } from '@/lib/engine';
+import {
+  autoSuggest,
+  bboxOf,
+  defaultStrategy,
+  geometryOutsideField,
+  netFillArea,
+} from '@/lib/engine';
+import { simplifyRDP } from '@/lib/svg/svg-path';
+import { orderOperations } from '@/lib/svg/ordering';
 
-function mapElements(doc: StagedDocument, fn: (el: ElementModel) => ElementModel): StagedDocument {
-  return { ...doc, elements: doc.elements.map(fn) };
+function mapOperations(
+  doc: StagedDocument,
+  fn: (operation: ElementModel) => ElementModel,
+): StagedDocument {
+  return { ...doc, operations: doc.operations.map(fn) };
+}
+
+function compatibleParams(
+  strategy: Strategy,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  if (strategy.kind !== 'runningMotif') return patch;
+  if (patch.bean === true) return { ...patch, estitch: false };
+  if (patch.estitch === true) return { ...patch, bean: false };
+  return patch;
 }
 
 export function setElementStrategy(
@@ -20,8 +40,8 @@ export function setElementStrategy(
   ids: Set<string>,
   kind: StrategyKind,
 ): StagedDocument {
-  return mapElements(doc, (el) =>
-    ids.has(el.id) ? { ...el, strategy: defaultStrategy(kind) } : el,
+  return mapOperations(doc, (operation) =>
+    ids.has(operation.id) ? { ...operation, strategy: defaultStrategy(kind) } : operation,
   );
 }
 
@@ -30,42 +50,51 @@ export function setElementParams(
   id: string,
   params: Record<string, unknown>,
 ): StagedDocument {
-  return mapElements(doc, (el) => {
-    if (el.id !== id || el.strategy.kind === 'skip') return el;
+  return mapOperations(doc, (operation) => {
+    if (operation.id !== id || operation.strategy.kind === 'skip') return operation;
     return {
-      ...el,
+      ...operation,
       strategy: {
-        ...el.strategy,
-        params: { ...(el.strategy as Extract<Strategy, { params: object }>).params, ...params },
+        ...operation.strategy,
+        params: {
+          ...(operation.strategy as Extract<Strategy, { params: object }>).params,
+          ...compatibleParams(operation.strategy, params),
+        },
       } as Strategy,
     };
   });
 }
 
-/** Edit a shared parameter across several elements (must share a strategy kind). */
 export function setParamsForSelection(
   doc: StagedDocument,
   ids: Set<string>,
   params: Record<string, unknown>,
 ): StagedDocument {
-  return mapElements(doc, (el) => {
-    if (!ids.has(el.id) || el.strategy.kind === 'skip') return el;
+  return mapOperations(doc, (operation) => {
+    if (!ids.has(operation.id) || operation.strategy.kind === 'skip') return operation;
     return {
-      ...el,
+      ...operation,
       strategy: {
-        ...el.strategy,
-        params: { ...(el.strategy as Extract<Strategy, { params: object }>).params, ...params },
+        ...operation.strategy,
+        params: {
+          ...(operation.strategy as Extract<Strategy, { params: object }>).params,
+          ...compatibleParams(operation.strategy, params),
+        },
       } as Strategy,
     };
   });
 }
 
 export function setInclude(doc: StagedDocument, id: string, include: boolean): StagedDocument {
-  return mapElements(doc, (el) => (el.id === id ? { ...el, include } : el));
+  return mapOperations(doc, (operation) =>
+    operation.id === id ? { ...operation, include } : operation,
+  );
 }
 
 export function renameElement(doc: StagedDocument, id: string, name: string): StagedDocument {
-  return mapElements(doc, (el) => (el.id === id ? { ...el, name } : el));
+  return mapOperations(doc, (operation) =>
+    operation.id === id ? { ...operation, name } : operation,
+  );
 }
 
 export function setHole(
@@ -74,138 +103,169 @@ export function setHole(
   ringIndex: number,
   hole: boolean,
 ): StagedDocument {
-  return mapElements(doc, (el) => {
-    if (el.id !== id) return el;
-    const holeMap = el.holeMap.map((h, i) => (i === ringIndex ? { ...h, hole } : h));
-    return { ...el, holeMap };
+  return mapOperations(doc, (operation) => {
+    if (operation.id !== id) return operation;
+    const holeMap = operation.holeMap.map((entry, index) =>
+      index === ringIndex ? { ...entry, hole } : entry,
+    );
+    return { ...operation, holeMap, areaMm2: netFillArea(operation.rings, holeMap) };
   });
 }
 
-/** Remap every element using a given source colour to a palette slot. */
 export function remapSourceColor(
   doc: StagedDocument,
   sourceHex: string,
   threadIndex: number,
 ): StagedDocument {
-  const next = mapElements(doc, (el) => {
-    const src = el.sourceFill ?? el.sourceStroke;
-    return src === sourceHex ? { ...el, threadIndex } : el;
+  const next = mapOperations(doc, (operation) => {
+    const source = operation.sourceFill ?? operation.sourceStroke;
+    return source === sourceHex ? { ...operation, threadIndex } : operation;
   });
   return { ...next, threadMap: { ...next.threadMap, [sourceHex]: threadIndex } };
 }
 
-/** Remap a single element to a palette slot (split it onto its own thread). */
 export function remapElementThread(
   doc: StagedDocument,
   id: string,
   threadIndex: number,
 ): StagedDocument {
-  return mapElements(doc, (el) => (el.id === id ? { ...el, threadIndex } : el));
+  return mapOperations(doc, (operation) =>
+    operation.id === id ? { ...operation, threadIndex } : operation,
+  );
 }
 
 export function setGlobal(doc: StagedDocument, patch: Partial<StagedDocument>): StagedDocument {
   return { ...doc, ...patch };
 }
 
-/** Move an element so it sits at a new index in sew order. */
 export function reorderElements(
   doc: StagedDocument,
   activeId: string,
   overId: string,
 ): StagedDocument {
-  const ordered = doc.elements.slice().sort((a, b) => a.order - b.order);
-  const from = ordered.findIndex((e) => e.id === activeId);
-  const to = ordered.findIndex((e) => e.id === overId);
+  const ordered = doc.operations.slice().sort((a, b) => a.order - b.order);
+  const from = ordered.findIndex((operation) => operation.id === activeId);
+  const to = ordered.findIndex((operation) => operation.id === overId);
   if (from < 0 || to < 0 || from === to) return doc;
   const [moved] = ordered.splice(from, 1);
   ordered.splice(to, 0, moved);
-  const orderById = new Map(ordered.map((e, i) => [e.id, i]));
+  const orderById = new Map(ordered.map((operation, index) => [operation.id, index]));
   return {
-    ...mapElements(doc, (el) => ({ ...el, order: orderById.get(el.id) ?? el.order })),
-    sewOrderKey: 'manual' as SewOrderKey,
+    ...mapOperations(doc, (operation) => ({
+      ...operation,
+      order: orderById.get(operation.id) ?? operation.order,
+    })),
+    sewOrderKey: 'manual',
   };
 }
 
-/** Re-sort sew order by a primary key (depth or colour), keeping groups optional. */
 export function autoOrder(doc: StagedDocument, key: SewOrderKey): StagedDocument {
-  const els = doc.elements.slice();
-  if (key === 'depth') {
-    els.sort((a, b) => b.areaMm2 - a.areaMm2);
-  } else if (key === 'color') {
-    // group by thread (contiguous), tiebreak by area large→small
-    els.sort((a, b) => a.threadIndex - b.threadIndex || b.areaMm2 - a.areaMm2);
-  }
-  const orderById = new Map(els.map((e, i) => [e.id, i]));
+  const ordered = orderOperations(doc.operations, key, doc.keepGroups);
+  const orderById = new Map(ordered.map((operation, index) => [operation.id, index]));
   return {
-    ...mapElements(doc, (el) => ({ ...el, order: orderById.get(el.id) ?? el.order })),
+    ...mapOperations(doc, (operation) => ({
+      ...operation,
+      order: orderById.get(operation.id) ?? operation.order,
+    })),
     sewOrderKey: key,
   };
 }
 
-/**
- * Apply a new absolute scale factor to all element geometry.
- * The ratio `newFactor / doc.scaleFactor` is multiplied into every ring
- * coordinate, bbox, and areaMm2 so that all consumers (emit, overlays,
- * hit-testing) see the updated geometry without extra wiring.
- *
- * After scaling, `outsideHoop` flags are recomputed and `include` / strategy
- * are updated at hoop-boundary crossings:
- *   - Newly outside → disable the element.
- *   - Newly inside  → re-enable and auto-suggest a strategy.
- */
+function scaledBBox(bbox: BBox, ratio: number): BBox {
+  return {
+    minX: bbox.minX * ratio,
+    minY: bbox.minY * ratio,
+    maxX: bbox.maxX * ratio,
+    maxY: bbox.maxY * ratio,
+  };
+}
+
+function syncOperationGeometry(doc: StagedDocument): StagedDocument {
+  const geometryById = new Map(doc.geometries.map((geometry) => [geometry.id, geometry]));
+  return mapOperations(doc, (operation) => {
+    const geometry = geometryById.get(operation.geometryIds[0]);
+    if (!geometry) return operation;
+    const rings = operation.pathIndices.map((index) => geometry.paths[index]);
+    const curveSpecs = geometry.curveSpecs
+      ? operation.pathIndices.map((index) => geometry.curveSpecs![index])
+      : undefined;
+    const isOutside = geometryOutsideField(rings, doc.activeField);
+    const wasOutside = operation.flags.outsideHoop ?? false;
+    let include = operation.include;
+    if (!wasOutside && isOutside) include = false;
+    if (wasOutside && !isOutside && !operation.flags.degenerate) include = true;
+    let strategy = operation.strategy;
+    if (wasOutside && !isOutside && strategy.kind === 'skip' && !operation.flags.degenerate) {
+      strategy = autoSuggest(
+        operation.geomType,
+        rings,
+        operation.sourceFill,
+        operation.sourceStroke,
+        operation.sourceStrokeWidth,
+      );
+    }
+    return {
+      ...operation,
+      rings,
+      curveSpecs,
+      bbox: bboxOf(rings),
+      areaMm2: operation.role === 'fill' ? netFillArea(rings, operation.holeMap) : 0,
+      include,
+      strategy,
+      flags: { ...operation.flags, outsideHoop: isOutside || undefined },
+    };
+  });
+}
+
+export function setGeometryTolerance(doc: StagedDocument, tolerance: number): StagedDocument {
+  const next = {
+    ...doc,
+    geometryToleranceMM: tolerance,
+    geometries: doc.geometries.map((geometry) => {
+      const paths = geometry.sourcePaths.map((path) => simplifyRDP(path, tolerance));
+      return { ...geometry, paths, bbox: bboxOf(paths) };
+    }),
+  };
+  return syncOperationGeometry(next);
+}
+
 export function setScale(doc: StagedDocument, newFactor: number): StagedDocument {
   const ratio = newFactor / doc.scaleFactor;
   if (Math.abs(ratio - 1) < 1e-9) return { ...doc, scaleFactor: newFactor };
-  const r2 = ratio * ratio;
-  const scaleEl = (el: ElementModel): ElementModel => {
-    const rings = el.rings.map((ring) =>
-      ring.map(([x, y]) => [x * ratio, y * ratio] as [number, number]),
-    );
-    const curveSpecs = el.curveSpecs?.map((spec) => ({
-      ...spec,
-      anchors: spec.anchors.map(
-        ([position, incoming, outgoing]) =>
-          [
-            [position[0] * ratio, position[1] * ratio],
-            [incoming[0] * ratio, incoming[1] * ratio],
-            [outgoing[0] * ratio, outgoing[1] * ratio],
-          ] as [[number, number], [number, number], [number, number]],
-      ),
-    }));
-    const scaledBbox: BBox = {
-      minX: el.bbox.minX * ratio,
-      minY: el.bbox.minY * ratio,
-      maxX: el.bbox.maxX * ratio,
-      maxY: el.bbox.maxY * ratio,
-    };
-    const areaMm2 = el.areaMm2 * r2;
-
-    const wasOutside = el.flags.outsideHoop ?? false;
-    const isOutside = bboxOutsideDisc(scaledBbox, SEWABLE_RADIUS);
-    const flags = { ...el.flags, outsideHoop: isOutside || undefined };
-    if (!isOutside) delete flags.outsideHoop;
-
-    // Recompute include at boundary crossings only (preserve manual overrides).
-    let include = el.include;
-    if (!wasOutside && isOutside) {
-      include = false;
-    } else if (wasOutside && !isOutside && !flags.degenerate && !flags.unsupported) {
-      include = true;
-    }
-
-    // Restore a sensible strategy when an element re-enters the hoop.
-    let strategy = el.strategy;
-    if (wasOutside && !isOutside && strategy.kind === 'skip' && !flags.degenerate) {
-      strategy = autoSuggest(
-        el.geomType,
-        rings,
-        el.sourceFill,
-        el.sourceStroke,
-        el.sourceStrokeWidth,
-      );
-    }
-
-    return { ...el, rings, curveSpecs, bbox: scaledBbox, areaMm2, flags, include, strategy };
+  const next: StagedDocument = {
+    ...doc,
+    scaleFactor: newFactor,
+    geometries: doc.geometries.map((geometry) => ({
+      ...geometry,
+      paths: geometry.paths.map((path) => path.map(([x, y]) => [x * ratio, y * ratio])),
+      sourcePaths: geometry.sourcePaths.map((path) => path.map(([x, y]) => [x * ratio, y * ratio])),
+      curveSpecs: geometry.curveSpecs?.map((spec) => ({
+        ...spec,
+        anchors: spec.anchors.map(([position, incoming, outgoing]) => [
+          [position[0] * ratio, position[1] * ratio],
+          [incoming[0] * ratio, incoming[1] * ratio],
+          [outgoing[0] * ratio, outgoing[1] * ratio],
+        ]),
+      })),
+      bbox: scaledBBox(geometry.bbox, ratio),
+    })),
+    sourceObjects: doc.sourceObjects.map((sourceObject) => ({
+      ...sourceObject,
+      paint: {
+        ...sourceObject.paint,
+        strokeWidthMM:
+          sourceObject.paint.strokeWidthMM === null
+            ? null
+            : sourceObject.paint.strokeWidthMM * ratio,
+        dashArrayMM: sourceObject.paint.dashArrayMM?.map((value) => value * ratio) ?? null,
+        dashOffsetMM: sourceObject.paint.dashOffsetMM * ratio,
+      },
+    })),
+    operations: doc.operations.map((operation) => ({
+      ...operation,
+      sourceStrokeWidth:
+        operation.sourceStrokeWidth === null ? null : operation.sourceStrokeWidth * ratio,
+    })),
   };
-  return { ...mapElements(doc, scaleEl), scaleFactor: newFactor };
+  return syncOperationGeometry(next);
 }
