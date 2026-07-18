@@ -160,8 +160,8 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
           if (firstOverload.length > 0) {
             sigLine += ` \`(${firstOverload.join(', ')})\``;
           } else {
-            // zero-arg reporter
-            sigLine += ' *(reporter)*';
+            // Bare zero-arg values are reporters; function-kind items use call syntax.
+            sigLine += item.kindName === 'variable' ? ' *(reporter)*' : ' `()`';
           }
         }
 

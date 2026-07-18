@@ -1,5 +1,8 @@
 // Static catalog of all Needlescript built-ins used by Monaco language services.
 
+import { FABRIC_MODES, FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery-registry.ts';
+import { PLAN_MODES } from '../travel-planner.ts';
+
 export type NSItemKind = 'keyword' | 'function' | 'variable' | 'constant';
 
 export interface NSItem {
@@ -10,6 +13,10 @@ export interface NSItem {
   insertText: string;
   isSnippet?: boolean;
   params?: string[][];
+}
+
+function modeCommandSnippet(command: string, modes: readonly string[], quote: "'" | '"'): string {
+  return `${command} ${quote}\${1|${modes.join(',')}|}${quote}`;
 }
 
 export const NS_ITEMS: NSItem[] = [
@@ -288,6 +295,7 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       'Needle up — subsequent moves are jump travels, not stitches.\n\nAliases: `penup`, `pu`',
     insertText: 'up',
+    params: [[]],
   },
   {
     label: 'down',
@@ -295,6 +303,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'pen down (sew mode)',
     documentation: 'Needle down — subsequent moves sew stitches.\n\nAliases: `pendown`, `pd`',
     insertText: 'down',
+    params: [[]],
   },
   {
     label: 'penup',
@@ -383,6 +392,7 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       'Return to origin (0, 0) with heading 0 (north). Sews/jumps depending on pen state.\n\n**Warning:** if the pen is *down*, this **sews a line** back to the origin. For a non-sewing return use `moveto 0 0` or `gohome`.',
     insertText: 'home',
+    params: [[]],
   },
   {
     label: 'moveto',
@@ -411,6 +421,7 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       'Jump to `(0, 0)` without sewing — pen state preserved. Does **not** reset heading; add `seth 0` for a full neutral reset.\n\nEquivalent to `moveto 0 0`. Contrast with `home`, which sews a line back when the pen is down.\n\nDraw cost: 0.',
     insertText: 'gohome',
+    params: [[]],
   },
   {
     label: 'push',
@@ -419,6 +430,7 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       'Save needle state (position, heading, pen up/down) onto a stack. Max 500 saved states.',
     insertText: 'push',
+    params: [[]],
   },
   {
     label: 'pop',
@@ -427,6 +439,7 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       'Restore the last saved needle state from the stack. Pop on an empty stack warns and is ignored.',
     insertText: 'pop',
+    params: [[]],
   },
   {
     label: 'cs',
@@ -435,6 +448,7 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       'Accepted for Logo familiarity; does nothing in NeedleScript.\n\nAliases: `clearscreen`, `clear`',
     insertText: 'cs',
+    params: [[]],
   },
   // Zero-arg reporters
   {
@@ -694,6 +708,7 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       'Start tracing a fill boundary. Moves between `beginfill` and `endfill` define the shape rather than sewing. A pen-up move starts a new ring — inner rings become holes (even-odd rule).',
     insertText: 'beginfill',
+    params: [[]],
   },
   {
     label: 'endfill',
@@ -701,6 +716,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'end fill — sew the enclosed area',
     documentation: 'Close the fill boundary and sew a tatami fill of the enclosed area.',
     insertText: 'endfill',
+    params: [[]],
   },
   {
     label: 'fill',
@@ -758,6 +774,7 @@ export const NS_ITEMS: NSItem[] = [
       'Top-level, once-only palette metadata. Takes a list of 1–64 colors and must precede stitches, `color`, and `stop`.',
     insertText: "palette ['${1:#0b132b}', '${2:#5bc0be}', '${3:#e94560}']",
     isSnippet: true,
+    params: [['colors']],
   },
   {
     label: 'background',
@@ -767,6 +784,7 @@ export const NS_ITEMS: NSItem[] = [
       'Top-level fabric-color metadata. Must precede the first stitch and does not affect DST output.',
     insertText: "background '${1:#f5efe4}'",
     isSnippet: true,
+    params: [['color']],
   },
   {
     label: 'stop',
@@ -775,6 +793,7 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       'Shorthand for "next colour" — equivalent to incrementing the thread number by 1.',
     insertText: 'stop',
+    params: [[]],
   },
   {
     label: 'trim',
@@ -782,6 +801,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'cut thread here',
     documentation: 'Cut the thread here. Long travels also get one automatically (see `autotrim`).',
     insertText: 'trim',
+    params: [[]],
   },
   {
     label: 'lock',
@@ -841,6 +861,7 @@ export const NS_ITEMS: NSItem[] = [
       "Configure the physical hoop for this design. The sewable field is the hoop inset by 3 mm on every side.\n\n**Named presets:**\n- `'round100'` — ⌀100 mm round (default)\n- `'4x4'` — 100 × 100 mm\n- `'5x7'` — 130 × 180 mm  \n- `'6x10'` — 160 × 260 mm\n- `'8x8'` — 200 × 200 mm\n- `'8x12'` — 200 × 300 mm\n\n**Numeric (round hoop):** `hoop 150` → ⌀150 mm\n**List (rectangular):** `hoop [130, 180]` → 130 × 180 mm\n\nMust be at the top of the program, before any stitches. At most one per program.\n\n```\nhoop '5x7'\nseed 42\nlet pts = scatter(8)  // fills the 124 × 174 mm field\n```",
     insertText: "hoop '${1|round100,4x4,5x7,6x10,8x8,8x12|}'",
     isSnippet: true,
+    params: [['preset'], ['diameter'], ['dimensions']],
   },
   {
     label: 'override',
@@ -851,6 +872,7 @@ export const NS_ITEMS: NSItem[] = [
     insertText:
       "override '${1|stitches,ops,calldepth,loopiters,listlen,listcells,stringlen,stringtotal,scatterpoints,geoinput,clipverts,chalks,chalkverts|}' ${2:value}",
     isSnippet: true,
+    params: [['key', 'value']],
   },
   {
     label: 'plan',
@@ -858,8 +880,9 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'reorder independent thread runs to shorten travel',
     documentation:
       "Top-level travel-planning directive. `plan 'nearest'` greedily reorders whole thread runs within each color block after execution and before autotrim/locks. `plan 'reversing-nearest'` may also enter eligible stitch-only runs from their nearer endpoint. Planning never crosses a color change, changes stitch geometry, or removes an explicit `trim`. Use `plan 'off'` for an explicit no-op. Must appear before the first stitch and at most once.",
-    insertText: "plan '${1|nearest,reversing-nearest,off|}'",
+    insertText: modeCommandSnippet('plan', PLAN_MODES, "'"),
     isSnippet: true,
+    params: [['mode']],
   },
   {
     label: 'fabric',
@@ -867,8 +890,9 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'fabric preset',
     documentation:
       'Apply a fabric preset. Sets pull compensation, density limit, and underlay defaults.\n\n- `"woven` — pull 0.2 mm, max 3.5 layers\n- `"knit` — pull 0.5 mm, max 3.0, density floor 0.45 mm\n- `"stretch` — pull 0.6 mm, max 2.8, density floor 0.5 mm\n- `"denim` / `"canvas` — pull 0.15 mm, max 4.0\n- `"fleece` — pull 0.3 mm, max 2.6, double underlay',
-    insertText: 'fabric "${1|woven,knit,stretch,denim,canvas,fleece|}"',
+    insertText: modeCommandSnippet('fabric', FABRIC_MODES, '"'),
     isSnippet: true,
+    params: [['preset']],
   },
   {
     label: 'underlay',
@@ -876,8 +900,9 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'satin underlay style',
     documentation:
       'Stabilising stitches under each satin column.\n\n- `"auto` — picks by width: <1.5 mm none, <4 mm center, wider zigzag\n- `"center` — center walk\n- `"edge` — edge walk\n- `"zigzag` — cross-grain zigzag\n- `"off` — no underlay',
-    insertText: 'underlay "${1|auto,center,edge,zigzag,off|}"',
+    insertText: modeCommandSnippet('underlay', SATIN_UNDERLAY_MODES, '"'),
     isSnippet: true,
+    params: [['mode']],
   },
   {
     label: 'fillunderlay',
@@ -885,8 +910,9 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'fill underlay style',
     documentation:
       'Underlay beneath fills.\n\n- `"auto` — tatami, plus edge run on areas > 100 mm²\n- `"tatami` — sparse cross-grain pass\n- `"edge` — inset edge run only\n- `"off` — no underlay',
-    insertText: 'fillunderlay "${1|auto,tatami,edge,off|}"',
+    insertText: modeCommandSnippet('fillunderlay', FILL_UNDERLAY_MODES, '"'),
     isSnippet: true,
+    params: [['mode']],
   },
   // Debug commands
   {
@@ -915,6 +941,7 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       'Log the current needle position to the console as `loc: [x, y]`.\n\nCoordinates are in the **local (turtle) frame** — the same as `pos()`. Under a transform they reflect what the turtle "thinks", which is what you usually want when debugging motif logic.\n\n`printloc "label` uses a custom label instead of `loc`.\n\nDraw cost: 0. Never exported.\n\n```\nfd 20  rt 45  fd 10\nprintloc "after-elbow\n// prints: after-elbow: [7.07, 27.07]\n```',
     insertText: 'printloc',
+    params: [[]],
   },
   {
     label: 'mark',
@@ -923,6 +950,7 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       "Drop a numbered pin on the preview at the needle position. Optional string label shown instead of the pin number.\n\n```\nmark         // numbered pin\nmark 'rose'  // labelled pin\n```\n\nNever exported to the machine or counted in stats.",
     insertText: 'mark',
+    params: [[], ['label']],
   },
   {
     label: 'chalk',

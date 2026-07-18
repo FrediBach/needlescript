@@ -400,7 +400,15 @@ and pre-scan consult:
 | `QUERY_FUNCS`              | stitch-history query reporters                                     |
 | `STRING_FUNCS`             | string library                                                     |
 | `LIBRARY_FUNCS`            | union of the shadowable "Library tier" names                       |
+| `CORE_COMMAND_NAMES`       | canonical Core commands gated by Monaco coverage tests             |
 | `RESERVED`                 | "Core tier" words a user definition may **not** shadow             |
+
+Quoted embroidery modes use a focused layer rather than repeating arrays in this table.
+`embroidery-registry.ts` owns the fabric profiles and satin/fill underlay mode registries;
+`QWORD_BUILTINS` is a compatibility view consumed by parser classification. `mode-registry.ts`
+provides literal-preserving registry helpers, case-insensitive resolution, and the shared
+unknown-mode/did-you-mean diagnostic. Monaco snippets import the same registries, and catalog
+tests require every registered mode to remain documented.
 
 Two tiers govern name shadowing:
 
@@ -495,22 +503,24 @@ need no color-specific token or node.
 
 ## 8. File reference
 
-| File                    | Responsibility                                                                    |
-| ----------------------- | --------------------------------------------------------------------------------- |
-| `tokenizer.ts`          | `tokenize()` — source → `Token[]`                                                 |
-| `closure-lowering.ts`   | anonymous-def scope analysis, capture checks, and lambda lifting                  |
-| `prescan.ts`            | `prescan()` — token stream → `PreScan` (names, arity, scopes)                     |
-| `module-linker.ts`      | import/export extraction, std resolution, qualification, AST linking              |
-| `standard-library/`     | bundled NeedleScript source modules and pure module registry                      |
-| `parser/index.ts`       | `parse()` entry, `ParseContext` construction, top-level loop, reporter-path check |
-| `parser/context.ts`     | `ParseContext` interface (shared state + helpers)                                 |
-| `parser/expressions.ts` | precedence ladder, primaries, argument lists, postfix chains                      |
-| `parser/statements.ts`  | statement dispatcher, blocks, headers                                             |
-| `parser/analysis.ts`    | static control-flow analysis for reporter paths                                   |
-| `commands.ts`           | name/arity/reservation tables driving parser dispatch                             |
-| `suggestions.ts`        | bounded edit-distance "did you mean?" helper                                      |
-| `errors.ts`             | `NeedlescriptError`                                                               |
-| `types.ts`              | `Token`, `TokenType`, `ASTNode`, `ExprNode` and related types                     |
+| File                     | Responsibility                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `tokenizer.ts`           | `tokenize()` — source → `Token[]`                                                 |
+| `closure-lowering.ts`    | anonymous-def scope analysis, capture checks, and lambda lifting                  |
+| `prescan.ts`             | `prescan()` — token stream → `PreScan` (names, arity, scopes)                     |
+| `module-linker.ts`       | import/export extraction, std resolution, qualification, AST linking              |
+| `standard-library/`      | bundled NeedleScript source modules and pure module registry                      |
+| `parser/index.ts`        | `parse()` entry, `ParseContext` construction, top-level loop, reporter-path check |
+| `parser/context.ts`      | `ParseContext` interface (shared state + helpers)                                 |
+| `parser/expressions.ts`  | precedence ladder, primaries, argument lists, postfix chains                      |
+| `parser/statements.ts`   | statement dispatcher, blocks, headers                                             |
+| `parser/analysis.ts`     | static control-flow analysis for reporter paths                                   |
+| `commands.ts`            | name/arity/reservation tables driving parser dispatch                             |
+| `embroidery-registry.ts` | fabric profiles and focused embroidery mode registries                            |
+| `mode-registry.ts`       | typed mode keys, case-insensitive resolution, standard diagnostics                |
+| `suggestions.ts`         | bounded edit-distance "did you mean?" helper                                      |
+| `errors.ts`              | `NeedlescriptError`                                                               |
+| `types.ts`               | `Token`, `TokenType`, `ASTNode`, `ExprNode` and related types                     |
 
 Tests covering the front-end live in `src/lib/__tests__/` — notably
 `tokenizer.test.ts`, `parser.test.ts`, `modern-syntax.test.ts`, and `language.test.ts`.

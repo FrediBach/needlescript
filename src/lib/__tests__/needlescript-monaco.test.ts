@@ -5,9 +5,24 @@ import {
   getImportCompletionContext,
   getSignatureContext,
 } from '../needlescript-monaco/symbols.ts';
+import { NS_ITEM_MAP } from '../needlescript-monaco/catalog.ts';
 import { STANDARD_LIBRARY_PROCEDURES } from '../standard-library/index.ts';
+import { CORE_COMMAND_NAMES } from '../commands.ts';
+import { EMBROIDERY_MODE_REGISTRIES } from '../embroidery-registry.ts';
+import { catalogCoverageGaps, catalogModeGaps } from './helpers/catalog-coverage.ts';
 
 describe('NeedleScript Monaco symbol analysis', () => {
+  it('covers every Core command with completion, hover, and signature metadata', () => {
+    expect(catalogCoverageGaps(CORE_COMMAND_NAMES, NS_ITEM_MAP)).toEqual([]);
+  });
+
+  it('documents every registered embroidery mode in its catalog item', () => {
+    const gaps = Object.entries(EMBROIDERY_MODE_REGISTRIES).flatMap(([command, modes]) =>
+      catalogModeGaps(command, modes, NS_ITEM_MAP),
+    );
+    expect(gaps).toEqual([]);
+  });
+
   it('extracts modern and classic procedures and variables with source lines', () => {
     const symbols = extractUserSymbols(`let radius = 12
 def petal(size, angle) [

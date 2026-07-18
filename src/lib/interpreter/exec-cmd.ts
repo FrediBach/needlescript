@@ -5,15 +5,17 @@ import type { ASTNode } from '../types.ts';
 import type { OverrideKey } from '../types.ts';
 import { LIMITS, STOCK_LIMITS, OVERRIDE_CEILINGS, OVERRIDE_FLOORS } from '../machine.ts';
 import type { BudgetKey } from '../machine.ts';
-import { FABRICS, QWORD_BUILTINS } from '../commands.ts';
+import { QWORD_BUILTINS } from '../commands.ts';
+import { EMBROIDERY_MODE_REGISTRIES, FABRICS } from '../embroidery-registry.ts';
+import type { FabricPreset } from '../embroidery-registry.ts';
 import { lookupHoopPreset, HOOP_PRESET_NAMES, buildHoopInfo } from '../hoop-presets.ts';
 import type { HoopInfo } from '../types.ts';
 import { makeRNG, makeNoise } from '../prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { didYouMean } from '../suggestions.ts';
+import { resolveMode, unknownModeMessage } from '../mode-registry.ts';
 import type { RunContext } from './context.ts';
-import { PLAN_STRATEGIES } from '../travel-planner.ts';
-import type { PlanMode } from '../travel-planner.ts';
+import { PLAN_MODES } from '../travel-planner.ts';
 import { apply } from '../affine.ts';
 import { inspectChalkValue } from '../chalk.ts';
 import type { ChalkStyle } from '../types.ts';
@@ -305,20 +307,17 @@ export function initExecCmdHandler(
           `${st.name} expects a string mode, got ${describeVal(modeVal)} — e.g. ${st.name} '${QWORD_BUILTINS[st.name][0]}'`,
           st.line,
         );
-      const mode = modeVal.toLowerCase();
-      const allowed = QWORD_BUILTINS[st.name];
-      if (!allowed.includes(mode))
-        throw new NeedlescriptError(
-          `Unknown ${st.name} '${mode}'${didYouMean(mode, allowed)} — expected ${allowed.map((w) => `'${w}'`).join(', ')}`,
-          st.line,
-        );
+      const allowed = EMBROIDERY_MODE_REGISTRIES[st.name];
+      const mode = resolveMode(modeVal, allowed);
+      if (mode === undefined)
+        throw new NeedlescriptError(unknownModeMessage(st.name, modeVal, allowed), st.line);
       if (st.name === 'underlay') {
         ctx.m.underlayMode = mode as typeof ctx.m.underlayMode;
       } else if (st.name === 'fillunderlay') {
         ctx.m.fillUnderlayMode = mode as typeof ctx.m.fillUnderlayMode;
       } else {
         // fabric
-        const f = FABRICS[mode];
+        const f: FabricPreset = FABRICS[mode];
         ctx.m.pullComp = f.pull;
         ctx.m.underlayMode = 'auto';
         ctx.m.fillUnderlayMode = 'auto';
@@ -358,14 +357,10 @@ export function initExecCmdHandler(
           `plan expects a string mode, got ${describeVal(modeValue)} — e.g. plan 'nearest'`,
           st.line,
         );
-      const mode = modeValue.toLowerCase();
-      const allowed = ['off', ...Object.keys(PLAN_STRATEGIES)];
-      if (!allowed.includes(mode))
-        throw new NeedlescriptError(
-          `Unknown plan '${mode}'${didYouMean(mode, allowed)} — expected ${allowed.map((word) => `'${word}'`).join(', ')}`,
-          st.line,
-        );
-      ctx.planMode = mode as PlanMode | 'off';
+      const mode = resolveMode(modeValue, PLAN_MODES);
+      if (mode === undefined)
+        throw new NeedlescriptError(unknownModeMessage('plan', modeValue, PLAN_MODES), st.line);
+      ctx.planMode = mode;
       ctx.planLine = st.line;
       return;
     }

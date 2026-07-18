@@ -386,6 +386,13 @@ count itself is enforced inside the `Machine`.
 - **`list(v, …)`** / **`funcRef(v, …)`** — assert list / procedure-reference types.
 - **`checkDepth(v, line)`** — reject nesting a value past `LIMITS.maxListDepth`.
 
+String-valued construction modes are resolved separately through `mode-registry.ts`.
+`exec-cmd.ts` reads the focused registries from `embroidery-registry.ts`, matches values
+case-insensitively while retaining their literal TypeScript union, and uses one standard
+unknown-mode message with choices and did-you-mean text. Travel planning exposes `PLAN_MODES`
+from its strategy registry for the same validation path. These registries are also consumed by
+Monaco metadata, so runtime and editor choices cannot drift independently.
+
 ---
 
 ## 10. Built-in library dispatchers
@@ -537,6 +544,8 @@ than an exporter filtering rule.
 | `interpreter/string-func.ts` | string library dispatcher                                        |
 | `list.ts`                    | value model (`Val`, `NsList`, `FuncRef`) + value utilities       |
 | `colormath.ts`               | CSS colors, normalization, HSL/RGB, OKLab math and defaults      |
+| `embroidery-registry.ts`     | fabric profiles and accepted embroidery construction modes       |
+| `mode-registry.ts`           | typed mode resolution and standard unknown-mode diagnostics      |
 | `machine/`                   | the stitch machine (side-effect target, budgets, events)         |
 
 Interpreter behavior is exercised by tests in `src/lib/__tests__/` — notably

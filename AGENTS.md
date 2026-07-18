@@ -94,6 +94,23 @@ ESLint uses flat config (`eslint.config.js`) with TypeScript, React Hooks, React
 - Use `npm update` for semver-compatible (minor/patch) updates. Avoid major version bumps unless explicitly requested.
 - After updating packages, run the full check suite: `npm test`, `npm run lint`, `npm run build`.
 
+## Adding a language command or mode
+
+Before considering a user-visible command or mode complete:
+
+- Add its canonical name and arity to the appropriate table in `src/lib/commands.ts`. Add special
+  Core statement forms to `CORE_COMMAND_NAMES` as well.
+- Put embroidery construction modes and their numeric bounds in a focused registry; do not repeat
+  literal choice lists in the parser, runtime, or Monaco snippets.
+- Resolve string modes with the shared case-insensitive helpers in `src/lib/mode-registry.ts` so
+  unknown values get the standard choices and did-you-mean diagnostic.
+- Add a Monaco catalog item with completion text, hover documentation, and `params` signature
+  metadata. Catalog coverage tests intentionally fail when any Core command omits one of these.
+- Document syntax, units, bounds, defaults, output semantics, warnings, transform space, and RNG
+  draw behavior in `needlescript-language-reference.md` and the relevant architecture document.
+- Add parser/runtime tests, compatibility fixtures for changed generators, and tests that every
+  registered mode appears in editor documentation.
+
 ## General coding practices
 
 - Prefer TypeScript strict types — avoid `any`, keep types explicit.

@@ -1,5 +1,9 @@
 // ---------- Command tables ----------
 
+import { EMBROIDERY_MODE_REGISTRIES } from './embroidery-registry.ts';
+
+export { FABRICS } from './embroidery-registry.ts';
+
 export const ALIASES: Record<string, string> = {
   forward: 'fd',
   back: 'bk',
@@ -124,35 +128,8 @@ export const EFFECT_ARITY: Record<string, { min: number; max: number }> = {
 };
 
 /** Builtins that take a single quoted-word argument, with their allowed words. */
-export const QWORD_BUILTINS: Record<string, readonly string[]> = {
-  fabric: ['woven', 'knit', 'stretch', 'denim', 'canvas', 'fleece'],
-  underlay: ['auto', 'center', 'edge', 'zigzag', 'off'],
-  fillunderlay: ['auto', 'tatami', 'edge', 'off'],
-};
-
-/** Fabric presets: how much the fabric distorts and how much stitching it tolerates. */
-export const FABRICS: Record<
-  string,
-  {
-    pull: number; // pull compensation in mm
-    maxDensity: number; // thread coverage warning threshold, in layers
-    densityFloor?: number; // minimum satin penetration spacing in mm
-    doubleUnderlay?: boolean;
-    note?: string;
-  }
-> = {
-  woven: { pull: 0.2, maxDensity: 3.5 },
-  knit: { pull: 0.5, maxDensity: 3.0, densityFloor: 0.45 },
-  stretch: { pull: 0.6, maxDensity: 2.8, densityFloor: 0.5 },
-  denim: { pull: 0.15, maxDensity: 4.0 },
-  canvas: { pull: 0.15, maxDensity: 4.0 },
-  fleece: {
-    pull: 0.3,
-    maxDensity: 2.6,
-    doubleUnderlay: true,
-    note: 'fleece: consider a water-soluble topping so stitches don\u2019t sink into the pile',
-  },
-};
+export const QWORD_BUILTINS: Readonly<Record<string, readonly string[]>> =
+  EMBROIDERY_MODE_REGISTRIES;
 
 export const FUNC_ARITY: Record<string, number> = {
   random: 1,
@@ -411,6 +388,22 @@ export const LIBRARY_FUNCS = new Set<string>([
   ...Object.keys(GEN_CMDS).filter((name) => name !== 'satinbetween'),
   ...Object.keys(QUERY_FUNCS),
   ...Object.keys(STRING_FUNCS),
+]);
+
+/**
+ * Canonical Core statement commands. Monaco coverage tests consume this set,
+ * so adding a command to a standard command table automatically requires its
+ * completion, hover documentation, and call signature metadata.
+ */
+export const CORE_COMMAND_NAMES: ReadonlySet<string> = new Set([
+  ...Object.keys(BUILTIN_ARITY),
+  ...Object.keys(TRANSFORM_ARITY),
+  ...Object.keys(EFFECT_ARITY),
+  'fill',
+  'satinbetween',
+  'mark',
+  'chalk',
+  'assert',
 ]);
 
 /** Words with special meaning that user procedures must not shadow. */

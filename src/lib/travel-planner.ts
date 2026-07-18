@@ -1,5 +1,6 @@
 import type { StitchEvent } from './types.ts';
 import { ROUTE_ALGORITHMS, routeItems } from './routing.ts';
+import { defineModes } from './mode-registry.ts';
 
 export interface TravelPlanResult {
   events: StitchEvent[];
@@ -36,6 +37,12 @@ export const PLAN_STRATEGIES = {
 } as const satisfies Record<string, PlanStrategy>;
 
 export type PlanMode = keyof typeof PLAN_STRATEGIES;
+
+/** All accepted directive values, including the explicit no-op mode. */
+export const PLAN_MODES: readonly (PlanMode | 'off')[] = defineModes([
+  ...Object.keys(PLAN_STRATEGIES),
+  'off',
+] as (PlanMode | 'off')[]);
 
 function travelLength(events: StitchEvent[]): number {
   let previous: StitchEvent | null = null;
