@@ -11,6 +11,7 @@ import {
 } from '../svg/geometry.ts';
 import { STRATEGIES, eligibleStrategies, isClosedGeom, autoSuggest } from '../svg/strategies.ts';
 import { emit, resampleRing } from '../svg/emit.ts';
+import { emitAppend, inventoryProgram, mergeAppend } from '../svg/merge.ts';
 import { orderOperations } from '../svg/ordering.ts';
 import { parseSvgToModel } from '../../svg-import/parse-svg-dom.ts';
 import { pathToCurveSpecs } from '../svg/svg-path.ts';
@@ -306,6 +307,29 @@ describe('emit → run integration', () => {
     expect(code).not.toContain('let off =');
   });
 
+  it('allocates collision-free names for generated subpaths', () => {
+    const code = emit(
+      mkDoc([
+        mkElement({
+          id: 'compound',
+          name: 'crest',
+          rings: [SQUARE, HOLE],
+          strategy: defaultStrategy('tatamiFill'),
+        }),
+        mkElement({
+          id: 'named-like-subpath',
+          name: 'crest_path1',
+          rings: [SQUARE],
+          strategy: defaultStrategy('outline'),
+        }),
+      ]),
+      { date: '2026-01-01' },
+    ).code;
+    expect(code).toContain('let crest_path1 =');
+    expect(code).toContain('let crest_path1_2 =');
+    expect(() => run(code)).not.toThrow();
+  });
+
   it('manual Solid/Hole edits change the emitted fill topology', () => {
     const operation = mkElement({
       id: 'crest',
@@ -336,6 +360,59 @@ describe('emit → run integration', () => {
     expect(fragment).not.toMatch(/^fabric /m);
     expect(fragment).toContain("color '#ff0000'");
     expect(run(fragment).events.length).toBeGreaterThan(0);
+  });
+
+  it('merges append output with the base program and avoids declared names', () => {
+    const operation = mkElement({
+      id: 'append',
+      name: 'crest',
+      rings: [SQUARE],
+      sourceFill: '#ff0000',
+      strategy: defaultStrategy('tatamiFill'),
+    });
+    const base = `seed 17\nfabric "knit"\nlet crest = 42\nfd 2`;
+    const merged = emitAppend(mkDoc([operation]), base, { date: '2026-01-01' });
+
+    expect(merged.code).toContain(base);
+    expect(merged.fragmentCode).not.toMatch(/^seed /m);
+    expect(merged.fragmentCode).not.toMatch(/^fabric /m);
+    expect(merged.code).toContain('let crest_2 =');
+    expect(merged.code.match(/^seed /gm)).toHaveLength(1);
+    expect(merged.code.match(/^fabric /gm)).toHaveLength(1);
+    expect(run(merged.code).events.length).toBeGreaterThan(run(base).events.length);
+
+    const span = merged.sewSpans.append;
+    expect(
+      merged.code
+        .split('\n')
+        .slice(span.start - 1, span.end)
+        .join('\n'),
+    ).toContain('beginfill');
+  });
+
+  it('inventories imports, variables, and procedures for append collision checks', () => {
+    const inventory = inventoryProgram(
+      `import std.shapes.rectpath as rectangle\nlet boundary = []\ndef grain(p) [ return 45 ]`,
+    );
+    expect(inventory.imports).toEqual([{ specifier: 'std.shapes.rectpath', alias: 'rectangle' }]);
+    expect(inventory.usedNames.has('rectangle')).toBe(true);
+    expect(inventory.usedNames.has('boundary')).toBe(true);
+    expect(inventory.usedNames.has('grain')).toBe(true);
+  });
+
+  it('deduplicates compatible append imports and rejects alias conflicts', () => {
+    const fragment = {
+      code: '',
+      imports: ['import std.shapes.rectpath as shapehelper'],
+      preamble: ['// fragment'],
+      body: ['', 'fd 1'],
+      sewSpans: {},
+    };
+    const compatible = mergeAppend('import std.shapes.rectpath as shapehelper\nfd 1', fragment);
+    expect(compatible.code.match(/^import .* as shapehelper$/gm)).toHaveLength(1);
+    expect(() =>
+      mergeAppend('import std.shapes.ellipsepath as shapehelper\nfd 1', fragment),
+    ).toThrow(/already refers to/);
   });
 });
 

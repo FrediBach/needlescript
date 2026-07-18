@@ -10,6 +10,8 @@ import { RESERVED } from '../commands.ts';
 export interface EmitOptions {
   mode?: 'replace' | 'append';
   date?: string;
+  /** Names already owned by a base program when emitting an append fragment. */
+  reservedNames?: Iterable<string>;
 }
 
 export interface EmitResult {
@@ -88,9 +90,13 @@ function included(operation: ImportOperation): boolean {
   return operation.include && operation.strategy.kind !== 'skip';
 }
 
-function namesForGeometry(base: string, geometry: SourceGeometry): string[] {
+function namesForGeometry(
+  base: string,
+  geometry: SourceGeometry,
+  usedNames: Set<string>,
+): string[] {
   if (geometry.paths.length === 1) return [base];
-  return geometry.paths.map((_, index) => `${base}_path${index + 1}`);
+  return geometry.paths.map((_, index) => sanitizeBase(`${base}_path${index + 1}`, usedNames));
 }
 
 function operationColor(operation: ImportOperation): string | null {
@@ -117,12 +123,12 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
   }
 
   const body: string[] = ['', '// --- geometry ---'];
-  const usedNames = new Set<string>();
+  const usedNames = new Set(Array.from(opts.reservedNames ?? [], (name) => name.toLowerCase()));
   const geometryNames = new Map<string, string[]>();
   const geometryBases = new Map<string, string>();
   for (const geometry of geometries) {
     const base = sanitizeBase(geometry.name, usedNames);
-    const names = namesForGeometry(base, geometry);
+    const names = namesForGeometry(base, geometry, usedNames);
     geometryNames.set(geometry.id, names);
     geometryBases.set(geometry.id, base);
     geometry.paths.forEach((path, index) => {
@@ -131,8 +137,7 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
         body.push(`let ${names[index]} = ${formatPathLiteral(path)}`);
         return;
       }
-      const specName = `${names[index]}_spec`;
-      usedNames.add(specName);
+      const specName = sanitizeBase(`${names[index]}_spec`, usedNames);
       body.push(
         `let ${specName} = ${formatCurveLiteral(curve)} // ${curve.closed ? '[curve: closed]' : '[curve]'}`,
       );

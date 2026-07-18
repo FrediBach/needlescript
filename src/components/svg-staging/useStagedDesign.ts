@@ -5,11 +5,11 @@
 // Per the plan: full-program recompile (correctness first) — "what you
 // preview is what you sew."
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { DesignState, DebugMark } from '@/App';
 import type { StitchEvent } from '@/lib/engine';
-import { emit } from '@/lib/engine';
-import type { StagedDocument } from '@/lib/engine';
+import { emit, emitAppend } from '@/lib/engine';
+import type { EmitResult, StagedDocument } from '@/lib/engine';
 import { useCompiler } from '@/hooks/useCompiler';
 
 const EMPTY_DESIGN: DesignState = {
@@ -38,16 +38,28 @@ export interface StagedPreview {
   sewSpans: Record<string, { start: number; end: number }>;
   compiling: boolean;
   error: string | null;
+  /** true only when the current document/mode has compiled successfully. */
+  ready: boolean;
   /** the code that would be inserted right now. */
   emitCode: () => string;
 }
 
-export function useStagedDesign(initial: StagedDocument): StagedPreview {
+export function useStagedDesign(
+  initial: StagedDocument,
+  baseSource: string,
+  mode: 'replace' | 'append',
+): StagedPreview {
   const [doc, setDoc] = useState<StagedDocument>(initial);
   const [design, setDesign] = useState<DesignState>(EMPTY_DESIGN);
   const [sewSpans, setSewSpans] = useState<Record<string, { start: number; end: number }>>({});
   const [compiling, setCompiling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [committable, setCommittable] = useState<{
+    code: string;
+    doc: StagedDocument;
+    baseSource: string;
+    mode: 'replace' | 'append';
+  } | null>(null);
   const { compile } = useCompiler();
 
   const update = useCallback(
@@ -55,34 +67,53 @@ export function useStagedDesign(initial: StagedDocument): StagedPreview {
     [],
   );
 
-  const emitCode = useCallback(() => emit(doc).code, [doc]);
+  const render = useCallback(
+    (current: StagedDocument): EmitResult =>
+      mode === 'append' ? emitAppend(current, baseSource) : emit(current, { mode: 'replace' }),
+    [baseSource, mode],
+  );
+  const ready =
+    committable?.doc === doc && committable.baseSource === baseSource && committable.mode === mode;
+  const emitCode = useCallback(() => {
+    if (!ready || committable === null)
+      throw new Error('The staged preview is not ready to commit.');
+    return committable.code;
+  }, [committable, ready]);
 
   // Debounced full recompile on any document change.
-  const liveRef = useRef(true);
   useEffect(() => {
-    liveRef.current = true;
+    let cancelled = false;
     const handle = setTimeout(async () => {
       setCompiling(true);
-      const { code, sewSpans: spans } = emit(doc);
       let response;
+      let spans: Record<string, { start: number; end: number }>;
+      let code: string;
       try {
-        response = await compile(code, doc.seed);
+        const emitted = render(doc);
+        code = emitted.code;
+        spans = emitted.sewSpans;
+        response = await compile(code);
       } catch (caught) {
-        if (!liveRef.current) return;
+        if (cancelled) return;
         setCompiling(false);
         setError(caught instanceof Error ? caught.message : String(caught));
+        setCommittable(null);
         setDesign((current) => ({ ...current, ok: false }));
+        setSewSpans({});
         return;
       }
-      if (!liveRef.current) return;
+      if (cancelled) return;
       setCompiling(false);
       if (response === null) return; // superseded
       if (!response.ok) {
         setError(response.message);
-        setDesign((d) => ({ ...d, ok: false }));
+        setCommittable(null);
+        setDesign((current) => ({ ...current, ok: false }));
+        setSewSpans({});
         return;
       }
       setError(null);
+      setCommittable({ code, doc, baseSource, mode });
       const { result, stats } = response;
       const pts: StitchEvent[] = [];
       const marks: DebugMark[] = [];
@@ -108,10 +139,10 @@ export function useStagedDesign(initial: StagedDocument): StagedPreview {
       setSewSpans(spans);
     }, DEBOUNCE_MS);
     return () => {
-      liveRef.current = false;
+      cancelled = true;
       clearTimeout(handle);
     };
-  }, [doc, compile]);
+  }, [baseSource, compile, doc, mode, render]);
 
-  return { doc, update, design, sewSpans, compiling, error, emitCode };
+  return { doc, update, design, sewSpans, compiling, error, ready, emitCode };
 }

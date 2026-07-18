@@ -32,10 +32,11 @@ const FABRICS: Fabric[] = ['woven', 'knit', 'stretch', 'denim', 'canvas', 'fleec
 
 interface Props {
   doc: StagedDocument;
+  mode: 'replace' | 'append';
   update: (fn: (doc: StagedDocument) => StagedDocument) => void;
 }
 
-export default function GlobalToolbar({ doc, update }: Props) {
+export default function GlobalToolbar({ doc, mode, update }: Props) {
   const sources = Object.keys(doc.threadMap);
 
   return (
@@ -45,6 +46,7 @@ export default function GlobalToolbar({ doc, update }: Props) {
         <span className="uppercase tracking-[0.1em] text-muted-foreground">fabric</span>
         <Select
           value={doc.fabric}
+          disabled={mode === 'append'}
           onValueChange={(v: string | null) =>
             v && update((d) => setGlobal(d, { fabric: v as Fabric }))
           }
@@ -162,6 +164,7 @@ export default function GlobalToolbar({ doc, update }: Props) {
         <Input
           type="number"
           value={doc.seed}
+          disabled={mode === 'append'}
           onChange={(e) => update((d) => setGlobal(d, { seed: Number(e.target.value) || 0 }))}
           className="h-7 w-16 text-[11px]"
           aria-label="seed"

@@ -860,10 +860,9 @@ export default function App() {
   }, [design.name, runProgram]);
 
   const handleStagingCommit = useCallback(
-    (code: string, mode: 'replace' | 'append') => {
-      const next = mode === 'append' ? `${sourceRef.current}\n\n${code}` : code;
-      setSource(next);
-      runProgram(next, 'import');
+    (nextSource: string) => {
+      setSource(nextSource);
+      runProgram(nextSource, 'import');
       closeStaging();
     },
     [runProgram, closeStaging],
@@ -1136,6 +1135,7 @@ export default function App() {
               if (!o) closeStaging();
             }}
             initialDoc={stagingDoc}
+            baseSource={source}
             hoop={selectedHoop}
             onCommit={handleStagingCommit}
           />

@@ -27,12 +27,25 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialDoc: StagedDocument;
+  baseSource: string;
   hoop: HoopConfig;
-  onCommit: (code: string, mode: 'replace' | 'append') => void;
+  onCommit: (source: string) => void;
 }
 
-export default function StagingDialog({ open, onOpenChange, initialDoc, hoop, onCommit }: Props) {
-  const { doc, update, design, compiling, error, emitCode } = useStagedDesign(initialDoc);
+export default function StagingDialog({
+  open,
+  onOpenChange,
+  initialDoc,
+  baseSource,
+  hoop,
+  onCommit,
+}: Props) {
+  const [mode, setMode] = useState<'replace' | 'append'>('replace');
+  const { doc, update, design, compiling, error, ready, emitCode } = useStagedDesign(
+    initialDoc,
+    baseSource,
+    mode,
+  );
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -58,7 +71,12 @@ export default function StagingDialog({ open, onOpenChange, initialDoc, hoop, on
         operation.include && operation.findings.some((finding) => finding.severity === 'error'),
     );
   const canCommit =
-    design.ok && !compiling && error === null && hasIncludedOperation && !hasBlockingFinding;
+    ready &&
+    design.ok &&
+    !compiling &&
+    error === null &&
+    hasIncludedOperation &&
+    !hasBlockingFinding;
 
   const select = useCallback((id: string, additive: boolean) => {
     setFocusedId(id);
@@ -87,7 +105,7 @@ export default function StagingDialog({ open, onOpenChange, initialDoc, hoop, on
 
   const commit = useCallback(() => {
     if (!canCommit) return;
-    onCommit(emitCode(), 'replace');
+    onCommit(emitCode());
     onOpenChange(false);
   }, [canCommit, emitCode, onCommit, onOpenChange]);
 
@@ -134,7 +152,7 @@ export default function StagingDialog({ open, onOpenChange, initialDoc, hoop, on
           <DialogTitle className="shrink-0 font-mono text-[13px]">
             SVG import — {doc.name}.svg
           </DialogTitle>
-          <GlobalToolbar doc={doc} update={update} />
+          <GlobalToolbar doc={doc} mode={mode} update={update} />
           {compiling && <span className="ml-2 text-muted-foreground">compiling…</span>}
           <DialogClose
             render={<Button variant="ghost" size="icon-sm" className="ml-auto shrink-0" />}
@@ -194,13 +212,12 @@ export default function StagingDialog({ open, onOpenChange, initialDoc, hoop, on
           </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-[11px]">
-              <Checkbox checked={false} disabled aria-label="append to program unavailable" />
-              <Label
-                className="text-[11px] text-muted-foreground"
-                title="Safe program merging is not available yet"
-              >
-                Append unavailable
-              </Label>
+              <Checkbox
+                checked={mode === 'append'}
+                onCheckedChange={(checked) => setMode(checked ? 'append' : 'replace')}
+                aria-label="append to current program"
+              />
+              <Label className="text-[11px]">Append to current program</Label>
             </label>
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Cancel

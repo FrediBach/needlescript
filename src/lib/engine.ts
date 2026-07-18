@@ -183,5 +183,13 @@ export {
   type StrategyDef,
 } from './svg/strategies.ts';
 export { emit, resampleRing, type EmitResult, type EmitOptions } from './svg/emit.ts';
+export {
+  emitAppend,
+  inventoryProgram,
+  mergeAppend,
+  type AppendEmitResult,
+  type ProgramImport,
+  type ProgramInventory,
+} from './svg/merge.ts';
 export { orderOperations } from './svg/ordering.ts';
 export { parseColorStr, nearestThread, threadForColor, buildThreadMap } from './svg/thread-map.ts';
