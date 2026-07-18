@@ -14,6 +14,7 @@ let pts = scatter(npts)
 let tiles = voronoi(pts)
 
 color 1
+// Inset rings keep the outlines from colliding with their neighbouring tiles.
 for cell in tiles [
   for ring in offsetpath(cell, -inset) [
     sewpath(resample(ring, 2.2))
@@ -23,6 +24,7 @@ for cell in tiles [
 ]
 
 color 2
+// Start each flow stroke at its tile centroid and stop before crossing an edge.
 for cell in tiles [
   let c = centroid(cell)
   if inpath(c, cell) [
@@ -30,7 +32,7 @@ for cell in tiles [
     repeat 25 [
       seth(snoise2(xcor / 14, ycor / 14) * 180)
       let nxt = vadd(pos(), vfromheading(heading, 1.8))
-      if !inpath(nxt, cell) [ break ]
+      if !inpath(nxt, cell) [ break ] // exit this stroke, not the outer tile loop
       fd 1.8
     ]
     trim

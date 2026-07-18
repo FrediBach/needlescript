@@ -16,6 +16,7 @@ def ribbon(t, s, i, u) [
   return satinpair(adv, rib_halfw)          // symmetric perpendicular bite
 ]
 
+// Pass the procedure by reference (`@`) so satin can ask it for each stitch pair.
 satin @ribbon
 
 // 1 · straight ribbon

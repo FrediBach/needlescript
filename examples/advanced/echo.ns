@@ -23,8 +23,10 @@ repeat nsteps [
 trim
 
 let off = 0
+// `shuffle` changes the colour order; the seed above makes that order repeatable.
 for c in shuffle(thread_slots) [
   color c
+  // Negating x mirrors the recorded path; `off` separates each echo.
   up setpos([-first(path)[0] + off, first(path)[1]]) down
   for p in path [
     setpos([-p[0] + off, p[1]])

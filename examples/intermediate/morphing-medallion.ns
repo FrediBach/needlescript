@@ -23,11 +23,13 @@ let circleform = ellipsepath(inner, inner)
 let starform = starpath(points, outer, outer * 0.42)
 
 for i = 0 to layers - 1 [
+  // `u` progresses from 0 (circle) to 1 (star); easing slows both endpoints.
   let u = easeinout(i / (layers - 1))
+  // morphpaths first aligns the two point lists, then interpolates them.
   let outline = morphpaths(circleform, starform, u)
 
+  // Cycle through three thread colours while each outline remains a separate run.
   color 2 + mod(i, 3)
   sewrun(outline, 1.8)
   trim
 ]
-

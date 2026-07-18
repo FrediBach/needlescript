@@ -24,6 +24,7 @@ let curves = truchetpaths(window, cell)
 let outer_frame = xscale(window, 1.04)
 
 color 4
+// The texture generator has already clipped every curve to `window`.
 for curve in curves [
   up setpos(first(curve)) down
   sewrun(curve, 1.6)
@@ -31,5 +32,6 @@ for curve in curves [
 ]
 
 color 2
+// Scale the same boundary slightly outward, then cover it with a satin frame.
 satinalong(outer_frame, 1.4)
 trim
