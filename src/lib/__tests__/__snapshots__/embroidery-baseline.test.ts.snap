@@ -1,0 +1,1109 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`embroidery construction characterization fixtures > 'closed rail-pair satin' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 21,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.688339975,
+  },
+  "events": [
+    "jump -3,0 c0 line3",
+    "stitch -3,0 c0 line3",
+    "stitch -1.122430656,0.877569344 c0 line3",
+    "stitch -0.489722623,3.510277377 c0 line3",
+    "stitch 0.683645984,1.316354016 c0 line3",
+    "stitch 3.122430656,0.877569344 c0 line3",
+    "stitch 1.561215328,-0.438784672 c0 line3",
+    "stitch 1.367291967,-2.632708033 c0 line3",
+    "stitch -0.244861312,-1.755138688 c0 line3",
+    "stitch -2.244861312,-1.755138688 c0 line3",
+    "stitch -2,0 c0 line3",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 6.142985409,
+    "jumps": 1,
+    "maxRadius": 3.544273622,
+    "maxStitchLen": 2.707668931,
+    "maxX": 3.122430656,
+    "maxY": 3.510277377,
+    "minX": -3,
+    "minY": -2.632708033,
+    "stitches": 10,
+    "trims": 0,
+    "width": 6.122430656,
+    "yarnLength": 19.598380458,
+  },
+  "warnings": [
+    "note: satinbetween chose a deterministic closed-rail seam",
+    "satinbetween column is wider than the curve it follows near (-0.2, 3.8) — split the column or widen the curve",
+  ],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'concave fill' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 25,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.940832691,
+  },
+  "events": [
+    "jump 0,7 c0 line5",
+    "stitch 3,7 c0 line5",
+    "stitch 3,5 c0 line5",
+    "stitch 2,5 c0 line5",
+    "stitch 0,5 c0 line5",
+    "stitch 0,3 c0 line5",
+    "stitch 1,3 c0 line5",
+    "stitch 3,3 c0 line5",
+    "stitch 1.5,2 c0 line5",
+    "stitch 0,1 c0 line5",
+    "stitch 3,1 c0 line5",
+    "stitch 6,1 c0 line5",
+    "stitch 8,1 c0 line5",
+    "jump 0,0 c0 line5",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 7,
+    "jumps": 2,
+    "maxRadius": 8.062257748,
+    "maxStitchLen": 3,
+    "maxX": 8,
+    "maxY": 7,
+    "minX": 0,
+    "minY": 0,
+    "stitches": 12,
+    "trims": 0,
+    "width": 8,
+    "yarnLength": 24.605551275,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'curved closed satin' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 80,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.935889899,
+  },
+  "events": [
+    "jump 0,-5 c0 line2",
+    "stitch 0,-5 c0 line2",
+    "stitch 1.657538161,-3.901694063 c0 line2",
+    "stitch -0.715946318,-1.925974851 c0 line2",
+    "stitch 2.654496105,-2.377608238 c0 line2",
+    "stitch 1.586857856,0.520157029 c0 line2",
+    "stitch 4.279929923,-1.556190167 c0 line2",
+    "stitch 4.804210712,1.487167292 c0 line2",
+    "stitch 6.098305937,-1.657538161 c0 line2",
+    "stitch 8.074025149,0.715946318 c0 line2",
+    "stitch 7.622391762,-2.654496105 c0 line2",
+    "stitch 10.520157029,-1.586857856 c0 line2",
+    "stitch 8.443809833,-4.279929923 c0 line2",
+    "stitch 11.487167292,-4.804210712 c0 line2",
+    "stitch 8.342461839,-6.098305937 c0 line2",
+    "stitch 10.715946318,-8.074025149 c0 line2",
+    "stitch 7.345503895,-7.622391762 c0 line2",
+    "stitch 8.413142144,-10.520157029 c0 line2",
+    "stitch 5.720070077,-8.443809833 c0 line2",
+    "stitch 5.195789288,-11.487167292 c0 line2",
+    "stitch 3.901694063,-8.342461839 c0 line2",
+    "stitch 1.925974851,-10.715946318 c0 line2",
+    "stitch 2.377608238,-7.345503895 c0 line2",
+    "stitch -0.520157029,-8.413142144 c0 line2",
+    "stitch 1.556190167,-5.720070077 c0 line2",
+    "stitch -1.487167292,-5.195789288 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 12.974334584,
+    "jumps": 1,
+    "maxRadius": 13.470510928,
+    "maxStitchLen": 3.400566841,
+    "maxX": 11.487167292,
+    "maxY": 1.487167292,
+    "minX": -1.487167292,
+    "minY": -11.487167292,
+    "stitches": 25,
+    "trims": 0,
+    "width": 12.974334584,
+    "yarnLength": 76.452865014,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'curved open satin' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 37,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 1.058947674,
+  },
+  "events": [
+    "stitch 0,0 c0 line2",
+    "stitch 2.085112244,0.515404751 c0 line2",
+    "stitch -1.77844468,1.813966655 c0 line2",
+    "stitch 2.351905375,1.511090271 c0 line2",
+    "stitch -1.043911488,3.765366865 c0 line2",
+    "stitch 2.867310126,2.403797486 c0 line2",
+    "stitch 0.170652632,5.460163545 c0 line2",
+    "stitch 3.596202514,3.132689874 c0 line2",
+    "stitch 1.782477142,6.782859103 c0 line2",
+    "stitch 4.488909729,3.648094625 c0 line2",
+    "stitch 3.681718865,7.643314023 c0 line2",
+    "stitch 5.484595249,3.914887756 c0 line2",
+    "stitch 5.738947616,7.982889723 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 7.982889723,
+    "jumps": 0,
+    "maxRadius": 9.831685922,
+    "maxStitchLen": 4.141440049,
+    "maxX": 5.738947616,
+    "maxY": 7.982889723,
+    "minX": -1.77844468,
+    "minY": 0,
+    "stitches": 13,
+    "trims": 0,
+    "width": 7.517392296,
+    "yarnLength": 47.310743332,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'custom path fill' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 34,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.4,
+  },
+  "events": [
+    "stitch 0,1 c0 line4",
+    "stitch 3,1 c0 line4",
+    "stitch 6,1 c0 line4",
+    "stitch 8,1 c0 line4",
+    "jump 8,3 c0 line4",
+    "stitch 5,3 c0 line4",
+    "stitch 2,3 c0 line4",
+    "stitch 0,3 c0 line4",
+    "jump 0,5 c0 line4",
+    "stitch 3,5 c0 line4",
+    "stitch 6,5 c0 line4",
+    "stitch 8,5 c0 line4",
+    "jump 8,7 c0 line4",
+    "stitch 5,7 c0 line4",
+    "stitch 2,7 c0 line4",
+    "stitch 0,7 c0 line4",
+    "jump 0,0 c0 line4",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 7,
+    "jumps": 4,
+    "maxRadius": 10.630145813,
+    "maxStitchLen": 3,
+    "maxX": 8,
+    "maxY": 7,
+    "minX": 0,
+    "minY": 0,
+    "stitches": 13,
+    "trims": 0,
+    "width": 8,
+    "yarnLength": 32,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'fill auto underlay' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 50,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 1.2,
+  },
+  "events": [
+    "jump 5.5,0.6 c0 underlay line2",
+    "stitch 5.5,4 c0 underlay line2",
+    "stitch 5.5,7.4 c0 underlay line2",
+    "stitch 3,7.4 c0 underlay line2",
+    "stitch 0.5,7.4 c0 underlay line2",
+    "stitch 0.5,5.333333333 c0 underlay line2",
+    "stitch 0.5,1.333333333 c0 underlay line2",
+    "stitch 0.5,0.6 c0 underlay line2",
+    "jump 0,7 c0 line2",
+    "stitch 3,7 c0 line2",
+    "stitch 6,7 c0 line2",
+    "stitch 8,7 c0 line2",
+    "stitch 8,5 c0 line2",
+    "stitch 5,5 c0 line2",
+    "stitch 2,5 c0 line2",
+    "stitch 0,5 c0 line2",
+    "stitch 0,3 c0 line2",
+    "stitch 1,3 c0 line2",
+    "stitch 4,3 c0 line2",
+    "stitch 7,3 c0 line2",
+    "stitch 8,3 c0 line2",
+    "stitch 8,1 c0 line2",
+    "stitch 6,1 c0 line2",
+    "stitch 3,1 c0 line2",
+    "stitch 0,1 c0 line2",
+    "jump 0,0 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 7.4,
+    "jumps": 3,
+    "maxRadius": 10.630145813,
+    "maxStitchLen": 4,
+    "maxX": 8,
+    "maxY": 7.4,
+    "minX": 0,
+    "minY": 0,
+    "stitches": 23,
+    "trims": 0,
+    "width": 8,
+    "yarnLength": 56.6,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'fill edge underlay' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 52,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 1.383431458,
+  },
+  "events": [
+    "stitch 0.353553391,0.353553391 c0 underlay line2",
+    "stitch 0.353553391,2.784517797 c0 underlay line2",
+    "stitch 0.353553391,5.215482203 c0 underlay line2",
+    "stitch 0.353553391,7.646446609 c0 underlay line2",
+    "stitch 2.784517797,7.646446609 c0 underlay line2",
+    "stitch 5.215482203,7.646446609 c0 underlay line2",
+    "stitch 7.646446609,7.646446609 c0 underlay line2",
+    "stitch 7.646446609,5.215482203 c0 underlay line2",
+    "stitch 7.646446609,2.784517797 c0 underlay line2",
+    "stitch 7.646446609,0.353553391 c0 underlay line2",
+    "stitch 5.215482203,0.353553391 c0 underlay line2",
+    "stitch 2.784517797,0.353553391 c0 underlay line2",
+    "stitch 0.353553391,0.353553391 c0 underlay line2",
+    "jump 0,7 c0 line2",
+    "stitch 3,7 c0 line2",
+    "stitch 6,7 c0 line2",
+    "stitch 8,7 c0 line2",
+    "stitch 8,5 c0 line2",
+    "stitch 5,5 c0 line2",
+    "stitch 2,5 c0 line2",
+    "stitch 0,5 c0 line2",
+    "stitch 0,3 c0 line2",
+    "stitch 1,3 c0 line2",
+    "stitch 4,3 c0 line2",
+    "stitch 7,3 c0 line2",
+    "stitch 8,3 c0 line2",
+    "stitch 8,1 c0 line2",
+    "stitch 6,1 c0 line2",
+    "stitch 3,1 c0 line2",
+    "stitch 0,1 c0 line2",
+    "jump 0,0 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 7.646446609,
+    "jumps": 2,
+    "maxRadius": 10.813708499,
+    "maxStitchLen": 3,
+    "maxX": 8,
+    "maxY": 7.646446609,
+    "minX": 0,
+    "minY": 0,
+    "stitches": 29,
+    "trims": 0,
+    "width": 8,
+    "yarnLength": 67.171572875,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'fill tatami underlay' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 50,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 1.2,
+  },
+  "events": [
+    "jump 5.5,0.6 c0 underlay line2",
+    "stitch 5.5,4 c0 underlay line2",
+    "stitch 5.5,7.4 c0 underlay line2",
+    "stitch 3,7.4 c0 underlay line2",
+    "stitch 0.5,7.4 c0 underlay line2",
+    "stitch 0.5,5.333333333 c0 underlay line2",
+    "stitch 0.5,1.333333333 c0 underlay line2",
+    "stitch 0.5,0.6 c0 underlay line2",
+    "jump 0,7 c0 line2",
+    "stitch 3,7 c0 line2",
+    "stitch 6,7 c0 line2",
+    "stitch 8,7 c0 line2",
+    "stitch 8,5 c0 line2",
+    "stitch 5,5 c0 line2",
+    "stitch 2,5 c0 line2",
+    "stitch 0,5 c0 line2",
+    "stitch 0,3 c0 line2",
+    "stitch 1,3 c0 line2",
+    "stitch 4,3 c0 line2",
+    "stitch 7,3 c0 line2",
+    "stitch 8,3 c0 line2",
+    "stitch 8,1 c0 line2",
+    "stitch 6,1 c0 line2",
+    "stitch 3,1 c0 line2",
+    "stitch 0,1 c0 line2",
+    "jump 0,0 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 7.4,
+    "jumps": 3,
+    "maxRadius": 10.630145813,
+    "maxStitchLen": 4,
+    "maxX": 8,
+    "maxY": 7.4,
+    "minX": 0,
+    "minY": 0,
+    "stitches": 23,
+    "trims": 0,
+    "width": 8,
+    "yarnLength": 56.6,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'fill with a hole' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 39,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.8,
+  },
+  "events": [
+    "jump 0,7 c0 line6",
+    "stitch 3,7 c0 line6",
+    "stitch 6,7 c0 line6",
+    "stitch 8,7 c0 line6",
+    "stitch 8,5 c0 line6",
+    "stitch 5,5 c0 line6",
+    "stitch 3,5 c0 line6",
+    "stitch 2,5 c0 line6",
+    "stitch 0,5 c0 line6",
+    "stitch 0,3 c0 line6",
+    "stitch 1,3 c0 line6",
+    "stitch 4,3 c0 line6",
+    "stitch 7,3 c0 line6",
+    "stitch 8,3 c0 line6",
+    "stitch 8,1 c0 line6",
+    "stitch 6,1 c0 line6",
+    "stitch 3,1 c0 line6",
+    "stitch 0,1 c0 line6",
+    "jump 3,3 c0 line6",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 6,
+    "jumps": 2,
+    "maxRadius": 10.630145813,
+    "maxStitchLen": 3,
+    "maxX": 8,
+    "maxY": 7,
+    "minX": 0,
+    "minY": 1,
+    "stitches": 17,
+    "trims": 0,
+    "width": 8,
+    "yarnLength": 38,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'nearest travel planning' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 6,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.4,
+  },
+  "events": [
+    "stitch 0,0 c0 line3",
+    "stitch 0,1 c0 line3",
+    "trim 0,1 c0 line3",
+    "jump 5,0 c0 line5",
+    "stitch 5,1 c0 line5",
+    "jump 20,0 c0 line4",
+    "stitch 20,1 c0 line4",
+    "trim 20,1 c0 line4",
+  ],
+  "plan": {
+    "colors": 1,
+    "planMode": "nearest",
+    "runs": 3,
+    "travelAfterMm": 20.132315891965696,
+    "travelBeforeMm": 35.0582807728737,
+  },
+  "printed": [
+    "281729.945",
+    "plan 'nearest': travel 35.1 mm → 20.1 mm, autotrims 0 → 0 (runs: 3, colors: 1)",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 1,
+    "jumps": 2,
+    "maxRadius": 20.024984395,
+    "maxStitchLen": 1,
+    "maxX": 20,
+    "maxY": 1,
+    "minX": 0,
+    "minY": 0,
+    "planMode": "nearest",
+    "stitches": 4,
+    "travelAfterMm": 20.132315892,
+    "travelBeforeMm": 35.058280773,
+    "trims": 2,
+    "width": 20,
+    "yarnLength": 3,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'open rail-pair satin' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 26,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.549747417,
+  },
+  "events": [
+    "stitch 0,0 c0 line2",
+    "stitch 2,1 c0 line2",
+    "stitch -2,2 c0 line2",
+    "stitch 2,3 c0 line2",
+    "stitch -2,4 c0 line2",
+    "stitch 2,5 c0 line2",
+    "stitch -2,6 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 6,
+    "jumps": 0,
+    "maxRadius": 6.32455532,
+    "maxStitchLen": 4.123105626,
+    "maxX": 2,
+    "maxY": 6,
+    "minX": -2,
+    "minY": 0,
+    "stitches": 7,
+    "trims": 0,
+    "width": 4,
+    "yarnLength": 22.851596106,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'programmable fill' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 35,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.55,
+  },
+  "events": [
+    "jump 2.631919427,0.241229517 c0 line6",
+    "stitch 3.657979857,3.060307379 c0 line6",
+    "stitch 4.684040287,5.879385242 c0 line6",
+    "stitch 5.368080573,7.758770483 c0 line6",
+    "stitch 3.146675188,7.503118149 c0 line6",
+    "stitch 2.890160081,6.798348683 c0 line6",
+    "stitch 1.864099651,3.979270821 c0 line6",
+    "stitch 0.838039221,1.160192959 c0 line6",
+    "stitch 0.752534185,0.925269804 c0 line6",
+    "jump 4.853324812,0.496881851 c0 line6",
+    "stitch 5.622870134,2.611190248 c0 line6",
+    "stitch 6.648930564,5.43026811 c0 line6",
+    "stitch 7.247465815,7.074730196 c0 line6",
+    "jump 0.925269804,7.247465815 c0 line6",
+    "stitch 0.241229517,5.368080573 c0 line6",
+    "jump 7.074730196,0.752534185 c0 line6",
+    "stitch 7.587760411,2.162073116 c0 line6",
+    "stitch 7.758770483,2.631919427 c0 line6",
+    "jump 0,0 c0 line6",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 7.758770483,
+    "jumps": 5,
+    "maxRadius": 10.128058456,
+    "maxStitchLen": 3,
+    "maxX": 7.758770483,
+    "maxY": 7.758770483,
+    "minX": 0,
+    "minY": 0,
+    "stitches": 14,
+    "trims": 0,
+    "width": 7.758770483,
+    "yarnLength": 28.236067977,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'reversing-nearest travel planning' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 10,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.4,
+  },
+  "events": [
+    "stitch 0,0 c0 line3",
+    "stitch 0,1 c0 line3",
+    "trim 0,1 c0 line3",
+    "jump 2,0 c0 line4",
+    "stitch 10,0 c0 line4",
+  ],
+  "plan": {
+    "colors": 1,
+    "planMode": "reversing-nearest",
+    "runs": 2,
+    "travelAfterMm": 2.23606797749979,
+    "travelBeforeMm": 10.04987562112089,
+  },
+  "printed": [
+    "281729.945",
+    "plan 'reversing-nearest': travel 10.0 mm → 2.2 mm, autotrims 0 → 0 (runs: 2, colors: 1)",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 1,
+    "jumps": 1,
+    "maxRadius": 10,
+    "maxStitchLen": 8,
+    "maxX": 10,
+    "maxY": 1,
+    "minX": 0,
+    "minY": 0,
+    "planMode": "reversing-nearest",
+    "stitches": 3,
+    "travelAfterMm": 2.236067977,
+    "travelBeforeMm": 10.049875621,
+    "trims": 1,
+    "width": 10,
+    "yarnLength": 9,
+  },
+  "warnings": [
+    "stitchlen 20 clamped to 12 mm (machine-safe range is 0.4–12)",
+  ],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'running stitch' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 11,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.56,
+  },
+  "events": [
+    "stitch 0,0 c0 line2",
+    "stitch 0,2.333333333 c0 line2",
+    "stitch 0,4.666666667 c0 line2",
+    "stitch 0,7 c0 line2",
+    "stitch 1.5,7 c0 line2",
+    "stitch 3,7 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 7,
+    "jumps": 0,
+    "maxRadius": 7.615773106,
+    "maxStitchLen": 2.333333333,
+    "maxX": 3,
+    "maxY": 7,
+    "minX": 0,
+    "minY": 0,
+    "stitches": 6,
+    "trims": 0,
+    "width": 3,
+    "yarnLength": 10,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'satin auto underlay' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 37,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 1.497089366,
+  },
+  "events": [
+    "stitch 0,0 c0 line2",
+    "stitch 1.5,2 c0 underlay line2",
+    "stitch -1.5,4 c0 underlay line2",
+    "stitch 1.5,6 c0 underlay line2",
+    "stitch 0,6 c0 underlay line2",
+    "stitch 0,4 c0 underlay line2",
+    "stitch 0,2 c0 underlay line2",
+    "stitch 0,0 c0 underlay line2",
+    "stitch -2.5,1 c0 line2",
+    "stitch 2.5,2 c0 line2",
+    "stitch -2.5,3 c0 line2",
+    "stitch 2.5,4 c0 line2",
+    "stitch -2.5,5 c0 line2",
+    "stitch 2.5,6 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 6,
+    "jumps": 0,
+    "maxRadius": 6.5,
+    "maxStitchLen": 5.099019514,
+    "maxX": 2.5,
+    "maxY": 6,
+    "minX": -2.5,
+    "minY": 0,
+    "stitches": 14,
+    "trims": 0,
+    "width": 5,
+    "yarnLength": 45.398782522,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'satin center underlay' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 27,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 1.349747417,
+  },
+  "events": [
+    "stitch 0,0 c0 line2",
+    "stitch 0,2 c0 underlay line2",
+    "stitch 0,4 c0 underlay line2",
+    "stitch 0,6 c0 underlay line2",
+    "stitch 0,4 c0 underlay line2",
+    "stitch 0,2 c0 underlay line2",
+    "stitch 0,0 c0 underlay line2",
+    "stitch 2,1 c0 line2",
+    "stitch -2,2 c0 line2",
+    "stitch 2,3 c0 line2",
+    "stitch -2,4 c0 line2",
+    "stitch 2,5 c0 line2",
+    "stitch -2,6 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 6,
+    "jumps": 0,
+    "maxRadius": 6.32455532,
+    "maxStitchLen": 4.123105626,
+    "maxX": 2,
+    "maxY": 6,
+    "minX": -2,
+    "minY": 0,
+    "stitches": 13,
+    "trims": 0,
+    "width": 4,
+    "yarnLength": 34.851596106,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'satin edge underlay' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 31,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.912249939,
+  },
+  "events": [
+    "stitch 0,0 c0 line2",
+    "stitch -1.2,0 c0 underlay line2",
+    "stitch -1.2,2 c0 underlay line2",
+    "stitch -1.2,4 c0 underlay line2",
+    "stitch -1.2,6 c0 underlay line2",
+    "stitch 1.2,6 c0 underlay line2",
+    "stitch 1.2,4 c0 underlay line2",
+    "stitch 1.2,2 c0 underlay line2",
+    "stitch 1.2,0 c0 underlay line2",
+    "stitch 2,1 c0 line2",
+    "stitch -2,2 c0 line2",
+    "stitch 2,3 c0 line2",
+    "stitch -2,4 c0 line2",
+    "stitch 2,5 c0 line2",
+    "stitch -2,6 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 6,
+    "jumps": 0,
+    "maxRadius": 6.32455532,
+    "maxStitchLen": 4.123105626,
+    "maxX": 2,
+    "maxY": 6,
+    "minX": -2,
+    "minY": 0,
+    "stitches": 15,
+    "trims": 0,
+    "width": 4,
+    "yarnLength": 37.496152976,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'satin zigzag underlay' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 28,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 1.485307395,
+  },
+  "events": [
+    "stitch 0,0 c0 line2",
+    "stitch 1.2,2 c0 underlay line2",
+    "stitch -1.2,4 c0 underlay line2",
+    "stitch 1.2,6 c0 underlay line2",
+    "stitch 0,6 c0 underlay line2",
+    "stitch 0,4 c0 underlay line2",
+    "stitch 0,2 c0 underlay line2",
+    "stitch 0,0 c0 underlay line2",
+    "stitch -2,1 c0 line2",
+    "stitch 2,2 c0 line2",
+    "stitch -2,3 c0 line2",
+    "stitch 2,4 c0 line2",
+    "stitch -2,5 c0 line2",
+    "stitch 2,6 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 6,
+    "jumps": 0,
+    "maxRadius": 6.32455532,
+    "maxStitchLen": 4.123105626,
+    "maxX": 2,
+    "maxY": 6,
+    "minX": -2,
+    "minY": 0,
+    "stitches": 14,
+    "trims": 0,
+    "width": 4,
+    "yarnLength": 38.632176604,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'simple fill' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 39,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.8,
+  },
+  "events": [
+    "jump 0,7 c0 line2",
+    "stitch 3,7 c0 line2",
+    "stitch 6,7 c0 line2",
+    "stitch 8,7 c0 line2",
+    "stitch 8,5 c0 line2",
+    "stitch 5,5 c0 line2",
+    "stitch 2,5 c0 line2",
+    "stitch 0,5 c0 line2",
+    "stitch 0,3 c0 line2",
+    "stitch 1,3 c0 line2",
+    "stitch 4,3 c0 line2",
+    "stitch 7,3 c0 line2",
+    "stitch 8,3 c0 line2",
+    "stitch 8,1 c0 line2",
+    "stitch 6,1 c0 line2",
+    "stitch 3,1 c0 line2",
+    "stitch 0,1 c0 line2",
+    "jump 0,0 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 7,
+    "jumps": 2,
+    "maxRadius": 10.630145813,
+    "maxStitchLen": 3,
+    "maxX": 8,
+    "maxY": 7,
+    "minX": 0,
+    "minY": 0,
+    "stitches": 16,
+    "trims": 0,
+    "width": 8,
+    "yarnLength": 38,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`embroidery construction characterization fixtures > 'straight open satin' pins events, warnings, density, stats, and RNG behavior 1`] = `
+{
+  "density": {
+    "cellCount": 26,
+    "cellMM": 1,
+    "hotspots": [],
+    "peak": 0.549747417,
+  },
+  "events": [
+    "stitch 0,0 c0 line2",
+    "stitch 2,1 c0 line2",
+    "stitch -2,2 c0 line2",
+    "stitch 2,3 c0 line2",
+    "stitch -2,4 c0 line2",
+    "stitch 2,5 c0 line2",
+    "stitch -2,6 c0 line2",
+  ],
+  "plan": undefined,
+  "printed": [
+    "281729.945",
+  ],
+  "stats": {
+    "colorChanges": 0,
+    "colorsUsed": 1,
+    "height": 6,
+    "jumps": 0,
+    "maxRadius": 6.32455532,
+    "maxStitchLen": 4.123105626,
+    "maxX": 2,
+    "maxY": 6,
+    "minX": -2,
+    "minY": 0,
+    "stitches": 7,
+    "trims": 0,
+    "width": 4,
+    "yarnLength": 22.851596106,
+  },
+  "warnings": [],
+}
+`;
+
+exports[`fabric preset characterization > canvas applies its current satin and fill settings 1`] = `
+{
+  "fabric": "canvas",
+  "fillUnderlayCount": 8,
+  "fillWarnings": [],
+  "maxToppingX": 2.575,
+  "satinUnderlayCount": 9,
+  "satinWarnings": [],
+  "toppingCount": 21,
+}
+`;
+
+exports[`fabric preset characterization > denim applies its current satin and fill settings 1`] = `
+{
+  "fabric": "denim",
+  "fillUnderlayCount": 8,
+  "fillWarnings": [],
+  "maxToppingX": 2.575,
+  "satinUnderlayCount": 9,
+  "satinWarnings": [],
+  "toppingCount": 21,
+}
+`;
+
+exports[`fabric preset characterization > fleece applies its current satin and fill settings 1`] = `
+{
+  "fabric": "fleece",
+  "fillUnderlayCount": 16,
+  "fillWarnings": [
+    "fleece: consider a water-soluble topping so stitches don’t sink into the pile",
+  ],
+  "maxToppingX": 2.65,
+  "satinUnderlayCount": 17,
+  "satinWarnings": [
+    "fleece: consider a water-soluble topping so stitches don’t sink into the pile",
+    "3.5 layers of thread (limit 2.6) near (1, 6) — mostly line 1 — may pucker or break needles",
+    "3.3 layers of thread (limit 2.6) near (1, 3) — mostly line 1 — may pucker or break needles",
+  ],
+  "toppingCount": 21,
+}
+`;
+
+exports[`fabric preset characterization > knit applies its current satin and fill settings 1`] = `
+{
+  "fabric": "knit",
+  "fillUnderlayCount": 8,
+  "fillWarnings": [],
+  "maxToppingX": 2.75,
+  "satinUnderlayCount": 9,
+  "satinWarnings": [],
+  "toppingCount": 19,
+}
+`;
+
+exports[`fabric preset characterization > stretch applies its current satin and fill settings 1`] = `
+{
+  "fabric": "stretch",
+  "fillUnderlayCount": 8,
+  "fillWarnings": [],
+  "maxToppingX": 2.8,
+  "satinUnderlayCount": 9,
+  "satinWarnings": [],
+  "toppingCount": 17,
+}
+`;
+
+exports[`fabric preset characterization > woven applies its current satin and fill settings 1`] = `
+{
+  "fabric": "woven",
+  "fillUnderlayCount": 8,
+  "fillWarnings": [],
+  "maxToppingX": 2.6,
+  "satinUnderlayCount": 9,
+  "satinWarnings": [],
+  "toppingCount": 21,
+}
+`;
+
+exports[`representative embroidery exporter baselines > 'holed fill' pins DST, PES, and EXP bytes 1`] = `
+{
+  "dst": "572 bytes, fnv1a32=e87233cd",
+  "exp": "42 bytes, fnv1a32=de9b4ad1",
+  "pes": "1048 bytes, fnv1a32=10644fbe",
+}
+`;
+
+exports[`representative embroidery exporter baselines > 'running, travel, color, and satin' pins DST, PES, and EXP bytes 1`] = `
+{
+  "dst": "569 bytes, fnv1a32=60bd096e",
+  "exp": "38 bytes, fnv1a32=3c6cc6d9",
+  "pes": "1279 bytes, fnv1a32=c5ae2598",
+}
+`;
