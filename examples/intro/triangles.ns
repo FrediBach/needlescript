@@ -1,3 +1,4 @@
+// TRIANGLE FIELD — a `for` loop grows, rotates, and recolours one motif.
 seed 42
 
 fabric "woven
@@ -9,12 +10,14 @@ let growFactor = 1.1   // [1.02:0.01:1.2] size multiplier per triangle
 let rotationStep = 13  // [1:1:45] rotation step, degrees
 
 def drawTriangle(cx, cy, size, angle) [
+  // Convert the three polar corners into x/y points around the centre.
   let x0 = cx + size * sin(angle)
   let y0 = cy - size * cos(angle)
   let x1 = cx + size * sin(angle + 120)
   let y1 = cy - size * cos(angle + 120)
   let x2 = cx + size * sin(angle + 240)
   let y2 = cy - size * cos(angle + 240)
+  // Lift before moving so separate triangles are not joined by thread.
   moveto x0 y0
   down
   setxy x1 y1
@@ -27,12 +30,14 @@ def drawTriangle(cx, cy, size, angle) [
 let colorList = [1, 2, 3, 4, 5, 6]
 
 for i = 0 to numTriangles - 1 [
+  // `i` starts at zero, so it is handy for a growing sequence and list index.
   let size = startSize * pow(growFactor, i)
   let angle = rotationStep * i
   let c = colorList[i % len(colorList)]
   color c
   let stitch = 1.5 + i * 0.1
   stitchlen stitch
+  // Keep the largest triangles inside the hoop.
   if size <= 44 [
     drawTriangle(0, 0, size, angle)
   ]

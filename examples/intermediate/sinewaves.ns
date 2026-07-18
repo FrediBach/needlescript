@@ -1,4 +1,4 @@
-// --- Sine wave mesh ---
+// SINE-WAVE MESH — generate point paths, then resample and sew each one.
 let nwaves  = 15      // [3:16]
 let amp     = 15     // [6:24]   peak amplitude at the centre
 let halfW   = 39     // [20:46]  half-length of the horizontal line
@@ -32,12 +32,14 @@ def buildwave(ox, cyc, phase) [
 ]
 
 repeat nwaves [
+  // `repcount` is 1-based; convert it to a zero-based index for calculations.
   let k     = repcount - 1
   let ox    = random(2 * xJitter) - xJitter          // different start position
   let cyc   = baseCyc + k * cycVar / nwaves + random(1)   // different frequency
   let phase = random(360)                            // different phase
   color((k % 3) + 2)
   up setpos([ox - halfW, 0]) down
+  // The generated points are dense; resample makes their stitch spacing regular.
   sewpath(resample(buildwave(ox, cyc, phase), slen))
   trim
 ]

@@ -12,6 +12,7 @@ let noisescale = 16   // [4:1:40] noise field scale — larger = broader turns
 
 to strand
   repeat 90 [
+    // noise2 is continuous, so nearby positions point in similar directions.
     seth ( noise2 xcor / noisescale ycor / noisescale ) * 720
     fd stepsize
     if distance 0 0 > boundary [ exit ]
@@ -21,6 +22,7 @@ end
 seed 9
 stitchlen 2
 repeat nstrands [
+  // A seeded random start gives each strand a different entry into the field.
   up setxy random 64 - 32 random 64 - 32 down
   strand
   trim

@@ -1,3 +1,4 @@
+// ECLIPSE — radial running stitches with smooth, repeatable noise.
 seed 30              ; reproducible glitch — change it, change the static
 
 // --- eclipse ---
@@ -16,6 +17,7 @@ def static_ticks(r, n) [
     let outer = r + 36  // 5–13 mm long, noise-driven
     let ix = cx + sin(ang) * inner      // turtle degrees: x = sin, y = cos
     let iy = cy + cos(ang) * inner
+    // Each tick is a separate stroke: jump to its start, then stitch outward.
     up setxy(ix, iy) down
     seth ang
     fd outer - inner

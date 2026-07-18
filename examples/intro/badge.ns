@@ -9,11 +9,13 @@ let bwidth = 3   // [1:1:5] bean border width (stitch count)
 
 fillangle hatch
 up setxy -26 -15 down
+// The first pass defines the hexagon and fills its enclosed area.
 beginfill
   repeat 6 [ fd 30 rt 60 ]
 endfill
 
 color 3
+// Turn on a three-pass bean stitch only while sewing the border.
 bean bwidth
 repeat 6 [ fd 30 rt 60 ]
 bean 1

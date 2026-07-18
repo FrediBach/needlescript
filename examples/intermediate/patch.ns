@@ -11,12 +11,14 @@ let satinw = 3   // [1:0.5:5] border satin width, mm
 fabric "knit
 maxdensity 4.5
 fillangle hatch
+// This smaller rounded square is filled first, leaving room for the border.
 up setxy -12.8 -14.8 down
 beginfill
   repeat 4 [ fd 16 arc 90 4.8 ]
 endfill
 
 color 0
+// The larger outline is then covered with a satin ribbon.
 up setxy -14 -16 down
 satin satinw
 repeat 4 [ fd 16 arc 90 6 ]

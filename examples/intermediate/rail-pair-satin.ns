@@ -1,4 +1,4 @@
-// Rail-pair satin: independently authored leaf edges
+// RAIL-PAIR SATIN — independently authored leaf edges become one ribbon.
 
 hoop 'round100'
 fabric 'woven'
@@ -6,12 +6,14 @@ underlay 'auto'
 density 0.42
 lock 0.6
 
+// A Bézier curve returns a path; these two paths are the ribbon's rails.
 let leafBase = [0, -20]  // [xy: disc 24]
 let leafTip = [0, 22]    // [xy: disc 24]
 let edgeLeft = bezier(leafBase, [-3.5, -10], [-3, 14], leafTip, 1.2)
 let edgeRight = bezier(leafBase, [3.5, -10], [3, 14], leafTip, 1.2)
 
 color 0
+// `satinbetween` pairs matching distances along the two rails automatically.
 satinbetween(edgeLeft, edgeRight)
 trim
 

@@ -8,8 +8,10 @@
 let length = 34  // [12:46] trunk length, mm
 
 to branch :len
+  // At the smallest size, sew out and back to end the branch cleanly.
   if :len < 5 [ fd :len bk :len ]
   else [
+    // Each recursive call returns to this fork before the next branch begins.
     fd :len / 2
     lt 28 branch :len * 0.62 rt 28
     fd :len / 4

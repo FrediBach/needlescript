@@ -12,6 +12,7 @@ let stepd  = 1.1  // [0.4:0.1:2.5] step size per arc segment, mm
 stitchlen stitch
 
 to wave
+  // One scallop turns right, then left by the same total angle.
   repeat 3 [
     repeat 18 [ fd stepd rt 10 ]
     repeat 18 [ fd stepd lt 10 ]
@@ -19,6 +20,7 @@ to wave
 end
 
 repeat nrows [
+  // `repcount` positions each row while the needle is up.
   up setxy 38 repcount * 16 - 40 seth 180 down
   wave
 ]

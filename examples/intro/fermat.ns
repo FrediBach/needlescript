@@ -1,8 +1,10 @@
+// FERMAT SPIRAL — build points with math, then sew the resulting path.
 seed 42
 fabric 'woven'
 stitchlen 1.8
 
 def fermat_point(t, c, angoff) [
+  // Radius grows with sqrt(t); the angle offset selects a spiral arm.
   let r = c * sqrt(t)
   let ang = t + angoff
   let x = r * sin(ang)
@@ -17,6 +19,7 @@ let dtheta = 3         // [1:1:8] angular sampling step, degrees
 let p = [0, 0]
 
 color 8
+// `trace` records turtle movement as a path without emitting stitches yet.
 let arm1 = trace [
   moveto 0 0
   for t = 0 to thetamax step dtheta [
@@ -24,9 +27,11 @@ let arm1 = trace [
     setxy p[0] p[1]
   ]
 ]
+// Resampling gives the final sewn path a regular stitch pitch.
 sewpath(resample(arm1, 1.8))
 trim
 
+// Remove `stop` to sew the mirrored second arm as well.
 stop
 let arm2 = trace [
   moveto 0 0
@@ -36,6 +41,7 @@ let arm2 = trace [
   ]
 ]
 
+// Position at its first point before sewing the second recorded path.
 up
 moveto 0 0
 down

@@ -1,4 +1,5 @@
-// Custom contour fill with an even-odd hole.
+// CONTOUR FILL — custom fill paths with an even-odd hole.
+// The reporter receives a ring count and returns inset outlines at `gap` mm.
 seed 11
 fabric 'woven'
 stitchlen 2
@@ -12,8 +13,10 @@ def echo(rings) [
 color 2
 fill paths @echo
 beginfill
+  // First contour: the filled triangle boundary.
   moveto -26 -15
   sewpath(closepath([[-26, -15], [26, -15], [0, 30]]))
+  // Second contour: a hole. Moving with the needle up keeps it separate.
   up
   moveto 0 4
   down

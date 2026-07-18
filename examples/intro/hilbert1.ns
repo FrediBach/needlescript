@@ -1,7 +1,9 @@
 // Hilbert curve via a single self-mirroring procedure.
 // sign = +1 or -1 chooses the chirality at each level.
 def hilbert(order, sign, side) [
+  // The base case prevents recursion from continuing below the smallest curve.
   if order == 0 [ return ]
+  // Four smaller curves, with alternating signs, join into one Hilbert curve.
   rt sign * 90
   hilbert(order - 1, -sign, side)
   fd side
@@ -28,4 +30,5 @@ let span = (pow(2, order) - 1) * side
 up setxy(-span / 2, -span / 2) down
 
 color 1
+// Start with order 2 or 3 to see the recursive pattern more clearly.
 hilbert(order, 1, side)

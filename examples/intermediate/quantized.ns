@@ -1,4 +1,4 @@
-// --- Sine wave mesh ---
+// QUANTIZED WAVE MESH — sine-wave paths snapped to a 2 mm grid.
 let nwaves  = 4      // [3:16]
 let amp     = 32     // [6:32]   peak amplitude at the centre
 let halfW   = 41     // [20:46]  half-length of the horizontal line
@@ -31,6 +31,7 @@ def buildwave(ox, cyc, phase) [
   return pts
 ]
 
+// A transform block affects every stitch inside it, after normal path generation.
 snaptogrid 2 [
   repeat nwaves [
     let k     = repcount - 1
@@ -39,7 +40,7 @@ snaptogrid 2 [
     let phase = random(360)                            // different phase
     color((k % 3) + 3)
     up setpos([ox - halfW, 0]) down
-    sewpath(resample(buildwave(ox, cyc, phase), slen))
+    sewpath(resample(buildwave(ox, cyc, phase), slen)) // regular spacing before snapping
     trim
   ]
 ]

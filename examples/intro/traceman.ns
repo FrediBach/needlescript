@@ -1,5 +1,6 @@
-// Use trace to cut out a smaller circle from a bigger one
-// and than let the "Pac Man" eat another circle.
+// TRACE + CLIP — record two outlines, subtract one, then fill the result.
+// `trace` produces a reusable path without sewing; `clippaths` performs the
+// geometric difference. A final filled circle gives the cut-out a "Pac-Man" bite.
 
 // --- cut-out ---
 let disc_r = 30    // [14:1:38] outer-disc radius, mm
@@ -7,12 +8,14 @@ let bite_r = 20    // [6:1:30] bite radius, mm
 let bite_x = -40   // [-44:1:0] bite centre X, mm
 
 moveto -10 0
+// The circles are traced, not stitched, so they can become clipping operands.
 let disc = trace [ translate -20 0 [ circle disc_r ] ]
 let bite = trace [ translate bite_x 0 [ circle bite_r ] ]
 
 color 3
 
 for piece in clippaths(disc, bite, "difference) [
+  // Clipping can return more than one contour. Start each one separately.
   let r = resample(piece, 1)
   up setpos(r[0]) down
   beginfill sewpath(r) endfill

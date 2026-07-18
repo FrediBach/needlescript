@@ -1,4 +1,6 @@
-// One continuous custom spiral fill.
+// SPIRAL FILL — supply a procedure that returns the fill's stitch paths.
+// `fill paths` calls it with the number of requested rings; spiralpath turns
+// that number into one continuous spiral instead of ordinary hatch rows.
 seed 4
 fabric 'woven'
 stitchlen 2
@@ -7,6 +9,7 @@ def whirl(rings) [
   return spiralpath(rings, 0.8)
 ]
 
+// The boundary is still drawn normally; only its interior uses `whirl`.
 fill paths @whirl
 beginfill
   circle 18

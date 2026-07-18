@@ -1,5 +1,6 @@
-// Three vertical bars with xy corner handles
-// lo = [left, bottom]   hi = [right, top]
+// THREE BARS — reusable filled rectangles controlled by draggable corners.
+// `lo` = [left, bottom]; `hi` = [right, top]. The `[xy]` annotations expose
+// those points as handles in the Customizer.
 
 // Left bar:
 let l_lo = [-24.452, -19.2061] // [xy]
@@ -22,12 +23,14 @@ fillspacing 1
 stitchlen 2.5
 
 def bar(lo, hi, ang) [
+  // Validate the input before calculating a width and height from the corners.
   assert(hi[0] > lo[0] and hi[1] > lo[1], 'bar: hi must be above-right of lo')
   let w = hi[0] - lo[0]
   let h = hi[1] - lo[1]
   fillangle ang
   moveto(lo[0], lo[1])
   seth 0
+  // Draw a closed rectangle; beginfill fills the boundary we trace.
   beginfill
     repeat 2 [ fd h rt 90 fd w rt 90 ]
   endfill

@@ -9,11 +9,13 @@ let satinw = 2.5  // [1:0.5:6] satin width, mm
 let stitchw = 4   // [2:0.5:8] estitch prong width, mm
 
 stitchlen stitch
+// Each `up … down` moves to the next row without sewing a connecting thread.
+// Turn a stitch mode on before its line, then reset it to zero afterwards.
 up setxy -30 27 seth 90 down
-fd 60
+fd 60                         // running stitch
 up setxy -30 10 seth 90 down
-bean 3 fd 60 bean 1
+bean 3 fd 60 bean 1            // triple-run bean stitch
 up setxy -30 -8 seth 90 down
-satin satinw fd 60 satin 0
+satin satinw fd 60 satin 0     // zigzag satin ribbon
 up setxy -30 -24 seth 90 down
-estitch stitchw fd 60 estitch 0
+estitch stitchw fd 60 estitch 0 // blanket-style edge stitch
