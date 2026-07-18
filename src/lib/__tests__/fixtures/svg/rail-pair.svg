@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <g id="leaf-rails" fill="none" stroke="#315c45" stroke-width="1">
+    <path id="left-rail" d="M35 85 C25 65 27 30 50 12" />
+    <path id="right-rail" d="M65 85 C75 65 73 30 50 12" />
+  </g>
+</svg>

@@ -200,21 +200,24 @@ function HolePanel({ el, update }: { el: ElementModel; update: Props['update'] }
 
 function StrategySelect({
   geomType,
+  role,
   value,
   onChange,
 }: {
   geomType: ElementModel['geomType'];
+  role: ElementModel['role'];
   value: StrategyKind;
   onChange: (k: StrategyKind) => void;
 }) {
-  const eligible = new Set(eligibleStrategies(geomType));
+  const eligible = new Set(eligibleStrategies(geomType, role));
+  const order = role === 'relation' ? [value] : STRATEGY_ORDER;
   return (
     <Select value={value} onValueChange={(v: string | null) => v && onChange(v as StrategyKind)}>
       <SelectTrigger className="h-8 text-[12px]">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {STRATEGY_ORDER.map((k) => (
+        {order.map((k) => (
           <SelectItem key={k} value={k} disabled={!eligible.has(k)}>
             {STRATEGIES[k].label}
             {!eligible.has(k) ? ' — n/a' : ''}
@@ -254,6 +257,7 @@ export default function Inspector({ doc, selectedIds, reporters, update }: Props
           </Alert>
           <StrategySelect
             geomType={selected[0].geomType}
+            role={selected[0].role}
             value={selected[0].strategy.kind}
             onChange={(k) => update((d) => setElementStrategy(d, selectedIds, k))}
           />
@@ -271,6 +275,7 @@ export default function Inspector({ doc, selectedIds, reporters, update }: Props
         </Alert>
         <StrategySelect
           geomType={selected[0].geomType}
+          role={selected[0].role}
           value={kind}
           onChange={(k) => update((d) => setElementStrategy(d, selectedIds, k))}
         />
@@ -304,6 +309,7 @@ export default function Inspector({ doc, selectedIds, reporters, update }: Props
         <CardContent className="flex flex-col gap-3">
           <StrategySelect
             geomType={el.geomType}
+            role={el.role}
             value={el.strategy.kind}
             onChange={(k) => update((d) => setElementStrategy(d, new Set([el.id]), k))}
           />

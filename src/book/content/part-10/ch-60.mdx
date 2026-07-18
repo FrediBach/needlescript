@@ -19,6 +19,12 @@ elements appear as findings instead of being silently approximated. Editable SVG
 as `// [curve]` anchor specs and converted to logical geometry with `curveflat`; recipe stitch length
 and density remain separate from that geometry tolerance.
 
+Relationships are deliberate construction choices. Select exactly two single-path operations in
+the order you mean them, then choose **Create relationship**. Two open paths can become authored
+satin rails; the emitted code retains both bindings and calls `satinbetween`. Or use the first path
+as a route and repeat the second as a centered motif through `std.layout.alongpath` and a reusable
+placement procedure. No proximity matching or baked zigzag coordinates are hidden in either recipe.
+
 Bitmap import adds crop and threshold controls that generate editable path code. Both workflows end
 with a real NeedleScript program and a sewability check, rather than a private stitch-object format.
 
@@ -30,6 +36,6 @@ let clean = simplify(resample(outline, 1), 0.5)
 sewpath(clean)`}</Run>
 
 <Checkpoint chapterId="ch-60">
-  Import a small SVG containing one shape with both fill and stroke. Confirm that staging shows two
-  operations and that the inserted program declares their geometry only once.
+  Import a small SVG containing two open paths. Select them explicitly, pair them as satin rails,
+  and confirm that the inserted program keeps both path declarations and calls `satinbetween` once.
 </Checkpoint>

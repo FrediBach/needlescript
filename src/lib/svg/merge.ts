@@ -131,13 +131,14 @@ export function mergeAppend(baseSource: string, fragment: EmitResult): AppendEmi
 export function emitAppend(
   doc: StagedDocument,
   baseSource: string,
-  opts: Omit<EmitOptions, 'mode' | 'reservedNames'> = {},
+  opts: Omit<EmitOptions, 'mode' | 'reservedNames' | 'availableImports'> = {},
 ): AppendEmitResult {
   const inventory = inventoryProgram(baseSource);
   const fragment = emit(doc, {
     ...opts,
     mode: 'append',
     reservedNames: inventory.usedNames,
+    availableImports: inventory.imports,
   });
   return mergeAppend(baseSource, fragment);
 }

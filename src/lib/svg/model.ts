@@ -16,7 +16,14 @@ export type GeomType =
   'closedPath' | 'openPath' | 'rect' | 'circle' | 'ellipse' | 'polyline' | 'polygon';
 
 export type StrategyKind =
-  'skip' | 'outline' | 'satinBorder' | 'tatamiFill' | 'directionalFill' | 'runningMotif';
+  | 'skip'
+  | 'outline'
+  | 'satinBorder'
+  | 'tatamiFill'
+  | 'directionalFill'
+  | 'runningMotif'
+  | 'railPair'
+  | 'motifAlong';
 
 type UnderlayMode = 'auto' | 'center' | 'edge' | 'zigzag' | 'off';
 type FillUnderlay = 'auto' | 'edge' | 'tatami' | 'off';
@@ -55,6 +62,17 @@ interface RunningMotifParams {
   estitch: boolean;
   estitchLen: number;
 }
+interface RailPairParams {
+  density: number;
+  underlay: UnderlayMode;
+  shortstitch: boolean;
+}
+interface MotifAlongParams {
+  count: number;
+  scale: number;
+  stitchlen: number;
+  align: boolean;
+}
 
 export type Strategy =
   | { kind: 'skip' }
@@ -62,7 +80,9 @@ export type Strategy =
   | { kind: 'satinBorder'; params: SatinBorderParams }
   | { kind: 'tatamiFill'; params: TatamiFillParams }
   | { kind: 'directionalFill'; params: DirectionalFillParams }
-  | { kind: 'runningMotif'; params: RunningMotifParams };
+  | { kind: 'runningMotif'; params: RunningMotifParams }
+  | { kind: 'railPair'; params: RailPairParams }
+  | { kind: 'motifAlong'; params: MotifAlongParams };
 
 export interface RingHole {
   /** true means the interior of this ring is unfilled. */
@@ -151,7 +171,10 @@ export interface ImportOperation {
   id: string;
   sourceObjectId: string;
   geometryIds: string[];
-  /** Indices into the first referenced geometry. */
+  /**
+   * Source operations index paths in their sole geometry. Relationship
+   * operations use one index per corresponding geometry ID.
+   */
   pathIndices: number[];
   name: string;
   role: OperationRole;
@@ -230,6 +253,10 @@ export function defaultStrategy(kind: StrategyKind): Strategy {
         kind,
         params: { stitchlen: 2.5, bean: false, estitch: false, estitchLen: 2 },
       };
+    case 'railPair':
+      return { kind, params: { density: 0.4, underlay: 'auto', shortstitch: true } };
+    case 'motifAlong':
+      return { kind, params: { count: 6, scale: 1, stitchlen: 2.5, align: true } };
   }
 }
 

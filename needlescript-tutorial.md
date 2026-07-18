@@ -1847,6 +1847,13 @@ When a design is ready, **Download .DST** produces a standard Tajima file: 3-byt
 
 You can also bring artwork _in_: **Import SVG** (a button, or drag and drop) converts SVG structure into _editable_ NeedleScript code. Quick import and **Import with options** use the same conversion pipeline. Fill and stroke become separate operations over one shared named geometry, compound paths honor SVG `evenodd` and `nonzero` winding, and nested groups, inherited paint, transforms, physical stroke widths, and the selected hoop field are retained. It supports `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon. Unknown paints and unsupported elements are shown as findings rather than changed to a guessed color. In the options workspace, curve paths can remain editable `// [curve]` specs flattened at runtime with `curveflat` — a useful handoff from a logo into generative code.
 
+Authored relationships stay explicit too. Select exactly two single-path operations and open
+**Create relationship**. **Pair as satin rails** accepts two open paths and emits
+`satinbetween(railA, railB)` over their original named bindings; it never pairs nearby paths by
+guessing. **Repeat second as motif along first** treats selection order as route then motif and emits
+an `std.layout.alongpath` loop plus a reusable placement procedure. The two standalone source
+operations are disabled, not deleted, so you can recover or edit them.
+
 ---
 
 ## 27. Sewing gotchas: where artefacts come from

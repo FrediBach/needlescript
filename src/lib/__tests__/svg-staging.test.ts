@@ -17,9 +17,16 @@ import { parseSvgToModel } from '../../svg-import/parse-svg-dom.ts';
 import { pathToCurveSpecs } from '../svg/svg-path.ts';
 import { defaultStrategy, type StagedDocument, type ElementModel } from '../svg/model.ts';
 import { run } from '../interpreter.ts';
+import {
+  canCreateMotifAlong,
+  canCreateRailPair,
+  createMotifAlong,
+  createRailPair,
+} from '../svg/relationships.ts';
 import fillAndStrokeFixture from './fixtures/svg/fill-and-stroke.svg?raw';
 import compoundNonzeroFixture from './fixtures/svg/compound-nonzero.svg?raw';
 import nestedGroupsFixture from './fixtures/svg/nested-groups.svg?raw';
+import railPairFixture from './fixtures/svg/rail-pair.svg?raw';
 
 const PALETTE = ['#C8472F', '#31604F', '#3A4E8C', '#D9A441', '#8C4A6B', '#2B2B2B'];
 
@@ -233,6 +240,130 @@ describe('strategy catalogue', () => {
     for (const operation of [outline, satin, tatami, running]) {
       expect(() => run(emit(mkDoc([operation]), { date: '2026-01-01' }).code)).not.toThrow();
     }
+  });
+});
+
+describe('explicit SVG relationships', () => {
+  it('creates rail-pair satin only after two open paths are explicitly selected', () => {
+    const { doc } = parseSvgToModel(railPairFixture, {
+      palette: PALETTE,
+      name: 'rail-pair.svg',
+      fitMM: 70,
+    });
+    const sourceIds = doc.operations.map((operation) => operation.id);
+
+    expect(doc.operations).toHaveLength(2);
+    expect(doc.operations.some((operation) => operation.role === 'relation')).toBe(false);
+    expect(canCreateRailPair(doc, sourceIds)).toBe(true);
+
+    const paired = createRailPair(doc, sourceIds);
+    const relation = paired.operations.find((operation) => operation.role === 'relation')!;
+    expect(relation).toMatchObject({
+      geometryIds: [doc.geometries[0].id, doc.geometries[1].id],
+      pathIndices: [0, 0],
+      strategy: { kind: 'railPair' },
+    });
+    expect(
+      paired.operations
+        .filter((operation) => sourceIds.includes(operation.id))
+        .every((operation) => !operation.include),
+    ).toBe(true);
+
+    const code = emit(paired, { date: '2026-01-01' }).code;
+    expect(code).toContain('let left_rail =');
+    expect(code).toContain('let right_rail =');
+    expect(code).toContain('satinbetween(left_rail, right_rail)');
+    expect(code).not.toMatch(/^satin \d/m);
+    expect(run(code).events.length).toBeGreaterThan(0);
+  });
+
+  it('rejects implicit, duplicate, multi-path, and closed-path rail pairing', () => {
+    const { doc } = parseSvgToModel(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <path id="open" d="M10 10 L90 10" fill="none" stroke="#000"/>
+        <rect id="closed" x="20" y="30" width="60" height="40" fill="none" stroke="#000"/>
+      </svg>`,
+      { palette: PALETTE, fitMM: 70 },
+    );
+    const ids = doc.operations.map((operation) => operation.id);
+    expect(canCreateRailPair(doc, ids)).toBe(false);
+    expect(createRailPair(doc, ids)).toBe(doc);
+  });
+
+  it('emits every rail-pair control without replacing satinbetween with stitches', () => {
+    const { doc } = parseSvgToModel(railPairFixture, { palette: PALETTE, fitMM: 70 });
+    const paired = createRailPair(
+      doc,
+      doc.operations.map((operation) => operation.id),
+    );
+    const relation = paired.operations.find((operation) => operation.role === 'relation')!;
+    const edited: StagedDocument = {
+      ...paired,
+      operations: paired.operations.map((operation) =>
+        operation.id === relation.id
+          ? {
+              ...operation,
+              strategy: {
+                kind: 'railPair',
+                params: { density: 0.65, underlay: 'edge', shortstitch: false },
+              },
+            }
+          : operation,
+      ),
+    };
+    const code = emit(edited, { date: '2026-01-01' }).code;
+    expect(code).toContain('underlay "edge"');
+    expect(code).toContain('shortstitch 0');
+    expect(code).toContain('density 0.65');
+    expect(code).toContain('satinbetween(');
+    expect(code).toContain('shortstitch 1');
+    expect(code).toContain('underlay "auto"');
+    expect(() => run(code)).not.toThrow();
+  });
+
+  it('keeps motif-along-path as authored path, layout, and procedure composition', () => {
+    const { doc } = parseSvgToModel(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80">
+        <path id="route" d="M10 40 C40 5 80 75 110 40" fill="none" stroke="#315c45"/>
+        <path id="motif" d="M55 30 L60 20 L65 30 L60 38 Z" fill="none" stroke="#d9a441"/>
+      </svg>`,
+      { palette: PALETTE, name: 'motifs.svg', fitMM: 70 },
+    );
+    const ids = doc.operations.map((operation) => operation.id);
+    expect(canCreateMotifAlong(doc, ids)).toBe(true);
+    const related = createMotifAlong(doc, ids);
+    const relation = related.operations.find((operation) => operation.role === 'relation')!;
+    const edited: StagedDocument = {
+      ...related,
+      operations: related.operations.map((operation) =>
+        operation.id === relation.id
+          ? {
+              ...operation,
+              strategy: {
+                kind: 'motifAlong',
+                params: { count: 3, scale: 0.5, stitchlen: 1.7, align: false },
+              },
+            }
+          : operation,
+      ),
+    };
+    const code = emit(edited, { date: '2026-01-01' }).code;
+
+    expect(code).toContain('import std.layout.alongpath as svg_alongpath');
+    expect(code).toContain('let route =');
+    expect(code).toContain('let motif =');
+    expect(code).toMatch(/def route_place_motif\(motif, placement\)/);
+    expect(code).toContain('xscale(motif, 0.5), 0)');
+    expect(code).toContain('sewpath(resample(placed, 1.7))');
+    expect(code).toContain('svg_alongpath(route, 3)');
+    expect(() => run(code)).not.toThrow();
+
+    const appended = emitAppend(edited, 'import std.layout.alongpath as placealong\nseed 9\nfd 1', {
+      date: '2026-01-01',
+    });
+    expect(appended.code.match(/^import std\.layout\.alongpath as /gm)).toHaveLength(1);
+    expect(appended.code).toContain('placealong(route, 3)');
+    expect(() => run(appended.code)).not.toThrow();
   });
 });
 

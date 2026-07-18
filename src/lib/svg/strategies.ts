@@ -7,7 +7,14 @@
 // `emit` produces the per-element sew block referenced by the emitter.
 // ============================================================
 
-import type { ElementModel, GeomType, RingHole, Strategy, StrategyKind } from './model.ts';
+import type {
+  ElementModel,
+  GeomType,
+  OperationRole,
+  RingHole,
+  Strategy,
+  StrategyKind,
+} from './model.ts';
 import { defaultStrategy } from './model.ts';
 import { isClosedRing } from './geometry.ts';
 
@@ -40,12 +47,17 @@ export interface EmitContext {
   /** Operation-local ring indices grouped for even-odd beginfill blocks. */
   fillGroups: number[][];
   scaffoldName: string;
+  /** Import alias for std.layout.alongpath when a relationship needs it. */
+  layoutName?: string;
+  /** Collision-free declarations used by relationship recipes. */
+  helperName?: string;
+  derivedName?: string;
 }
 
 export interface StrategyDef {
   kind: StrategyKind;
   label: string;
-  eligible: (g: GeomType) => boolean;
+  eligible: (g: GeomType, role?: OperationRole) => boolean;
   /** controls shown in the Inspector for the current params. */
   controls: ParamControl[];
   /** sew-block body lines (no `color`/`trim`; the emitter adds those). */
@@ -363,6 +375,112 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
       return lines;
     },
   },
+
+  railPair: {
+    kind: 'railPair',
+    label: 'Rail-pair satin',
+    eligible: (_g, role) => role === 'relation',
+    controls: [
+      {
+        kind: 'slider',
+        key: 'density',
+        label: 'density',
+        min: 0.25,
+        max: 5,
+        step: 0.05,
+        unit: 'mm',
+        tooltip: 'penetration spacing between authored rails, 0.25–5 mm',
+      },
+      {
+        kind: 'select',
+        key: 'underlay',
+        label: 'underlay',
+        options: UNDERLAY_OPTS,
+        tooltip: 'stabilising stitches generated beneath the rail-pair column',
+      },
+      {
+        kind: 'switch',
+        key: 'shortstitch',
+        label: 'short stitch',
+        tooltip: 'shorten stitches on the inside of tight rail curves',
+      },
+    ],
+    emit: (el, ctx) => {
+      const p = (el.strategy as Extract<Strategy, { kind: 'railPair' }>).params;
+      const [railA, railB] = ctx.ringNames;
+      if (!railA || !railB) return [];
+      const lines: string[] = [];
+      if (p.underlay !== 'auto') lines.push(`underlay "${p.underlay}"`);
+      lines.push(`shortstitch ${p.shortstitch ? 1 : 0}`);
+      lines.push(`density ${fmt(p.density)}`);
+      lines.push(`satinbetween(${railA}, ${railB})`);
+      if (!p.shortstitch) lines.push('shortstitch 1');
+      if (p.underlay !== 'auto') lines.push('underlay "auto"');
+      return lines;
+    },
+  },
+
+  motifAlong: {
+    kind: 'motifAlong',
+    label: 'Motif along path',
+    eligible: (_g, role) => role === 'relation',
+    controls: [
+      {
+        kind: 'slider',
+        key: 'count',
+        label: 'motif count',
+        min: 1,
+        max: 50,
+        step: 1,
+        tooltip: 'number of placements distributed along the authored route',
+      },
+      {
+        kind: 'slider',
+        key: 'scale',
+        label: 'motif scale',
+        min: 0.1,
+        max: 4,
+        step: 0.05,
+        tooltip: 'uniform scale applied to the centered source motif',
+      },
+      {
+        kind: 'slider',
+        key: 'stitchlen',
+        label: 'stitch length',
+        min: 1,
+        max: 6,
+        step: 0.1,
+        unit: 'mm',
+        tooltip: 'running-stitch spacing within each transformed motif',
+      },
+      {
+        kind: 'switch',
+        key: 'align',
+        label: 'follow path',
+        tooltip: 'rotate each motif to the route heading returned by std.layout.alongpath',
+      },
+    ],
+    emit: (el, ctx) => {
+      const p = (el.strategy as Extract<Strategy, { kind: 'motifAlong' }>).params;
+      const [route, motif] = ctx.ringNames;
+      if (!route || !motif) return [];
+      const helper = ctx.helperName ?? 'place_motif';
+      const centered = ctx.derivedName ?? 'centered_motif';
+      const alongpath = ctx.layoutName ?? 'alongpath';
+      const heading = p.align ? 'placement[1]' : '0';
+      return [
+        `def ${helper}(motif, placement) [`,
+        `  let placed = xlate(xrotate(xscale(motif, ${fmt(p.scale)}), ${heading}), placement[0][0], placement[0][1])`,
+        '  up setpos(first(placed)) down',
+        `  sewpath(resample(placed, ${fmt(p.stitchlen)}))`,
+        ']',
+        `let ${centered} = xlate(${motif}, -centroid(${motif})[0], -centroid(${motif})[1])`,
+        `for placement in ${alongpath}(${route}, ${fmt(p.count)}) [`,
+        `  ${helper}(${centered}, placement)`,
+        ']',
+      ];
+    },
+  },
 };
 
 /** Strategies eligible for a geometry type, in catalogue order (spec §15: keys 1–6). */
@@ -375,8 +493,12 @@ export const STRATEGY_ORDER: StrategyKind[] = [
   'runningMotif',
 ];
 
-export function eligibleStrategies(g: GeomType): StrategyKind[] {
-  return STRATEGY_ORDER.filter((k) => STRATEGIES[k].eligible(g));
+/** Relationship recipes are created explicitly, never assigned by auto-suggest. */
+export const RELATIONSHIP_STRATEGY_ORDER: StrategyKind[] = ['railPair', 'motifAlong'];
+
+export function eligibleStrategies(g: GeomType, role?: OperationRole): StrategyKind[] {
+  const order = role === 'relation' ? RELATIONSHIP_STRATEGY_ORDER : STRATEGY_ORDER;
+  return order.filter((k) => STRATEGIES[k].eligible(g, role));
 }
 
 /**

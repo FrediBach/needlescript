@@ -12,6 +12,8 @@ export interface EmitOptions {
   date?: string;
   /** Names already owned by a base program when emitting an append fragment. */
   reservedNames?: Iterable<string>;
+  /** Existing imports that append emission may reuse instead of duplicating. */
+  availableImports?: Iterable<{ specifier: string; alias: string }>;
 }
 
 export interface EmitResult {
@@ -103,6 +105,20 @@ function operationColor(operation: ImportOperation): string | null {
   return operation.role === 'fill' ? operation.sourceFill : operation.sourceStroke;
 }
 
+function pathNamesForOperation(
+  operation: ImportOperation,
+  geometryNames: Map<string, string[]>,
+): string[] {
+  if (operation.role === 'relation') {
+    return operation.geometryIds.flatMap((geometryId, index) => {
+      const name = geometryNames.get(geometryId)?.[operation.pathIndices[index] ?? 0];
+      return name ? [name] : [];
+    });
+  }
+  const names = geometryNames.get(operation.geometryIds[0]);
+  return names ? operation.pathIndices.flatMap((index) => names[index] ?? []) : [];
+}
+
 export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
   const mode = opts.mode ?? 'replace';
   const date = opts.date ?? new Date().toISOString().slice(0, 10);
@@ -122,8 +138,20 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
     preamble.push('', `seed ${doc.seed}`, `fabric "${doc.fabric}"`);
   }
 
-  const body: string[] = ['', '// --- geometry ---'];
   const usedNames = new Set(Array.from(opts.reservedNames ?? [], (name) => name.toLowerCase()));
+  const imports: string[] = [];
+  const needsMotifLayout = operations.some((operation) => operation.strategy.kind === 'motifAlong');
+  const existingLayout = Array.from(opts.availableImports ?? []).find(
+    (requirement) => requirement.specifier === 'std.layout.alongpath',
+  );
+  const layoutName = needsMotifLayout
+    ? (existingLayout?.alias ?? sanitizeBase('svg_alongpath', usedNames))
+    : undefined;
+  if (layoutName && !existingLayout) {
+    imports.push(`import std.layout.alongpath as ${layoutName}`);
+  }
+
+  const body: string[] = ['', '// --- geometry ---'];
   const geometryNames = new Map<string, string[]>();
   const geometryBases = new Map<string, string>();
   for (const geometry of geometries) {
@@ -152,9 +180,9 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
   let currentColor: number | string | null = null;
   for (const operation of operations) {
     const geometryId = operation.geometryIds[0];
-    const allNames = geometryNames.get(geometryId);
-    if (!allNames) continue;
-    const ringNames = operation.pathIndices.map((index) => allNames[index]);
+    const strategyKind = operation.strategy.kind;
+    const ringNames = pathNamesForOperation(operation, geometryNames);
+    if (ringNames.length === 0) continue;
     const base = geometryBases.get(geometryId) ?? 'imported';
     const context: EmitContext = {
       ringNames,
@@ -164,8 +192,15 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
           ? normalizedFillGroups(operation.holeMap)
           : operation.rings.map((_, index) => [index]),
       scaffoldName: sanitizeBase(`${base}_grain`, usedNames),
+      layoutName,
+      helperName:
+        strategyKind === 'motifAlong' ? sanitizeBase(`${base}_place_motif`, usedNames) : undefined,
+      derivedName:
+        strategyKind === 'motifAlong'
+          ? sanitizeBase(`${base}_centered_motif`, usedNames)
+          : undefined,
     };
-    const operationBody = STRATEGIES[operation.strategy.kind].emit(operation, context);
+    const operationBody = STRATEGIES[strategyKind].emit(operation, context);
     if (operationBody.length === 0) continue;
 
     const color =
@@ -180,7 +215,6 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
     spansRelative[operation.id] = { start, end: body.length };
   }
 
-  const imports: string[] = [];
   const lines = [...imports, ...preamble, ...body];
   const lineOffset = imports.length + preamble.length;
   const sewSpans = Object.fromEntries(

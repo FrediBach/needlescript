@@ -38,6 +38,10 @@ import {
   setInclude,
   renameElement,
   remapElementThread,
+  canCreateMotifAlong,
+  canCreateRailPair,
+  createMotifAlong,
+  createRailPair,
 } from './staging-actions';
 
 interface Props {
@@ -106,7 +110,8 @@ function ThreadDot({
 }
 
 function StrategyCell({ el, update }: { el: ElementModel; update: Props['update'] }) {
-  const eligible = new Set(eligibleStrategies(el.geomType));
+  const eligible = new Set(eligibleStrategies(el.geomType, el.role));
+  const order = el.role === 'relation' ? [el.strategy.kind] : STRATEGY_ORDER;
   return (
     <Select
       value={el.strategy.kind}
@@ -118,7 +123,7 @@ function StrategyCell({ el, update }: { el: ElementModel; update: Props['update'
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {STRATEGY_ORDER.map((k) => (
+        {order.map((k) => (
           <SelectItem key={k} value={k} disabled={!eligible.has(k)}>
             {STRATEGIES[k].label}
           </SelectItem>
@@ -214,10 +219,10 @@ function ElementRow({
           </span>
         )}
         <Badge variant={flag ? 'destructive' : 'secondary'} className="text-[9px] px-1">
-          {flag ?? el.geomType}
+          {flag ?? (el.role === 'relation' ? 'relationship' : el.geomType)}
         </Badge>
         <span className="w-14 shrink-0 text-right tabular-nums text-muted-foreground">
-          {el.areaMm2.toFixed(0)}
+          {el.role === 'relation' ? '—' : el.areaMm2.toFixed(0)}
         </span>
         <div onClick={(e) => e.stopPropagation()}>
           <ThreadDot doc={doc} el={el} update={update} />
@@ -271,6 +276,9 @@ export default function ElementList({
 
   const applyToSelection = (kind: StrategyKind) =>
     update((d) => setElementStrategy(d, selectedIds, kind));
+  const selectedInOrder = Array.from(selectedIds);
+  const railPairReady = canCreateRailPair(doc, selectedInOrder);
+  const motifAlongReady = canCreateMotifAlong(doc, selectedInOrder);
 
   return (
     <div className="flex h-full flex-col">
@@ -324,6 +332,29 @@ export default function ElementList({
                   {STRATEGIES[k].label}
                 </DropdownMenuItem>
               ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button variant="outline" size="sm" className="h-7 text-[11px]" />}
+              disabled={selectedIds.size !== 2}
+            >
+              Create relationship
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem
+                disabled={!railPairReady}
+                onClick={() => update((d) => createRailPair(d, selectedInOrder))}
+              >
+                Pair as satin rails
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!motifAlongReady}
+                onClick={() => update((d) => createMotifAlong(d, selectedInOrder))}
+              >
+                Repeat second as motif along first
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <span className="ml-auto text-[10px] text-muted-foreground">

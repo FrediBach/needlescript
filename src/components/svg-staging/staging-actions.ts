@@ -12,11 +12,19 @@ import {
   autoSuggest,
   bboxOf,
   defaultStrategy,
+  eligibleStrategies,
   geometryOutsideField,
   netFillArea,
 } from '@/lib/engine';
 import { simplifyRDP } from '@/lib/svg/svg-path';
 import { orderOperations } from '@/lib/svg/ordering';
+
+export {
+  canCreateMotifAlong,
+  canCreateRailPair,
+  createMotifAlong,
+  createRailPair,
+} from '@/lib/svg/relationships';
 
 function mapOperations(
   doc: StagedDocument,
@@ -41,7 +49,11 @@ export function setElementStrategy(
   kind: StrategyKind,
 ): StagedDocument {
   return mapOperations(doc, (operation) =>
-    ids.has(operation.id) ? { ...operation, strategy: defaultStrategy(kind) } : operation,
+    ids.has(operation.id) &&
+    eligibleStrategies(operation.geomType, operation.role).includes(kind) &&
+    (operation.role !== 'relation' || operation.strategy.kind === kind)
+      ? { ...operation, strategy: defaultStrategy(kind) }
+      : operation,
   );
 }
 
@@ -185,10 +197,18 @@ function syncOperationGeometry(doc: StagedDocument): StagedDocument {
   return mapOperations(doc, (operation) => {
     const geometry = geometryById.get(operation.geometryIds[0]);
     if (!geometry) return operation;
-    const rings = operation.pathIndices.map((index) => geometry.paths[index]);
-    const curveSpecs = geometry.curveSpecs
-      ? operation.pathIndices.map((index) => geometry.curveSpecs![index])
-      : undefined;
+    const rings =
+      operation.role === 'relation'
+        ? operation.geometryIds.flatMap((geometryId, index) => {
+            const path = geometryById.get(geometryId)?.paths[operation.pathIndices[index] ?? 0];
+            return path ? [path] : [];
+          })
+        : operation.pathIndices.map((index) => geometry.paths[index]);
+    if (rings.length !== operation.pathIndices.length) return operation;
+    const curveSpecs =
+      operation.role !== 'relation' && geometry.curveSpecs
+        ? operation.pathIndices.map((index) => geometry.curveSpecs![index])
+        : undefined;
     const isOutside = geometryOutsideField(rings, doc.activeField);
     const wasOutside = operation.flags.outsideHoop ?? false;
     let include = operation.include;

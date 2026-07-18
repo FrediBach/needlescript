@@ -761,11 +761,24 @@ hitomezashi exposes cell size and row/column bit lists.
 Returned paths remain generated at runtime from the editable region. Do not emit their clipped point
 fragments as literals.
 
-### 9.7 Rail-pair satin, deferred
+### 9.7 Rail-pair satin
 
 Emit `satinbetween(railA, railB, ...)` from an explicit relation operation. Preserve source rail
 directions and let NeedleScript's rail pairing perform its documented deterministic orientation and
 seam handling. Do not precompute the resulting zigzag stitches.
+
+Implemented interaction: select exactly two included, single-path source operations and choose
+**Create relationship → Pair as satin rails**. Both paths must be open. Creating the relation disables
+the standalone source operations but does not delete them, and the new operation owns density,
+underlay, and short-stitch controls. No proximity search runs during parsing or staging.
+
+### 9.8 Motif along path
+
+Select the route first and the reusable motif second, then choose **Create relationship → Repeat
+second as motif along first**. Emission imports `std.layout.alongpath`, centers the authored motif,
+and retains a readable placement procedure composed from `xscale`, `xrotate`, `xlate`, `resample`,
+and `sewpath`. Count, scale, stitch spacing, and path-heading alignment remain recipe parameters;
+placement coordinates are never expanded into literals.
 
 ## 10. Color behavior
 

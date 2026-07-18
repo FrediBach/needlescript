@@ -146,6 +146,7 @@ export type {
   StagedDocument,
   Strategy,
   StrategyKind,
+  OperationRole,
   GeomType,
   RingHole,
   ElementFlags,
@@ -176,6 +177,7 @@ export {
 export {
   STRATEGIES,
   STRATEGY_ORDER,
+  RELATIONSHIP_STRATEGY_ORDER,
   eligibleStrategies,
   isClosedGeom,
   autoSuggest,
@@ -192,4 +194,10 @@ export {
   type ProgramInventory,
 } from './svg/merge.ts';
 export { orderOperations } from './svg/ordering.ts';
+export {
+  canCreateMotifAlong,
+  canCreateRailPair,
+  createMotifAlong,
+  createRailPair,
+} from './svg/relationships.ts';
 export { parseColorStr, nearestThread, threadForColor, buildThreadMap } from './svg/thread-map.ts';
