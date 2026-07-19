@@ -769,6 +769,8 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
       doc: {
         name,
         fabric: 'woven',
+        threadProfile: 'polyester-40wt',
+        planMode: 'off',
         sewOrderKey: 'depth',
         keepGroups: true,
         geometryToleranceMM: 0.2,
@@ -975,6 +977,8 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
         sourceOrder: sourceObject.sourceIndex * 2 + (role === 'stroke' ? 1 : 0),
         order: operations.length,
         include: !geometry.flags.outsideField && !degenerate,
+        atomic: false,
+        planBarrierBefore: false,
         flags: {
           outsideHoop: geometry.flags.outsideField,
           degenerate: degenerate || undefined,
@@ -1010,6 +1014,8 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
     doc: {
       name,
       fabric: 'woven',
+      threadProfile: 'polyester-40wt',
+      planMode: 'off',
       sewOrderKey: 'depth',
       keepGroups: true,
       geometryToleranceMM,

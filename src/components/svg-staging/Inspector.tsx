@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 import type { ElementModel, StagedDocument, Strategy, StrategyKind } from '@/lib/engine';
-import { STRATEGIES, STRATEGY_ORDER, eligibleStrategies, type ParamControl } from '@/lib/engine';
+import {
+  STRATEGIES,
+  STRATEGY_ORDER,
+  eligibleStrategies,
+  strategySupportsAtomic,
+  type ParamControl,
+} from '@/lib/engine';
 import {
   Select,
   SelectContent,
@@ -26,6 +32,7 @@ import {
   setElementStrategy,
   setElementParams,
   setParamsForSelection,
+  setPlanningForSelection,
   setHole,
 } from './staging-actions';
 import { computeHoleMap, netFillArea } from '@/lib/engine';
@@ -230,6 +237,64 @@ function StrategySelect({
   );
 }
 
+function PlanningControls({
+  elements,
+  selectedIds,
+  update,
+}: {
+  elements: ElementModel[];
+  selectedIds: Set<string>;
+  update: Props['update'];
+}) {
+  const atomicSupported = elements.every((element) =>
+    strategySupportsAtomic(element.strategy.kind),
+  );
+  const atomic = atomicSupported && elements.every((element) => element.atomic);
+  const barrier = elements.every((element) => element.planBarrierBefore);
+  return (
+    <div className="flex flex-col gap-3 border-t border-foreground/10 pt-3">
+      <div className="flex items-center justify-between gap-2">
+        <Label
+          className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
+          title="Keep this complete same-colour construction contiguous and forward-only during planning"
+        >
+          atomic construction
+        </Label>
+        <Switch
+          checked={atomic}
+          disabled={!atomicSupported}
+          onCheckedChange={(checked) =>
+            update((doc) => setPlanningForSelection(doc, selectedIds, { atomic: checked }))
+          }
+          aria-label="keep operation atomic during planning"
+        />
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <Label
+          className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
+          title="Prevent travel planning from moving runs across the boundary before this operation"
+        >
+          barrier before
+        </Label>
+        <Switch
+          checked={barrier}
+          onCheckedChange={(checked) =>
+            update((doc) =>
+              setPlanningForSelection(doc, selectedIds, { planBarrierBefore: checked }),
+            )
+          }
+          aria-label="planner barrier before operation"
+        />
+      </div>
+      {!atomicSupported && (
+        <p className="text-[10px] text-muted-foreground">
+          Atomic grouping is unavailable for recipes that declare helpers or change thread colour.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function Inspector({ doc, selectedIds, reporters, update }: Props) {
   const selected = useMemo(
     () => doc.operations.filter((operation) => selectedIds.has(operation.id)),
@@ -296,6 +361,7 @@ export default function Inspector({ doc, selectedIds, reporters, update }: Props
             />
           ))}
         </div>
+        <PlanningControls elements={selected} selectedIds={selectedIds} update={update} />
       </div>
     );
   }
@@ -327,6 +393,7 @@ export default function Inspector({ doc, selectedIds, reporters, update }: Props
               onChange={(key, value) => update((d) => setElementParams(d, el.id, { [key]: value }))}
             />
           ))}
+          <PlanningControls elements={[el]} selectedIds={selectedIds} update={update} />
           <HolePanel el={el} update={update} />
         </CardContent>
       </Card>

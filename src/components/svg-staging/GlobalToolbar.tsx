@@ -1,4 +1,11 @@
-import type { Fabric, SewOrderKey, StagedDocument } from '@/lib/engine';
+import type {
+  Fabric,
+  SewOrderKey,
+  StagedDocument,
+  SvgPlanMode,
+  ThreadProfileMode,
+} from '@/lib/engine';
+import { FABRIC_MODES, PLAN_MODES, THREAD_PROFILE_MODES } from '@/lib/engine';
 import {
   Select,
   SelectContent,
@@ -28,8 +35,6 @@ import {
   setScale,
 } from './staging-actions';
 
-const FABRICS: Fabric[] = ['woven', 'knit', 'stretch', 'denim', 'canvas', 'fleece'];
-
 interface Props {
   doc: StagedDocument;
   mode: 'replace' | 'append';
@@ -55,9 +60,54 @@ export default function GlobalToolbar({ doc, mode, update }: Props) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {FABRICS.map((f) => (
+            {FABRIC_MODES.map((f) => (
               <SelectItem key={f} value={f}>
                 {f}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+
+      <label className="flex items-center gap-1">
+        <span className="uppercase tracking-[0.1em] text-muted-foreground">thread</span>
+        <Select
+          value={doc.threadProfile}
+          disabled={mode === 'append'}
+          onValueChange={(value: string | null) =>
+            value &&
+            update((current) => setGlobal(current, { threadProfile: value as ThreadProfileMode }))
+          }
+        >
+          <SelectTrigger className="h-7 w-[145px] text-[11px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {THREAD_PROFILE_MODES.map((profile) => (
+              <SelectItem key={profile} value={profile}>
+                {profile}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+
+      <label className="flex items-center gap-1">
+        <span className="uppercase tracking-[0.1em] text-muted-foreground">plan</span>
+        <Select
+          value={doc.planMode}
+          disabled={mode === 'append'}
+          onValueChange={(value: string | null) =>
+            value && update((current) => setGlobal(current, { planMode: value as SvgPlanMode }))
+          }
+        >
+          <SelectTrigger className="h-7 w-[135px] text-[11px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PLAN_MODES.map((plan) => (
+              <SelectItem key={plan} value={plan}>
+                {plan}
               </SelectItem>
             ))}
           </SelectContent>

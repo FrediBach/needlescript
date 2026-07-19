@@ -15,6 +15,7 @@ import {
   eligibleStrategies,
   geometryOutsideField,
   netFillArea,
+  strategySupportsAtomic,
 } from '@/lib/engine';
 import { simplifyRDP } from '@/lib/svg/svg-path';
 import { orderOperations } from '@/lib/svg/ordering';
@@ -56,9 +57,28 @@ export function setElementStrategy(
       operation.sourceGradient !== null,
     ).includes(kind) &&
     (operation.role !== 'relation' || operation.strategy.kind === kind)
-      ? { ...operation, strategy: defaultStrategy(kind) }
+      ? {
+          ...operation,
+          strategy: defaultStrategy(kind),
+          atomic: operation.atomic && strategySupportsAtomic(kind),
+        }
       : operation,
   );
+}
+
+export function setPlanningForSelection(
+  doc: StagedDocument,
+  ids: Set<string>,
+  patch: { atomic?: boolean; planBarrierBefore?: boolean },
+): StagedDocument {
+  return mapOperations(doc, (operation) => {
+    if (!ids.has(operation.id)) return operation;
+    const atomic =
+      patch.atomic === undefined
+        ? operation.atomic
+        : patch.atomic && strategySupportsAtomic(operation.strategy.kind);
+    return { ...operation, ...patch, atomic };
+  });
 }
 
 export function setElementParams(

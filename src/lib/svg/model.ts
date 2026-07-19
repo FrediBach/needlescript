@@ -4,6 +4,13 @@
 // operations. All coordinates and physical paint values are hoop-space mm.
 
 import type { Pt } from '../genmath.ts';
+import type {
+  FillUnderlayMode,
+  SatinUnderlayMode,
+  ThreadProfileMode,
+} from '../embroidery-registry.ts';
+import type { SatinCapMode, SatinJoinMode } from '../satin-profile.ts';
+import type { PlanMode } from '../travel-planner.ts';
 import type { SvgCurveSpec } from './svg-path.ts';
 
 export type Point = Pt;
@@ -26,9 +33,6 @@ export type StrategyKind =
   | 'railPair'
   | 'motifAlong';
 
-type UnderlayMode = 'auto' | 'center' | 'edge' | 'zigzag' | 'off';
-type FillUnderlay = 'auto' | 'edge' | 'tatami' | 'off';
-
 export interface BBox {
   minX: number;
   minY: number;
@@ -44,14 +48,17 @@ interface OutlineParams {
 interface SatinBorderParams {
   width: number;
   density: number;
-  underlay: UnderlayMode;
+  underlay: SatinUnderlayMode;
   shortstitch: boolean;
+  cap: SatinCapMode;
+  join: SatinJoinMode;
 }
 interface TatamiFillParams {
   fillangle: number;
   fillspacing: number;
   filllen: number;
-  fillunderlay: FillUnderlay;
+  fillunderlay: FillUnderlayMode;
+  fillinset: number;
 }
 interface GradientFillParams {
   pitch: number;
@@ -60,6 +67,7 @@ interface GradientFillParams {
 interface DirectionalFillParams {
   field: string | null;
   fillspacing: number;
+  fillunderlay: FillUnderlayMode;
 }
 interface RunningMotifParams {
   stitchlen: number;
@@ -69,8 +77,10 @@ interface RunningMotifParams {
 }
 interface RailPairParams {
   density: number;
-  underlay: UnderlayMode;
+  underlay: SatinUnderlayMode;
   shortstitch: boolean;
+  cap: SatinCapMode;
+  join: SatinJoinMode;
 }
 interface MotifAlongParams {
   count: number;
@@ -218,6 +228,10 @@ export interface ImportOperation {
   sourceOrder: number;
   order: number;
   include: boolean;
+  /** Keep this operation's complete construction forward-only and contiguous when planning. */
+  atomic: boolean;
+  /** Start a new planner segment immediately before this operation. */
+  planBarrierBefore: boolean;
   flags: ElementFlags;
   findings: OperationFinding[];
   groupPath: string[];
@@ -230,6 +244,7 @@ export type ElementModel = ImportOperation;
 
 export type Fabric = 'woven' | 'knit' | 'stretch' | 'denim' | 'canvas' | 'fleece';
 export type SewOrderKey = 'depth' | 'color' | 'svg' | 'manual';
+export type SvgPlanMode = 'off' | PlanMode;
 
 export interface ImportField {
   shape: 'circle' | 'oval' | 'rectangle';
@@ -240,6 +255,8 @@ export interface ImportField {
 export interface StagedDocument {
   name: string;
   fabric: Fabric;
+  threadProfile: ThreadProfileMode;
+  planMode: SvgPlanMode;
   sewOrderKey: SewOrderKey;
   keepGroups: boolean;
   geometryToleranceMM: number;
@@ -263,24 +280,46 @@ export function defaultStrategy(kind: StrategyKind): Strategy {
     case 'satinBorder':
       return {
         kind,
-        params: { width: 1.6, density: 0.4, underlay: 'auto', shortstitch: true },
+        params: {
+          width: 1.6,
+          density: 0.4,
+          underlay: 'auto',
+          shortstitch: true,
+          cap: 'legacy',
+          join: 'legacy',
+        },
       };
     case 'tatamiFill':
       return {
         kind,
-        params: { fillangle: 45, fillspacing: 0.4, filllen: 4, fillunderlay: 'auto' },
+        params: {
+          fillangle: 45,
+          fillspacing: 0.4,
+          filllen: 4,
+          fillunderlay: 'auto',
+          fillinset: 0,
+        },
       };
     case 'gradientFill':
       return { kind, params: { pitch: 0.5, stitchlen: 2.5 } };
     case 'directionalFill':
-      return { kind, params: { field: null, fillspacing: 0.4 } };
+      return { kind, params: { field: null, fillspacing: 0.4, fillunderlay: 'auto' } };
     case 'runningMotif':
       return {
         kind,
         params: { stitchlen: 2.5, bean: false, estitch: false, estitchLen: 2 },
       };
     case 'railPair':
-      return { kind, params: { density: 0.4, underlay: 'auto', shortstitch: true } };
+      return {
+        kind,
+        params: {
+          density: 0.4,
+          underlay: 'auto',
+          shortstitch: true,
+          cap: 'legacy',
+          join: 'legacy',
+        },
+      };
     case 'motifAlong':
       return { kind, params: { count: 6, scale: 1, stitchlen: 2.5, align: true } };
   }

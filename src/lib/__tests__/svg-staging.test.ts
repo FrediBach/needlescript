@@ -16,6 +16,8 @@ import { orderOperations } from '../svg/ordering.ts';
 import { parseSvgToModel } from '../../svg-import/parse-svg-dom.ts';
 import { pathToCurveSpecs } from '../svg/svg-path.ts';
 import { defaultStrategy, type StagedDocument, type ElementModel } from '../svg/model.ts';
+import { FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery-registry.ts';
+import { SATIN_CAP_MODES, SATIN_JOIN_MODES } from '../satin-profile.ts';
 import { run } from '../interpreter.ts';
 import {
   canCreateMotifAlong,
@@ -112,6 +114,22 @@ describe('svg geometry', () => {
 });
 
 describe('strategy catalogue', () => {
+  it('exposes every registered high-level underlay, cap, and join policy', () => {
+    const options = (strategy: keyof typeof STRATEGIES, key: string) => {
+      const control = STRATEGIES[strategy].controls.find((candidate) => candidate.key === key);
+      return control?.kind === 'select' ? control.options.map((option) => option.value) : [];
+    };
+
+    expect(options('satinBorder', 'underlay')).toEqual(SATIN_UNDERLAY_MODES);
+    expect(options('railPair', 'underlay')).toEqual(SATIN_UNDERLAY_MODES);
+    expect(options('tatamiFill', 'fillunderlay')).toEqual(FILL_UNDERLAY_MODES);
+    expect(options('directionalFill', 'fillunderlay')).toEqual(FILL_UNDERLAY_MODES);
+    expect(options('satinBorder', 'cap')).toEqual(SATIN_CAP_MODES);
+    expect(options('railPair', 'cap')).toEqual(SATIN_CAP_MODES);
+    expect(options('satinBorder', 'join')).toEqual(SATIN_JOIN_MODES);
+    expect(options('railPair', 'join')).toEqual(SATIN_JOIN_MODES);
+  });
+
   it('eligibility by geom type', () => {
     expect(isClosedGeom('closedPath')).toBe(true);
     expect(isClosedGeom('openPath')).toBe(false);
@@ -143,10 +161,11 @@ describe('strategy catalogue', () => {
       scaffoldName: 'crest_grain',
     };
     const lines = STRATEGIES.tatamiFill.emit(el, ctx);
-    expect(lines).toContain('beginfill');
-    expect(lines).toContain('endfill');
-    expect(lines.join('\n')).toContain('sewpath(crest_outer)');
-    expect(lines.join('\n')).toContain('sewpath(crest_hole0)');
+    const code = lines.join('\n');
+    expect(code).toContain('beginfill');
+    expect(code).toContain('endfill');
+    expect(code).toContain('sewpath(crest_outer)');
+    expect(code).toContain('sewpath(crest_hole0)');
   });
 
   it('satin emit brackets the path with satin width / 0', () => {
@@ -157,14 +176,18 @@ describe('strategy catalogue', () => {
       fillGroups: [[0]],
       scaffoldName: 'edge_grain',
     });
-    expect(lines.some((l) => /^satin \d/.test(l))).toBe(true);
-    expect(lines).toContain('satin 0');
+    const code = lines.join('\n');
+    expect(code).toMatch(/^\s+satin \d/m);
+    expect(code).toContain('satin 0');
   });
 
   it('directional fill with no field emits an active scaffold', () => {
     const el = mkElement({
       rings: [SQUARE],
-      strategy: { kind: 'directionalFill', params: { field: null, fillspacing: 0.73 } },
+      strategy: {
+        kind: 'directionalFill',
+        params: { field: null, fillspacing: 0.73, fillunderlay: 'edge' },
+      },
     });
     const lines = STRATEGIES.directionalFill.emit(el, {
       ringNames: ['petal'],
@@ -173,8 +196,9 @@ describe('strategy catalogue', () => {
       scaffoldName: 'petal_grain',
     });
     expect(lines).toContain('def petal_grain(p) [ return 45 ]');
-    expect(lines).toContain('fillspacing 0.73');
-    expect(lines).toContain('fill dir @petal_grain');
+    expect(lines).toContain('  fillunderlay "edge"');
+    expect(lines).toContain('  fillspacing 0.73');
+    expect(lines).toContain('  fill dir @petal_grain');
     expect(run(emit(mkDoc([el]), { date: '2026-01-01' }).code).events.length).toBeGreaterThan(0);
   });
 
@@ -189,43 +213,60 @@ describe('strategy catalogue', () => {
       rings: [SQUARE],
       strategy: { kind: 'outline', params: { stitchlen: 3.2, bean: true, beanCount: 5 } },
     });
-    expect(STRATEGIES.outline.emit(outline, context)).toEqual(
-      expect.arrayContaining(['stitchlen 3.2', 'bean 5', 'bean 0']),
-    );
+    const outlineCode = STRATEGIES.outline.emit(outline, context).join('\n');
+    expect(outlineCode).toContain('stitchlen 3.2');
+    expect(outlineCode).toContain('bean 5');
+    expect(outlineCode).not.toContain('bean 0');
 
     const satin = mkElement({
       rings: [SQUARE],
       strategy: {
         kind: 'satinBorder',
-        params: { width: 3.4, density: 0.55, underlay: 'edge', shortstitch: false },
+        params: {
+          width: 3.4,
+          density: 0.55,
+          underlay: 'edge',
+          shortstitch: false,
+          cap: 'taper',
+          join: 'fan',
+        },
       },
     });
-    expect(STRATEGIES.satinBorder.emit(satin, context)).toEqual(
-      expect.arrayContaining([
-        'underlay "edge"',
-        'shortstitch 0',
-        'density 0.55',
-        'satin 3.4',
-        'shortstitch 1',
-        'underlay "auto"',
-      ]),
-    );
+    const satinCode = STRATEGIES.satinBorder.emit(satin, context).join('\n');
+    for (const command of [
+      'underlay "edge"',
+      "satincap 'taper'",
+      "satinjoin 'fan'",
+      'shortstitch 0',
+      'density 0.55',
+      'satin 3.4',
+    ]) {
+      expect(satinCode).toContain(command);
+    }
 
     const tatami = mkElement({
       rings: [SQUARE],
       strategy: {
         kind: 'tatamiFill',
-        params: { fillangle: 30, fillspacing: 0.65, filllen: 3.3, fillunderlay: 'off' },
+        params: {
+          fillangle: 30,
+          fillspacing: 0.65,
+          filllen: 3.3,
+          fillunderlay: 'off',
+          fillinset: 0.6,
+        },
       },
     });
-    expect(STRATEGIES.tatamiFill.emit(tatami, context)).toEqual(
-      expect.arrayContaining([
-        'fillunderlay "off"',
-        'fillangle 30',
-        'fillspacing 0.65',
-        'filllen 3.3',
-      ]),
-    );
+    const tatamiCode = STRATEGIES.tatamiFill.emit(tatami, context).join('\n');
+    for (const command of [
+      'fillunderlay "off"',
+      'fillinset 0.6',
+      'fillangle 30',
+      'fillspacing 0.65',
+      'filllen 3.3',
+    ]) {
+      expect(tatamiCode).toContain(command);
+    }
 
     const running = mkElement({
       rings: [SQUARE],
@@ -234,9 +275,10 @@ describe('strategy catalogue', () => {
         params: { stitchlen: 2.8, bean: false, estitch: true, estitchLen: 4.2 },
       },
     });
-    expect(STRATEGIES.runningMotif.emit(running, context)).toEqual(
-      expect.arrayContaining(['stitchlen 2.8', 'estitch 4.2', 'estitch 0']),
-    );
+    const runningCode = STRATEGIES.runningMotif.emit(running, context).join('\n');
+    expect(runningCode).toContain('stitchlen 2.8');
+    expect(runningCode).toContain('estitch 4.2');
+    expect(runningCode).not.toContain('estitch 0');
 
     for (const operation of [outline, satin, tatami, running]) {
       expect(() => run(emit(mkDoc([operation]), { date: '2026-01-01' }).code)).not.toThrow();
@@ -306,7 +348,13 @@ describe('explicit SVG relationships', () => {
               ...operation,
               strategy: {
                 kind: 'railPair',
-                params: { density: 0.65, underlay: 'edge', shortstitch: false },
+                params: {
+                  density: 0.65,
+                  underlay: 'edge',
+                  shortstitch: false,
+                  cap: 'round',
+                  join: 'miter',
+                },
               },
             }
           : operation,
@@ -314,11 +362,12 @@ describe('explicit SVG relationships', () => {
     };
     const code = emit(edited, { date: '2026-01-01' }).code;
     expect(code).toContain('underlay "edge"');
+    expect(code).toContain("satincap 'round'");
+    expect(code).toContain("satinjoin 'miter'");
     expect(code).toContain('shortstitch 0');
     expect(code).toContain('density 0.65');
     expect(code).toContain('satinbetween(');
-    expect(code).toContain('shortstitch 1');
-    expect(code).toContain('underlay "auto"');
+    expect(code).toContain('stitchscope [');
     expect(() => run(code)).not.toThrow();
   });
 
@@ -414,6 +463,107 @@ describe('emit → run integration', () => {
     // the real engine must accept it and produce stitches
     const result = run(code);
     expect(result.events.length).toBeGreaterThan(0);
+  });
+
+  it('emits explicit construction, material intent, and group-preserving planner metadata', () => {
+    const fill = mkElement({
+      id: 'badge-fill',
+      name: 'badge fill',
+      rings: [SQUARE],
+      groupPath: ['badge'],
+      atomic: true,
+      strategy: {
+        kind: 'tatamiFill',
+        params: {
+          fillangle: 30,
+          fillspacing: 0.5,
+          filllen: 3.5,
+          fillunderlay: 'edge',
+          fillinset: 0.7,
+        },
+      },
+    });
+    const border = mkElement({
+      id: 'badge-border',
+      name: 'badge border',
+      role: 'stroke',
+      rings: [SQUARE],
+      groupPath: ['badge'],
+      sourceFill: null,
+      sourceStroke: '#ff0000',
+      atomic: true,
+      strategy: {
+        kind: 'satinBorder',
+        params: {
+          width: 3,
+          density: 0.45,
+          underlay: 'edge',
+          shortstitch: true,
+          cap: 'round',
+          join: 'fan',
+        },
+      },
+    });
+    const detail = mkElement({
+      id: 'detail',
+      name: 'detail',
+      rings: [SQUARE.map(([x, y]) => [x / 2, y / 2])],
+      groupPath: ['detail'],
+      planBarrierBefore: true,
+      strategy: defaultStrategy('outline'),
+    });
+    const doc = {
+      ...mkDoc([fill, border, detail]),
+      threadProfile: 'rayon-60wt' as const,
+      planMode: 'reversing-nearest' as const,
+    };
+    const code = emit(doc, { date: '2026-01-01' }).code;
+
+    expect(code).toContain("threadprofile 'rayon-60wt'");
+    expect(code).toContain("plan 'reversing-nearest'");
+    expect(code.match(/^routegroup \[/gm)).toHaveLength(2);
+    expect(code).toContain('planbarrier');
+    expect(code.match(/^\s*atomic \[/gm)).toHaveLength(2);
+    expect(code).toContain('fillinset 0.7');
+    expect(code).toContain('fillunderlay "edge"');
+    expect(code).toContain("satincap 'round'");
+    expect(code).toContain("satinjoin 'fan'");
+    expect(code).not.toContain('fabricgrain');
+    expect(code).not.toContain('fabricstretch');
+    expect(code).not.toContain('stabilizer');
+    expect(() => run(code)).not.toThrow();
+  });
+
+  it('inherits append-mode setup while retaining authored planner barriers', () => {
+    const first = mkElement({
+      id: 'first',
+      rings: [SQUARE],
+      groupPath: ['first-group'],
+      atomic: true,
+    });
+    const second = mkElement({
+      id: 'second',
+      rings: [SQUARE.map(([x, y]) => [x / 2, y / 2])],
+      groupPath: ['second-group'],
+    });
+    const doc = {
+      ...mkDoc([first, second]),
+      fabric: 'fleece' as const,
+      threadProfile: 'rayon-60wt' as const,
+      planMode: 'nearest' as const,
+    };
+    const base = "threadprofile 'polyester-60wt'\nplan 'nearest'\nfd 2";
+    const appended = emitAppend(doc, base, { date: '2026-01-01' });
+
+    expect(appended.fragmentCode).not.toMatch(/^fabric /m);
+    expect(appended.fragmentCode).not.toMatch(/^threadprofile /m);
+    expect(appended.fragmentCode).not.toMatch(/^plan /m);
+    expect(appended.fragmentCode).not.toContain('routegroup [');
+    expect(appended.fragmentCode).toContain('planbarrier');
+    expect(appended.fragmentCode).toContain('atomic [');
+    expect(appended.code.match(/^threadprofile /gm)).toHaveLength(1);
+    expect(appended.code.match(/^plan /gm)).toHaveLength(1);
+    expect(() => run(appended.code)).not.toThrow();
   });
 
   it('skips excluded and skip-strategy elements', () => {
@@ -593,7 +743,11 @@ describe('parseSvgToModel', () => {
   it('builds an element model in hoop mm and auto-suggests strategies', () => {
     const { doc } = parseSvgToModel(SVG, { palette: PALETTE, name: 'logo.svg', fitMM: 50 });
     expect(doc.name).toBe('logo');
+    expect(doc.threadProfile).toBe('polyester-40wt');
+    expect(doc.planMode).toBe('off');
     expect(doc.operations.length).toBe(2);
+    expect(doc.operations.every((operation) => !operation.atomic)).toBe(true);
+    expect(doc.operations.every((operation) => !operation.planBarrierBefore)).toBe(true);
     const rect = doc.operations.find((e) => e.geomType === 'rect')!;
     expect(rect.strategy.kind).toBe('tatamiFill');
     const circ = doc.operations.find((e) => e.geomType === 'circle')!;
@@ -888,6 +1042,8 @@ function mkElement(partial: Partial<ElementModel> & { rings: [number, number][][
     sourceOrder: 0,
     order: 0,
     include: true,
+    atomic: false,
+    planBarrierBefore: false,
     flags: {},
     findings: [],
     groupPath: [],
@@ -904,6 +1060,8 @@ function mkDoc(operations: ElementModel[]): StagedDocument {
   return {
     name: 'logo',
     fabric: 'woven',
+    threadProfile: 'polyester-40wt',
+    planMode: 'off',
     sewOrderKey: 'depth',
     keepGroups: true,
     geometryToleranceMM: 0.2,

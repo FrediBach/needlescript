@@ -268,7 +268,7 @@ export {
   hoopDescription,
 } from './hoop-presets.ts';
 export { applyLocks, applyAutoTrim, densityMap, designStats, DensityGrid } from './postprocess.ts';
-export { applyTravelPlan, PLAN_STRATEGIES } from './travel-planner.ts';
+export { applyTravelPlan, PLAN_MODES, PLAN_STRATEGIES } from './travel-planner.ts';
 export type {
   PlanAtomicSpan,
   PlanMode,
@@ -327,6 +327,7 @@ export type {
   RingHole,
   ElementFlags,
   Fabric,
+  SvgPlanMode,
   SewOrderKey,
   BBox,
   ImportField,
@@ -355,6 +356,7 @@ export {
   STRATEGY_ORDER,
   RELATIONSHIP_STRATEGY_ORDER,
   eligibleStrategies,
+  strategySupportsAtomic,
   isClosedGeom,
   autoSuggest,
   type ParamControl,

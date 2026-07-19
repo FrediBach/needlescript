@@ -1773,6 +1773,8 @@ compensation remain opt-in. No language/runtime semantics changed in this audit.
 
 ### Session 9.2 — SVG staging integration
 
+Status: complete (2026-07-19)
+
 Expose only stable, high-level settings:
 
 - fill inset/overlap for tatami plus satin border operations;
@@ -1784,6 +1786,21 @@ Expose only stable, high-level settings:
 
 Do not make the importer infer grain, stabilizer, satin branching, or calibration. Preview must still
 compile emitted NeedleScript through the normal worker.
+
+Implementation note: the canonical staging model now carries a generic thread profile, travel-plan
+mode, and explicit per-operation atomic/barrier intent. The inspector exposes registry-backed satin
+and fill underlay choices, satin cap/join policies, tatami border-overlap inset, and planner
+controls. Replace emission inherits fabric/thread intent from document globals, scopes sticky
+construction per operation, emits optional atomics, preserves top-level SVG groups with route groups
+and barriers, and emits a selected plan only before stitches. Append emission omits once-only
+fabric/thread/plan setup and avoids adding route groups that could change the base program's
+eligibility, while retaining authored barriers and safe atomics.
+
+The importer seeds conservative defaults and does not infer grain/stretch, stabilizer, topping,
+wide-column splitting, directional compensation, satin branching, or machine calibration. Preview
+still uses the existing debounced emit/merge-to-normal-worker compilation path. Focused tests pin
+replace and append source, group/atomic lowering, construction settings, absent inferred physics,
+and successful execution through the real interpreter.
 
 ### Session 9.3 — Examples and sew-out suite
 

@@ -804,6 +804,30 @@ and retains a readable placement procedure composed from `xscale`, `xrotate`, `x
 and `sewpath`. Count, scale, stitch spacing, and path-heading alignment remain recipe parameters;
 placement coordinates are never expanded into literals.
 
+### 9.9 Stable embroidery construction integration
+
+Implemented in embroidery-results Session 9.2. The staging model exposes only settings backed by
+the shared runtime registries and physical bounds:
+
+- Tatami fills expose a 0–10 mm `fillinset` control labeled as the explicit overlap reservation for
+  a later satin border. The importer never derives it from neighboring paint or stroke width.
+- Satin borders and rail-pair satin expose the registered underlay, cap, and join policies. Tatami
+  and directional fills expose the registered fill-underlay policies. Each construction body is
+  emitted inside `stitchscope`, so an operation's sticky settings do not leak into its siblings.
+- Operations whose recipe emits no helper declarations or color changes may opt into `atomic`.
+  Helper-declaring and multi-color recipes keep the control disabled because they cannot satisfy the
+  current atomic contract safely. Any operation may request a `planbarrier` immediately before it.
+- Replace-mode group preservation emits one `routegroup` per top-level SVG group/source fallback and
+  a `planbarrier` between groups. Append mode emits the barriers but not new route groups, avoiding a
+  change that would make an existing base program's previously ungrouped runs ineligible.
+- Replace mode emits the selected `fabric`, generic `threadprofile`, and optional travel `plan` once
+  in the preamble. Append mode disables those controls and inherits the base program's setup.
+
+The parser seeds neutral defaults (`polyester-40wt`, plan off, no atomic or manual barriers). It does
+not infer fabric grain/stretch, stabilizer, topping, wide-column splitting, directional
+compensation, satin branching, or machine calibration. The staged preview continues to compile the
+exact replacement or merged append source through the normal compiler worker before commit.
+
 ## 10. Color behavior
 
 ### 10.1 Staging color policies

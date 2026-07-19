@@ -134,6 +134,8 @@ function addRelationship(
     sourceOrder: Math.max(...sourceOperations.map((operation) => operation.sourceOrder)) + 0.5,
     order: insertAfter + 1,
     include: true,
+    atomic: false,
+    planBarrierBefore: false,
     flags: {},
     findings: [],
     groupPath,

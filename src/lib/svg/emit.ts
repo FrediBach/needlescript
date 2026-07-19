@@ -4,7 +4,7 @@
 import type { ImportOperation, Point, SourceGeometry, StagedDocument } from './model.ts';
 import type { SvgCurveSpec } from './svg-path.ts';
 import { normalizedFillGroups } from './geometry.ts';
-import { STRATEGIES, type EmitContext } from './strategies.ts';
+import { STRATEGIES, strategySupportsAtomic, type EmitContext } from './strategies.ts';
 import { RESERVED } from '../commands.ts';
 
 export interface EmitOptions {
@@ -119,6 +119,26 @@ function pathNamesForOperation(
   return names ? operation.pathIndices.flatMap((index) => names[index] ?? []) : [];
 }
 
+function planningUnit(operation: ImportOperation): string {
+  return operation.groupPath[0] ?? operation.sourceObjectId;
+}
+
+function planningUnits(operations: ImportOperation[], keepGroups: boolean): ImportOperation[][] {
+  if (!keepGroups) return operations.map((operation) => [operation]);
+  const byUnit = new Map<string, ImportOperation[]>();
+  for (const operation of operations) {
+    const key = planningUnit(operation);
+    const members = byUnit.get(key) ?? [];
+    members.push(operation);
+    byUnit.set(key, members);
+  }
+  return [...byUnit.values()];
+}
+
+function indentLines(lines: string[], indent: string): string[] {
+  return lines.map((line) => `${indent}${line}`);
+}
+
 export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
   const mode = opts.mode ?? 'replace';
   const date = opts.date ?? new Date().toISOString().slice(0, 10);
@@ -130,12 +150,18 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
   const geometries = doc.geometries.filter((geometry) => requiredGeometryIds.has(geometry.id));
   const preamble: string[] = [`// imported from ${doc.name}.svg — ${date}`];
   preamble.push(
-    `// fabric "${doc.fabric}", geometry tolerance ${fmt(doc.geometryToleranceMM)} mm` +
+    `// fabric "${doc.fabric}", thread '${doc.threadProfile}', geometry tolerance ${fmt(doc.geometryToleranceMM)} mm` +
       (doc.scaleFactor !== 1 ? `, scale ${fmt(doc.scaleFactor)}×` : '') +
-      `, ${operations.length} operation${operations.length === 1 ? '' : 's'}, seed ${doc.seed}`,
+      `, ${operations.length} operation${operations.length === 1 ? '' : 's'}, seed ${doc.seed}, plan '${doc.planMode}'`,
   );
   if (mode === 'replace') {
-    preamble.push('', `seed ${doc.seed}`, `fabric "${doc.fabric}"`);
+    preamble.push(
+      '',
+      `seed ${doc.seed}`,
+      `fabric "${doc.fabric}"`,
+      `threadprofile '${doc.threadProfile}'`,
+    );
+    if (doc.planMode !== 'off') preamble.push(`plan '${doc.planMode}'`);
   }
 
   const usedNames = new Set(Array.from(opts.reservedNames ?? [], (name) => name.toLowerCase()));
@@ -197,11 +223,11 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
   body.push('', '// --- sew ---');
   const spansRelative: Record<string, { start: number; end: number }> = {};
   let currentColor: number | string | null = null;
-  for (const operation of operations) {
+  const appendOperation = (operation: ImportOperation, indent: string): void => {
     const geometryId = operation.geometryIds[0];
     const strategyKind = operation.strategy.kind;
     const ringNames = pathNamesForOperation(operation, geometryNames);
-    if (ringNames.length === 0) continue;
+    if (ringNames.length === 0) return;
     const base = geometryBases.get(geometryId) ?? 'imported';
     const context: EmitContext = {
       ringNames,
@@ -237,23 +263,42 @@ export function emit(doc: StagedDocument, opts: EmitOptions = {}): EmitResult {
       ),
     };
     const operationBody = STRATEGIES[strategyKind].emit(operation, context);
-    if (operationBody.length === 0) continue;
+    if (operationBody.length === 0) return;
 
     body.push('');
+    if (operation.planBarrierBefore) body.push(`${indent}planbarrier`);
     if (strategyKind !== 'gradientFill') {
       const color =
         mode === 'append' ? (operationColor(operation) ?? '#000000') : operation.threadIndex;
       if (color !== currentColor) {
-        body.push(typeof color === 'number' ? `color ${color}` : `color '${color}'`);
+        body.push(`${indent}${typeof color === 'number' ? `color ${color}` : `color '${color}'`}`);
         currentColor = color;
       }
     } else {
       currentColor = null;
     }
     const start = body.length + 1;
-    body.push(...operationBody, 'trim');
+    const scopedBody = [...operationBody, 'trim'];
+    if (operation.atomic && strategySupportsAtomic(strategyKind)) {
+      body.push(`${indent}atomic [`, ...indentLines(scopedBody, `${indent}  `), `${indent}]`);
+    } else {
+      body.push(...indentLines(scopedBody, indent));
+    }
     spansRelative[operation.id] = { start, end: body.length };
-  }
+  };
+
+  const units = planningUnits(operations, doc.keepGroups);
+  const emitRouteGroups = mode === 'replace' && doc.keepGroups;
+  units.forEach((unit, unitIndex) => {
+    if (emitRouteGroups) {
+      body.push('', 'routegroup [');
+      unit.forEach((operation) => appendOperation(operation, '  '));
+      body.push(']');
+    } else {
+      unit.forEach((operation) => appendOperation(operation, ''));
+    }
+    if (doc.keepGroups && unitIndex < units.length - 1) body.push('', 'planbarrier');
+  });
 
   const lines = [...imports, ...preamble, ...body];
   const lineOffset = imports.length + preamble.length;

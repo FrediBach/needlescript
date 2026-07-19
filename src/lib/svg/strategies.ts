@@ -17,6 +17,9 @@ import type {
 } from './model.ts';
 import { defaultStrategy } from './model.ts';
 import { isClosedRing } from './geometry.ts';
+import { FILL_CONSTRUCTION_RANGES } from '../fill-profile.ts';
+import { SATIN_CAP_MODES, SATIN_JOIN_MODES } from '../satin-profile.ts';
+import { FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery-registry.ts';
 
 // ---------- parameter schema ----------
 
@@ -87,25 +90,21 @@ function fmtPrecise(v: number): string {
   return Object.is(rounded, -0) ? '0' : String(rounded);
 }
 
-const UNDERLAY_OPTS = [
-  { value: 'auto', label: 'auto' },
-  { value: 'center', label: 'center' },
-  { value: 'edge', label: 'edge' },
-  { value: 'zigzag', label: 'zigzag' },
-  { value: 'off', label: 'off' },
-];
+const UNDERLAY_OPTS = SATIN_UNDERLAY_MODES.map((mode) => ({ value: mode, label: mode }));
+const FILL_UNDERLAY_OPTS = FILL_UNDERLAY_MODES.map((mode) => ({ value: mode, label: mode }));
 
-const FILL_UNDERLAY_OPTS = [
-  { value: 'auto', label: 'auto' },
-  { value: 'edge', label: 'edge' },
-  { value: 'tatami', label: 'tatami' },
-  { value: 'off', label: 'off' },
-];
+const SATIN_CAP_OPTS = SATIN_CAP_MODES.map((mode) => ({ value: mode, label: mode }));
+const SATIN_JOIN_OPTS = SATIN_JOIN_MODES.map((mode) => ({ value: mode, label: mode }));
 
 // ---------- per-strategy emit helpers ----------
 
 function startRing(name: string): string {
   return `up setpos(first(${name})) down`;
+}
+
+/** Isolate sticky construction settings without hiding required top-level declarations. */
+function stitchScope(lines: string[], declarations: string[] = []): string[] {
+  return [...declarations, 'stitchscope [', ...lines.map((line) => `  ${line}`), ']'];
 }
 
 /** beginfill/endfill over outer + hole rings (shared by tatami & directional). */
@@ -202,8 +201,7 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
         lines.push(startRing(name));
         lines.push(`sewpath(${name})`);
       });
-      if (p.bean) lines.push('bean 0');
-      return lines;
+      return stitchScope(lines);
     },
   },
 
@@ -245,11 +243,27 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
         label: 'short stitch',
         tooltip: 'shorten stitches on tight inner curves to avoid bunching',
       },
+      {
+        kind: 'select',
+        key: 'cap',
+        label: 'open-path cap',
+        options: SATIN_CAP_OPTS,
+        tooltip: 'construction at open satin ends; closed borders ignore this setting',
+      },
+      {
+        kind: 'select',
+        key: 'join',
+        label: 'corner join',
+        options: SATIN_JOIN_OPTS,
+        tooltip: 'construction used for sharp physical satin turns',
+      },
     ],
     emit: (el, ctx) => {
       const p = (el.strategy as Extract<Strategy, { kind: 'satinBorder' }>).params;
       const lines: string[] = [];
       if (p.underlay !== 'auto') lines.push(`underlay "${p.underlay}"`);
+      if (p.cap !== 'legacy') lines.push(`satincap '${p.cap}'`);
+      if (p.join !== 'legacy') lines.push(`satinjoin '${p.join}'`);
       lines.push(`shortstitch ${p.shortstitch ? 1 : 0}`);
       lines.push(`density ${fmt(p.density)}`);
       lines.push(`satin ${fmt(p.width)}`);
@@ -258,9 +272,7 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
         lines.push(`sewpath(${name})`);
       });
       lines.push('satin 0');
-      if (!p.shortstitch) lines.push('shortstitch 1');
-      if (p.underlay !== 'auto') lines.push('underlay "auto"');
-      return lines;
+      return stitchScope(lines);
     },
   },
 
@@ -306,16 +318,27 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
         options: FILL_UNDERLAY_OPTS,
         tooltip: 'stabilising layer beneath the fill',
       },
+      {
+        kind: 'slider',
+        key: 'fillinset',
+        label: 'border overlap inset',
+        min: FILL_CONSTRUCTION_RANGES.insetMM.min,
+        max: FILL_CONSTRUCTION_RANGES.insetMM.max,
+        step: 0.1,
+        unit: 'mm',
+        tooltip: 'reserve physical overlap inside the fill boundary for a later satin border',
+      },
     ],
     emit: (el, ctx) => {
       const p = (el.strategy as Extract<Strategy, { kind: 'tatamiFill' }>).params;
       const lines: string[] = [];
       if (p.fillunderlay !== 'auto') lines.push(`fillunderlay "${p.fillunderlay}"`);
+      if (p.fillinset > 0) lines.push(`fillinset ${fmt(p.fillinset)}`);
       lines.push(`fillangle ${fmt(p.fillangle)}`);
       lines.push(`fillspacing ${fmt(p.fillspacing)}`);
       lines.push(`filllen ${fmt(p.filllen)}`);
       lines.push(...fillBody(ctx));
-      return lines;
+      return stitchScope(lines);
     },
   },
 
@@ -433,21 +456,32 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
         unit: 'mm',
         tooltip: 'gap between fill rows, 0.25–3 mm — smaller is denser',
       },
+      {
+        kind: 'select',
+        key: 'fillunderlay',
+        label: 'fill underlay',
+        options: FILL_UNDERLAY_OPTS,
+        tooltip: 'stabilising profile generated from the recorded fill region',
+      },
     ],
     emit: (el, ctx) => {
       const p = (el.strategy as Extract<Strategy, { kind: 'directionalFill' }>).params;
+      const underlay = p.fillunderlay === 'auto' ? [] : [`fillunderlay "${p.fillunderlay}"`];
       if (!p.field) {
-        return [
-          `def ${ctx.scaffoldName}(p) [ return 45 ]`,
-          `fillspacing ${fmt(p.fillspacing)}`,
-          `fill dir @${ctx.scaffoldName}`,
-          ...fillBody(ctx),
-        ];
+        return stitchScope(
+          [
+            ...underlay,
+            `fillspacing ${fmt(p.fillspacing)}`,
+            `fill dir @${ctx.scaffoldName}`,
+            ...fillBody(ctx),
+          ],
+          [`def ${ctx.scaffoldName}(p) [ return 45 ]`],
+        );
       }
-      const lines: string[] = [`fillspacing ${fmt(p.fillspacing)}`];
+      const lines: string[] = [...underlay, `fillspacing ${fmt(p.fillspacing)}`];
       lines.push(`fill dir @${p.field}`);
       lines.push(...fillBody(ctx));
-      return lines;
+      return stitchScope(lines);
     },
   },
 
@@ -498,9 +532,7 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
         lines.push(startRing(name));
         lines.push(`sewpath(${name})`);
       });
-      if (p.estitch) lines.push('estitch 0');
-      else if (p.bean) lines.push('bean 0');
-      return lines;
+      return stitchScope(lines);
     },
   },
 
@@ -532,6 +564,20 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
         label: 'short stitch',
         tooltip: 'shorten stitches on the inside of tight rail curves',
       },
+      {
+        kind: 'select',
+        key: 'cap',
+        label: 'open-rail cap',
+        options: SATIN_CAP_OPTS,
+        tooltip: 'construction at open rail-pair ends; closed rails ignore this setting',
+      },
+      {
+        kind: 'select',
+        key: 'join',
+        label: 'corner join',
+        options: SATIN_JOIN_OPTS,
+        tooltip: 'construction used for sharp turns in the paired rails',
+      },
     ],
     emit: (el, ctx) => {
       const p = (el.strategy as Extract<Strategy, { kind: 'railPair' }>).params;
@@ -539,12 +585,12 @@ export const STRATEGIES: Record<StrategyKind, StrategyDef> = {
       if (!railA || !railB) return [];
       const lines: string[] = [];
       if (p.underlay !== 'auto') lines.push(`underlay "${p.underlay}"`);
+      if (p.cap !== 'legacy') lines.push(`satincap '${p.cap}'`);
+      if (p.join !== 'legacy') lines.push(`satinjoin '${p.join}'`);
       lines.push(`shortstitch ${p.shortstitch ? 1 : 0}`);
       lines.push(`density ${fmt(p.density)}`);
       lines.push(`satinbetween(${railA}, ${railB})`);
-      if (!p.shortstitch) lines.push('shortstitch 1');
-      if (p.underlay !== 'auto') lines.push('underlay "auto"');
-      return lines;
+      return stitchScope(lines);
     },
   },
 
@@ -624,6 +670,19 @@ export const STRATEGY_ORDER: StrategyKind[] = [
 
 /** Relationship recipes are created explicitly, never assigned by auto-suggest. */
 export const RELATIONSHIP_STRATEGY_ORDER: StrategyKind[] = ['railPair', 'motifAlong'];
+
+const ATOMIC_STRATEGIES: ReadonlySet<StrategyKind> = new Set([
+  'outline',
+  'satinBorder',
+  'tatamiFill',
+  'runningMotif',
+  'railPair',
+]);
+
+/** Strategies whose emitted sew body contains no declarations or color changes. */
+export function strategySupportsAtomic(kind: StrategyKind): boolean {
+  return ATOMIC_STRATEGIES.has(kind);
+}
 
 export function eligibleStrategies(
   g: GeomType,
