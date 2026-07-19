@@ -31,6 +31,7 @@ import {
 import type { FillConnectorAction } from '../fill-profile.ts';
 import { DECLUMP_STITCH_FLOOR, declumpFoldPoint, declumpResetRun } from '../declump.ts';
 import { compensateOpenPathEnds, compensationForHeading } from '../directional-compensation.ts';
+import { cloneRegion } from '../construction-metadata.ts';
 
 export class FillMachine extends SatinMachine {
   private _fillStaggerShortWarned = false;
@@ -176,11 +177,13 @@ export class FillMachine extends SatinMachine {
   }
 
   _recordFillConnector(connector: GeneratedFillConnector) {
-    this.fillConnectorRecords.push({
+    const record = {
       fillId: this._activeFillConnectorId,
       ...connector,
       line: this.currentLine,
-    });
+    };
+    this.fillConnectorRecords.push(record);
+    if (this.activeConstruction?.kind === 'fill') this.activeConstruction.connectors.push(record);
   }
 
   /** Emit one non-legacy topping connector in final physical hoop space. */
@@ -414,35 +417,41 @@ export class FillMachine extends SatinMachine {
       return;
     }
 
-    let cornerWarned = false;
-    for (const ring of insetRings) {
-      if (ring.length < 3) continue;
-      const closed: FillPoint[] = ring.map(([x, y]) => ({ x, y, jump: false }));
-      closed.push({ ...closed[0] });
-      const guarded = this._guardFillEdgeRun(
-        this._subdividePts(closed, this._fillConnectorStitchLength()),
-        rings,
-      );
-      if (guarded.droppedAt && !cornerWarned) {
-        cornerWarned = true;
-        this._noteFillEdgeRun(
-          'filledgerun bounded repeated penetrations at an acute or collapsed corner',
-          guarded.droppedAt,
+    const previousLayer = this.activeConstructionLayer;
+    this.activeConstructionLayer = 'edge-run';
+    try {
+      let cornerWarned = false;
+      for (const ring of insetRings) {
+        if (ring.length < 3) continue;
+        const closed: FillPoint[] = ring.map(([x, y]) => ({ x, y, jump: false }));
+        closed.push({ ...closed[0] });
+        const guarded = this._guardFillEdgeRun(
+          this._subdividePts(closed, this._fillConnectorStitchLength()),
+          rings,
         );
+        if (guarded.droppedAt && !cornerWarned) {
+          cornerWarned = true;
+          this._noteFillEdgeRun(
+            'filledgerun bounded repeated penetrations at an acute or collapsed corner',
+            guarded.droppedAt,
+          );
+        }
+        if (!guarded.points.length) continue;
+        const first = guarded.points[0];
+        if (
+          this.started &&
+          this.lastEmit &&
+          Math.hypot(first.x - this.lastEmit.x, first.y - this.lastEmit.y) > 0.05
+        )
+          this._pushFillJump(first.x, first.y, false);
+        this._emitFillPts(guarded.points, false, undefined, rings);
+        for (const point of guarded.points) {
+          if (this._fillEdgeRunSamples.length >= 2000) break;
+          this._fillEdgeRunSamples.push({ x: point.x, y: point.y, line: this.currentLine });
+        }
       }
-      if (!guarded.points.length) continue;
-      const first = guarded.points[0];
-      if (
-        this.started &&
-        this.lastEmit &&
-        Math.hypot(first.x - this.lastEmit.x, first.y - this.lastEmit.y) > 0.05
-      )
-        this._pushFillJump(first.x, first.y, false);
-      this._emitFillPts(guarded.points, false, undefined, rings);
-      for (const point of guarded.points) {
-        if (this._fillEdgeRunSamples.length >= 2000) break;
-        this._fillEdgeRunSamples.push({ x: point.x, y: point.y, line: this.currentLine });
-      }
+    } finally {
+      this.activeConstructionLayer = previousLayer;
     }
   }
 
@@ -1158,6 +1167,28 @@ export class FillMachine extends SatinMachine {
         !opts.underlay && this.fillConnect !== 'legacy' && emittedToppingRow
           ? this._emitPolicyFillConnector([fillPts[0].x, fillPts[0].y], hoopRings)
           : undefined;
+      if (!opts.underlay && this.fillConnect === 'legacy' && emittedToppingRow && this.lastEmit) {
+        const from: [number, number] = [this.lastEmit.x, this.lastEmit.y];
+        const to: [number, number] = [fillPts[0].x, fillPts[0].y];
+        const distanceMM = Math.hypot(to[0] - from[0], to[1] - from[1]);
+        if (distanceMM >= 0.05) {
+          const contained = segmentInsideCompoundRegion(hoopRings, from, to, 0);
+          const action =
+            distanceMM > Math.max(this.stitchLen * 1.5, 2) ||
+            (this.fillInset > 0 && !this._fillConnectorInside(hoopRings, from, to))
+              ? 'jump'
+              : 'sew';
+          this._recordFillConnector({
+            policy: 'legacy',
+            action,
+            from,
+            to,
+            distanceMM,
+            contained,
+            edgeMarginMM: FILL_CONNECT_EDGE_MARGIN_MM,
+          });
+        }
+      }
       this._emitFillPts(
         connectorAction === 'sew' ? fillPts.slice(1) : fillPts,
         opts.underlay,
@@ -1344,6 +1375,15 @@ export class FillMachine extends SatinMachine {
   }
 
   endFill() {
+    try {
+      this._endFillConstruction();
+    } finally {
+      if (this.activeConstruction?.kind === 'fill') this._finishConstruction();
+      this._activeFillConnectorId = 0;
+    }
+  }
+
+  _endFillConstruction() {
     if (!this.recording) throw new NeedlescriptError('endfill without a matching beginfill');
     this._closeRing();
     this.recording = false;
@@ -1386,7 +1426,16 @@ export class FillMachine extends SatinMachine {
       }
       return;
     }
-    this._activeFillConnectorId = this.fillConnectorNextId++;
+    const construction = this._beginConstruction({
+      kind: 'fill',
+      line: this.currentLine,
+      region: cloneRegion(rings),
+      authoredRegion: cloneRegion(this._directionalFillAuthoredRings),
+      fillInsetMM: this.fillInset,
+      edgeRunInsetMM: this.fillEdgeRun,
+      connectors: [],
+    });
+    this._activeFillConnectorId = construction?.id ?? 0;
     if (this.fillArmed && this.fillInset > 0) {
       const inv = invert(this.fillCTM);
       if (!inv)
@@ -1654,6 +1703,20 @@ export class FillMachine extends SatinMachine {
           emittedCustomPath = true;
         } else {
           const sewConnector = previousLocal ? connectorInside(previousLocal, local[0]) : true;
+          const previousPoint = all.at(-1);
+          if (previousLocal && previousPoint && subdivided.length) {
+            const from: [number, number] = [previousPoint.x, previousPoint.y];
+            const to: [number, number] = [subdivided[0][0], subdivided[0][1]];
+            this._recordFillConnector({
+              policy: 'legacy',
+              action: sewConnector ? 'sew' : 'jump',
+              from,
+              to,
+              distanceMM: Math.hypot(to[0] - from[0], to[1] - from[1]),
+              contained: segmentInsideCompoundRegion(rings, from, to, 0),
+              edgeMarginMM: FILL_CONNECT_EDGE_MARGIN_MM,
+            });
+          }
           for (let i = 0; i < subdivided.length; i++)
             all.push({ x: subdivided[i][0], y: subdivided[i][1], jump: i === 0 && !sewConnector });
         }

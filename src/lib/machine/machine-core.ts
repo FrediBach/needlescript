@@ -26,6 +26,12 @@ import { SATIN_CONSTRUCTION_RANGES } from '../satin-profile.ts';
 import type { SatinCapMode, SatinJoinMode, SatinWideMode } from '../satin-profile.ts';
 import { DEFAULT_MATERIAL_INTENT } from '../embroidery-registry.ts';
 import type { CompensationMode } from '../embroidery-registry.ts';
+import type {
+  ConstructionLayer,
+  ConstructionRecord,
+  FillConstructionRecord,
+  SatinConstructionRecord,
+} from '../construction-metadata.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -314,9 +320,14 @@ export abstract class MachineCore {
   events: StitchEvent[] = [];
   warnings: string[] = [];
   constructionWarningLocations: WarningLocation[] = [];
-  /** Internal-only fill-connector sidecar for later construction-aware preflight. */
+  /** Internal-only fill-connector sidecar consumed by construction-aware preflight. */
   protected fillConnectorRecords: FillConnectorRecord[] = [];
-  protected fillConnectorNextId = 1;
+  /** Internal-only explicit construction identities and boundaries. */
+  constructionRecords: ConstructionRecord[] = [];
+  protected activeConstruction: ConstructionRecord | null = null;
+  protected activeConstructionLayer: ConstructionLayer = 'topping';
+  protected activeConstructionLane: number | undefined = undefined;
+  protected constructionNextId = 1;
   started = false;
   tinyDropped = 0;
   // Locations of the first few merged sub-minimum moves, so the warning can be
@@ -944,6 +955,13 @@ export abstract class MachineCore {
     const ev: StitchEvent = { t, x, y, c: this.colorIdx, line: this.currentLine };
     if (u) ev.u = 1;
     this.events.push(ev);
+    if (this.activeConstruction) {
+      this.activeConstruction.events.push({
+        event: ev,
+        layer: t === 'stitch' ? (u ? 'underlay' : this.activeConstructionLayer) : 'travel',
+        ...(this.activeConstructionLane === undefined ? {} : { lane: this.activeConstructionLane }),
+      });
+    }
     this.density.feed(t, x, y, this.currentLine);
     if (t === 'stitch' || t === 'jump') this.lastEmit = { x, y };
     // Overflow check: collect the first 50 stitches outside the sewable field.
@@ -955,6 +973,39 @@ export abstract class MachineCore {
         kind: inHoopOuter(this.hoopInfo, x, y) ? 'field' : 'hoop',
       });
     }
+  }
+
+  protected _beginConstruction(
+    record: Omit<FillConstructionRecord, 'id' | 'events'>,
+  ): FillConstructionRecord | null;
+  protected _beginConstruction(
+    record: Omit<SatinConstructionRecord, 'id' | 'events'>,
+  ): SatinConstructionRecord | null;
+  protected _beginConstruction(
+    record:
+      | Omit<FillConstructionRecord, 'id' | 'events'>
+      | Omit<SatinConstructionRecord, 'id' | 'events'>,
+  ): ConstructionRecord | null {
+    if (this.noEmit) return null;
+    if (this.activeConstruction)
+      throw new Error('internal construction metadata cannot overlap active constructions');
+    const complete = {
+      ...record,
+      id: this.constructionNextId++,
+      events: [],
+    } as ConstructionRecord;
+    this.constructionRecords.push(complete);
+    this.activeConstruction = complete;
+    this.activeConstructionLayer = 'topping';
+    this.activeConstructionLane = undefined;
+    return complete;
+  }
+
+  protected _finishConstruction(record?: ConstructionRecord | null) {
+    if (record && this.activeConstruction !== record) return;
+    this.activeConstruction = null;
+    this.activeConstructionLayer = 'topping';
+    this.activeConstructionLane = undefined;
   }
 
   _ensureStart() {

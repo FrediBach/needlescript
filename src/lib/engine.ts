@@ -62,6 +62,7 @@ export {
   analyzeEventStreamPreflight,
   EVENT_STREAM_PREFLIGHT_THRESHOLDS,
 } from './preflight-event-stream.ts';
+export { CONSTRUCTION_PREFLIGHT_THRESHOLDS } from './preflight-construction.ts';
 export {
   COLOR_NAMES,
   DEFAULT_PALETTE,

@@ -482,7 +482,7 @@ auto-trimming is disabled. Fill underlay deliberately retains legacy routing.
 
 Each considered topping connector appends an internal `FillConnectorRecord` sidecar with fill ID,
 policy, action, containment result, physical endpoints/distance, margin, and source line. It is not
-added to public `StitchEvent` or exported formats; later construction-aware preflight can consume it
+added to public `StitchEvent` or exported formats; construction-aware preflight consumes it
 directly. Only a connector emitted as `stitch` feeds `DensityGrid`, so jump/trim policies never
 become topping coverage or history. Since their run boundaries are ordinary jump/trim events, the
 existing planner, auto-trim, and lock passes require no special cases.
@@ -673,6 +673,24 @@ Each check yields at most three issues with at most sixteen points. These are co
 engineering defaults and deliberately have no fabric/thread multiplier pending physical sew-out
 evidence; resolved thread width already influences the separate coverage metric.
 
+`construction-metadata.ts` is the internal identity layer for construction-aware analysis. Every
+generated fill and satin receives one globally unique ID plus its resolved hoop-space compound
+region or paired-rail topping envelope. Event object identities are tagged as underlay, edge run,
+topping, or travel; split satin also tags its lane, and fills retain their connector sidecars. These
+objects remain private machine state and are never copied into `StitchEvent` or exports. The travel
+planner reorders the same event objects, so finalization can compare planned positions with authored
+layer identities without guessing from stitch shape.
+
+`preflight-construction.ts` consumes only those explicit records. In fixed order it checks underlay
+containment; 0.4–1.25 mm fill/border overlap; edge-run/satin stacking; cross-lane split hotspots of
+four penetrations within 0.3 mm; sewn connector containment; and underlay-before-topping order after
+planning. A satin border is associated only when its center samples lie within 0.75 mm of the
+authored fill boundary. Each check emits at most three structured issues with at most sixteen points.
+Fill/border analysis is bounded to 4,096 construction pairs and 2,048 satin samples per construction;
+split hotspots use a 0.3 mm spatial grid. The thresholds live in exported
+`CONSTRUCTION_PREFLIGHT_THRESHOLDS`; no arbitrary running stitch is classified as fill, border,
+underlay, or split satin.
+
 ---
 
 ## 14. Design themes
@@ -711,6 +729,8 @@ evidence; resolved thread width already influences the separate coverage metric.
 | `postprocess.ts`            | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`         |
 | `preflight.ts`              | pure structured-issue adapter and resolved diagnostic profile          |
 | `preflight-event-stream.ts` | bounded pure checks over completed pre-lock events                     |
+| `construction-metadata.ts`  | internal fill/satin IDs, boundaries, layers, lanes, and connectors     |
+| `preflight-construction.ts` | pure checks over explicit construction records and final event order   |
 | `routing.ts`                | generic deterministic route algorithms and endpoint model              |
 | `travel-planner.ts`         | thread-run partitioning, plan modes, and connector reconstruction      |
 | `effects.ts`, `declump.ts`  | after-split effect maps and declump fold state                         |

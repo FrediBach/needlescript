@@ -574,12 +574,15 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
 8. **Assemble structured preflight** (`preflight.ts`): the pure adapter sorts locatable diagnostic
    sidecars by their legacy warning index, maps them to stable codes/severities/suggestions, copies
    deterministic hoop-space points and source lines, then appends the fixed-order results from the
-   pure event-stream analyzer and counts severities. Event-stream analysis sees planned/autotrimmed
+   pure event-stream and construction analyzers and counts severities. Event-stream analysis sees planned/autotrimmed
    events before `applyLocks`, excluding deliberate tie-off micro-stitches. It does not mutate the
    completed events or the legacy warning array. Density hotspots, same-hole stacks, merged tiny
    movements, field/physical-hoop overflow, satin snag advisories, short/reversal/near-hole and
    sharp-turn clusters, long sewn/jump spans, and continuous runs participate; unrelated fill
-   construction warnings remain string-only until construction-aware preflight.
+   construction warnings remain string-only. Construction analysis additionally consumes internal
+   fill/satin IDs, boundaries, layer event identities, connector records, and split lanes to check
+   containment, fill/border registration and stacking, split overlap, and post-plan layer order. It
+   never infers construction roles from ordinary running stitches.
 9. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
    `warningLocations`, optional `preflight`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional

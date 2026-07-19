@@ -413,6 +413,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       warningLocations,
       hoop: m.hoopInfo,
       maximumDensityLayers: m.maxDensity,
+      constructionRecords: m.constructionRecords,
     }),
     printed: ctx.printed,
     locks,

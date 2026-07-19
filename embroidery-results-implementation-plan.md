@@ -1607,6 +1607,8 @@ continuous-run advisory.
 
 ### Session 8.3 — Construction-aware checks
 
+Status: complete (2026-07-19)
+
 Using internal construction metadata, add:
 
 - underlay protrusion beyond topping envelopes;
@@ -1618,6 +1620,29 @@ Using internal construction metadata, add:
 
 Do not infer these relationships from arbitrary running stitches. Run a check only when the machine
 has explicit construction IDs and boundaries.
+
+Implementation note: fill and satin generators now retain internal-only, globally unique
+construction IDs, resolved hoop-space compound/envelope boundaries, layer-tagged event identities,
+fill connector records, and split-satin lane tags. The records never enter public `StitchEvent` or
+export formats. Event identity lets the final pure analysis observe the post-plan/post-autotrim sew
+order while preserving authored geometry metadata.
+
+`preflight-construction.ts` adds seven fixed-order issue codes: underlay outside a topping envelope,
+fill/border overlap below 0.4 mm or above 1.25 mm, edge-run plus explicit satin-border stacking,
+four or more adjacent split-lane penetrations within 0.3 mm, sewn fill connectors leaving a compound
+region, and topping planned before its construction's underlay. Border association requires an
+explicit satin envelope whose center samples lie within 0.75 mm of an explicit authored fill
+boundary. Split lane ordering is checked independently because each split lane intentionally sews
+its own foundation immediately before topping. Every check is capped at three issues and sixteen
+points through the exported `CONSTRUCTION_PREFLIGHT_THRESHOLDS` registry.
+Fill/border analysis examines at most 4,096 construction pairs and 2,048 satin boundary samples per
+construction; the split hotspot scan uses a 0.3 mm spatial grid instead of an all-pairs pass.
+
+Construction-aware issues are structured-only: they add no legacy warning strings and never change
+events, planning, locks, density, or exports. Boundary-running connectors are considered contained;
+hole crossings and genuine excursions are not. Trigger and adjacent-safe fixtures cover all six
+requested relationships, and a running-stitch fixture pins that no relationship is inferred without
+construction metadata.
 
 ### Session 8.4 — `preflight` command and playground presentation
 

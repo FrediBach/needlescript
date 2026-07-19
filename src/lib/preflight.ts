@@ -1,6 +1,8 @@
 import { inHoopOuter } from './hoop-presets.ts';
 import { LIMITS } from './machine/limits.ts';
 import { analyzeEventStreamPreflight } from './preflight-event-stream.ts';
+import { analyzeConstructionPreflight } from './preflight-construction.ts';
+import type { ConstructionRecord } from './construction-metadata.ts';
 import { DEFAULT_PREFERRED_SATIN_CHORD_MM } from './satin-profile.ts';
 import type {
   HoopInfo,
@@ -19,6 +21,7 @@ export interface PreflightInput {
   warningLocations: readonly WarningLocation[];
   hoop: HoopInfo;
   maximumDensityLayers: number;
+  constructionRecords?: readonly ConstructionRecord[];
 }
 
 /** Resolve the current built-in diagnostic envelope without retaining machine state. */
@@ -118,7 +121,11 @@ export function buildPreflightResult(input: PreflightInput): PreflightResult {
       ];
     });
 
-  const issues = [...legacyIssues, ...analyzeEventStreamPreflight(input.events, profile)];
+  const issues = [
+    ...legacyIssues,
+    ...analyzeEventStreamPreflight(input.events, profile),
+    ...analyzeConstructionPreflight(input.constructionRecords ?? [], input.events),
+  ];
   const count = (severity: PreflightSeverity) =>
     issues.reduce((total, issue) => total + Number(issue.severity === severity), 0);
   return {
