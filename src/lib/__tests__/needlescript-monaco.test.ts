@@ -6,6 +6,7 @@ import {
   getSignatureContext,
 } from '../needlescript-monaco/symbols.ts';
 import { NS_ITEM_MAP } from '../needlescript-monaco/catalog.ts';
+import { registerNeedlescriptTokenizer } from '../needlescript-monaco/tokenizer.ts';
 import { STANDARD_LIBRARY_PROCEDURES } from '../standard-library/index.ts';
 import { CORE_COMMAND_NAMES } from '../commands.ts';
 import { EMBROIDERY_MODE_REGISTRIES } from '../embroidery-registry.ts';
@@ -21,6 +22,20 @@ describe('NeedleScript Monaco symbol analysis', () => {
       catalogModeGaps(command, modes, NS_ITEM_MAP),
     );
     expect(gaps).toEqual([]);
+  });
+
+  it('highlights stitchscope as a sewing block command', () => {
+    let tokenizer: { sewingKwCmds?: string[] } | undefined;
+    registerNeedlescriptTokenizer({
+      languages: {
+        setMonarchTokensProvider: (_language: string, definition: unknown) => {
+          tokenizer = definition as { sewingKwCmds?: string[] };
+        },
+      },
+    } as never);
+
+    expect(tokenizer?.sewingKwCmds).toContain('stitchscope');
+    expect(NS_ITEM_MAP.get('stitchscope')?.insertText).toContain('[\n');
   });
 
   it('extracts modern and classic procedures and variables with source lines', () => {

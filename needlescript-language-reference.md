@@ -35,7 +35,7 @@ The most common code-generation errors, in order of frequency:
 
 ### 2.1 Blocks use `[ ]`, never `{ }`
 
-Every block — loop bodies, `if`/`else`, `def` bodies, transform/effect blocks — is delimited by square brackets. The characters `{` and `}` must appear **nowhere**.
+Every block — loop bodies, `if`/`else`, `def` bodies, `stitchscope`, and transform/effect blocks — is delimited by square brackets. The characters `{` and `}` must appear **nowhere**.
 
 ```text
 repeat 6 [ fd 10 rt 60 ]        // correct
@@ -60,7 +60,7 @@ break continue return exit output true false and or not
 | `shape` | `fill … shape @proc` — immediately after `fill` | ordinary name                       |
 | `paths` | `fill paths @proc                               | expr`— immediately after`fill`      | ordinary name |
 
-**Core tier** (hard error if redefined): all movement, stitching, thread, fill, control-flow, transform and effect commands, `@name` references, and the zero-arg reporters — e.g. `fd`, `rt`, `circle`, `color`, `satin`, `satinbetween`, `scale`, `rotate`, `translate`, `transform`, `warp`, `humanize`, `snaptogrid`, `declump`, `pos`, `heading`, `xcor`, `ycor`, `repcount`, `random`, `trace`, `tracerings`. Cannot be used as variable, parameter, or procedure names.
+**Core tier** (hard error if redefined): all movement, stitching, thread, fill, control-flow, transform and effect commands, `@name` references, and the zero-arg reporters — e.g. `fd`, `rt`, `circle`, `color`, `satin`, `satinbetween`, `stitchscope`, `scale`, `rotate`, `translate`, `transform`, `warp`, `humanize`, `snaptogrid`, `declump`, `pos`, `heading`, `xcor`, `ycor`, `repcount`, `random`, `trace`, `tracerings`. Cannot be used as variable, parameter, or procedure names.
 
 **Library tier** (soft reservation): every list, string, generative-math, and stitch-history function (`len`, `clamp`, `scatter`, `str`, `upper`, `coverat`, `satinpair`, `tatamirow`, …). Variables and parameters **may** reuse these names (builtins resolve only at glued-call position); a user `def` of the same name shadows the builtin for the whole program with a one-time console note. **Best practice for generated code: avoid reusing any builtin name.** Safe alternatives:
 
@@ -214,6 +214,7 @@ Reads: plain names (`fd x`) or classic (`fd :x`) resolve identically. Plain `x =
 | `if c1 [ … ] else if c2 [ … ] else [ … ]` | chains of any depth                                                                     |
 | `break`                                   | end innermost enclosing loop                                                            |
 | `continue`                                | next iteration of innermost loop                                                        |
+| `stitchscope [ … ]`                       | temporarily override stitch-construction settings; always restore them on exit          |
 
 - `to` and `step` end the bound expressions naturally: `for i = 1 to n * 2 [ … ]` needs no parens.
 - The loop variable doesn't leak.
@@ -373,6 +374,44 @@ Modes are sticky: they apply to every move until changed.
 | `lock mm`                       | tie-in/tie-off: 4 micro back-stitches auto-sewn wherever thread starts or ends (design start/end, colour changes, trims, jumps ≥ 4 mm). Size 0.3–1.5 mm (default **0.7**); `lock 0` disables                    |
 
 A satin column is buffered while drawn and flushed (underlay first, then zigzag) when it ends: pen up, mode change, colour change, trim, fill, or end of program.
+
+### Scoped construction settings — `stitchscope`
+
+`stitchscope [ … ]` temporarily overrides stitch construction without manually resetting every
+command:
+
+```text
+stitchscope [
+  density 0.5
+  underlay 'edge'
+  satin 4
+  fd 20
+]
+// the previous stitch mode, density, and underlay are active again here
+```
+
+The scope snapshots and restores running-stitch numeric/list/reporter forms and list progress; bean
+and E-stitch modes; satin width/reporter, density, and alternating side; fill angle, spacing, length
+forms, and pending programmable/custom fill arm; plus lock, pull compensation, satin/fill underlay,
+double underlay, short-stitch, auto-trim, and max-density settings. `fabric` changes those same
+construction fields and is therefore scoped.
+
+It does **not** restore turtle position/heading/pen or the `push`/`pop` stack; variables; events,
+warnings, history, or budgets; color/palette; seed/RNG/noise; transforms/effects/declump; hoop,
+override, plan, or preflight directives. In particular, movement and color changes inside remain in
+effect afterward. Top-level-only directives remain illegal inside the block; ordinary side effects
+such as `seed`, variables, and printing escape normally. `[ ]` still creates no variable scope.
+
+Scopes nest in LIFO order and restore through `return`/`exit`, `break`, `continue`, and runtime
+errors. Pending reporter-running or satin construction flushes at entry and exit so each buffered
+construction uses one coherent configuration. A `beginfill…endfill` recording cannot cross either
+boundary. An unused outer `fill` arm is restored after the block; replacing it inside produces the
+existing one-time “replaced before use” note, while merely crossing a scope is silent.
+
+`stitchscope` composes with procedures and transform/effect blocks in normal lexical order. Boundary
+flushes occur under the transform/effect active at that boundary. Inside `trace`, construction
+commands remain inert for captured geometry and emit their existing notes; scope restoration still
+runs.
 
 ### Native color metadata
 

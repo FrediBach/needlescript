@@ -284,6 +284,18 @@ export function initExecStmt(ctx: RunContext): void {
         ctx.structuralDepth--;
         return;
       }
+      case 'stitchscope': {
+        ctx.m.currentLine = contextLine ?? st.line;
+        const snapshot = ctx.m.snapshotConstructionConfig();
+        ctx.structuralDepth++;
+        try {
+          ctx.execBlock(st.body, env, repcount, depth, contextLine);
+        } finally {
+          ctx.structuralDepth--;
+          ctx.m.restoreConstructionConfig(snapshot);
+        }
+        return;
+      }
       case 'transform': {
         // Build the delta matrix from the args, compose it onto the CTM for
         // the duration of the block, then restore. flushSatin on both edges

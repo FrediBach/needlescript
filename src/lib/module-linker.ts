@@ -203,6 +203,9 @@ function rewriteStatements(stmts: ASTNode[], names: ReadonlyMap<string, string>)
         rewriteStatements(stmt.body, names);
         if (stmt.elseBody) rewriteStatements(stmt.elseBody, names);
         break;
+      case 'stitchscope':
+        rewriteStatements(stmt.body, names);
+        break;
       case 'transform':
       case 'effect':
         stmt.args.forEach((arg) => rewriteExpr(arg, names));

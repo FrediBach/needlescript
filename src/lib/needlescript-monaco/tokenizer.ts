@@ -44,6 +44,8 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
 
     // ── Sewing-world transform & effect block commands (gold, italic) ─
     sewingKwCmds: [
+      // Construction configuration scope.
+      'stitchscope',
       // Transform block commands (CTM stack) — mutate the stitch transform.
       'translate',
       'rotate',

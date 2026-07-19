@@ -133,6 +133,11 @@ event-free and leave list-cycle progress untouched. An unused fill arm may cross
 restored with the other construction settings. Replacing such an outer arm still uses the existing
 single note emitted by `fillarm`; merely crossing the boundary adds no warning.
 
+The interpreter's `stitchscope [ … ]` node pairs these methods in `try/finally` order.
+Nested scopes therefore restore LIFO through procedure returns, loop-control signals,
+and runtime errors. Restoration itself reinstates the snapshot in a `finally`, so an
+error raised while flushing an inner buffered reporter cannot strand its configuration.
+
 ---
 
 ## 5. The stitching pipeline: `travel()`

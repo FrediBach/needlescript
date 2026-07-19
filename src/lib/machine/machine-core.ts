@@ -371,43 +371,45 @@ export abstract class MachineCore {
       throw new NeedlescriptError(
         'cannot restore construction configuration during an active fill — close it with endfill first',
       );
-    if (this.runBuffer !== null || this.satinPath !== null) this.flushSatin();
-
-    this.stitchLen = snapshot.stitchLen;
-    this.stitchLenList = snapshot.stitchLenList?.slice() ?? null;
-    this.stitchLenListPhase = snapshot.stitchLenListPhase;
-    this.stitchLenStretchIndex = snapshot.stitchLenStretchIndex;
-    this.stitchLenStretchStart = snapshot.stitchLenStretchStart;
-    this.stitchLenReporter = snapshot.stitchLenReporter;
-    this.mode = snapshot.mode;
-    this.beanRepeats = snapshot.beanRepeats;
-    this.eWidth = snapshot.eWidth;
-    this.satinWidth = snapshot.satinWidth;
-    this.satinSpacing = snapshot.satinSpacing;
-    this.satinSide = snapshot.satinSide;
-    this.satinReporter = snapshot.satinReporter;
-    this.fillAngle = snapshot.fillAngle;
-    this.fillSpacing = snapshot.fillSpacing;
-    this.fillLen = snapshot.fillLen;
-    this.fillLenList = snapshot.fillLenList?.slice() ?? null;
-    this.fillLenListPhase = snapshot.fillLenListPhase;
-    this.fillLenReporter = snapshot.fillLenReporter;
-    this.lockLen = snapshot.lockLen;
-    this.pullComp = snapshot.pullComp;
-    this.underlayMode = snapshot.underlayMode;
-    this.fillUnderlayMode = snapshot.fillUnderlayMode;
-    this.doubleUnderlay = snapshot.doubleUnderlay;
-    this.shortStitch = snapshot.shortStitch;
-    this.autoTrim = snapshot.autoTrim;
-    this.maxDensity = snapshot.maxDensity;
-    this.fillArmed = snapshot.fillArmed;
-    this.fillDirReporter = snapshot.fillDirReporter;
-    this.fillShapeReporter = snapshot.fillShapeReporter;
-    this.fillPathsReporter = snapshot.fillPathsReporter;
-    this.fillPathsStatic =
-      snapshot.fillPathsStatic?.map((path) => path.map((point) => [point[0], point[1]])) ?? null;
-    this.fillArmLine = snapshot.fillArmLine;
-    this.fillPathsName = snapshot.fillPathsName;
+    try {
+      if (this.runBuffer !== null || this.satinPath !== null) this.flushSatin();
+    } finally {
+      this.stitchLen = snapshot.stitchLen;
+      this.stitchLenList = snapshot.stitchLenList?.slice() ?? null;
+      this.stitchLenListPhase = snapshot.stitchLenListPhase;
+      this.stitchLenStretchIndex = snapshot.stitchLenStretchIndex;
+      this.stitchLenStretchStart = snapshot.stitchLenStretchStart;
+      this.stitchLenReporter = snapshot.stitchLenReporter;
+      this.mode = snapshot.mode;
+      this.beanRepeats = snapshot.beanRepeats;
+      this.eWidth = snapshot.eWidth;
+      this.satinWidth = snapshot.satinWidth;
+      this.satinSpacing = snapshot.satinSpacing;
+      this.satinSide = snapshot.satinSide;
+      this.satinReporter = snapshot.satinReporter;
+      this.fillAngle = snapshot.fillAngle;
+      this.fillSpacing = snapshot.fillSpacing;
+      this.fillLen = snapshot.fillLen;
+      this.fillLenList = snapshot.fillLenList?.slice() ?? null;
+      this.fillLenListPhase = snapshot.fillLenListPhase;
+      this.fillLenReporter = snapshot.fillLenReporter;
+      this.lockLen = snapshot.lockLen;
+      this.pullComp = snapshot.pullComp;
+      this.underlayMode = snapshot.underlayMode;
+      this.fillUnderlayMode = snapshot.fillUnderlayMode;
+      this.doubleUnderlay = snapshot.doubleUnderlay;
+      this.shortStitch = snapshot.shortStitch;
+      this.autoTrim = snapshot.autoTrim;
+      this.maxDensity = snapshot.maxDensity;
+      this.fillArmed = snapshot.fillArmed;
+      this.fillDirReporter = snapshot.fillDirReporter;
+      this.fillShapeReporter = snapshot.fillShapeReporter;
+      this.fillPathsReporter = snapshot.fillPathsReporter;
+      this.fillPathsStatic =
+        snapshot.fillPathsStatic?.map((path) => path.map((point) => [point[0], point[1]])) ?? null;
+      this.fillArmLine = snapshot.fillArmLine;
+      this.fillPathsName = snapshot.fillPathsName;
+    }
   }
 
   /** Push an affine transform delta (translate/rotate/scale/…) onto the stack. */

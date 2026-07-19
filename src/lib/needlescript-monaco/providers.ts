@@ -300,7 +300,7 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
 
   // ── Folding range provider ────────────────────────────────────────
   // Produces fold regions for:
-  //   • [ … ]  blocks — for repeat/if/while/for/def/transform bodies
+  //   • [ … ]  blocks — for repeat/if/while/for/def/stitchscope/transform bodies
   //   • to … end  blocks — classic Logo procedure definitions
   // Comments are stripped from each line before scanning, so brackets
   // inside // # ; comments do not produce stray fold regions.

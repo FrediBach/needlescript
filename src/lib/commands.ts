@@ -399,6 +399,7 @@ export const CORE_COMMAND_NAMES: ReadonlySet<string> = new Set([
   ...Object.keys(BUILTIN_ARITY),
   ...Object.keys(TRANSFORM_ARITY),
   ...Object.keys(EFFECT_ARITY),
+  'stitchscope',
   'fill',
   'satinbetween',
   'mark',
@@ -441,6 +442,8 @@ export const RESERVED = new Set<string>([
   // Loop control (RFC-4).
   'break',
   'continue',
+  // Construction configuration scope.
+  'stitchscope',
   // Programmable fills: `fill dir @d shape @s` arms the next beginfill…endfill.
   // `dir`/`shape` are only positional keywords after `fill`, so they are NOT
   // reserved globally — existing variables named dir/shape keep working.

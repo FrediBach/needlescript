@@ -197,6 +197,7 @@ export type ASTNode =
     }
   | { k: 'forin'; varName: string; list: ExprNode; body: ASTNode[]; line: number }
   | { k: 'if'; cond: ExprNode; body: ASTNode[]; elseBody: ASTNode[] | null; line: number }
+  | { k: 'stitchscope'; body: ASTNode[]; line: number }
   | { k: 'transform'; name: string; args: ExprNode[]; body: ASTNode[]; line: number }
   | { k: 'effect'; name: string; args: ExprNode[]; body: ASTNode[]; line: number }
   | { k: 'make'; name: string; value: ExprNode; line: number }

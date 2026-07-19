@@ -106,25 +106,25 @@ state from it and installs its functions onto it.
 
 ### 3.1 Mutable state (`context.ts:15-33`)
 
-| Field               | Purpose                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------ |
-| `globals`           | top-level variable bindings (`Record<string, Val>`)                                  |
-| `globalLines`       | first assignment/declaration line for each global, used by the Data inspector        |
-| `chalk`             | preview-only affine-mapped snapshots plus their raw event-stream anchors             |
-| `chalkVertices`     | run-total vertex counter for the dedicated preview budget                            |
-| `procs`             | procedure name → its `to` AST node (populated as `to` statements execute)            |
-| `rng`               | main PRNG stream; reassigned by `seed`                                               |
-| `noise`             | legacy coherent noise; reassigned by `seed`                                          |
-| `snoise2/snoise3`   | seeded simplex noise streams                                                         |
-| `ops`               | operation counter (the anti-infinite-loop budget)                                    |
-| `cells`             | live list-cell counter                                                               |
-| `stringChars`       | cumulative string-char allocation counter                                            |
-| `printed`           | accumulated `print`/`printloc` output                                                |
-| `insideTrace`       | trace-sandbox nesting depth                                                          |
-| `traceNoted`        | one-time notes already emitted inside trace                                          |
-| `structuralDepth`   | structural block nesting (loop/if/transform/effect) — for directive placement guards |
-| `planMode/planLine` | selected post-run travel strategy and its source line                                |
-| `m`                 | the `Machine` — the side-effect target                                               |
+| Field               | Purpose                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| `globals`           | top-level variable bindings (`Record<string, Val>`)                                              |
+| `globalLines`       | first assignment/declaration line for each global, used by the Data inspector                    |
+| `chalk`             | preview-only affine-mapped snapshots plus their raw event-stream anchors                         |
+| `chalkVertices`     | run-total vertex counter for the dedicated preview budget                                        |
+| `procs`             | procedure name → its `to` AST node (populated as `to` statements execute)                        |
+| `rng`               | main PRNG stream; reassigned by `seed`                                                           |
+| `noise`             | legacy coherent noise; reassigned by `seed`                                                      |
+| `snoise2/snoise3`   | seeded simplex noise streams                                                                     |
+| `ops`               | operation counter (the anti-infinite-loop budget)                                                |
+| `cells`             | live list-cell counter                                                                           |
+| `stringChars`       | cumulative string-char allocation counter                                                        |
+| `printed`           | accumulated `print`/`printloc` output                                                            |
+| `insideTrace`       | trace-sandbox nesting depth                                                                      |
+| `traceNoted`        | one-time notes already emitted inside trace                                                      |
+| `structuralDepth`   | structural block nesting (loop/if/stitchscope/transform/effect) — for directive placement guards |
+| `planMode/planLine` | selected post-run travel strategy and its source line                                            |
+| `m`                 | the `Machine` — the side-effect target                                                           |
 
 ### 3.2 Function slots and init ordering
 
@@ -224,6 +224,7 @@ error rather than a hang — the project's "loud beats convenient" rule.
 | `setindex`                           | lvalue index chains `xs[i] = v`, `grid[i][j] += v` (strings rejected)                                                                                              |
 | `repeat` / `while` / `for` / `forin` | loops, each bumping `structuralDepth` and using `runLoopBody`; `for` and `forin` save/restore the loop variable's prior binding                                    |
 | `if`                                 | conditional with optional `elseBody`                                                                                                                               |
+| `stitchscope`                        | snapshots construction configuration, executes its body, and restores in `finally` through all control transfers and errors                                        |
 | `transform`                          | composes a CTM matrix onto the machine's stack for the block's duration; `flushSatin` on both edges                                                                |
 | `effect`                             | `warp`/`humanize`/`snaptogrid`/`declump` — pushes an effect onto the machine's pen/warp stack for the block                                                        |
 | `output`                             | throws `ReturnSignal` (guarded: only inside a procedure, `depth > 0`)                                                                                              |
@@ -261,6 +262,12 @@ and turtle commands:
 
 Most parameter commands emit a **trace note** via `ctx.traceNote` if used inside a
 `trace` block, where they have no effect on the captured path.
+
+`stitchscope` increments `structuralDepth`, so top-level-only directives remain
+illegal inside it. Its machine restore runs from `finally`, after inner transform/effect
+cleanups during non-local unwinding. Color, turtle, RNG, variables, output, history,
+and directive state are deliberately outside the construction snapshot and therefore
+remain changed after the block.
 
 ---
 
@@ -303,6 +310,10 @@ recording frame, executes the block, then restores everything except warnings/RN
 variables. `ReturnSignal` and `LoopSignal` cannot cross the trace boundary (each is
 converted to a clear error); real errors propagate. `trace` returns a single path;
 `tracerings` returns a list of paths.
+
+A nested `stitchscope` still takes and restores its construction-only snapshot in
+`finally`. Construction setters keep their existing trace-note/inert-geometry behavior;
+the enclosing trace snapshot remains the final authority on machine state.
 
 ---
 
@@ -453,7 +464,7 @@ stitch pair or a fill row.
 The interpreter never emits stitches directly. It computes values and control flow,
 then calls methods on `ctx.m` (the `Machine` from `machine/`) — `forward`, `arc`,
 `setXY`, `beginFill`/`endFill`, `pushTransform`/`popOut`, `flushSatin`, `markHere`,
-`colorChange`, etc. The `Machine` owns:
+`colorChange`, `snapshotConstructionConfig`/`restoreConstructionConfig`, etc. The `Machine` owns:
 
 - turtle state (position, heading, pen), the CTM/effect stacks, and satin/fill buffering;
 - the coverage/density grid the query reporters read;

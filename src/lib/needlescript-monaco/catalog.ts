@@ -80,6 +80,16 @@ export const NS_ITEMS: NSItem[] = [
     insertText: 'continue',
   },
   {
+    label: 'stitchscope',
+    kindName: 'keyword',
+    detail: 'temporarily override stitch construction settings',
+    documentation:
+      "Run a block with temporary stitch-construction settings, then restore the outer configuration even after `return`, `break`, `continue`, or an error. It scopes running/satin/E-stitch/bean modes, fill settings and an armed fill, plus lock, compensation, underlay, auto-trim, and density policies. Turtle position, heading, pen, color, RNG, transforms/effects, output/history, hoop, budgets, and planning are not restored. Pending satin or reporter-running construction flushes at both boundaries; an active `beginfill` cannot cross a boundary.\n\n```\nstitchscope [\n  density 0.5\n  underlay 'edge'\n  satin 4\n  fd 20\n]\n```",
+    insertText: 'stitchscope [\n\t$0\n]',
+    isSnippet: true,
+    params: [[]],
+  },
+  {
     label: 'import',
     kindName: 'keyword',
     detail: 'import a standard-library procedure',

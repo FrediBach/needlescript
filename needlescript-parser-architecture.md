@@ -363,6 +363,9 @@ tailored error messages (e.g. the `push` vs `append` hint).
 - **Block commands**: `transform`-family (CTM stack) and `effect`-family
   (`warp`/`humanize`/`snaptogrid`/`declump`), each taking args _then a block_ in both
   prefix and glued-call spellings (`statements.ts:409-436`, `566-590`).
+- **Construction scope**: `stitchscope [ … ]` produces a dedicated block node. It
+  preserves the surrounding `loopDepth`, so lexical `break`/`continue` validation
+  works through the wrapper exactly as it does through `if`.
 - **Special commands**: `print`/`printloc`, `assert`, `mark`, `chalk` (one required
   plus two optional expressions), and the programmable
   `fill dir @d shape @s` and exclusive `fill paths @gen|expr` arming forms (`statements.ts`). Static path expressions remain AST expressions; reporter references participate in the all-paths-return analysis.
@@ -425,6 +428,10 @@ running unchanged.
 
 `satinbetween` is the one Core call-only entry in `GEN_CMDS`: that table supplies its ranged call arity (2–4), while its explicit `RESERVED` entry keeps bindings and definitions illegal. Like every statement-only command, `@satinbetween` is rejected.
 
+`stitchscope` is a special Core block form rather than an arity-table command. It is
+listed explicitly in both `CORE_COMMAND_NAMES` (so Monaco completion/hover/signature
+coverage is mandatory) and `RESERVED` (so bindings and definitions cannot shadow it).
+
 ### 4.6 Static analysis (`analysis.ts`)
 
 After the full program is parsed, `parseProgram` performs a parse-time
@@ -438,6 +445,7 @@ After the full program is parsed, `parseProgram` performs a parse-time
 
 `stmtAlwaysReturns` (`analysis.ts:128`) is conservative: a valued `output` always
 returns; an `if` covers only if it has a final `else` and both branches always return;
+an unconditional `stitchscope` covers when its body covers;
 and a `return` reachable only inside a loop body does **not** count (the loop may run
 zero times), matching the engine's runtime semantics. This rejects strictly fewer
 programs than the runtime would — anything it flags would have thrown "never reached
@@ -475,7 +483,7 @@ The parser emits `ASTNode[]`. The node union is defined in `types.ts:110-152`.
 
 **Statement nodes** (`ASTNode`) include: `to`, `repeat`, `while`, `for`, `forin`,
 `if`, `transform`, `effect`, `make`, `local`, `letlist`, `setindex`, `output`,
-`break`, `continue`, `cmd`, `listcmd`, `fillarm`, `call`.
+`break`, `continue`, `stitchscope`, `cmd`, `listcmd`, `fillarm`, `call`.
 
 **Expression nodes** (`ExprNode`) include: `num`, `str`, `var`, `neg`, `bin`, `func`,
 `listfunc`, `list`, `index`, `callval`, `callexpr`, `procref`, `trace`.
