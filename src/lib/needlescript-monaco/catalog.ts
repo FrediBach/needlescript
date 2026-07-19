@@ -3,6 +3,7 @@
 import { FABRIC_MODES, FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery-registry.ts';
 import { PLAN_MODES } from '../travel-planner.ts';
 import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
+import { FILL_CONSTRUCTION_RANGES } from '../fill-profile.ts';
 
 export type NSItemKind = 'keyword' | 'function' | 'variable' | 'constant';
 
@@ -754,6 +755,15 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'fill row spacing (mm)',
     documentation: 'Fill row spacing, 0.25–5 mm (default 0.4).',
     insertText: 'fillspacing ${1:mm}',
+    isSnippet: true,
+    params: [['mm']],
+  },
+  {
+    label: 'fillinset',
+    kindName: 'function',
+    detail: 'inset the fill construction region (mm)',
+    documentation: `Reserve space inside a fill boundary for a later border. Range ${FILL_CONSTRUCTION_RANGES.insetMM.min}–${FILL_CONSTRUCTION_RANGES.insetMM.max} mm (default 0). The complete compound even-odd region is inset in physical hoop space: outer boundaries shrink, holes expand, and concave regions may split. Topping and fill underlay use the inset region; disconnected pieces are crossed only by jumps. Collapsed or split geometry warns with a source line and preview location.`,
+    insertText: 'fillinset ${1:mm}',
     isSnippet: true,
     params: [['mm']],
   },

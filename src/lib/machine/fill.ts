@@ -7,6 +7,8 @@ export interface FillOpts {
   endNear?: { x: number; y: number };
   /** Extend (+) or inset (−) each row end along the stitch axis, in mm. */
   comp?: number;
+  /** Require every sewn row connector to remain inside the compound region. */
+  safeConnect?: boolean;
 }
 
 export interface FillPoint {
@@ -199,7 +201,7 @@ export function generateFill(rings: [number, number][][], opt: FillOpts): FillPo
     if (!cur) return;
     const d = Math.hypot(to[0] - cur[0], to[1] - cur[1]);
     if (d < 0.05) return;
-    if (d <= spacing * 3 + 0.6) {
+    if (!opt.safeConnect && d <= spacing * 3 + 0.6) {
       sewLine(to);
       return;
     }

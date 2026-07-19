@@ -27,6 +27,7 @@ describe('machine construction configuration snapshots', () => {
     machine.satinReporter = satinReporter;
     machine.fillAngle = 37;
     machine.fillSpacing = 0.65;
+    machine.fillInset = 0.75;
     machine.fillLen = 3;
     machine.fillLenList = [2, 3.5];
     machine.fillLenListPhase = 1;
@@ -82,6 +83,7 @@ describe('machine construction configuration snapshots', () => {
     machine.satinReporter = null;
     machine.fillAngle = 0;
     machine.fillSpacing = 1;
+    machine.fillInset = 0;
     machine.fillLen = null;
     machine.fillLenList = null;
     machine.fillLenListPhase = 0;
@@ -120,6 +122,7 @@ describe('machine construction configuration snapshots', () => {
       satinSide: -1,
       fillAngle: 37,
       fillSpacing: 0.65,
+      fillInset: 0.75,
       fillLen: 3,
       fillLenList: [2, 3.5],
       fillLenListPhase: 1,

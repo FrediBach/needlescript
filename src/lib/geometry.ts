@@ -73,9 +73,10 @@ export function offsetCompoundRegion(
   delta: number,
   line?: number,
   maxVerts: number = MAX_CLIP_VERTICES,
+  what = 'contourpaths',
 ): Pt[][] {
   const count = rings.reduce((n, ring) => n + ring.length, 0);
-  checkVertexBudget('contourpaths', count, maxVerts, line);
+  checkVertexBudget(what, count, maxVerts, line);
   return fromPaths64(
     inflatePaths(
       union(rings.map(toPath64), FillRule.EvenOdd),

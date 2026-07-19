@@ -445,13 +445,14 @@ beginfill
 endfill
 ```
 
-| Command                                   | Effect                                                                                                                                                                                                                                                                        |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `beginfill … endfill`                     | moves between them trace a boundary; `endfill` sews the fill. A pen-up move (`up … down`) inside starts a new ring — inner rings become **holes** (even-odd rule)                                                                                                             |
-| `fillangle deg`                           | direction of fill rows (default 0). Thread is shiny — the angle is a visible design choice                                                                                                                                                                                    |
-| `fillspacing mm`                          | row spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                                                                                                      |
-| `filllen mm`                              | fill stitch length, 1–7 mm; default follows `stitchlen`; `filllen 0` = follow again. Rows are brick-offset. Same three forms as `stitchlen`: numeric · `[list]` rhythm per row · `@fn` reporter (t/s/i reset per row). `filllen 0` propagates whichever form `stitchlen` uses |
-| `fill dir @field` / `fill shape @texture` | arms a **programmable fill** for the next `beginfill…endfill` — §16.2                                                                                                                                                                                                         |
+| Command                                   | Effect                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `beginfill … endfill`                     | moves between them trace a boundary; `endfill` sews the fill. A pen-up move (`up … down`) inside starts a new ring — inner rings become **holes** (even-odd rule)                                                                                                                                                 |
+| `fillangle deg`                           | direction of fill rows (default 0). Thread is shiny — the angle is a visible design choice                                                                                                                                                                                                                        |
+| `fillspacing mm`                          | row spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                                                                                                                                          |
+| `fillinset mm`                            | inset the complete compound fill region by 0–10 physical mm (default **0**) to reserve border overlap. Outer boundaries shrink, holes expand, and split components are joined only by jumps. Topping and fill underlay use the inset region; collapsed/split results warn with a source line and preview location |
+| `filllen mm`                              | fill stitch length, 1–7 mm; default follows `stitchlen`; `filllen 0` = follow again. Rows are brick-offset. Same three forms as `stitchlen`: numeric · `[list]` rhythm per row · `@fn` reporter (t/s/i reset per row). `filllen 0` propagates whichever form `stitchlen` uses                                     |
+| `fill dir @field` / `fill shape @texture` | arms a **programmable fill** for the next `beginfill…endfill` — §16.2                                                                                                                                                                                                                                             |
 
 ---
 
@@ -938,6 +939,7 @@ Applies pull comp, underlay policy, satin density floor, and coverage limit in o
 | `fillunderlayinset mm`   | physical inset for both edge and tatami fill-underlay passes, 0–10 mm. Custom edge passes inset the complete even-odd region, so outer boundaries shrink, hole boundaries expand into the filled material, and disconnected contours stay separate                                                                                  |
 | `fillunderlayspacing mm` | row spacing for tatami underlay, 0.25–5 mm; edge passes are unaffected                                                                                                                                                                                                                                                              |
 | `fillunderlayangle deg`  | tatami-underlay angle relative to the topping direction. Plain fills use `fillangle + deg`; directional fills rotate their local field by `deg` before mapping it through the fill transform. Any finite degree value is accepted                                                                                                   |
+| `fillinset mm`           | sticky 0–10 mm inset for the complete fill construction region. Applied after authored transforms in hoop space. Underlay follows the inset region. `fillinset 0` is the byte-identical compatibility path                                                                                                                          |
 | `shortstitch 0/1`        | on by default: on tight satin curves, alternate inner-edge stitches pull in to 60% width. Column wider than the curve radius warns (can't sew cleanly at any setting)                                                                                                                                                               |
 | `maxdensity n`           | coverage warning threshold in layers (default 3.5; `maxdensity 0` silences). Coverage = thread layers on a 1 mm grid (1 layer ≈ one clean satin/fill pass); hotspots warn with coordinates and source lines; ≥ 5 penetrations within 0.15 mm flagged separately. Past ~2.5–3.5 layers fabric fails — raise the limit only knowingly |
 | `autotrim mm`            | travels ≥ this length (default 7, configurable 3–30, `autotrim 0` off) get an automatic `trim` before the jump; never inserted when nothing was sewn since the last cut                                                                                                                                                             |
@@ -975,6 +977,16 @@ expression. Custom edge passes use compound even-odd geometry and jump between d
 contours, so holes, concavities, and disconnected components are not crossed by sewn connectors.
 The commands are drawless; invalid lists and numeric values error before `endfill` can emit the
 recorded region.
+
+`fillinset` is a sticky construction setting and is included in `stitchscope`. A positive value
+normalizes and offsets the recorded compound even-odd region through Clipper at micrometre integer
+precision, after transforms, before underlay or topping generation. The resulting construction
+region is shared by plain, programmable, and custom-path fills. Outer rings contract while hole
+boundaries move outward into the filled material. Concave necks may split safely; fill routing uses
+jumps rather than sewn connectors across the resulting fabric gaps. Empty, partially collapsed,
+and split results warn with the `endfill` source line and a hoop-space preview location. The command
+is deterministic and consumes zero RNG draws. At the default `fillinset 0`, the geometry operation
+is skipped entirely, preserving existing events and warnings byte-for-byte.
 
 ### Stitch-history queries (pure reporters, call-syntax, shadowable)
 

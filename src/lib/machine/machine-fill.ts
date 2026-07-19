@@ -51,7 +51,7 @@ export class FillMachine extends SatinMachine {
   }
 
   /** Emit a sequence of fill points, connecting from wherever the thread is. */
-  _emitFillPts(pts: FillPoint[], u: boolean) {
+  _emitFillPts(pts: FillPoint[], u: boolean, connectRegion?: [number, number][][]) {
     if (!pts.length) return;
     const first = pts[0];
     if (!this.started) {
@@ -61,13 +61,34 @@ export class FillMachine extends SatinMachine {
     } else {
       const le = this.lastEmit || { x: 0, y: 0 };
       const d0 = Math.hypot(first.x - le.x, first.y - le.y);
-      if (d0 > Math.max(this.stitchLen * 1.5, 2)) this._push('jump', first.x, first.y, u);
+      if (
+        d0 > Math.max(this.stitchLen * 1.5, 2) ||
+        (connectRegion &&
+          !this._fillConnectorInside(connectRegion, [le.x, le.y], [first.x, first.y]))
+      )
+        this._push('jump', first.x, first.y, u);
       else if (d0 > 0.05) this._emitPen(first.x, first.y, u);
     }
     for (let i = 1; i < pts.length; i++) {
       if (pts[i].jump) this._push('jump', pts[i].x, pts[i].y, u);
       else this._emitPen(pts[i].x, pts[i].y, u);
     }
+  }
+
+  /** Conservative containment check for a prospective sewn fill connector. */
+  _fillConnectorInside(
+    rings: [number, number][][],
+    from: [number, number],
+    to: [number, number],
+  ): boolean {
+    const distance = Math.hypot(to[0] - from[0], to[1] - from[1]);
+    const samples = Math.max(2, Math.ceil(distance / 1.5));
+    for (let i = 1; i < samples; i++) {
+      const t = i / samples;
+      if (!evenOddInside(rings, from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t))
+        return false;
+    }
+    return true;
   }
 
   /** Inset a ring towards the interior of the shape by `d` mm (approximate). */
@@ -172,7 +193,12 @@ export class FillMachine extends SatinMachine {
     if (!robustCompoundInset) {
       for (const ring of rings) {
         const inset = this._insetRing(ring, rings, pass.insetMM);
-        if (inset.length) this._emitFillPts(this._subdividePts(inset, pass.stitchLengthMM), true);
+        if (inset.length)
+          this._emitFillPts(
+            this._subdividePts(inset, pass.stitchLengthMM),
+            true,
+            this.fillInset > 0 ? rings : undefined,
+          );
       }
       return;
     }
@@ -215,8 +241,10 @@ export class FillMachine extends SatinMachine {
             stitchLen: pass.stitchLengthMM,
             endNear,
             comp: -pass.insetMM,
+            safeConnect: this.fillInset > 0,
           }),
           true,
+          this.fillInset > 0 ? rings : undefined,
         );
       }
     }
@@ -688,7 +716,7 @@ export class FillMachine extends SatinMachine {
         const [fx, fy] = toFinal(p[0], p[1]);
         return { x: fx, y: fy, jump: false };
       });
-      this._emitFillPts(fillPts, opts.underlay);
+      this._emitFillPts(fillPts, opts.underlay, this.fillInset > 0 ? hoopRings : undefined);
     }
   }
 
@@ -769,6 +797,85 @@ export class FillMachine extends SatinMachine {
     return out;
   }
 
+  /**
+   * Build the physical hoop-space construction region selected by `fillinset`.
+   * The zero setting deliberately avoids Clipper so existing fills remain
+   * byte-identical. Positive settings normalize and offset the complete
+   * even-odd region in one operation, allowing concavities to split and holes
+   * to expand into the filled material.
+   */
+  _applyFillInset(rings: [number, number][][]): [number, number][][] {
+    if (!(this.fillInset > 0)) return rings;
+
+    const normalized = offsetCompoundRegion(
+      rings,
+      0,
+      this.currentLine,
+      this.effectiveLimits.maxClipVerts,
+      'fillinset',
+    );
+    const inset = offsetCompoundRegion(
+      rings,
+      -this.fillInset,
+      this.currentLine,
+      this.effectiveLimits.maxClipVerts,
+      'fillinset',
+    );
+    const componentCount = (region: [number, number][][]) => {
+      if (!region.length) return 0;
+      const signedArea = (ring: [number, number][]) => {
+        let twiceArea = 0;
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i],
+            b = ring[(i + 1) % ring.length];
+          twiceArea += a[0] * b[1] - b[0] * a[1];
+        }
+        return twiceArea / 2;
+      };
+      const areas = region.map(signedArea);
+      let largest = 0;
+      for (let i = 1; i < areas.length; i++)
+        if (Math.abs(areas[i]) > Math.abs(areas[largest])) largest = i;
+      const outerSign = Math.sign(areas[largest]) || 1;
+      return areas.filter((area) => (Math.sign(area) || outerSign) === outerSign).length;
+    };
+    const originalComponents = componentCount(normalized);
+    const insetComponents = componentCount(inset);
+    const location = rings[0]?.[0];
+    const warn = (message: string) => {
+      const lineSuffix = this.currentLine === undefined ? '' : ` (line ${this.currentLine})`;
+      const index = this.warnings.length;
+      this.warnings.push(`${message}${lineSuffix}`);
+      if (location)
+        this.constructionWarningLocations.push({
+          index,
+          points: [{ x: location[0], y: location[1] }],
+          lines: this.currentLine === undefined ? [] : [this.currentLine],
+          kind: 'fill',
+        });
+    };
+
+    if (!inset.length) {
+      warn(`fillinset ${this.fillInset} mm emptied the fill region — nothing sewn`);
+      return inset;
+    }
+    if (insetComponents > originalComponents)
+      warn(
+        `fillinset ${this.fillInset} mm split the fill region into ${insetComponents} disconnected components`,
+      );
+    if (insetComponents < originalComponents || inset.length < normalized.length) {
+      const lost = Math.max(
+        originalComponents - insetComponents,
+        normalized.length - inset.length,
+        1,
+      );
+      warn(
+        `fillinset ${this.fillInset} mm collapsed ${lost} fill ${lost === 1 ? 'boundary or component' : 'boundaries or components'}`,
+      );
+    }
+    return inset;
+  }
+
   endFill() {
     if (!this.recording) throw new NeedlescriptError('endfill without a matching beginfill');
     this._closeRing();
@@ -786,11 +893,41 @@ export class FillMachine extends SatinMachine {
       }
       return;
     }
-    const rings = this.rings;
+    let rings = this.rings;
     this.rings = [];
     // Rings are recorded in hoop space, so the "end near" hint must be too.
     const [hx, hy] = this.mapOut(this.x, this.y);
     const endNear = { x: hx, y: hy };
+    rings = this._applyFillInset(rings);
+    if (!rings.length) {
+      if (this.fillArmed) {
+        this.fillArmed = false;
+        this.fillDirReporter = null;
+        this.fillShapeReporter = null;
+        this.fillPathsReporter = null;
+        this.fillPathsStatic = null;
+        this.fillPathsName = null;
+        this.fillArmLine = undefined;
+        this.localRings = [];
+        this.curLocalRing = null;
+      }
+      return;
+    }
+    if (this.fillArmed && this.fillInset > 0) {
+      const inv = invert(this.fillCTM);
+      if (!inv)
+        throw new NeedlescriptError(
+          'fillinset cannot run under a singular transform (scale 0 has no local inverse)',
+          this.currentLine,
+        );
+      this.localRings = rings.map((ring) =>
+        ring.map((point) => apply(inv, point[0], point[1]) as [number, number]),
+      );
+      // The inset is already expressed in final physical hoop space. Reusing
+      // it as the programmable construction frame avoids applying a warp twice.
+      this.fillHasWarp = false;
+      this.fillLayers = [];
+    }
 
     if (this.fillArmed && (this.fillPathsReporter || this.fillPathsStatic)) {
       const reporter = this.fillPathsReporter;
@@ -894,8 +1031,9 @@ export class FillMachine extends SatinMachine {
           stitchLen,
           endNear,
           comp: this.pullComp,
+          safeConnect: this.fillInset > 0,
         });
-        this._emitFillPts(points, false);
+        this._emitFillPts(points, false, this.fillInset > 0 ? rings : undefined);
         const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
         if (back > 0.6) this._push('jump', hx, hy);
         return;
@@ -989,7 +1127,7 @@ export class FillMachine extends SatinMachine {
           all.push({ x: subdivided[i][0], y: subdivided[i][1], jump: i === 0 && !sewConnector });
         previousLocal = local[local.length - 1];
       }
-      this._emitFillPts(all, false);
+      this._emitFillPts(all, false, this.fillInset > 0 ? rings : undefined);
       const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
       if (back > 0.6) this._push('jump', hx, hy);
       return;
@@ -1192,12 +1330,13 @@ export class FillMachine extends SatinMachine {
       stitchLen: useLen,
       endNear,
       comp: this.pullComp, // rows run along the stitch axis: extend against pull
+      safeConnect: this.fillInset > 0,
     });
     if (!pts.length) {
       this.warnings.push('fill skipped — the area is too small to fill at this spacing');
       return;
     }
-    this._emitFillPts(pts, false);
+    this._emitFillPts(pts, false, this.fillInset > 0 ? rings : undefined);
     const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
     if (back > 0.6) this._push('jump', hx, hy);
   }

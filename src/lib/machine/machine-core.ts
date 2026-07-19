@@ -1,7 +1,7 @@
 // ---------- Stitch machine core ----------
 
 import { LIMITS, STOCK_LIMITS, OVERRIDE_CEILINGS } from './limits.ts';
-import type { StitchEvent, EventType, HoopInfo } from '../types.ts';
+import type { StitchEvent, EventType, HoopInfo, WarningLocation } from '../types.ts';
 import { NeedlescriptError } from '../errors.ts';
 import { IDENTITY, apply, linApply, compose } from '../affine.ts';
 import type { Mat } from '../affine.ts';
@@ -64,6 +64,7 @@ export interface ConstructionConfigSnapshot {
   readonly satinReporter: SatinReporter | null;
   readonly fillAngle: number;
   readonly fillSpacing: number;
+  readonly fillInset: number;
   readonly fillLen: number | null;
   readonly fillLenList: readonly number[] | null;
   readonly fillLenListPhase: number;
@@ -113,6 +114,7 @@ interface MachineSnapshot {
   beanRepeats: number;
   fillAngle: number;
   fillSpacing: number;
+  fillInset: number;
   fillLen: number | null;
   // Extended filllen forms (list / reporter)
   fillLenList: number[] | null;
@@ -200,6 +202,7 @@ export abstract class MachineCore {
   beanRepeats = 1;
   fillAngle = 0;
   fillSpacing = 0.4;
+  fillInset = 0;
   fillLen: number | null = null;
   // Extended filllen forms (list / reporter). Exactly one active at a time.
   fillLenList: number[] | null = null; // cycling length pattern for fill rows
@@ -251,6 +254,7 @@ export abstract class MachineCore {
   colorIdx = 0;
   events: StitchEvent[] = [];
   warnings: string[] = [];
+  constructionWarningLocations: WarningLocation[] = [];
   started = false;
   tinyDropped = 0;
   // Locations of the first few merged sub-minimum moves, so the warning can be
@@ -353,6 +357,7 @@ export abstract class MachineCore {
       satinReporter: this.satinReporter,
       fillAngle: this.fillAngle,
       fillSpacing: this.fillSpacing,
+      fillInset: this.fillInset,
       fillLen: this.fillLen,
       fillLenList: this.fillLenList?.slice() ?? null,
       fillLenListPhase: this.fillLenListPhase,
@@ -402,6 +407,7 @@ export abstract class MachineCore {
       this.satinReporter = snapshot.satinReporter;
       this.fillAngle = snapshot.fillAngle;
       this.fillSpacing = snapshot.fillSpacing;
+      this.fillInset = snapshot.fillInset;
       this.fillLen = snapshot.fillLen;
       this.fillLenList = snapshot.fillLenList?.slice() ?? null;
       this.fillLenListPhase = snapshot.fillLenListPhase;
@@ -509,6 +515,7 @@ export abstract class MachineCore {
       beanRepeats: this.beanRepeats,
       fillAngle: this.fillAngle,
       fillSpacing: this.fillSpacing,
+      fillInset: this.fillInset,
       fillLen: this.fillLen,
       fillLenList: this.fillLenList ? this.fillLenList.slice() : null,
       fillLenListPhase: this.fillLenListPhase,
@@ -630,6 +637,7 @@ export abstract class MachineCore {
     this.beanRepeats = snap.beanRepeats;
     this.fillAngle = snap.fillAngle;
     this.fillSpacing = snap.fillSpacing;
+    this.fillInset = snap.fillInset;
     this.fillLen = snap.fillLen;
     this.fillLenList = snap.fillLenList ? snap.fillLenList.slice() : null;
     this.fillLenListPhase = snap.fillLenListPhase;

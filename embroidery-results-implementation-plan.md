@@ -755,6 +755,8 @@ engines and characterized with affine/warp, crossing-rail, open/closed, clipping
 
 ### Session 4.1 — Fill inset
 
+Status: complete (2026-07-19)
+
 Purpose: reserve controlled overlap for later borders and reduce edge collisions.
 
 Tasks:
@@ -773,6 +775,14 @@ Acceptance criteria:
 - Positive inset consistently creates space for a satin border.
 - Concave regions may split without generating connectors across fabric gaps.
 - Holes grow rather than shrink the exclusion area.
+
+Implementation note: `fillinset` is a sticky 0–10 mm construction setting included in
+`stitchscope`. Positive values offset the complete recorded even-odd region through the shared
+Clipper geometry in physical hoop space; zero bypasses the operation for byte-identical legacy
+output. The inset region drives both underlay and topping, including programmable and custom-path
+fills. Outer boundaries shrink, holes expand, and containment-aware routing forces jumps between
+split components. Split, partial-collapse, and empty results carry the `endfill` source line and a
+hoop-space warning location. The command is deterministic and honors the active `clipverts` budget.
 
 ### Session 4.2 — Stagger policies
 

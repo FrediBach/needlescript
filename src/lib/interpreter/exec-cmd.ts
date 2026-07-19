@@ -28,6 +28,7 @@ import {
   SATIN_UNDERLAY_PASS_KINDS,
   SATIN_UNDERLAY_RANGES,
 } from '../underlay-profile.ts';
+import { FILL_CONSTRUCTION_RANGES } from '../fill-profile.ts';
 
 /**
  * Handler for the `'cmd'` statement branch of execStmt. Returns a function
@@ -831,6 +832,17 @@ export function initExecCmdHandler(
         if (v !== a[0])
           ctx.m.warnings.push(`fillspacing ${a[0]} clamped to ${v} mm (safe range 0.25–5)`);
         ctx.m.fillSpacing = v;
+        return;
+      }
+      case 'fillinset': {
+        ctx.traceNote(
+          'fillinset',
+          'note: fillinset inside trace has no effect on the captured path',
+        );
+        const { min, max } = FILL_CONSTRUCTION_RANGES.insetMM;
+        if (!Number.isFinite(a[0]) || a[0] < min || a[0] > max)
+          throw new NeedlescriptError(`fillinset must be between ${min} and ${max} mm`, st.line);
+        ctx.m.fillInset = a[0];
         return;
       }
       case 'filllen': {

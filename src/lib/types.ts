@@ -31,15 +31,15 @@ export interface StitchEvent {
 
 /**
  * Maps a warning (by its index in RunResult.warnings) to where the problem is
- * in the design. Currently emitted only for density/stack hotspots, the only
- * warnings that carry true spatial coordinates. Additive: the warnings array
- * itself keeps its plain-string shape.
+ * in the design. Used for coverage, bounds, tiny-stitch, and construction
+ * diagnostics that carry true spatial coordinates. Additive: the warnings
+ * array itself keeps its plain-string shape.
  */
 export interface WarningLocation {
   index: number; // index into RunResult.warnings
   points: { x: number; y: number }[]; // hoop-space coordinates (mm)
   lines: number[]; // source lines that contributed to the hotspot
-  kind: 'density' | 'stack' | 'tiny' | 'overflow';
+  kind: 'density' | 'stack' | 'tiny' | 'overflow' | 'fill';
 }
 
 /** Physical hoop and derived sewable field, as configured by the `hoop` command. */
