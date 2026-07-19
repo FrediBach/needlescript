@@ -84,6 +84,10 @@ export const BUILTIN_ARITY: Record<string, number> = {
   // fabric, underlay, fillunderlay handled specially (string mode args)
   fabric: 1,
   underlay: 1,
+  underlaypasses: 1,
+  underlaylen: 1,
+  underlayinset: 1,
+  underlayspacing: 1,
   fillunderlay: 1,
   // Hoop and override directives (§hoop, §override). Both are Core words and
   // accept mixed argument types (string / number / list for hoop; string +

@@ -4,6 +4,7 @@ import {
   lowerFabricUnderlay,
   lowerLegacyFillUnderlay,
   lowerLegacySatinUnderlay,
+  resolveSatinUnderlayProfile,
   validateFillUnderlayProfile,
   validateSatinUnderlayProfile,
 } from '../underlay-profile.ts';
@@ -55,6 +56,53 @@ describe('legacy satin underlay profile lowering', () => {
 
     expect(spine.passes[0]).toMatchObject({ inset: { value: 0.2 } });
     expect(rails.passes[0]).toMatchObject({ inset: { value: 0.3 } });
+  });
+
+  it('resolves explicit custom order and absolute parameters without fabric doubling', () => {
+    const profile = resolveSatinUnderlayProfile(
+      'auto',
+      {
+        columnWidthMM: 5,
+        runningStitchLengthMM: 2.5,
+        doubled: true,
+        generator: 'spine',
+      },
+      {
+        passKinds: ['edge', 'center', 'zigzag'],
+        runningStitchLengthMM: 2.8,
+        edgeInsetMM: 0.6,
+        zigzagSpacingMM: 1.7,
+      },
+    );
+
+    expect(profile).toMatchObject({ source: 'custom', explicitPassOrder: true });
+    expect(profile.passes).toMatchObject([
+      { kind: 'edge', runningStitchLengthMM: 2.8, inset: { unit: 'mm', value: 0.6 } },
+      { kind: 'center', runningStitchLengthMM: 2.8 },
+      { kind: 'zigzag', spacingMM: 1.7, returnRunStitchLengthMM: 2.8 },
+    ]);
+    expect(validateSatinUnderlayProfile(profile)).toEqual([]);
+  });
+
+  it('layers numeric customization over legacy pass selection', () => {
+    const profile = resolveSatinUnderlayProfile(
+      'edge',
+      {
+        columnWidthMM: 5,
+        runningStitchLengthMM: 2.5,
+        doubled: false,
+        generator: 'rail-pair',
+      },
+      { runningStitchLengthMM: 3.2 },
+    );
+
+    expect(profile.passes).toMatchObject([
+      {
+        kind: 'edge',
+        runningStitchLengthMM: 3.2,
+        inset: { unit: 'column-width-ratio', value: 0.3 },
+      },
+    ]);
   });
 });
 

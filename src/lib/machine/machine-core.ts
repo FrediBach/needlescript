@@ -9,6 +9,8 @@ import { DensityGrid } from '../postprocess.ts';
 import type { DeclumpState } from '../declump.ts';
 import { declumpFoldPoint, declumpResetRun } from '../declump.ts';
 import { DEFAULT_HOOP_INFO, inHoopField, inHoopOuter } from '../hoop-presets.ts';
+import { cloneSatinUnderlayCustomization } from '../underlay-profile.ts';
+import type { SatinUnderlayCustomization } from '../underlay-profile.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -66,6 +68,7 @@ export interface ConstructionConfigSnapshot {
   readonly lockLen: number;
   readonly pullComp: number;
   readonly underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
+  readonly satinUnderlayCustomization: SatinUnderlayCustomization | null;
   readonly fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge';
   readonly doubleUnderlay: boolean;
   readonly shortStitch: boolean;
@@ -114,6 +117,7 @@ interface MachineSnapshot {
   lockLen: number;
   pullComp: number;
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
+  satinUnderlayCustomization: SatinUnderlayCustomization | null;
   fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge';
   doubleUnderlay: boolean;
   shortStitch: boolean;
@@ -199,6 +203,7 @@ export abstract class MachineCore {
   lockLen = 0.7;
   pullComp = 0; // pull compensation in mm
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag' = 'off';
+  satinUnderlayCustomization: SatinUnderlayCustomization | null = null;
   fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge' = 'off';
   doubleUnderlay = false; // fleece: stack center + zigzag passes
   shortStitch = true; // auto short-stitch on tight satin curves
@@ -349,6 +354,7 @@ export abstract class MachineCore {
       lockLen: this.lockLen,
       pullComp: this.pullComp,
       underlayMode: this.underlayMode,
+      satinUnderlayCustomization: cloneSatinUnderlayCustomization(this.satinUnderlayCustomization),
       fillUnderlayMode: this.fillUnderlayMode,
       doubleUnderlay: this.doubleUnderlay,
       shortStitch: this.shortStitch,
@@ -396,6 +402,9 @@ export abstract class MachineCore {
       this.lockLen = snapshot.lockLen;
       this.pullComp = snapshot.pullComp;
       this.underlayMode = snapshot.underlayMode;
+      this.satinUnderlayCustomization = cloneSatinUnderlayCustomization(
+        snapshot.satinUnderlayCustomization,
+      );
       this.fillUnderlayMode = snapshot.fillUnderlayMode;
       this.doubleUnderlay = snapshot.doubleUnderlay;
       this.shortStitch = snapshot.shortStitch;
@@ -497,6 +506,7 @@ export abstract class MachineCore {
       lockLen: this.lockLen,
       pullComp: this.pullComp,
       underlayMode: this.underlayMode,
+      satinUnderlayCustomization: cloneSatinUnderlayCustomization(this.satinUnderlayCustomization),
       fillUnderlayMode: this.fillUnderlayMode,
       doubleUnderlay: this.doubleUnderlay,
       shortStitch: this.shortStitch,
@@ -616,6 +626,9 @@ export abstract class MachineCore {
     this.lockLen = snap.lockLen;
     this.pullComp = snap.pullComp;
     this.underlayMode = snap.underlayMode;
+    this.satinUnderlayCustomization = cloneSatinUnderlayCustomization(
+      snap.satinUnderlayCustomization,
+    );
     this.fillUnderlayMode = snap.fillUnderlayMode;
     this.doubleUnderlay = snap.doubleUnderlay;
     this.shortStitch = snap.shortStitch;

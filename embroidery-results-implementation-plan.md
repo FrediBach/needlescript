@@ -620,6 +620,8 @@ arithmetic; the characterization and exporter baselines remain unchanged.
 
 ### Session 3.2 — User commands for satin underlay
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Implement `underlaypasses`, `underlaylen`, `underlayinset`, and `underlayspacing`.
@@ -634,6 +636,14 @@ Acceptance criteria:
 - Ordered multi-pass underlay is visibly ordered before topping.
 - Profile works under affine transforms and rail-pair satin in physical hoop millimetres.
 - Invalid combinations fail before partial column emission.
+
+Implementation note: `underlaypasses` installs an explicit ordered list of up to 16
+`center`/`edge`/`zigzag` passes; duplicates are meaningful and an empty list disables underlay.
+`underlaylen`, `underlayinset`, and `underlayspacing` are independent sticky overrides. Insets are
+absolute physical millimetres only; the legacy ratio remains internal rather than sharing ambiguous
+syntax. Explicit pass order supersedes preset doubling, applies to buffered/programmable satin and
+`satinbetween`, and is included in construction snapshots. Narrow edge passes clamp at the center
+with a warning. Invalid lists and values fail before a buffered column is flushed.
 
 ### Session 3.3 — User commands for fill underlay
 

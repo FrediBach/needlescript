@@ -10,6 +10,7 @@ import { registerNeedlescriptTokenizer } from '../needlescript-monaco/tokenizer.
 import { STANDARD_LIBRARY_PROCEDURES } from '../standard-library/index.ts';
 import { CORE_COMMAND_NAMES } from '../commands.ts';
 import { EMBROIDERY_MODE_REGISTRIES } from '../embroidery-registry.ts';
+import { SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
 import { catalogCoverageGaps, catalogModeGaps } from './helpers/catalog-coverage.ts';
 
 describe('NeedleScript Monaco symbol analysis', () => {
@@ -21,6 +22,7 @@ describe('NeedleScript Monaco symbol analysis', () => {
     const gaps = Object.entries(EMBROIDERY_MODE_REGISTRIES).flatMap(([command, modes]) =>
       catalogModeGaps(command, modes, NS_ITEM_MAP),
     );
+    gaps.push(...catalogModeGaps('underlaypasses', SATIN_UNDERLAY_PASS_KINDS, NS_ITEM_MAP));
     expect(gaps).toEqual([]);
   });
 

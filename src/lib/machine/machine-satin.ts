@@ -8,10 +8,48 @@ import { MachineCore } from './machine-core.ts';
 import type { Pt } from '../genmath.ts';
 import { prepareRailPair } from '../rail-pair.ts';
 import type { RailCheckpoint, RailPairGeometry, RailPairSample } from '../rail-pair.ts';
-import { lowerLegacySatinUnderlay } from '../underlay-profile.ts';
+import { resolveSatinUnderlayProfile } from '../underlay-profile.ts';
+import type {
+  LegacySatinGenerator,
+  ResolvedSatinUnderlayProfile,
+  SatinEdgeInset,
+} from '../underlay-profile.ts';
 
 export class SatinMachine extends MachineCore {
   // ---- Satin column: underlay + zigzag, sewn when the column ends ----
+
+  _resolveSatinUnderlay(
+    columnWidthMM: number,
+    generator: LegacySatinGenerator,
+  ): ResolvedSatinUnderlayProfile {
+    return resolveSatinUnderlayProfile(
+      this.underlayMode,
+      {
+        columnWidthMM,
+        runningStitchLengthMM: this.stitchLen,
+        doubled: this.doubleUnderlay,
+        generator,
+      },
+      this.satinUnderlayCustomization,
+    );
+  }
+
+  _warnCollapsedEdgeInset(profile: ResolvedSatinUnderlayProfile, width: number, label: string) {
+    const edge = profile.passes.find((pass) => pass.kind === 'edge' && pass.inset.unit === 'mm');
+    if (!edge || edge.kind !== 'edge' || edge.inset.unit !== 'mm') return;
+    if (edge.inset.value <= 0) return;
+    const insetSpan = edge.inset.value * 2;
+    if (insetSpan < width - 1e-9) return;
+    const behavior = Math.abs(insetSpan - width) <= 1e-9 ? 'collapses at' : 'crosses';
+    this.warnings.push(
+      `underlayinset ${edge.inset.value} mm ${behavior} the center of ${label} (${width.toFixed(1)} mm wide) — edge underlay clamped to the center`,
+    );
+  }
+
+  _edgeCenterOffset(width: number, inset: SatinEdgeInset): number {
+    if (inset.unit === 'mm') return Math.max(0, width / 2 - inset.value);
+    return Math.max(0.3, width * (0.5 - inset.value));
+  }
 
   /** Sew running stitches along a polyline (used for underlay passes). */
   _runAlong(pts: { x: number; y: number }[], slen: number, u: boolean) {
@@ -403,14 +441,21 @@ export class SatinMachine extends MachineCore {
 
   _railPairUnderlay(geometry: RailPairGeometry) {
     const width = geometry.meanWidth + this.pullComp;
-    const profile = lowerLegacySatinUnderlay(this.underlayMode, {
-      columnWidthMM: width,
-      runningStitchLengthMM: this.stitchLen,
-      doubled: this.doubleUnderlay,
-      generator: 'rail-pair',
-    });
+    const profile = this._resolveSatinUnderlay(width, 'rail-pair');
     if (!profile.passes.length) return;
-    const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
+    this._warnCollapsedEdgeInset(
+      profile,
+      Math.min(...geometry.samples.map((sample) => this._railWidth(sample) + this.pullComp)),
+      'the narrowest satinbetween section',
+    );
+    const runningLengths = profile.passes.flatMap((pass) =>
+      pass.kind === 'zigzag'
+        ? pass.returnRun === 'reverse-center'
+          ? [pass.returnRunStitchLengthMM]
+          : []
+        : [pass.runningStitchLengthMM],
+    );
+    const uLen = runningLengths.length ? Math.min(...runningLengths) : 2.5;
     const underlaySteps = Math.max(1, Math.ceil(geometry.spineLength / uLen));
     const underlaySamples: RailPairSample[] = [];
     for (let i = 0; i <= underlaySteps; i++)
@@ -428,10 +473,14 @@ export class SatinMachine extends MachineCore {
         const left = underlaySamples.map((sample) => {
           const railWidth = this._railWidth(sample);
           const f =
-            railWidth < 1
-              ? 0
-              : pass.inset.unit === 'mm'
-                ? pass.inset.value / railWidth
+            pass.inset.unit === 'mm'
+              ? railWidth > 1e-9
+                ? (Math.min(pass.inset.value, (railWidth + this.pullComp) / 2) -
+                    this.pullComp / 2) /
+                  railWidth
+                : 0.5
+              : railWidth < 1
+                ? 0
                 : pass.inset.value;
           return {
             x: sample.a[0] + (sample.b[0] - sample.a[0]) * f,
@@ -441,10 +490,14 @@ export class SatinMachine extends MachineCore {
         const right = underlaySamples.map((sample) => {
           const railWidth = this._railWidth(sample);
           const f =
-            railWidth < 1
-              ? 0
-              : pass.inset.unit === 'mm'
-                ? pass.inset.value / railWidth
+            pass.inset.unit === 'mm'
+              ? railWidth > 1e-9
+                ? (Math.min(pass.inset.value, (railWidth + this.pullComp) / 2) -
+                    this.pullComp / 2) /
+                  railWidth
+                : 0.5
+              : railWidth < 1
+                ? 0
                 : pass.inset.value;
           return {
             x: sample.b[0] + (sample.a[0] - sample.b[0]) * f,
@@ -459,9 +512,14 @@ export class SatinMachine extends MachineCore {
         for (let i = 0; i <= steps; i++) {
           const sample = geometry.atArc((geometry.spineLength * i) / steps);
           const edge = i % 2 === 0 ? sample.a : sample.b;
+          const railWidth = this._railWidth(sample);
+          const widthRatio =
+            profile.source === 'custom' && railWidth > 1e-9
+              ? pass.widthRatio * ((railWidth + this.pullComp) / railWidth)
+              : pass.widthRatio;
           zigzag.push({
-            x: sample.mid[0] + (edge[0] - sample.mid[0]) * pass.widthRatio,
-            y: sample.mid[1] + (edge[1] - sample.mid[1]) * pass.widthRatio,
+            x: sample.mid[0] + (edge[0] - sample.mid[0]) * widthRatio,
+            y: sample.mid[1] + (edge[1] - sample.mid[1]) * widthRatio,
           });
         }
         for (const point of zigzag) {
@@ -502,29 +560,20 @@ export class SatinMachine extends MachineCore {
   }
 
   _flushSatinPlain(path: { x: number; y: number }[]) {
+    const w = this.satinWidth + this.pullComp;
+    const profile = this._resolveSatinUnderlay(w, 'spine');
+    this._warnCollapsedEdgeInset(profile, w, 'the satin column');
     if (!this.started) {
       this.started = true;
       this._push('stitch', path[0].x, path[0].y);
     }
-    const w = this.satinWidth + this.pullComp;
-    // Resolve underlay: physics says thin columns need none, medium columns a
-    // spine, wide columns a zigzag that lofts the topping and grips the fabric.
-    const profile = lowerLegacySatinUnderlay(this.underlayMode, {
-      columnWidthMM: w,
-      runningStitchLengthMM: this.stitchLen,
-      doubled: this.doubleUnderlay,
-      generator: 'spine',
-    });
     const rev = path.slice().reverse();
     for (const pass of profile.passes) {
       if (pass.kind === 'center') {
         this._runAlong(path, pass.runningStitchLengthMM, true);
         this._runAlong(rev, pass.runningStitchLengthMM, true);
       } else if (pass.kind === 'edge') {
-        const off = Math.max(
-          0.3,
-          pass.inset.unit === 'mm' ? w / 2 - pass.inset.value : w * (0.5 - pass.inset.value),
-        );
+        const off = this._edgeCenterOffset(w, pass.inset);
         this._runAlong(this._offsetPath(path, off), pass.runningStitchLengthMM, true);
         this._runAlong(this._offsetPath(rev, off), pass.runningStitchLengthMM, true);
       } else {
@@ -673,12 +722,8 @@ export class SatinMachine extends MachineCore {
     }
     const avgScale = scaleN ? scaleSum / scaleN : 1;
     const w = this.satinWidth * avgScale + this.pullComp;
-    const profile = lowerLegacySatinUnderlay(this.underlayMode, {
-      columnWidthMM: w,
-      runningStitchLengthMM: this.stitchLen,
-      doubled: this.doubleUnderlay,
-      generator: 'spine',
-    });
+    const profile = this._resolveSatinUnderlay(w, 'spine');
+    this._warnCollapsedEdgeInset(profile, w, 'the transformed satin column');
     const hoop = this._toHoop(local);
     const revLocal = local.slice().reverse();
     const revHoop = hoop.slice().reverse();
@@ -687,10 +732,7 @@ export class SatinMachine extends MachineCore {
         this._runAlong(hoop, pass.runningStitchLengthMM, true);
         this._runAlong(revHoop, pass.runningStitchLengthMM, true);
       } else if (pass.kind === 'edge') {
-        const off = Math.max(
-          0.3,
-          pass.inset.unit === 'mm' ? w / 2 - pass.inset.value : w * (0.5 - pass.inset.value),
-        );
+        const off = this._edgeCenterOffset(w, pass.inset);
         this._runAlong(this._offsetPathT(local, ctm, off), pass.runningStitchLengthMM, true);
         this._runAlong(this._offsetPathT(revLocal, ctm, off), pass.runningStitchLengthMM, true);
       } else {
@@ -907,13 +949,9 @@ export class SatinMachine extends MachineCore {
 
   /** Underlay for a programmable column, sized by the max realized width (§9). */
   _programmableUnderlay(local: { x: number; y: number }[], w: number) {
-    const profile = lowerLegacySatinUnderlay(this.underlayMode, {
-      columnWidthMM: w,
-      runningStitchLengthMM: this.stitchLen,
-      doubled: this.doubleUnderlay,
-      generator: 'programmable',
-    });
+    const profile = this._resolveSatinUnderlay(w, 'programmable');
     if (!profile.passes.length) return;
+    this._warnCollapsedEdgeInset(profile, w, 'the programmable satin column');
     const hoop = this._toHoop(local);
     const revHoop = hoop.slice().reverse();
     const revLocal = local.slice().reverse();
@@ -922,10 +960,7 @@ export class SatinMachine extends MachineCore {
         this._runAlong(hoop, pass.runningStitchLengthMM, true);
         this._runAlong(revHoop, pass.runningStitchLengthMM, true);
       } else if (pass.kind === 'edge') {
-        const off = Math.max(
-          0.3,
-          pass.inset.unit === 'mm' ? w / 2 - pass.inset.value : w * (0.5 - pass.inset.value),
-        );
+        const off = this._edgeCenterOffset(w, pass.inset);
         this._runAlong(
           this._offsetPathT(local, this.satinCTM, off),
           pass.runningStitchLengthMM,
@@ -937,9 +972,10 @@ export class SatinMachine extends MachineCore {
           true,
         );
       } else {
+        const designWidth = profile.source === 'custom' ? Math.max(0, w - this.pullComp) : w;
         this._zigzagAlongT(
           local,
-          w * pass.widthRatio,
+          designWidth * pass.widthRatio,
           this.pullComp * pass.widthRatio,
           pass.spacingMM,
           true,

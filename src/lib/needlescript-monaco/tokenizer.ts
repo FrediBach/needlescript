@@ -127,6 +127,10 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'trim',
       'fabric',
       'underlay',
+      'underlaypasses',
+      'underlaylen',
+      'underlayinset',
+      'underlayspacing',
       'fillunderlay',
       'hoop', // hoop directive (§hoop)
       'override', // override directive (§override)

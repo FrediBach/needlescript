@@ -20,6 +20,11 @@ import { apply } from '../affine.ts';
 import { inspectChalkValue } from '../chalk.ts';
 import type { ChalkStyle } from '../types.ts';
 import { parseColorDetails } from '../colormath.ts';
+import {
+  SATIN_UNDERLAY_MAX_PASSES,
+  SATIN_UNDERLAY_PASS_KINDS,
+  SATIN_UNDERLAY_RANGES,
+} from '../underlay-profile.ts';
 
 /**
  * Handler for the `'cmd'` statement branch of execStmt. Returns a function
@@ -298,6 +303,43 @@ export function initExecCmdHandler(
       }
       return;
     }
+    if (st.name === 'underlaypasses') {
+      ctx.traceNote(
+        'underlaypasses',
+        'note: underlaypasses inside trace has no effect on the captured path',
+      );
+      const value = vals[0];
+      if (!isList(value))
+        throw new NeedlescriptError(
+          `underlaypasses expects a list of pass names, got ${describeVal(value)} — e.g. underlaypasses ['center', 'edge']`,
+          st.line,
+        );
+      if (value.items.length > SATIN_UNDERLAY_MAX_PASSES)
+        throw new NeedlescriptError(
+          `underlaypasses accepts at most ${SATIN_UNDERLAY_MAX_PASSES} passes`,
+          st.line,
+        );
+      const passKinds = value.items.map((entry, index) => {
+        if (typeof entry !== 'string')
+          throw new NeedlescriptError(
+            `underlaypasses entry ${index + 1} must be a pass name string, got ${describeVal(entry)}`,
+            st.line,
+          );
+        const pass = resolveMode(entry, SATIN_UNDERLAY_PASS_KINDS);
+        if (pass === undefined)
+          throw new NeedlescriptError(
+            `underlaypasses entry ${index + 1}: ${unknownModeMessage('underlay pass', entry, SATIN_UNDERLAY_PASS_KINDS)}`,
+            st.line,
+          );
+        return pass;
+      });
+      ctx.m.flushSatin();
+      ctx.m.satinUnderlayCustomization = {
+        ...ctx.m.satinUnderlayCustomization,
+        passKinds,
+      };
+      return;
+    }
     // String-argument mode commands — handled before the bulk num() conversion.
     if (st.name === 'fabric' || st.name === 'underlay' || st.name === 'fillunderlay') {
       ctx.traceNote(st.name, `note: ${st.name} inside trace has no effect on the captured path`);
@@ -312,14 +354,18 @@ export function initExecCmdHandler(
       if (mode === undefined)
         throw new NeedlescriptError(unknownModeMessage(st.name, modeVal, allowed), st.line);
       if (st.name === 'underlay') {
+        if (ctx.m.satinUnderlayCustomization) ctx.m.flushSatin();
         ctx.m.underlayMode = mode as typeof ctx.m.underlayMode;
+        ctx.m.satinUnderlayCustomization = null;
       } else if (st.name === 'fillunderlay') {
         ctx.m.fillUnderlayMode = mode as typeof ctx.m.fillUnderlayMode;
       } else {
         // fabric
         const f: FabricPreset = FABRICS[mode];
+        if (ctx.m.satinUnderlayCustomization) ctx.m.flushSatin();
         ctx.m.pullComp = f.pull;
         ctx.m.underlayMode = f.underlay.satin;
+        ctx.m.satinUnderlayCustomization = null;
         ctx.m.fillUnderlayMode = f.underlay.fill;
         ctx.m.maxDensity = f.maxDensity;
         ctx.m.doubleUnderlay = f.underlay.doubled;
@@ -765,6 +811,60 @@ export function initExecCmdHandler(
         ctx.m.flushSatin();
         ctx.m.satinSpacing = Math.min(Math.max(a[0], 0.25), 5);
         return;
+      case 'underlaylen': {
+        ctx.traceNote(
+          'underlaylen',
+          'note: underlaylen inside trace has no effect on the captured path',
+        );
+        const range = SATIN_UNDERLAY_RANGES.runningStitchLengthMM;
+        if (!Number.isFinite(a[0]) || a[0] < range.min || a[0] > range.max)
+          throw new NeedlescriptError(
+            `underlaylen must be between ${range.min} and ${range.max} mm`,
+            st.line,
+          );
+        ctx.m.flushSatin();
+        ctx.m.satinUnderlayCustomization = {
+          ...ctx.m.satinUnderlayCustomization,
+          runningStitchLengthMM: a[0],
+        };
+        return;
+      }
+      case 'underlayinset': {
+        ctx.traceNote(
+          'underlayinset',
+          'note: underlayinset inside trace has no effect on the captured path',
+        );
+        const range = SATIN_UNDERLAY_RANGES.edgeInsetMM;
+        if (!Number.isFinite(a[0]) || a[0] < range.min || a[0] > range.max)
+          throw new NeedlescriptError(
+            `underlayinset must be between ${range.min} and ${range.max} mm`,
+            st.line,
+          );
+        ctx.m.flushSatin();
+        ctx.m.satinUnderlayCustomization = {
+          ...ctx.m.satinUnderlayCustomization,
+          edgeInsetMM: a[0],
+        };
+        return;
+      }
+      case 'underlayspacing': {
+        ctx.traceNote(
+          'underlayspacing',
+          'note: underlayspacing inside trace has no effect on the captured path',
+        );
+        const range = SATIN_UNDERLAY_RANGES.zigzagSpacingMM;
+        if (!Number.isFinite(a[0]) || a[0] < range.min || a[0] > range.max)
+          throw new NeedlescriptError(
+            `underlayspacing must be between ${range.min} and ${range.max} mm`,
+            st.line,
+          );
+        ctx.m.flushSatin();
+        ctx.m.satinUnderlayCustomization = {
+          ...ctx.m.satinUnderlayCustomization,
+          zigzagSpacingMM: a[0],
+        };
+        return;
+      }
       case 'pullcomp': {
         ctx.traceNote('pullcomp', 'note: pullcomp inside trace has no effect on the captured path');
         const v = Math.min(Math.max(a[0], 0), 1.5);

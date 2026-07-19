@@ -928,6 +928,10 @@ Applies pull comp, underlay policy, satin density floor, and coverage limit in o
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pullcomp mm`         | 0–1.5 mm. Widens satin columns and extends fill rows at both ends to cancel thread-tension shrink                                                                                                                                                                                                                                   |
 | `underlay 'mode'`     | satin-column underlay: `'center'` (spine out-and-back), `'edge'` (runs offset ±30% width), `'zigzag'` (open zigzag at 60% width + return run), `'off'`, `'auto'` (by width: < 1.5 mm none, < 4 mm center, wider zigzag)                                                                                                             |
+| `underlaypasses xs`   | exact ordered satin passes from `'center'`, `'edge'`, and `'zigzag'`; duplicates repeat, up to 16 passes, and `[]` disables underlay. Explicit order supersedes `fabric` doubling and the pass choice from `underlay 'auto'`                                                                                                        |
+| `underlaylen mm`      | running length for center/edge passes and zigzag return runs, 0.4–12 mm                                                                                                                                                                                                                                                             |
+| `underlayinset mm`    | absolute physical inset inward from each topping edge, 0–10 mm. Ratio syntax is deliberately not overloaded into this command. If the two insets meet/cross, edge walks clamp to the center and warn                                                                                                                                |
+| `underlayspacing mm`  | along-column spacing for zigzag underlay, 0.25–5 mm. Zigzag width remains the fixed 60% column-width ratio                                                                                                                                                                                                                          |
 | `fillunderlay 'mode'` | fill underlay: `'tatami'` (sparse cross-grain pass at `fillangle + 90`, inset 0.6 mm), `'edge'` (boundary run inset 0.5 mm), `'off'`, `'auto'` (tatami, plus edge on areas > 100 mm²). Under a directional `fill dir @fn`, the tatami pass follows the field rotated +90°                                                           |
 | `shortstitch 0/1`     | on by default: on tight satin curves, alternate inner-edge stitches pull in to 60% width. Column wider than the curve radius warns (can't sew cleanly at any setting)                                                                                                                                                               |
 | `maxdensity n`        | coverage warning threshold in layers (default 3.5; `maxdensity 0` silences). Coverage = thread layers on a 1 mm grid (1 layer ≈ one clean satin/fill pass); hotspots warn with coordinates and source lines; ≥ 5 penetrations within 0.15 mm flagged separately. Past ~2.5–3.5 layers fabric fails — raise the limit only knowingly |
@@ -937,6 +941,18 @@ Internally, these legacy mode names and each `fabric` preset lower to ordered ty
 after the satin width or fill area is known. This representation adds no syntax and does not change
 events, warnings, exports, or RNG draws. Profile validation is pure and uses centralized physical
 ranges so later parameter commands share one set of bounds.
+
+The four parameterized satin commands are sticky. Numeric settings tune the current legacy pass
+selection until `underlaypasses` supplies an explicit order. `underlay 'mode'` or `fabric 'preset'`
+returns satin underlay to the complete legacy/preset profile, clearing these overrides. A valid
+parameter command flushes a pending satin column under its old profile before changing the next
+column; invalid input errors before that flush.
+
+All custom underlay is emitted before the topping and carries `u: 1`. The same ordered profile is
+used for numeric and reporter-driven buffered satin and, where rails define the width directly,
+`satinbetween`. Authored geometry is transformed first, so `underlaylen`, `underlayinset`, and
+`underlayspacing` remain hoop-space millimetres under affine transforms. These commands are drawless
+and consume no RNG values.
 
 ### Stitch-history queries (pure reporters, call-syntax, shadowable)
 

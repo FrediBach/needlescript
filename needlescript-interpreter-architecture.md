@@ -243,6 +243,13 @@ generator knows the physical width or region area, then lower to ordered typed p
 relying on implicit dispatcher defaults. Lowering and validation are pure functions in
 `underlay-profile.ts`; they require neither interpreter context nor program execution.
 
+`underlaypasses` validates a list of up to 16 case-insensitive pass names before touching machine
+state. The numeric `underlaylen`, `underlayinset`, and `underlayspacing` commands use the centralized
+profile ranges and reject rather than clamp invalid values. Once validated, each command flushes a
+pending satin column under its old settings and replaces the immutable customization record. The
+record is copied by construction and trace snapshots; `underlay` and `fabric` clear it to restore a
+complete legacy/preset profile.
+
 ### 5.1 The command dispatcher (`exec-cmd.ts`)
 
 `initExecCmdHandler` (`exec-cmd.ts:23`) returns the `execCmd` closure used by the

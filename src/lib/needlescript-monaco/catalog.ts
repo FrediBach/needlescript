@@ -2,6 +2,7 @@
 
 import { FABRIC_MODES, FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery-registry.ts';
 import { PLAN_MODES } from '../travel-planner.ts';
+import { SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
 
 export type NSItemKind = 'keyword' | 'function' | 'variable' | 'constant';
 
@@ -913,6 +914,46 @@ export const NS_ITEMS: NSItem[] = [
     insertText: modeCommandSnippet('underlay', SATIN_UNDERLAY_MODES, '"'),
     isSnippet: true,
     params: [['mode']],
+  },
+  {
+    label: 'underlaypasses',
+    kindName: 'function',
+    detail: 'ordered satin underlay passes',
+    documentation:
+      "Set the exact ordered passes sewn beneath every satin column. Accepted pass names are `'center'`, `'edge'`, and `'zigzag'`; duplicates are allowed and an empty list disables underlay. Explicit pass order supersedes `fabric` doubling and `underlay 'auto'`. All underlay events retain the preview `u: 1` flag.\n\n```\nunderlaypasses ['center', 'edge']\nunderlaylen 2.8\nunderlayinset 0.6\nunderlayspacing 1.8\n```",
+    insertText: `underlaypasses ['\${1|${SATIN_UNDERLAY_PASS_KINDS.join(',')}|}']`,
+    isSnippet: true,
+    params: [['passes']],
+  },
+  {
+    label: 'underlaylen',
+    kindName: 'function',
+    detail: 'satin underlay running length (mm)',
+    documentation:
+      'Set center/edge running-stitch length and zigzag return-run length, in physical hoop millimetres. Range 0.4–12 mm. It tunes the current legacy pass selection unless `underlaypasses` supplies an explicit order.',
+    insertText: 'underlaylen ${1:2.8}',
+    isSnippet: true,
+    params: [['mm']],
+  },
+  {
+    label: 'underlayinset',
+    kindName: 'function',
+    detail: 'absolute satin edge-underlay inset (mm)',
+    documentation:
+      'Set edge-pass inset inward from each topping rail, in physical hoop millimetres (0–10 mm). This command is deliberately absolute-only; ratio-based legacy settings are not overloaded into the same syntax. On a column narrower than twice the inset, the edge walks meet at the center and a warning is emitted.',
+    insertText: 'underlayinset ${1:0.6}',
+    isSnippet: true,
+    params: [['mm']],
+  },
+  {
+    label: 'underlayspacing',
+    kindName: 'function',
+    detail: 'satin underlay zigzag spacing (mm)',
+    documentation:
+      'Set spacing along zigzag underlay passes in physical hoop millimetres. Range 0.25–5 mm. Zigzag width remains the unambiguous built-in 60% column-width ratio.',
+    insertText: 'underlayspacing ${1:2}',
+    isSnippet: true,
+    params: [['mm']],
   },
   {
     label: 'fillunderlay',

@@ -1,7 +1,17 @@
 import type { FabricPreset, FillUnderlayMode, SatinUnderlayMode } from './embroidery-registry.ts';
+import { defineModes } from './mode-registry.ts';
 
-export type SatinUnderlayPassKind = 'center' | 'edge' | 'zigzag';
+export const SATIN_UNDERLAY_PASS_KINDS = defineModes(['center', 'edge', 'zigzag']);
+export type SatinUnderlayPassKind = (typeof SATIN_UNDERLAY_PASS_KINDS)[number];
 export type FillUnderlayPassKind = 'edge' | 'tatami';
+
+export const SATIN_UNDERLAY_MAX_PASSES = 16;
+
+export const SATIN_UNDERLAY_DEFAULTS = {
+  edgeInsetMM: 0.5,
+  zigzagWidthRatio: 0.6,
+  zigzagSpacingMM: 2,
+} as const;
 
 export interface NumericRange {
   readonly min: number;
@@ -61,12 +71,40 @@ export interface SatinUnderlayProfile {
   readonly passes: readonly SatinUnderlayPass[];
 }
 
-export interface ResolvedSatinUnderlayProfile extends SatinUnderlayProfile {
+export interface LegacyResolvedSatinUnderlayProfile extends SatinUnderlayProfile {
   readonly source: 'legacy';
   readonly requestedMode: SatinUnderlayMode;
   readonly resolvedMode: Exclude<SatinUnderlayMode, 'auto'>;
   readonly generator: LegacySatinGenerator;
   readonly doubled: boolean;
+}
+
+export interface CustomResolvedSatinUnderlayProfile extends SatinUnderlayProfile {
+  readonly source: 'custom';
+  readonly generator: LegacySatinGenerator;
+  readonly explicitPassOrder: boolean;
+}
+
+export type ResolvedSatinUnderlayProfile =
+  LegacyResolvedSatinUnderlayProfile | CustomResolvedSatinUnderlayProfile;
+
+/** Sticky user overrides. Omitted fields continue to inherit the selected legacy profile. */
+export interface SatinUnderlayCustomization {
+  readonly passKinds?: readonly SatinUnderlayPassKind[];
+  readonly runningStitchLengthMM?: number;
+  readonly edgeInsetMM?: number;
+  readonly zigzagSpacingMM?: number;
+}
+
+export function cloneSatinUnderlayCustomization(
+  customization: SatinUnderlayCustomization | null,
+): SatinUnderlayCustomization | null {
+  return customization
+    ? {
+        ...customization,
+        ...(customization.passKinds ? { passKinds: customization.passKinds.slice() } : {}),
+      }
+    : null;
 }
 
 export type FillUnderlayAngle =
@@ -168,7 +206,7 @@ const zigzagPass = (runningStitchLengthMM: number): SatinZigzagUnderlayPass => (
 export function lowerLegacySatinUnderlay(
   mode: SatinUnderlayMode,
   context: LegacySatinUnderlayContext,
-): ResolvedSatinUnderlayProfile {
+): LegacyResolvedSatinUnderlayProfile {
   const generator = context.generator ?? 'spine';
   const resolvedMode =
     mode === 'auto'
@@ -201,6 +239,69 @@ export function lowerLegacySatinUnderlay(
     doubled: context.doubled,
     passes,
   };
+}
+
+const customPass = (
+  kind: SatinUnderlayPassKind,
+  runningStitchLengthMM: number,
+  edgeInsetMM: number,
+  zigzagSpacingMM: number,
+): SatinUnderlayPass => {
+  if (kind === 'center') return centerPass(runningStitchLengthMM);
+  if (kind === 'edge')
+    return {
+      kind: 'edge',
+      runningStitchLengthMM,
+      inset: { unit: 'mm', value: edgeInsetMM },
+      returnRun: 'opposite-edge',
+    };
+  return {
+    kind: 'zigzag',
+    widthRatio: SATIN_UNDERLAY_DEFAULTS.zigzagWidthRatio,
+    spacingMM: zigzagSpacingMM,
+    returnRun: 'reverse-center',
+    returnRunStitchLengthMM: runningStitchLengthMM,
+  };
+};
+
+/** Resolve optional user settings over the legacy profile once physical width is known. */
+export function resolveSatinUnderlayProfile(
+  mode: SatinUnderlayMode,
+  context: LegacySatinUnderlayContext,
+  customization: SatinUnderlayCustomization | null,
+): ResolvedSatinUnderlayProfile {
+  const legacy = lowerLegacySatinUnderlay(mode, context);
+  if (!customization) return legacy;
+
+  const runningStitchLengthMM =
+    customization.runningStitchLengthMM ??
+    Math.max(1.5, Math.min(context.runningStitchLengthMM, 3));
+  const edgeInsetMM = customization.edgeInsetMM ?? SATIN_UNDERLAY_DEFAULTS.edgeInsetMM;
+  const zigzagSpacingMM = customization.zigzagSpacingMM ?? SATIN_UNDERLAY_DEFAULTS.zigzagSpacingMM;
+  const explicitPassOrder = customization.passKinds !== undefined;
+  const passes = explicitPassOrder
+    ? customization.passKinds!.map((kind) =>
+        customPass(kind, runningStitchLengthMM, edgeInsetMM, zigzagSpacingMM),
+      )
+    : legacy.passes.map((pass): SatinUnderlayPass => {
+        if (pass.kind === 'center') return centerPass(runningStitchLengthMM);
+        if (pass.kind === 'edge')
+          return {
+            ...pass,
+            runningStitchLengthMM,
+            inset:
+              customization.edgeInsetMM === undefined
+                ? pass.inset
+                : { unit: 'mm', value: edgeInsetMM },
+          };
+        return {
+          ...pass,
+          spacingMM: zigzagSpacingMM,
+          returnRunStitchLengthMM: runningStitchLengthMM,
+        };
+      });
+
+  return { source: 'custom', generator: legacy.generator, explicitPassOrder, passes };
 }
 
 const fillEdgePass = (): FillEdgeUnderlayPass => ({
@@ -276,6 +377,11 @@ export function validateSatinUnderlayProfile(
   profile: SatinUnderlayProfile,
 ): readonly ProfileValidationIssue[] {
   const issues: ProfileValidationIssue[] = [];
+  if (profile.passes.length > SATIN_UNDERLAY_MAX_PASSES)
+    issues.push({
+      path: 'passes',
+      message: `must contain at most ${SATIN_UNDERLAY_MAX_PASSES} passes`,
+    });
   profile.passes.forEach((pass, index) => {
     const base = `passes[${index}]`;
     if (pass.kind === 'center' || pass.kind === 'edge') {

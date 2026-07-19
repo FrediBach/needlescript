@@ -118,7 +118,8 @@ touching the shared constants.
 `Machine.snapshotConstructionConfig()` captures the settings that determine how future movement is
 constructed, and `restoreConstructionConfig(snapshot)` restores only those settings. The typed
 `ConstructionConfigSnapshot` includes running-stitch numeric/list/reporter forms and list progress;
-bean and E-stitch modes; satin width/reporter, spacing, and alternating side; fill angle, spacing,
+bean and E-stitch modes; satin width/reporter, spacing, alternating side, and optional custom
+underlay pass/length/inset/spacing overrides; fill angle, spacing,
 length forms, and an unused one-shot fill arm; and the lock, pull-compensation, underlay,
 short-stitch, auto-trim, and density settings. Current `fabric` presets resolve into these same
 physics fields, so their construction effects are scoped without treating warning notes as state.
@@ -240,6 +241,14 @@ laid first, then the topping zigzag (`_zigzagAlong`, `1054`). The topping
 applies the **short-stitch** curve fix: on tight curves the inner-edge penetrations
 bunch up (breaking thread and damaging fabric), so alternate inner stitches are pulled
 in to 60% width, and an over-wide-for-the-curve column raises a warning.
+
+The parameter commands layer a `SatinUnderlayCustomization` over that legacy resolution. Without an
+explicit pass list, numeric overrides retain the selected legacy/automatic pass order. With one,
+the authored order is resolved directly and preset doubling is omitted. Custom edge inset is always
+absolute hoop-space millimetres; ratio insets exist only in lowered legacy profiles. Buffered spine,
+programmable satin, and rail-pair satin consume the same pass objects. A requested absolute inset
+that reaches the center of a narrow column is clamped there and warns once per column. Every pass
+emits through the existing underlay paths with `u: 1`.
 
 After-split effects (humanize/snaptogrid/declump) deliberately **skip** satin rails —
 perturbing a precise rail wrecks the column — with a one-time warning.

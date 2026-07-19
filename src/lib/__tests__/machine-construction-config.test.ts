@@ -34,6 +34,12 @@ describe('machine construction configuration snapshots', () => {
     machine.lockLen = 0.9;
     machine.pullComp = 0.45;
     machine.underlayMode = 'edge';
+    machine.satinUnderlayCustomization = {
+      passKinds: ['center', 'edge'],
+      runningStitchLengthMM: 2.8,
+      edgeInsetMM: 0.6,
+      zigzagSpacingMM: 1.8,
+    };
     machine.fillUnderlayMode = 'tatami';
     machine.doubleUnderlay = true;
     machine.shortStitch = false;
@@ -76,6 +82,7 @@ describe('machine construction configuration snapshots', () => {
     machine.lockLen = 0;
     machine.pullComp = 0;
     machine.underlayMode = 'off';
+    machine.satinUnderlayCustomization = null;
     machine.fillUnderlayMode = 'off';
     machine.doubleUnderlay = false;
     machine.shortStitch = true;
@@ -111,6 +118,12 @@ describe('machine construction configuration snapshots', () => {
       lockLen: 0.9,
       pullComp: 0.45,
       underlayMode: 'edge',
+      satinUnderlayCustomization: {
+        passKinds: ['center', 'edge'],
+        runningStitchLengthMM: 2.8,
+        edgeInsetMM: 0.6,
+        zigzagSpacingMM: 1.8,
+      },
       fillUnderlayMode: 'tatami',
       doubleUnderlay: true,
       shortStitch: false,
@@ -138,6 +151,7 @@ describe('machine construction configuration snapshots', () => {
     const machine = new Machine();
     const stitchPattern = [1, 2];
     const fillPattern = [3, 4];
+    const underlayPasses = ['center', 'edge'] as const;
     const staticPaths: [number, number][][] = [
       [
         [0, 0],
@@ -146,11 +160,13 @@ describe('machine construction configuration snapshots', () => {
     ];
     machine.stitchLenList = stitchPattern;
     machine.fillLenList = fillPattern;
+    machine.satinUnderlayCustomization = { passKinds: underlayPasses };
     machine.fillPathsStatic = staticPaths;
 
     const snapshot = machine.snapshotConstructionConfig();
     expect(snapshot.stitchLenList).not.toBe(stitchPattern);
     expect(snapshot.fillLenList).not.toBe(fillPattern);
+    expect(snapshot.satinUnderlayCustomization?.passKinds).not.toBe(underlayPasses);
     expect(snapshot.fillPathsStatic).not.toBe(staticPaths);
     expect(snapshot.fillPathsStatic?.[0]).not.toBe(staticPaths[0]);
     expect(snapshot.fillPathsStatic?.[0][0]).not.toBe(staticPaths[0][0]);
