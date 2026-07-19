@@ -1145,11 +1145,18 @@ source order: `threadprofile 'rayon-60wt' threadwidth 0.35` resolves to 0.35 mm,
 order resolves back to the profile's 0.3 mm default.
 
 The four generic thread profiles are `'rayon-40wt'`, `'rayon-60wt'`,
-`'polyester-40wt'`, and `'polyester-60wt'`. Their planning approximations are 0.4 mm for 40 wt and
-0.3 mm for 60 wt. These values, grain/stretch, needle, stabilizer, and topping are metadata only in
-Session 7.1: they do not alter events, geometry, current coverage, exports, warnings, or RNG draws.
-Only the pre-existing construction behavior of `fabric` changes stitches. Thread-aware coverage is
-introduced separately in Session 7.2.
+`'polyester-40wt'`, and `'polyester-60wt'`. Their coverage approximations are 0.4 mm for 40 wt and
+0.3 mm for 60 wt. Resolved width scales `coverat`, final heatmap layers, and density warnings; it
+does not alter stitch geometry, exports, penetration counts, locks, or RNG draws. Grain/stretch,
+needle, stabilizer, and topping remain advisory metadata. Only the pre-existing construction
+behavior of `fabric` changes stitches.
+
+The live coverage grid retains raw thread-path length and applies one active resolved width to every
+coverage read. Changing `threadprofile` or `threadwidth` therefore reinterprets already committed
+coverage as well as later stitches; set the intended profile near the start of a program. A later
+history query and `RunResult.density` use that same active width. `DensityResult.threadWidthMM`
+records it. The default remains 0.4 mm, so default cell layers, peaks, hotspots, and warnings remain
+value-identical. `maxdensity` stays an absolute layer threshold and is never silently rescaled.
 
 Fabric profile grain/stretch defaults are deliberately neutral (`0°`, zero declared stretch) until
 versioned sew-out evidence supports automatic directional values. Use `fabricgrain` and
@@ -1164,7 +1171,7 @@ intent.
 | `fabricgrain deg`        | fabric-grain heading in turtle degrees (`0` = up, clockwise positive); finite values wrap into 0–360. Metadata only in this phase                                                                                                                                                                                                   |
 | `fabricstretch a b`      | declared fractional stretch along/across the grain, each 0–1. A later `fabric` command restores its profile defaults; metadata only in this phase                                                                                                                                                                                   |
 | `threadprofile 'name'`   | generic rayon/polyester 40 wt or 60 wt profile; resets resolved thread width to 0.4 mm or 0.3 mm respectively                                                                                                                                                                                                                       |
-| `threadwidth mm`         | explicit resolved thread-width approximation, 0.1–1 mm. Overrides the active profile in source order; does not affect coverage until Session 7.2                                                                                                                                                                                    |
+| `threadwidth mm`         | explicit resolved thread-width approximation, 0.1–1 mm. Overrides the active profile in source order and scales coverage queries/heatmaps/warnings without changing stitch geometry                                                                                                                                                 |
 | `needle nm`              | advisory metric needle size: 60, 65, 70, 75, 80, or 90; `needle 0` clears the optional value. Does not affect construction                                                                                                                                                                                                          |
 | `stabilizer 'category'`  | portable category metadata: `'none'`, `'tearaway'`, `'cutaway'`, or `'washaway'`                                                                                                                                                                                                                                                    |
 | `topping 0/1`            | records whether topping is used; accepts `false`/`true` because booleans are numeric. Does not automatically add or recommend a product                                                                                                                                                                                             |
@@ -1279,7 +1286,7 @@ Read back the committed coverage grid mid-program for closed-loop generation (ad
 | `sewnwithin(p, r)`             | list of prior penetrations within r mm                                           |
 | `stitchedpoints()`             | deep-copied snapshot of every penetration so far, as a path                      |
 
-Contract: zero RNG draws, zero emission — branching on them keeps determinism. They see **committed** penetrations in sewing order (a buffered satin column is invisible until it flushes; tie-off locks excluded, matching the heatmap). Query points are local-frame and mapped through the CTM; returned points are hoop-space. `coverat`/`countat` O(1); `nearestsewn`/`sewnwithin` grid-bucketed. Coverage-conditioned loops must have a hard cap (`repeat N [ … if done [ break ] ]`, not open-ended `while`).
+Contract: zero RNG draws, zero emission — branching on them keeps determinism. They see **committed** penetrations in sewing order (a buffered satin column is invisible until it flushes; tie-off locks excluded, matching the heatmap). `coverat` uses the resolved thread width also recorded in `RunResult.density.threadWidthMM`; `countat` is width-independent. Query points are local-frame and mapped through the CTM; returned points are hoop-space. `coverat`/`countat` O(1); `nearestsewn`/`sewnwithin` grid-bucketed. Coverage-conditioned loops must have a hard cap (`repeat N [ … if done [ break ] ]`, not open-ended `while`).
 
 ---
 

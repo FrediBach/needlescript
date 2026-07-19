@@ -272,11 +272,19 @@ construction view through the compatible `FABRICS` export. `threadprofile` resol
 rayon/polyester weight and resets its width default; `threadwidth`, `fabricgrain`, `fabricstretch`,
 `needle`, `stabilizer`, and `topping` then replace only their resolved metadata fields. This makes
 profile/default precedence ordinary source order. Directional fabric defaults remain neutral and
-none of the new metadata commands feeds geometry or `DensityGrid` in Session 7.1.
+none of the material commands feeds geometry. Beginning in Session 7.2, `threadprofile` and
+`threadwidth` synchronize the live `DensityGrid` width; other new fields remain metadata-only.
 
 Both construction and trace snapshots copy the material record. `stitchscope` therefore restores
 outer material intent with its other sticky construction settings, and material commands evaluated
-inside `trace` cannot leak. Finalization copies the resolved record to `RunResult.material`.
+inside `trace` cannot leak. Restoring either snapshot also resynchronizes the coverage-grid width.
+Finalization copies the resolved record to `RunResult.material`.
+
+`DensityGrid` accumulates raw per-cell thread length and applies its current resolved width to every
+`coverat`/`coverAvg` read and to finalization. A late thread-width change therefore reinterprets both
+committed and later length consistently instead of mixing widths in one result. The finalized
+`DensityResult.threadWidthMM` reports that width. The default remains 0.4 mm, and `maxdensity`
+continues to be the exact authored layer threshold rather than being profile-scaled.
 
 ### 5.1 The command dispatcher (`exec-cmd.ts`)
 
@@ -553,7 +561,7 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    operation budget. Because the current representation cannot move one item across independently
    routed color blocks, an atomic span containing a color event errors with its source line. Planning
    unwraps to plain `StitchEvent[]` before returning.
-3. **Auto-trim**, then **density analysis** before locks (so tie-offs don't read as false hotspots), then
+3. **Auto-trim**, then **density analysis** with the resolved thread width before locks (so tie-offs don't read as false hotspots), then
    density/stack hotspot warnings with `WarningLocation` spatial data
    (`index.ts:121-153`).
 4. **Lock (tie-off) pass** via `applyLocks` (`index.ts:155-160`).
@@ -564,7 +572,7 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
 7. **Finalize preview data**: translate each chalk command's raw event-stream offset
    to the stitch/jump playback index, and classify/snapshot chalkable final globals.
 8. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
-   `warningLocations`, `printed`, `locks`, `density`, `activeHoop`, `activeOverrides`,
+   `warningLocations`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional
    `plan` statistics. Explicit groups add per-group line, eligibility/movement, accepted-improvement,
    and before/after-travel records.

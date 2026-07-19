@@ -495,6 +495,7 @@ export function initExecCmdHandler(
           threadProfile: mode,
           threadWidthMM: THREAD_PROFILES[mode].widthMM,
         };
+        ctx.m.density.setThreadWidthMM(ctx.m.materialIntent.threadWidthMM);
       } else {
         const allowed = EMBROIDERY_MODE_REGISTRIES.stabilizer;
         const mode = resolveMode(modeVal, allowed);
@@ -1281,6 +1282,7 @@ export function initExecCmdHandler(
         if (!Number.isFinite(a[0]) || a[0] < min || a[0] > max)
           throw new NeedlescriptError(`threadwidth must be between ${min} and ${max} mm`, st.line);
         ctx.m.materialIntent = { ...ctx.m.materialIntent, threadWidthMM: a[0] };
+        ctx.m.density.setThreadWidthMM(a[0]);
         return;
       }
       case 'needle': {

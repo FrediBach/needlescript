@@ -341,7 +341,7 @@ export abstract class MachineCore {
   // query always reports the same number the heatmap shows. Buffered satin /
   // fills aren't here until flushed (committed-only); locks are added later and
   // never fed, so tie-offs don't read as crowding.
-  density = new DensityGrid(1);
+  density = new DensityGrid(1, this.materialIntent.threadWidthMM);
   usedQuery = false; // a history query ran — used to make limit errors loop-aware
   // Trace recording state (RFC-trace §4): captures the pre-split turtle path
   // as data. When traceRecording is true, travel() records the spine instead
@@ -505,6 +505,7 @@ export abstract class MachineCore {
       this.autoTrim = snapshot.autoTrim;
       this.maxDensity = snapshot.maxDensity;
       this.materialIntent = { ...snapshot.materialIntent };
+      this.density.setThreadWidthMM(this.materialIntent.threadWidthMM);
       this.fillArmed = snapshot.fillArmed;
       this.fillDirReporter = snapshot.fillDirReporter;
       this.fillShapeReporter = snapshot.fillShapeReporter;
@@ -760,6 +761,7 @@ export abstract class MachineCore {
     this.autoTrim = snap.autoTrim;
     this.maxDensity = snap.maxDensity;
     this.materialIntent = { ...snap.materialIntent };
+    this.density.setThreadWidthMM(this.materialIntent.threadWidthMM);
     this.colorIdx = snap.colorIdx;
     // Emission — truncate events back; density was never fed (noEmit)
     this.events.length = snap.eventsLen;

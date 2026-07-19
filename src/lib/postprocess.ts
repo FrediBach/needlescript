@@ -9,6 +9,7 @@ import type {
   DensityResult,
   TravelPlanStats,
 } from './types.ts';
+import { DEFAULT_THREAD_WIDTH_MM } from './embroidery-registry.ts';
 
 interface LockResult {
   events: StitchEvent[];
@@ -166,8 +167,6 @@ export function applyAutoTrim(
 
 // ---------- Local density analysis ----------
 
-const THREAD_W = 0.4; // typical 40 wt thread width on fabric, mm
-
 interface DensCell {
   count: number;
   len: number;
@@ -193,6 +192,7 @@ interface DensCell {
 export class DensityGrid {
   readonly cellMM: number;
   private readonly cellArea: number;
+  private _threadWidthMM: number;
   private readonly grid = new Map<string, DensCell>();
   private readonly micro = new Map<
     string,
@@ -207,9 +207,29 @@ export class DensityGrid {
   private px: number | null = null;
   private py = 0;
 
-  constructor(cellMM = 1) {
+  constructor(cellMM = 1, threadWidthMM = DEFAULT_THREAD_WIDTH_MM) {
     this.cellMM = cellMM;
     this.cellArea = cellMM * cellMM;
+    this._threadWidthMM = DensityGrid.validateThreadWidth(threadWidthMM);
+  }
+
+  private static validateThreadWidth(threadWidthMM: number): number {
+    if (!Number.isFinite(threadWidthMM) || threadWidthMM <= 0)
+      throw new RangeError('DensityGrid thread width must be a positive finite number');
+    return threadWidthMM;
+  }
+
+  /** Width currently used for every live query and final coverage calculation. */
+  get threadWidthMM(): number {
+    return this._threadWidthMM;
+  }
+
+  /**
+   * Change the resolved width without rebuilding geometry. Accumulated cells
+   * retain raw path length, so all coverage reads consistently use this width.
+   */
+  setThreadWidthMM(threadWidthMM: number): void {
+    this._threadWidthMM = DensityGrid.validateThreadWidth(threadWidthMM);
   }
 
   private cellOf(x: number, y: number): DensCell {
@@ -266,7 +286,7 @@ export class DensityGrid {
   /** Thread coverage in layers at a point (containing 1 mm cell). */
   coverAt(x: number, y: number): number {
     const cell = this.grid.get(Math.floor(x / this.cellMM) + ',' + Math.floor(y / this.cellMM));
-    return cell ? (cell.len * THREAD_W) / this.cellArea : 0;
+    return cell ? (cell.len * this.threadWidthMM) / this.cellArea : 0;
   }
 
   /** Coverage in layers averaged over the disc of radius r (empty cells = 0). */
@@ -286,7 +306,7 @@ export class DensityGrid {
         if (Math.hypot(cx - x, cy - y) > r) continue;
         n++;
         const cell = this.grid.get(ix + ',' + iy);
-        if (cell) sum += (cell.len * THREAD_W) / this.cellArea;
+        if (cell) sum += (cell.len * this.threadWidthMM) / this.cellArea;
       }
     }
     return n ? sum / n : 0;
@@ -360,7 +380,7 @@ export class DensityGrid {
     let peak = 0;
     for (const [k, cell] of this.grid) {
       const [ix, iy] = k.split(',').map(Number);
-      const layers = (cell.len * THREAD_W) / this.cellArea;
+      const layers = (cell.len * this.threadWidthMM) / this.cellArea;
       if (layers > peak) peak = layers;
       cells.push({ ix, iy, count: cell.count, layers });
     }
@@ -397,7 +417,7 @@ export class DensityGrid {
         }
       }
     }
-    return { cellMM: this.cellMM, cells, peak, hotspots };
+    return { cellMM: this.cellMM, threadWidthMM: this.threadWidthMM, cells, peak, hotspots };
   }
 }
 
@@ -406,8 +426,13 @@ export class DensityGrid {
  * finalize. Identical output to feeding the live machine grid, so the history
  * queries and the heatmap always agree (one notion of density).
  */
-export function densityMap(events: StitchEvent[], cellMM = 1, threshold = 3): DensityResult {
-  const g = new DensityGrid(cellMM);
+export function densityMap(
+  events: StitchEvent[],
+  cellMM = 1,
+  threshold = 3,
+  threadWidthMM = DEFAULT_THREAD_WIDTH_MM,
+): DensityResult {
+  const g = new DensityGrid(cellMM, threadWidthMM);
   for (const e of events) g.feed(e.t, e.x, e.y, e.line);
   return g.finalize(threshold);
 }

@@ -295,6 +295,8 @@ export interface DensityHotspot {
 
 export interface DensityResult {
   cellMM: number;
+  /** Thread-width approximation used to convert path length into coverage layers. */
+  threadWidthMM: number;
   cells: DensityCell[];
   peak: number; // highest thread coverage, in layers
   hotspots: DensityHotspot[];

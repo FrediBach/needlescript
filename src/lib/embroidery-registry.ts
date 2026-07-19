@@ -105,10 +105,16 @@ export interface ThreadProfile {
   widthMM: number;
 }
 
+export const DEFAULT_THREAD_WIDTH_MM = 0.4;
+
 export const THREAD_PROFILES = {
-  'rayon-40wt': { fiber: 'rayon', weight: 40, widthMM: 0.4 },
+  'rayon-40wt': { fiber: 'rayon', weight: 40, widthMM: DEFAULT_THREAD_WIDTH_MM },
   'rayon-60wt': { fiber: 'rayon', weight: 60, widthMM: 0.3 },
-  'polyester-40wt': { fiber: 'polyester', weight: 40, widthMM: 0.4 },
+  'polyester-40wt': {
+    fiber: 'polyester',
+    weight: 40,
+    widthMM: DEFAULT_THREAD_WIDTH_MM,
+  },
   'polyester-60wt': { fiber: 'polyester', weight: 60, widthMM: 0.3 },
 } as const satisfies Record<string, ThreadProfile>;
 

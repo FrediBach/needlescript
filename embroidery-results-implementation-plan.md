@@ -1303,6 +1303,8 @@ material command leaves events, current coverage, warnings, exports, and RNG dra
 
 ### Session 7.2 — Thread-aware coverage
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Replace the fixed `THREAD_W` constant with resolved thread width supplied to `DensityGrid`.
@@ -1317,6 +1319,23 @@ Acceptance criteria:
 - Default density maps are byte/value-identical.
 - History queries and final heatmap use the same configured width.
 - Locks remain excluded as currently documented.
+
+Implementation note: `DensityGrid` now owns a validated resolved `threadWidthMM`, defaulting to the
+legacy 0.4 mm. It continues to accumulate raw thread-path length; `coverAt`, `coverAvg`, hotspot
+classification, peak calculation, and `finalize` all convert that same length with the active width.
+`DensityResult.threadWidthMM` exposes the configured value, and the standalone `densityMap` helper
+accepts an optional fourth width argument while preserving its existing argument order.
+
+`threadprofile` and `threadwidth` synchronize material intent and the live grid. Because the grid
+stores raw length, a source-order width change consistently reinterprets already committed and later
+coverage instead of mixing widths in one heatmap. Construction-scope and trace restoration also
+restore the grid width. Profile selection never changes stitch geometry, penetration counts,
+micro-stack diagnostics, or RNG behavior.
+
+Compatibility remains explicit: the default map's cells, layer values, peak, hotspots, and warning
+decisions are pinned to the previous 0.4 mm output; the new width field is additive metadata.
+`maxdensity` remains the authored absolute layer threshold and profiles do not rescale it. Final
+density analysis still runs before `applyLocks`, so tie-offs remain excluded for every thread width.
 
 ### Session 7.3 — Directional compensation model
 

@@ -1099,7 +1099,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'generic thread profile',
     documentation:
-      "Select generic `'rayon-40wt'`, `'rayon-60wt'`, `'polyester-40wt'`, or `'polyester-60wt'` metadata. 40 wt resolves to an approximate 0.4 mm width and 60 wt to 0.3 mm. A later `threadwidth` overrides that default. Width does not affect stitches or coverage until Session 7.2.",
+      "Select generic `'rayon-40wt'`, `'rayon-60wt'`, `'polyester-40wt'`, or `'polyester-60wt'` metadata. 40 wt resolves to an approximate 0.4 mm width and 60 wt to 0.3 mm. A later `threadwidth` overrides that default. Width scales live coverage queries, the final heatmap, and density warnings without changing stitch geometry.",
     insertText: modeCommandSnippet('threadprofile', THREAD_PROFILE_MODES, "'"),
     isSnippet: true,
     params: [['profile']],
@@ -1108,7 +1108,7 @@ export const NS_ITEMS: NSItem[] = [
     label: 'threadwidth',
     kindName: 'function',
     detail: 'resolved thread width metadata (mm)',
-    documentation: `Override the active thread profile's approximate width with ${MATERIAL_RANGES.threadWidthMM.min}–${MATERIAL_RANGES.threadWidthMM.max} mm. This is metadata only in Session 7.1 and does not alter stitch geometry or current coverage calculations.`,
+    documentation: `Override the active thread profile's approximate width with ${MATERIAL_RANGES.threadWidthMM.min}–${MATERIAL_RANGES.threadWidthMM.max} mm. The width scales live coverage queries, final heatmap layers, and density warnings. It never changes stitch geometry or rescales the active \`maxdensity\` threshold.`,
     insertText: 'threadwidth ${1:0.4}',
     isSnippet: true,
     params: [['mm']],

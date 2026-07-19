@@ -112,20 +112,20 @@ wrapper segment/atomic/group tags at that one lowering boundary. See the Session
 The public `Machine` class is a small facade over `FillMachine`, `SatinMachine`, and
 `MachineCore`. Together they form one mutable machine object; its state groups into:
 
-| Group           | Fields                                                                                                                                                                                         | Notes                                                                 |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Turtle          | `x`, `y`, `heading`, `penDown`                                                                                                                                                                 | always in **local** space                                             |
-| Stitch config   | `stitchLen`, `stitchLenList`/`Reporter`, `mode`, `beanRepeats`                                                                                                                                 | one of numeric / list / reporter stitch-length forms active at a time |
-| Satin           | `satinWidth`, `satinSpacing`, `satinSide`, cap/join settings, `satinWide`/`MaxWidth`/`SplitOverlap`, `eWidth`, `satinReporter`, `satinPath`                                                    | buffered column                                                       |
-| Fill            | `fillAngle`, `fillSpacing`, `fillInset`, `fillEdgeRun`, `fillEdgeShort`, `fillStagger`/`Amount`, `fillConnect`, `fillLen`(+list/reporter), `fillArmed`, `fillDirReporter`, `fillShapeReporter` | tatami + programmable                                                 |
-| Physics         | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity`                                                                           | selectors lower to typed profiles at generation time                  |
-| Material        | `materialIntent`                                                                                                                                                                               | resolved source intent; metadata-only except legacy `fabric` effects  |
-| Output          | `events`, `warnings`, `colorIdx`, `lastEmit`, `started`                                                                                                                                        | accumulation                                                          |
-| Transform stack | `ctm`, `outLayers`, `hasWarp`, `penLayers`, `declumpStack`                                                                                                                                     | see §6                                                                |
-| Hoop            | `hoopInfo`, `hoopSet`, `fieldLocked`, `fieldOverflows`                                                                                                                                         | see §9                                                                |
-| Budgets         | `effectiveLimits`, `activeOverrides`                                                                                                                                                           | see §10                                                               |
-| Coverage        | `density` (a `DensityGrid`), `usedQuery`                                                                                                                                                       | see §8                                                                |
-| Trace           | `traceRecording`, `traceRuns`, `noEmit`                                                                                                                                                        | see §11                                                               |
+| Group           | Fields                                                                                                                                                                                         | Notes                                                                  |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Turtle          | `x`, `y`, `heading`, `penDown`                                                                                                                                                                 | always in **local** space                                              |
+| Stitch config   | `stitchLen`, `stitchLenList`/`Reporter`, `mode`, `beanRepeats`                                                                                                                                 | one of numeric / list / reporter stitch-length forms active at a time  |
+| Satin           | `satinWidth`, `satinSpacing`, `satinSide`, cap/join settings, `satinWide`/`MaxWidth`/`SplitOverlap`, `eWidth`, `satinReporter`, `satinPath`                                                    | buffered column                                                        |
+| Fill            | `fillAngle`, `fillSpacing`, `fillInset`, `fillEdgeRun`, `fillEdgeShort`, `fillStagger`/`Amount`, `fillConnect`, `fillLen`(+list/reporter), `fillArmed`, `fillDirReporter`, `fillShapeReporter` | tatami + programmable                                                  |
+| Physics         | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity`                                                                           | selectors lower to typed profiles at generation time                   |
+| Material        | `materialIntent`                                                                                                                                                                               | thread width feeds coverage; legacy `fabric` also affects construction |
+| Output          | `events`, `warnings`, `colorIdx`, `lastEmit`, `started`                                                                                                                                        | accumulation                                                           |
+| Transform stack | `ctm`, `outLayers`, `hasWarp`, `penLayers`, `declumpStack`                                                                                                                                     | see §6                                                                 |
+| Hoop            | `hoopInfo`, `hoopSet`, `fieldLocked`, `fieldOverflows`                                                                                                                                         | see §9                                                                 |
+| Budgets         | `effectiveLimits`, `activeOverrides`                                                                                                                                                           | see §10                                                                |
+| Coverage        | `density` (a `DensityGrid`), `usedQuery`                                                                                                                                                       | see §8                                                                 |
+| Trace           | `traceRecording`, `traceRuns`, `noEmit`                                                                                                                                                        | see §11                                                                |
 
 `effectiveLimits` starts as a mutable copy of `STOCK_LIMITS`
 (`machine/machine-core.ts`) so `override` can raise/lower budgets per run without
@@ -152,12 +152,13 @@ functions retain reference identity. Mutable stitch/fill length patterns and sta
 are copied when taking and restoring a snapshot, so later mutation of live configuration cannot
 alter the saved value.
 
-The initial material phase keeps source intent separate from generated physics. `materialIntent`
+Material intent stays separate from generated geometry. `materialIntent`
 records the fabric preset, grain and stretch axes, generic thread profile/width, optional needle,
 stabilizer category, and topping boolean. Only `fabric` continues to update the legacy scalar
-physics above. The other material commands replace metadata fields without flushing construction,
-feeding coverage, or changing events. Trace snapshots also copy the record, and finalization exposes
-a fresh copy as `RunResult.material`.
+construction physics above. `threadprofile` and `threadwidth` also synchronize the live coverage
+grid's width; the other material commands remain metadata-only. None of them changes events. Trace
+and construction snapshots copy the record and restore the grid width, and finalization exposes a
+fresh material copy as `RunResult.material`.
 
 An active `beginfill` recording cannot cross either boundary. A pending satin column or
 reporter-driven running stretch is flushed before the snapshot or restore; otherwise the methods are
@@ -459,7 +460,7 @@ the programmable generator so the per-row length function is honored (`2448`).
 ## 8. Coverage tracking (`DensityGrid`)
 
 The machine feeds every committed penetration to a live `DensityGrid`
-(`postprocess.ts:192`) in sewing order, via `_push`. The grid maintains:
+(`postprocess.ts`) in sewing order, via `_push`. The grid maintains:
 
 - a 1 mm **cell grid** accumulating penetration counts and thread _length_ per cell
   (coverage in "layers" = length × thread width / cell area), with per-cell source-line
@@ -474,6 +475,18 @@ query always reports the same number the heatmap shows. It exposes `coverAt`,
 `coverat`/`countat`/`nearestsewn`/`sewnwithin`/`stitchedpoints`. Buffered satin/fills
 are **not** counted until flushed (committed-only), and locks are added afterward and
 never fed, so tie-offs don't read as false crowding.
+
+The grid stores raw path length and a resolved `threadWidthMM`, defaulting to 0.4 mm. Coverage reads
+and `finalize` multiply by that same active width; `DensityResult.threadWidthMM` records it. The
+`threadprofile`/`threadwidth` commands update the width without rebuilding geometry, so a later
+change consistently reinterprets committed and future path length. Construction-scope and trace
+restoration resynchronize the width from restored material intent. Penetration counts and micro-stack
+diagnostics are width-independent.
+
+`maxDensity` remains an absolute layer threshold. Profiles change the calculated layers, not the
+threshold. The standalone `densityMap(events, cellMM, threshold, threadWidthMM)` helper accepts the
+same optional width as the `DensityGrid` constructor; omitting it preserves every legacy 0.4 mm
+cell value and hotspot decision.
 
 ---
 

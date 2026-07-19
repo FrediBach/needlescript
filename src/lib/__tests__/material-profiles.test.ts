@@ -47,7 +47,7 @@ describe('resolved material intent', () => {
     expect(run('').material).toEqual(DEFAULT_MATERIAL_INTENT);
   });
 
-  it('resolves all material commands without changing stitches or current coverage', () => {
+  it('resolves all material commands without changing stitches', () => {
     const source = 'lock 0 stitchlen 2 fd 10';
     const baseline = run(source);
     const configured = run(`
@@ -79,7 +79,8 @@ describe('resolved material intent', () => {
         return copy;
       });
     expect(withoutLines(configured.events)).toEqual(withoutLines(baseline.events));
-    expect(configured.density).toEqual(baseline.density);
+    expect(configured.density.threadWidthMM).toBe(0.35);
+    expect(configured.density.peak).toBeCloseTo(baseline.density.peak * (0.35 / 0.4), 12);
   });
 
   it('applies profile defaults and explicit overrides in source order', () => {
