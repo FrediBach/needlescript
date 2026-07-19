@@ -14,6 +14,7 @@ import {
   SATIN_CAP_MODES,
   SATIN_CONSTRUCTION_MODE_REGISTRIES,
   SATIN_JOIN_MODES,
+  SATIN_WIDE_MODES,
 } from '../satin-profile.ts';
 
 describe('shared mode registries', () => {
@@ -42,6 +43,7 @@ describe('shared mode registries', () => {
     expect(SATIN_CONSTRUCTION_MODE_REGISTRIES).toEqual({
       satincap: SATIN_CAP_MODES,
       satinjoin: SATIN_JOIN_MODES,
+      satinwide: SATIN_WIDE_MODES,
     });
   });
 });

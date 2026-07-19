@@ -8,7 +8,12 @@ import {
   FILL_CONSTRUCTION_RANGES,
   FILL_STAGGER_MODES,
 } from '../fill-profile.ts';
-import { SATIN_CAP_MODES, SATIN_CONSTRUCTION_RANGES, SATIN_JOIN_MODES } from '../satin-profile.ts';
+import {
+  SATIN_CAP_MODES,
+  SATIN_CONSTRUCTION_RANGES,
+  SATIN_JOIN_MODES,
+  SATIN_WIDE_MODES,
+} from '../satin-profile.ts';
 
 export type NSItemKind = 'keyword' | 'function' | 'variable' | 'constant';
 
@@ -91,7 +96,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'keyword',
     detail: 'temporarily override stitch construction settings',
     documentation:
-      "Run a block with temporary stitch-construction settings, then restore the outer configuration even after `return`, `break`, `continue`, or an error. It scopes running/satin/E-stitch/bean modes, fill settings and an armed fill, plus lock, compensation, underlay, auto-trim, and density policies. Turtle position, heading, pen, color, RNG, transforms/effects, output/history, hoop, budgets, and planning are not restored. Pending satin or reporter-running construction flushes at both boundaries; an active `beginfill` cannot cross a boundary.\n\n```\nstitchscope [\n  density 0.5\n  underlay 'edge'\n  satin 4\n  fd 20\n]\n```",
+      "Run a block with temporary stitch-construction settings, then restore the outer configuration even after `return`, `break`, `continue`, or an error. It scopes running/satin/E-stitch/bean modes, satin cap/join/wide policies, fill settings and an armed fill, plus lock, compensation, underlay, auto-trim, and density policies. Turtle position, heading, pen, color, RNG, transforms/effects, output/history, hoop, budgets, and planning are not restored. Pending satin or reporter-running construction flushes at both boundaries; an active `beginfill` cannot cross a boundary.\n\n```\nstitchscope [\n  density 0.5\n  underlay 'edge'\n  satin 4\n  fd 20\n]\n```",
     insertText: 'stitchscope [\n\t$0\n]',
     isSnippet: true,
     params: [[]],
@@ -727,6 +732,34 @@ export const NS_ITEMS: NSItem[] = [
     insertText: `satincorner \${1:${SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.default}}`,
     isSnippet: true,
     params: [['degrees']],
+  },
+  {
+    label: 'satinwide',
+    kindName: 'function',
+    detail: 'choose wide satin-column handling',
+    documentation:
+      "Choose how columns wider than `satinmaxwidth` are handled. `'warn'` is the byte-identical legacy path. `'split'` partitions a safe open, smooth column into adjacent hoop-space subcolumns. Shared seams alternate ownership of the `satinsplitoverlap` band so the topping interlocks without a fixed double-density strip. Each subcolumn sews its underlay before topping, and nearest-end routing limits jumps. Closed columns, sharp/cusped curves, crossed rails, and reporter-defined rake warn and remain unsplit. Sticky, `stitchscope`-aware, and drawless.",
+    insertText: modeCommandSnippet('satinwide', SATIN_WIDE_MODES, "'"),
+    isSnippet: true,
+    params: [['mode']],
+  },
+  {
+    label: 'satinmaxwidth',
+    kindName: 'function',
+    detail: 'maximum split satin subcolumn width (mm)',
+    documentation: `Set the physical hoop-space width ceiling that activates and sizes \`satinwide 'split'\`. Range ${SATIN_CONSTRUCTION_RANGES.maxWidthMM.min}–${SATIN_CONSTRUCTION_RANGES.maxWidthMM.max} mm; default ${SATIN_CONSTRUCTION_RANGES.maxWidthMM.default}. It does not replace the legacy snag warning while \`satinwide 'warn'\` is active.`,
+    insertText: `satinmaxwidth \${1:${SATIN_CONSTRUCTION_RANGES.maxWidthMM.default}}`,
+    isSnippet: true,
+    params: [['mm']],
+  },
+  {
+    label: 'satinsplitoverlap',
+    kindName: 'function',
+    detail: 'split satin seam interlock (mm)',
+    documentation: `Set the physical width alternately assigned across neighboring split-column seams. Range ${SATIN_CONSTRUCTION_RANGES.splitOverlapMM.min}–${SATIN_CONSTRUCTION_RANGES.splitOverlapMM.max} mm; default ${SATIN_CONSTRUCTION_RANGES.splitOverlapMM.default}. The shared seam moves by half this amount to avoid both gaps and a stationary double-density band.`,
+    insertText: `satinsplitoverlap \${1:${SATIN_CONSTRUCTION_RANGES.splitOverlapMM.default}}`,
+    isSnippet: true,
+    params: [['mm']],
   },
   {
     label: 'density',

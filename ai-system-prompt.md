@@ -113,6 +113,7 @@ Any numeric stitchlen disengages the list/reporter: stitchlen 2.5
 satin n — satin column n mm wide (n=0 for off). Width 2–8 mm recommended (>8 mm snag warning). The column is buffered while drawn and flushes (underlay first, then zigzag) on pen up, mode/colour change, trim, fill, or end of program.
 satin @fn — programmable column: see Programmable satin below.
 satinbetween(railA, railB) — immediate satin between two path rails; call syntax only. Optional third argument: ordered checkpoints or @shape; four-arg form accepts both. Rails map through transform/warp before physical spacing/physics. Both rails must both be open or both closed. Drawless; preserves heading/pen/modes; history is immediate; forbidden inside trace/fill recording.
+satinwide 'warn'|'split' — sticky wide-column policy. Default warn preserves current output. Split safely partitions smooth open numeric satin/non-reporter satinbetween columns in hoop space when wider than satinmaxwidth (2–12 mm, default 7.5); satinsplitoverlap is 0–1 mm (default 0.5). Shared seams interlock without a fixed double-density strip; each subcolumn sews underlay before topping. Closed/sharp/cusped/crossed or reporter-defined columns warn and stay unsplit. Do not enable automatically unless the user explicitly asks for split construction.
 density n — satin penetration spacing (0.25–5 mm, default 0.4)
 bean n — bean stitch: each stitch sewn n times (forced odd, max 9; 1=off)
 estitch n — blanket stitch prongs n mm on the left of travel, spaced by stitchlen (0=off)

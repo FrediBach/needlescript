@@ -17,7 +17,7 @@ import type { FillUnderlayCustomization, SatinUnderlayCustomization } from '../u
 import { FILL_CONSTRUCTION_RANGES } from '../fill-profile.ts';
 import type { FillConnectMode, FillConnectorRecord, FillStaggerMode } from '../fill-profile.ts';
 import { SATIN_CONSTRUCTION_RANGES } from '../satin-profile.ts';
-import type { SatinCapMode, SatinJoinMode } from '../satin-profile.ts';
+import type { SatinCapMode, SatinJoinMode, SatinWideMode } from '../satin-profile.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -71,6 +71,9 @@ export interface ConstructionConfigSnapshot {
   readonly satinCapLength: number;
   readonly satinJoin: SatinJoinMode;
   readonly satinCornerAngle: number;
+  readonly satinWide: SatinWideMode;
+  readonly satinMaxWidth: number;
+  readonly satinSplitOverlap: number;
   readonly fillAngle: number;
   readonly fillSpacing: number;
   readonly fillInset: number;
@@ -129,6 +132,9 @@ interface MachineSnapshot {
   satinCapLength: number;
   satinJoin: SatinJoinMode;
   satinCornerAngle: number;
+  satinWide: SatinWideMode;
+  satinMaxWidth: number;
+  satinSplitOverlap: number;
   eWidth: number;
   beanRepeats: number;
   fillAngle: number;
@@ -226,6 +232,9 @@ export abstract class MachineCore {
   satinCapLength: number = SATIN_CONSTRUCTION_RANGES.capLengthMM.default;
   satinJoin: SatinJoinMode = 'legacy';
   satinCornerAngle: number = SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.default;
+  satinWide: SatinWideMode = 'warn';
+  satinMaxWidth: number = SATIN_CONSTRUCTION_RANGES.maxWidthMM.default;
+  satinSplitOverlap: number = SATIN_CONSTRUCTION_RANGES.splitOverlapMM.default;
   eWidth = 0;
   beanRepeats = 1;
   fillAngle = 0;
@@ -392,6 +401,9 @@ export abstract class MachineCore {
       satinCapLength: this.satinCapLength,
       satinJoin: this.satinJoin,
       satinCornerAngle: this.satinCornerAngle,
+      satinWide: this.satinWide,
+      satinMaxWidth: this.satinMaxWidth,
+      satinSplitOverlap: this.satinSplitOverlap,
       fillAngle: this.fillAngle,
       fillSpacing: this.fillSpacing,
       fillInset: this.fillInset,
@@ -452,6 +464,9 @@ export abstract class MachineCore {
       this.satinCapLength = snapshot.satinCapLength;
       this.satinJoin = snapshot.satinJoin;
       this.satinCornerAngle = snapshot.satinCornerAngle;
+      this.satinWide = snapshot.satinWide;
+      this.satinMaxWidth = snapshot.satinMaxWidth;
+      this.satinSplitOverlap = snapshot.satinSplitOverlap;
       this.fillAngle = snapshot.fillAngle;
       this.fillSpacing = snapshot.fillSpacing;
       this.fillInset = snapshot.fillInset;
@@ -568,6 +583,9 @@ export abstract class MachineCore {
       satinCapLength: this.satinCapLength,
       satinJoin: this.satinJoin,
       satinCornerAngle: this.satinCornerAngle,
+      satinWide: this.satinWide,
+      satinMaxWidth: this.satinMaxWidth,
+      satinSplitOverlap: this.satinSplitOverlap,
       eWidth: this.eWidth,
       beanRepeats: this.beanRepeats,
       fillAngle: this.fillAngle,
@@ -699,6 +717,9 @@ export abstract class MachineCore {
     this.satinCapLength = snap.satinCapLength;
     this.satinJoin = snap.satinJoin;
     this.satinCornerAngle = snap.satinCornerAngle;
+    this.satinWide = snap.satinWide;
+    this.satinMaxWidth = snap.satinMaxWidth;
+    this.satinSplitOverlap = snap.satinSplitOverlap;
     this.eWidth = snap.eWidth;
     this.beanRepeats = snap.beanRepeats;
     this.fillAngle = snap.fillAngle;

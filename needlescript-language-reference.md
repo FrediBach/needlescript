@@ -368,6 +368,9 @@ Modes are sticky: they apply to every move until changed.
 | `satincaplen mm`                | physical taper/point/round transition length, 0.4–20 mm (default **2**)                                                                                                                                         |
 | `satinjoin 'mode'`              | sharp-corner construction: `'legacy'`, `'continuous'`, `'fan'`, `'miter'`, or `'split'`; default `'legacy'`                                                                                                     |
 | `satincorner degrees`           | absolute travel-direction change that selects a sharp join, 5–175° (default **60**)                                                                                                                             |
+| `satinwide 'mode'`              | wide-column policy: `'warn'` keeps the legacy event path; `'split'` opts into safe adjacent subcolumns; default `'warn'`                                                                                        |
+| `satinmaxwidth mm`              | physical width ceiling for each split subcolumn, 2–12 mm (default **7.5**)                                                                                                                                      |
+| `satinsplitoverlap mm`          | interlocking shared-seam band, 0–1 mm (default **0.5**)                                                                                                                                                         |
 | `density mm`                    | satin penetration spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                          |
 | `bean n`                        | each stitch sewn n times (forced odd, max 9); `bean 1` off                                                                                                                                                      |
 | `estitch mm`                    | blanket stitch: prongs of this length on the left of travel, spaced by `stitchlen`; `estitch 0` off                                                                                                             |
@@ -378,6 +381,39 @@ Modes are sticky: they apply to every move until changed.
 | `lock mm`                       | tie-in/tie-off: 4 micro back-stitches auto-sewn wherever thread starts or ends (design start/end, colour changes, trims, jumps ≥ 4 mm). Size 0.3–1.5 mm (default **0.7**); `lock 0` disables                    |
 
 A satin column is buffered while drawn and flushed (underlay first, then zigzag) when it ends: pen up, mode change, colour change, trim, fill, or end of program.
+
+### Wide-column splitting
+
+`satinwide 'split'` examines the completed column after transforms and pull compensation, in
+physical hoop-space millimetres. If its widest realized rung exceeds `satinmaxwidth`, the machine
+chooses enough adjacent subcolumns that every topping chord remains below the configured ceiling.
+The construction supports numeric open spine satin and non-reporter `satinbetween` rails, including
+smooth width changes, ordinary tapers, cap narrowing, straight columns, and gently curved columns.
+The default `satinwide 'warn'` path does not run this planner: existing events and snag/curvature
+warnings remain byte-identical, and `satinmaxwidth` does not replace the legacy ~8 mm advisory.
+
+```needlescript
+satinwide 'split'
+satinmaxwidth 7.5
+satinsplitoverlap 0.5
+satin 12
+fd 40
+satin 0
+```
+
+Each shared split seam alternates which neighbor owns half of the `satinsplitoverlap` band. Both
+neighbors use the same moving boundary, so the topping has neither a fabric gap nor a stationary
+double-layer strip. The default 0.5 mm value is physical and is not scaled. The machine routes each
+complete subcolumn from the nearest available end; that subcolumn's resolved underlay passes sew
+before its topping, then a short jump moves to the next construction. No trim or color change is
+inserted by the splitter itself, although the normal `autotrim` post-process may act on a long jump.
+
+Splitting is deliberately conservative. Closed columns, sharp corners, cusps/U-turns, widths that
+already exceed the local curve radius, reversed/crossed rails, programmable spine satin, and
+reporter-driven `satinbetween` remain unsplit with a precise warning. Reporter-defined width,
+inset, and rake do not provide a safe common partition topology. Split planning consumes no RNG
+draws, has no effect in `trace`, is sticky and `stitchscope`-aware, and affects emitted stitches,
+coverage/history, and warnings only when `'split'` is selected and the physical ceiling is exceeded.
 
 ### Scoped construction settings — `stitchscope`
 
@@ -395,7 +431,8 @@ stitchscope [
 ```
 
 The scope snapshots and restores running-stitch numeric/list/reporter forms and list progress; bean
-and E-stitch modes; satin width/reporter, density, alternating side, cap modes, and cap length;
+and E-stitch modes; satin width/reporter, density, alternating side, cap/join policies, wide-column
+policy, maximum width, and seam interlock;
 fill angle, spacing,
 construction/edge-run insets, minimum useful edge-fragment length, connector/stagger policies,
 length forms, and pending programmable/custom fill arm; plus lock, pull compensation, satin/fill

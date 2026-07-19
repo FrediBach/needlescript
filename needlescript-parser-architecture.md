@@ -407,7 +407,9 @@ and pre-scan consult:
 | `RESERVED`                 | "Core tier" words a user definition may **not** shadow             |
 
 Quoted embroidery modes use a focused layer rather than repeating arrays in this table.
-`embroidery-registry.ts` owns the fabric profiles and satin/fill underlay mode registries;
+`embroidery-registry.ts` owns the fabric profiles and satin/fill underlay mode registries, while
+`fill-profile.ts` and `satin-profile.ts` own construction choices such as
+`satinwide 'warn'|'split'`;
 `QWORD_BUILTINS` is a compatibility view consumed by parser classification. `mode-registry.ts`
 provides literal-preserving registry helpers, case-insensitive resolution, and the shared
 unknown-mode/did-you-mean diagnostic. Monaco snippets import the same registries, and catalog

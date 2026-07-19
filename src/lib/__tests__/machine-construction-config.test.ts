@@ -27,6 +27,9 @@ describe('machine construction configuration snapshots', () => {
     machine.satinReporter = satinReporter;
     machine.satinJoin = 'fan';
     machine.satinCornerAngle = 35;
+    machine.satinWide = 'split';
+    machine.satinMaxWidth = 6;
+    machine.satinSplitOverlap = 0.35;
     machine.fillAngle = 37;
     machine.fillSpacing = 0.65;
     machine.fillInset = 0.75;
@@ -90,6 +93,9 @@ describe('machine construction configuration snapshots', () => {
     machine.satinReporter = null;
     machine.satinJoin = 'legacy';
     machine.satinCornerAngle = 60;
+    machine.satinWide = 'warn';
+    machine.satinMaxWidth = 7.5;
+    machine.satinSplitOverlap = 0.5;
     machine.fillAngle = 0;
     machine.fillSpacing = 1;
     machine.fillInset = 0;
@@ -136,6 +142,9 @@ describe('machine construction configuration snapshots', () => {
       satinSide: -1,
       satinJoin: 'fan',
       satinCornerAngle: 35,
+      satinWide: 'split',
+      satinMaxWidth: 6,
+      satinSplitOverlap: 0.35,
       fillAngle: 37,
       fillSpacing: 0.65,
       fillInset: 0.75,

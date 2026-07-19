@@ -450,6 +450,22 @@ export function initExecCmdHandler(
       ctx.m.satinJoin = mode;
       return;
     }
+    if (st.name === 'satinwide') {
+      ctx.traceNote('satinwide', 'note: satinwide inside trace has no effect on the captured path');
+      const modeVal = vals[0];
+      if (typeof modeVal !== 'string')
+        throw new NeedlescriptError(
+          `satinwide expects a string mode, got ${describeVal(modeVal)} — e.g. satinwide 'split'`,
+          st.line,
+        );
+      const allowed = SATIN_CONSTRUCTION_MODE_REGISTRIES.satinwide;
+      const mode = resolveMode(modeVal, allowed);
+      if (mode === undefined)
+        throw new NeedlescriptError(unknownModeMessage('satinwide', modeVal, allowed), st.line);
+      ctx.m.flushSatin();
+      ctx.m.satinWide = mode;
+      return;
+    }
     // String-argument mode commands — handled before the bulk num() conversion.
     if (st.name === 'fabric' || st.name === 'underlay' || st.name === 'fillunderlay') {
       ctx.traceNote(st.name, `note: ${st.name} inside trace has no effect on the captured path`);
@@ -822,7 +838,7 @@ export function initExecCmdHandler(
         ctx.m.flushSatin();
         ctx.m.satinReporter = null;
         const v = Math.max(0, a[0]);
-        if (v > 10)
+        if (v > 10 && ctx.m.satinWide !== 'split')
           ctx.m.warnings.push(
             `satin ${v} mm is very wide — columns over ~8 mm tend to snag; consider splitting`,
           );
@@ -858,6 +874,36 @@ export function initExecCmdHandler(
           );
         ctx.m.flushSatin();
         ctx.m.satinCornerAngle = a[0];
+        return;
+      }
+      case 'satinmaxwidth': {
+        ctx.traceNote(
+          'satinmaxwidth',
+          'note: satinmaxwidth inside trace has no effect on the captured path',
+        );
+        const range = SATIN_CONSTRUCTION_RANGES.maxWidthMM;
+        if (!Number.isFinite(a[0]) || a[0] < range.min || a[0] > range.max)
+          throw new NeedlescriptError(
+            `satinmaxwidth must be between ${range.min} and ${range.max} mm`,
+            st.line,
+          );
+        ctx.m.flushSatin();
+        ctx.m.satinMaxWidth = a[0];
+        return;
+      }
+      case 'satinsplitoverlap': {
+        ctx.traceNote(
+          'satinsplitoverlap',
+          'note: satinsplitoverlap inside trace has no effect on the captured path',
+        );
+        const range = SATIN_CONSTRUCTION_RANGES.splitOverlapMM;
+        if (!Number.isFinite(a[0]) || a[0] < range.min || a[0] > range.max)
+          throw new NeedlescriptError(
+            `satinsplitoverlap must be between ${range.min} and ${range.max} mm`,
+            st.line,
+          );
+        ctx.m.flushSatin();
+        ctx.m.satinSplitOverlap = a[0];
         return;
       }
       case 'estitch': {

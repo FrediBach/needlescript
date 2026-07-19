@@ -1046,6 +1046,8 @@ fixtures live in `satin-corners.test.ts`.
 
 ### Session 5.4 — Wide-column splitting
 
+Status: complete (2026-07-19)
+
 Purpose: replace a warning-only failure mode with an explicit, opt-in construction.
 
 Tasks:
@@ -1064,6 +1066,22 @@ Acceptance criteria:
 - Straight and gently curved columns wider than the threshold split into safe realized chords.
 - Split overlap does not produce systematic density hotspots.
 - Highly pathological columns give a precise warning and remain unsplit.
+
+Implementation note: `satinwide 'warn'|'split'`, `satinmaxwidth` (2–12 mm, default 7.5), and
+`satinsplitoverlap` (0–1 mm, default 0.5) are sticky, `stitchscope`-aware construction settings.
+`warn` remains the byte-identical legacy route. The opt-in branch analyzes completed numeric spine
+and non-reporter rail-pair columns in hoop space after transforms, pull compensation, and cap
+factors. It chooses a constant lane count from the widest rung, partitions every topping row with
+one shared moving boundary per seam, and alternates ownership of the overlap band. This interlock
+avoids both fabric gaps and a stationary doubled topping strip. Each lane resolves and sews its own
+underlay before topping; a deterministic nearest-end route reverses lanes to minimize inter-lane
+jumps.
+
+Open straight, gently curved, transformed, varying-width, tapered, and capped columns use the
+splitter. Closed columns, sharp corners, cusps/U-turns, locally radius-unsafe widths, reversed or
+crossed rails, programmable satin, and reporter-driven rail inset/rake warn precisely and remain
+unsplit. Those cases are intentionally deferred until a topology-preserving partition can be
+proven rather than inferred. The construction is deterministic and consumes no RNG draws.
 
 ## 14. Phase 6: constrained travel planning
 
@@ -1586,7 +1604,8 @@ directional auto compensation waits for sew-out validation.
 3. Should fill edge-run order be underlay → edge → topping or underlay → topping → edge?
 4. How should reporter-supplied fill phase combine with named stagger policies?
 5. Should satin start/end caps be independently configurable in the first public API?
-6. What exact construction is safe for automatic wide-satin splitting on varying-width rail pairs?
+6. Resolved in Session 5.4: use a constant-count hoop-space rung partition with alternating shared
+   seam ownership; refuse closed, sharp, crossed, radius-unsafe, and reporter-defined topology.
 7. Does `atomic` permit internal color changes, or should that require a separate multi-color group?
 8. Which preflight checks are objective enough for `strict` mode?
 9. Which thread widths and material coefficients have sufficient evidence to ship as recommendations?

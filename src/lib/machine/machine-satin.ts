@@ -22,6 +22,8 @@ import {
 import type { AnalyzedColumn, AnalyzedColumnSample } from '../column-analysis.ts';
 import {
   SATIN_CORNER_LIMITS,
+  satinSplitCount,
+  satinSplitSeamFraction,
   satinCapUnderlayInset,
   satinCapWidthFactor,
 } from '../satin-profile.ts';
@@ -42,6 +44,19 @@ interface SatinToppingPoint {
   side: number;
   arc: number;
   widthMM: number;
+}
+
+interface WideSatinSection {
+  readonly arc: number;
+  readonly a: Pt;
+  readonly b: Pt;
+}
+
+interface WideSatinLaneSample {
+  readonly arc: number;
+  readonly a: Pt;
+  readonly b: Pt;
+  readonly mid: Pt;
 }
 
 export class SatinMachine extends MachineCore {
@@ -623,6 +638,316 @@ export class SatinMachine extends MachineCore {
     }
   }
 
+  _wideSplitWarning(label: string, reason: string) {
+    const lineSuffix = this.currentLine === undefined ? '' : ` (line ${this.currentLine})`;
+    this.warnings.push(
+      `${label}: wide-column split refused because ${reason}; the original column remains unsplit${lineSuffix}`,
+    );
+  }
+
+  _segmentsCross(a: Pt, b: Pt, c: Pt, d: Pt): boolean {
+    const cross = (p: Pt, q: Pt, r: Pt) =>
+      (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+    return cross(a, b, c) * cross(a, b, d) < -1e-9 && cross(c, d, a) * cross(c, d, b) < -1e-9;
+  }
+
+  _wideSplitTopologyIssue(sections: readonly WideSatinSection[]): string | null {
+    for (let index = 1; index < sections.length; index++) {
+      const previous = sections[index - 1];
+      const current = sections[index];
+      const previousRung: Pt = [previous.b[0] - previous.a[0], previous.b[1] - previous.a[1]];
+      const currentRung: Pt = [current.b[0] - current.a[0], current.b[1] - current.a[1]];
+      const previousWidth = Math.hypot(previousRung[0], previousRung[1]);
+      const currentWidth = Math.hypot(currentRung[0], currentRung[1]);
+      if (
+        previousWidth > 0.05 &&
+        currentWidth > 0.05 &&
+        previousRung[0] * currentRung[0] + previousRung[1] * currentRung[1] <= 0
+      )
+        return `the rail orientation reverses near (${current.a[0].toFixed(1)}, ${current.a[1].toFixed(1)})`;
+      if (
+        this._segmentsCross(previous.a, current.a, previous.b, current.b) ||
+        this._segmentsCross(previous.a, previous.b, current.a, current.b)
+      )
+        return `the rails cross near (${current.a[0].toFixed(1)}, ${current.a[1].toFixed(1)})`;
+    }
+    return null;
+  }
+
+  _wideSectionAtArc(sections: readonly WideSatinSection[], arc: number): WideSatinSection {
+    const target = Math.min(Math.max(arc, 0), sections[sections.length - 1].arc);
+    let index = 1;
+    while (index < sections.length - 1 && sections[index].arc < target) index++;
+    const previous = sections[index - 1];
+    const current = sections[index];
+    const span = current.arc - previous.arc;
+    const factor = span > 1e-9 ? (target - previous.arc) / span : 0;
+    return {
+      arc: target,
+      a: [
+        previous.a[0] + (current.a[0] - previous.a[0]) * factor,
+        previous.a[1] + (current.a[1] - previous.a[1]) * factor,
+      ],
+      b: [
+        previous.b[0] + (current.b[0] - previous.b[0]) * factor,
+        previous.b[1] + (current.b[1] - previous.b[1]) * factor,
+      ],
+    };
+  }
+
+  _spineWideSections(
+    centers: readonly Pt[],
+    widths: readonly number[],
+    directions?: readonly Pt[],
+  ): WideSatinSection[] {
+    const sections: WideSatinSection[] = [];
+    let arc = 0;
+    for (let index = 0; index < centers.length; index++) {
+      if (index > 0)
+        arc += Math.hypot(
+          centers[index][0] - centers[index - 1][0],
+          centers[index][1] - centers[index - 1][1],
+        );
+      const previous = centers[Math.max(0, index - 1)];
+      const next = centers[Math.min(centers.length - 1, index + 1)];
+      const dx = next[0] - previous[0];
+      const dy = next[1] - previous[1];
+      const length = Math.hypot(dx, dy) || 1;
+      const direction = directions?.[index] ?? ([-dy / length, dx / length] as Pt);
+      const half = widths[index] / 2;
+      sections.push({
+        arc,
+        a: [centers[index][0] + direction[0] * half, centers[index][1] + direction[1] * half],
+        b: [centers[index][0] - direction[0] * half, centers[index][1] - direction[1] * half],
+      });
+    }
+    return sections;
+  }
+
+  _capWideSections(
+    source: readonly WideSatinSection[],
+    caps: ResolvedSatinCaps,
+  ): WideSatinSection[] {
+    const length = source[source.length - 1].arc;
+    const steps = Math.max(1, Math.ceil(length / 0.5));
+    const out: WideSatinSection[] = [];
+    for (let index = 0; index <= steps; index++) {
+      const arc = (length * index) / steps;
+      const section = this._wideSectionAtArc(source, arc);
+      const mid: Pt = [(section.a[0] + section.b[0]) / 2, (section.a[1] + section.b[1]) / 2];
+      const width = Math.hypot(section.b[0] - section.a[0], section.b[1] - section.a[1]);
+      const factor = this._satinCapFactor(caps, arc, length, width);
+      out.push({
+        arc,
+        a: [mid[0] + (section.a[0] - mid[0]) * factor, mid[1] + (section.a[1] - mid[1]) * factor],
+        b: [mid[0] + (section.b[0] - mid[0]) * factor, mid[1] + (section.b[1] - mid[1]) * factor],
+      });
+    }
+    return out;
+  }
+
+  _wideBoundaryPoint(
+    section: WideSatinSection,
+    seamIndex: number,
+    columnCount: number,
+    rowIndex: number,
+  ): Pt {
+    if (seamIndex === 0) return [section.a[0], section.a[1]];
+    if (seamIndex === columnCount) return [section.b[0], section.b[1]];
+    const width = Math.hypot(section.b[0] - section.a[0], section.b[1] - section.a[1]);
+    const fraction = satinSplitSeamFraction(
+      seamIndex,
+      columnCount,
+      rowIndex,
+      width,
+      this.satinSplitOverlap,
+    );
+    return [
+      section.a[0] + (section.b[0] - section.a[0]) * fraction,
+      section.a[1] + (section.b[1] - section.a[1]) * fraction,
+    ];
+  }
+
+  _wideLaneUnderlay(samples: readonly WideSatinLaneSample[], maxWidth: number) {
+    const profile = this._resolveSatinUnderlay(maxWidth, 'rail-pair');
+    if (!profile.passes.length || samples.length < 2) return;
+    const forward = samples.map(({ mid }) => ({ x: mid[0], y: mid[1] }));
+    const reverse = forward.slice().reverse();
+    for (const pass of profile.passes) {
+      if (pass.kind === 'center') {
+        this._runAlong(forward, pass.runningStitchLengthMM, true);
+        this._runAlong(reverse, pass.runningStitchLengthMM, true);
+        continue;
+      }
+      if (pass.kind === 'edge') {
+        const edge = (fromA: boolean) =>
+          samples.map((sample) => {
+            const width = Math.hypot(sample.b[0] - sample.a[0], sample.b[1] - sample.a[1]);
+            const inset =
+              pass.inset.unit === 'mm'
+                ? Math.min(pass.inset.value, width / 2)
+                : Math.max(0, width * pass.inset.value);
+            const factor = width > 1e-9 ? inset / width : 0.5;
+            const origin = fromA ? sample.a : sample.b;
+            const target = fromA ? sample.b : sample.a;
+            return {
+              x: origin[0] + (target[0] - origin[0]) * factor,
+              y: origin[1] + (target[1] - origin[1]) * factor,
+            };
+          });
+        this._runAlong(edge(true), pass.runningStitchLengthMM, true);
+        this._runAlong(edge(false).reverse(), pass.runningStitchLengthMM, true);
+        continue;
+      }
+      const laneLength = Math.abs(samples[samples.length - 1].arc - samples[0].arc);
+      const steps = Math.max(1, Math.ceil(laneLength / pass.spacingMM));
+      const zigzag: { x: number; y: number }[] = [];
+      for (let index = 0; index <= steps; index++) {
+        const source = samples[Math.round((index * (samples.length - 1)) / steps)];
+        const edge = index % 2 === 0 ? source.a : source.b;
+        zigzag.push({
+          x: source.mid[0] + (edge[0] - source.mid[0]) * pass.widthRatio,
+          y: source.mid[1] + (edge[1] - source.mid[1]) * pass.widthRatio,
+        });
+      }
+      for (const point of zigzag) {
+        const previous = this.lastEmit;
+        if (previous && Math.hypot(point.x - previous.x, point.y - previous.y) < 0.1) continue;
+        this._push('stitch', point.x, point.y, true);
+      }
+      if (pass.returnRun === 'reverse-center')
+        this._runAlong(reverse, pass.returnRunStitchLengthMM, true);
+    }
+  }
+
+  _emitWideLane(
+    samples: readonly WideSatinLaneSample[],
+    laneIndex: number,
+    columnCount: number,
+    chooseInitialPhase: boolean,
+  ) {
+    const start = samples[0].mid;
+    const previous = this.lastEmit;
+    if (previous && Math.hypot(start[0] - previous.x, start[1] - previous.y) > 0.05)
+      this._push('jump', start[0], start[1]);
+    if (!this.started) {
+      this.started = true;
+      this._push('stitch', start[0], start[1]);
+    }
+    const maxWidth = Math.max(
+      ...samples.map((sample) => Math.hypot(sample.b[0] - sample.a[0], sample.b[1] - sample.a[1])),
+    );
+    this._wideLaneUnderlay(samples, maxWidth);
+    const toppingSteps = samples.length - 1;
+    let side = this.satinSide;
+    if (chooseInitialPhase) {
+      const desiredFinalSide = laneIndex < columnCount / 2 ? -1 : 1;
+      side = toppingSteps % 2 === 0 ? desiredFinalSide : -desiredFinalSide;
+    }
+    for (let index = 1; index < samples.length; index++) {
+      side = -side;
+      const point = side > 0 ? samples[index].a : samples[index].b;
+      this._pushCappedTopping(point[0], point[1]);
+    }
+    this.satinSide = side;
+  }
+
+  _tryEmitWideSplit(
+    sections: readonly WideSatinSection[],
+    analysis: AnalyzedColumn,
+    label: string,
+  ): boolean {
+    if (this.satinWide !== 'split') return false;
+    const maxWidth = Math.max(...analysis.samples.map((sample) => sample.realizedWidthMM));
+    if (maxWidth <= this.satinMaxWidth + 1e-9) return false;
+    if (analysis.closed) {
+      this._wideSplitWarning(label, 'closed columns do not have an unambiguous split seam');
+      return false;
+    }
+    const pathological = analysis.samples.find(
+      (sample) => sample.kind === 'cusp' || sample.kind === 'u-turn',
+    );
+    if (pathological) {
+      this._wideSplitWarning(
+        label,
+        `the spine has a ${pathological.kind} near (${pathological.point[0].toFixed(1)}, ${pathological.point[1].toFixed(1)})`,
+      );
+      return false;
+    }
+    if (analysis.sharpCornerIndices.length) {
+      const corner = analysis.samples[analysis.sharpCornerIndices[0]];
+      this._wideSplitWarning(
+        label,
+        `the spine has a sharp corner near (${corner.point[0].toFixed(1)}, ${corner.point[1].toFixed(1)})`,
+      );
+      return false;
+    }
+    if (analysis.unsafeWidthIndices.length) {
+      const unsafe = analysis.samples[analysis.unsafeWidthIndices[0]];
+      this._wideSplitWarning(
+        label,
+        `its width exceeds the local curve radius near (${unsafe.point[0].toFixed(1)}, ${unsafe.point[1].toFixed(1)})`,
+      );
+      return false;
+    }
+    const topologyIssue = this._wideSplitTopologyIssue(sections);
+    if (topologyIssue) {
+      this._wideSplitWarning(label, topologyIssue);
+      return false;
+    }
+
+    const columnCount = satinSplitCount(maxWidth, this.satinMaxWidth, this.satinSplitOverlap);
+    const length = sections[sections.length - 1].arc;
+    const rows = Math.max(1, Math.ceil(length / this.satinSpacing));
+    const lanes: WideSatinLaneSample[][] = Array.from({ length: columnCount }, () => []);
+    for (let row = 0; row <= rows; row++) {
+      const arc = (length * row) / rows;
+      const section = this._wideSectionAtArc(sections, arc);
+      for (let lane = 0; lane < columnCount; lane++) {
+        const a = this._wideBoundaryPoint(section, lane, columnCount, row);
+        const b = this._wideBoundaryPoint(section, lane + 1, columnCount, row);
+        lanes[lane].push({ arc, a, b, mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] });
+      }
+    }
+
+    const remaining = lanes.map((samples, index) => ({ samples, index }));
+    let emittedLanes = 0;
+    while (remaining.length) {
+      const from = this.lastEmit ?? { x: sections[0].a[0], y: sections[0].a[1] };
+      let bestIndex = 0;
+      let bestReverse = false;
+      let bestDistance = Infinity;
+      for (let index = 0; index < remaining.length; index++) {
+        const lane = remaining[index].samples;
+        for (const reverse of [false, true]) {
+          const start = reverse ? lane[lane.length - 1].mid : lane[0].mid;
+          const distance = Math.hypot(start[0] - from.x, start[1] - from.y);
+          if (
+            distance < bestDistance - 1e-9 ||
+            (Math.abs(distance - bestDistance) <= 1e-9 &&
+              remaining[index].index < remaining[bestIndex].index)
+          ) {
+            bestDistance = distance;
+            bestIndex = index;
+            bestReverse = reverse;
+          }
+        }
+      }
+      const [{ samples, index }] = remaining.splice(bestIndex, 1);
+      this._emitWideLane(
+        bestReverse ? samples.slice().reverse() : samples,
+        index,
+        columnCount,
+        emittedLanes === 0,
+      );
+      emittedLanes++;
+    }
+    this.warnings.push(
+      `note: ${label} split into ${columnCount} interlocking columns at a ${this.satinMaxWidth.toFixed(1)} mm ceiling`,
+    );
+    return true;
+  }
+
   /** Sew an immediate satin column between two authored rails. */
   sewSatinBetween(
     localRailA: readonly Pt[],
@@ -682,6 +1007,41 @@ export class SatinMachine extends MachineCore {
       throw new NeedlescriptError(
         'satinbetween rails coincide everywhere; the column has no width',
         this.currentLine,
+      );
+
+    const rawWideSections = geometry.samples.map((sample, index): WideSatinSection => {
+      const width = this._railWidth(sample);
+      const ux = width > 1e-9 ? (sample.b[0] - sample.a[0]) / width : 0;
+      const uy = width > 1e-9 ? (sample.b[1] - sample.a[1]) / width : 0;
+      return {
+        arc: geometry.cumulative[index],
+        a: [sample.a[0] - (ux * this.pullComp) / 2, sample.a[1] - (uy * this.pullComp) / 2],
+        b: [sample.b[0] + (ux * this.pullComp) / 2, sample.b[1] + (uy * this.pullComp) / 2],
+      };
+    });
+    const wideSections = hasCapPolicy
+      ? this._capWideSections(rawWideSections, caps)
+      : rawWideSections;
+    const wideAnalysis = analyzeRailPairColumn(
+      rawWideSections.map((section) => ({ a: section.a, b: section.b })),
+      { sharpTurnThresholdDeg: this.satinCornerAngle },
+    );
+    if (!reporter && this._tryEmitWideSplit(wideSections, wideAnalysis, 'satinbetween')) {
+      const localEnd =
+        this.satinSide > 0 ? localRailA[localRailA.length - 1] : localRailB[localRailB.length - 1];
+      this.x = localEnd[0];
+      this.y = localEnd[1];
+      return;
+    }
+    if (
+      reporter &&
+      this.satinWide === 'split' &&
+      Math.max(...wideAnalysis.samples.map((sample) => sample.realizedWidthMM)) >
+        this.satinMaxWidth + 1e-9
+    )
+      this._wideSplitWarning(
+        'satinbetween',
+        'reporter-defined insets and rake make the split topology ambiguous',
       );
 
     const topping: {
@@ -1103,6 +1463,15 @@ export class SatinMachine extends MachineCore {
     );
     const caps = this._resolveSatinCaps(analysis.lengthMM, w, w, analysis.closed, 'satin');
     const hasCapPolicy = caps.start !== 'legacy' || caps.end !== 'legacy';
+    const centers = path.map((point) => [point.x, point.y] as Pt);
+    const rawWideSections = this._spineWideSections(
+      centers,
+      path.map(() => w),
+    );
+    const wideSections = hasCapPolicy
+      ? this._capWideSections(rawWideSections, caps)
+      : rawWideSections;
+    if (this._tryEmitWideSplit(wideSections, analysis, 'satin')) return;
     const underlayPath = hasCapPolicy ? this._trimLocalPathForCaps(path, caps) : path;
     const profile = this._resolveSatinUnderlay(w, 'spine');
     this._warnCollapsedEdgeInset(profile, w, 'the satin column');
@@ -1344,6 +1713,23 @@ export class SatinMachine extends MachineCore {
       'transformed satin',
     );
     const hasCapPolicy = caps.start !== 'legacy' || caps.end !== 'legacy';
+    const directions = local.map((point, index) => {
+      const previous = local[Math.max(0, index - 1)];
+      const next = local[Math.min(local.length - 1, index + 1)];
+      const a = index < local.length - 1 ? point : previous;
+      const b = index < local.length - 1 ? next : point;
+      const { ox, oy, scale } = this._perpVec(ctm, a.x, a.y, b.x, b.y);
+      return [ox / scale, oy / scale] as Pt;
+    });
+    const rawWideSections = this._spineWideSections(
+      hoopFull.map((point) => [point.x, point.y] as Pt),
+      realizedWidths,
+      directions,
+    );
+    const wideSections = hasCapPolicy
+      ? this._capWideSections(rawWideSections, caps)
+      : rawWideSections;
+    if (this._tryEmitWideSplit(wideSections, analysis, 'transformed satin')) return;
     const underlayLocal = hasCapPolicy ? this._trimLocalPathForCaps(local, caps) : local;
     const profile = this._resolveSatinUnderlay(w, 'spine');
     this._warnCollapsedEdgeInset(profile, w, 'the transformed satin column');
@@ -1587,6 +1973,16 @@ export class SatinMachine extends MachineCore {
     ).scale;
     const startWidth = maxFullW * startScale + this.pullComp;
     const endWidth = maxFullW * endScale + this.pullComp;
+    const widestProgrammable = Math.max(
+      startWidth,
+      endWidth,
+      ...topping.map((point) => point.realizedWidth),
+    );
+    if (this.satinWide === 'split' && widestProgrammable > this.satinMaxWidth + 1e-9)
+      this._wideSplitWarning(
+        'programmable satin',
+        'reporter-defined width and rake make the split topology ambiguous',
+      );
     const mappedAnalysis = analyzeSpineColumn(capSpine, maxFullW + this.pullComp, {
       sharpTurnThresholdDeg: this.satinCornerAngle,
     });

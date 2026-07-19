@@ -8,10 +8,15 @@ export type SatinCapMode = (typeof SATIN_CAP_MODES)[number];
 export const SATIN_JOIN_MODES = defineModes(['legacy', 'continuous', 'fan', 'miter', 'split']);
 export type SatinJoinMode = (typeof SATIN_JOIN_MODES)[number];
 
+export const SATIN_WIDE_MODES = defineModes(['warn', 'split']);
+export type SatinWideMode = (typeof SATIN_WIDE_MODES)[number];
+
 /** Central physical bounds for satin cap construction controls. */
 export const SATIN_CONSTRUCTION_RANGES = Object.freeze({
   capLengthMM: Object.freeze({ min: 0.4, max: 20, default: 2 }),
   cornerAngleDeg: Object.freeze({ min: 5, max: 175, default: 60 }),
+  maxWidthMM: Object.freeze({ min: 2, max: 12, default: 7.5 }),
+  splitOverlapMM: Object.freeze({ min: 0, max: 1, default: 0.5 }),
 });
 
 /** Fixed physical safeguards used by automatic sharp-corner construction. */
@@ -25,7 +30,38 @@ export const SATIN_CORNER_LIMITS = Object.freeze({
 export const SATIN_CONSTRUCTION_MODE_REGISTRIES = {
   satincap: SATIN_CAP_MODES,
   satinjoin: SATIN_JOIN_MODES,
+  satinwide: SATIN_WIDE_MODES,
 } as const;
+
+/** Number of interlocking subcolumns needed to keep every realized chord under the ceiling. */
+export function satinSplitCount(maxWidthMM: number, ceilingMM: number, overlapMM: number): number {
+  if (![maxWidthMM, ceilingMM, overlapMM].every(Number.isFinite))
+    throw new RangeError('satin split dimensions must be finite');
+  if (maxWidthMM < 0 || ceilingMM <= 0 || overlapMM < 0 || overlapMM >= ceilingMM)
+    throw new RangeError('satin split dimensions are outside their safe range');
+  if (maxWidthMM <= ceilingMM) return 1;
+  return Math.max(2, Math.ceil(maxWidthMM / (ceilingMM - overlapMM)));
+}
+
+/**
+ * Shared seam fraction for two adjacent split columns. The seam alternates which
+ * neighbor owns the configured overlap band, avoiding a fixed double-density strip.
+ */
+export function satinSplitSeamFraction(
+  seamIndex: number,
+  columnCount: number,
+  rowIndex: number,
+  widthMM: number,
+  overlapMM: number,
+): number {
+  const base = seamIndex / columnCount;
+  if (!(widthMM > 0) || overlapMM === 0) return base;
+  const direction = (rowIndex + seamIndex) % 2 === 0 ? -1 : 1;
+  const shifted = base + (direction * overlapMM) / (2 * widthMM);
+  const lower = (seamIndex - 1) / columnCount;
+  const upper = (seamIndex + 1) / columnCount;
+  return Math.min(upper, Math.max(lower, shifted));
+}
 
 export interface SatinCapPolicy {
   /** Start and end remain separate internally so a later surface can expose asymmetric caps. */

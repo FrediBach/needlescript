@@ -281,6 +281,12 @@ and turtle commands:
   (`stitchlen`, `density`, `fillspacing`, `lock`, `bean`, `color`, `trim`, `seed`, …).
   Values are clamped to machine-safe ranges with warnings when clamped.
 
+The satin construction string dispatch also handles `satinwide 'warn'|'split'` through the shared
+registry. `satinmaxwidth` and `satinsplitoverlap` validate against centralized physical ranges
+before flushing a pending column and changing the sticky setting. All three values participate in
+construction and trace snapshots, so `stitchscope` restores them and trace evaluation cannot leak
+them.
+
 Most parameter commands emit a **trace note** via `ctx.traceNote` if used inside a
 `trace` block, where they have no effect on the captured path.
 
@@ -419,7 +425,8 @@ count itself is enforced inside the `Machine`.
 - **`checkDepth(v, line)`** — reject nesting a value past `LIMITS.maxListDepth`.
 
 String-valued construction modes are resolved separately through `mode-registry.ts`.
-`exec-cmd.ts` reads the focused registries from `embroidery-registry.ts`, matches values
+`exec-cmd.ts` reads the focused registries from `embroidery-registry.ts`, `fill-profile.ts`, and
+`satin-profile.ts`, matches values
 case-insensitively while retaining their literal TypeScript union, and uses one standard
 unknown-mode message with choices and did-you-mean text. Travel planning exposes `PLAN_MODES`
 from its strategy registry for the same validation path. These registries are also consumed by
