@@ -1,0 +1,64 @@
+// SATIN CAP AND CORNER SAMPLER
+// Compare four open-column caps (top row) and four sharp joins (bottom row).
+// SEW-OUT ASSUMPTIONS (4x4 hoop): stable woven, one medium tearaway
+// stabilizer, polyester 40 wt, NM 75 embroidery needle, no topping.
+
+hoop '4x4'
+preflight 'warn'
+
+palette ['#315f72', '#d1495b']
+background '#f4efe6'
+fabric 'woven'
+threadprofile 'polyester-40wt'
+needle 75
+stabilizer 'tearaway'
+topping 0
+
+density 0.4
+underlaypasses ['center']
+underlaylen 2.5
+lock 0.7
+
+def goto(x, y) [
+  up setxy x y down
+]
+
+def capbar(x, mode) [
+  goto(x, 23)
+  seth 0
+  stitchscope [
+    satincap mode
+    satincaplen 2.5
+    satin 4
+    fd 20
+    satin 0
+  ]
+  trim
+]
+
+def corner(x, mode) [
+  goto(x - 5, -29)
+  seth 0
+  stitchscope [
+    satinjoin mode
+    satincorner 35
+    satin 4
+    fd 10
+    rt 90
+    fd 10
+    satin 0
+  ]
+  trim
+]
+
+color '#315f72'
+capbar(-30, 'butt')
+capbar(-10, 'taper')
+capbar(10, 'point')
+capbar(30, 'round')
+
+color '#d1495b'
+corner(-30, 'continuous')
+corner(-10, 'fan')
+corner(10, 'miter')
+corner(30, 'split')

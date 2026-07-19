@@ -3,6 +3,9 @@ seed 7
 
 import std.stitchcraft.gradientrows as gradientrows
 
+// SEW-OUT ASSUMPTIONS (4x4 hoop): stable woven, one medium tearaway
+// stabilizer, polyester 40 wt, NM 75 embroidery needle, no topping.
+
 // --- Gradient band ---
 let w = 76       // [40:90] band width (mm)
 let h = 57       // [20:80] band height (mm)
@@ -13,6 +16,10 @@ let wobble = 0   // [0:0.05:0.6] hand-stitch jitter (mm)
 palette ['#1b6ca8', '#e94560']
 background '#f4efe6'
 fabric 'woven'
+threadprofile 'polyester-40wt'
+needle 75
+stabilizer 'tearaway'
+topping 0
 stitchlen 2.5
 
 // `v` runs from 0 to 1 across the row-seeding axis. The helper error-diffuses

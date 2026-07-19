@@ -4,6 +4,9 @@ seed 7
 import std.stitchcraft.gradientrowsn as gradientrowsn
 import std.stitchcraft.serpentinerows as serpentinerows
 
+// SEW-OUT ASSUMPTIONS (4x4 hoop): stable woven, one medium tearaway
+// stabilizer, polyester 40 wt, NM 75 embroidery needle, no topping.
+
 let w = 76       // [40:90] band width (mm)
 let h = 57       // [20:80] band height (mm)
 let pitch = 0.4  // [0.4:0.05:1.4] combined line spacing (mm)
@@ -15,6 +18,10 @@ let inks = ['#1464a0', '#d63f78', '#f2b134']
 palette inks
 background '#f4efe6'
 fabric 'woven'
+threadprofile 'polyester-40wt'
+needle 75
+stabilizer 'tearaway'
+topping 0
 stitchlen 2.5
 
 def sunset(v) [

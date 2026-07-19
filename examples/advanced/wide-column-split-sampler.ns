@@ -1,0 +1,40 @@
+// WIDE-COLUMN SPLIT SAMPLER
+// Four widths demonstrate the explicit interlocking split policy. The notes
+// about splitting are expected; an unsplit column this wide can snag.
+// SEW-OUT ASSUMPTIONS (4x4 hoop): medium canvas, one medium tearaway
+// stabilizer, polyester 40 wt, NM 90 embroidery needle, no topping.
+
+hoop '4x4'
+preflight 'warn'
+
+palette ['#235789', '#f1d302', '#ed1c24', '#7b2cbf']
+background '#f5f0e6'
+fabric 'canvas'
+threadprofile 'polyester-40wt'
+needle 90
+stabilizer 'tearaway'
+topping 0
+
+density 0.45
+underlaypasses ['center', 'edge']
+underlaylen 2.5
+underlayinset 0.8
+satinwide 'split'
+satinmaxwidth 6
+satinsplitoverlap 0.5
+lock 0.7
+
+def splitbar(x, width, ink) [
+  color ink
+  up setxy x -24 down
+  seth 0
+  satin width
+  fd 48
+  satin 0
+  trim
+]
+
+splitbar(-30, 8, '#235789')
+splitbar(-10, 11, '#f1d302')
+splitbar(10, 15, '#ed1c24')
+splitbar(30, 20, '#7b2cbf')

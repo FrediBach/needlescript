@@ -1,16 +1,28 @@
 hoop '4x4'
 
 import std.stitchcraft.knockdown as knockdown
+import std.stitchcraft.fillandborder as fillandborder
+
+// SEW-OUT ASSUMPTIONS (4x4 hoop): medium-loft fleece, one cutaway
+// stabilizer, polyester 40 wt, NM 75 embroidery needle, and
+// water-soluble topping. The knockdown is intentionally sparse; it is a
+// foundation beneath the smaller patch, not a second full-density fill.
 
 let w = 72       // [40:90] foundation width (mm)
 let h = 50       // [24:70] foundation height (mm)
 let angle = 30   // [0:5:175] row angle (degrees)
-let spacing = 3  // [1.5:0.25:5] sparse row spacing (mm)
+let spacing = 4  // [2.5:0.25:5] sparse row spacing (mm)
 
-palette ['#d8c8b8']
+palette ['#d8c8b8', '#2f7d8c', '#f4d35e']
 background '#eee6dc'
 fabric 'fleece'
+threadprofile 'polyester-40wt'
+needle 75
+stabilizer 'cutaway'
+topping 1
 lock 0.6
+density 0.6
+underlay 'off'
 
 let patch = [
   [0 - w / 2, 0 - h / 2],
@@ -21,4 +33,17 @@ let patch = [
 
 color '#d8c8b8'
 knockdown(patch, angle, spacing)
+trim
+
+// A smaller, smoothly sampled oval patch sits over the flattened pile.
+// Avoiding sharp satin corners keeps coverage below the fleece profile limit.
+// fillandborder changes color between its inset fill and 2 mm cover border.
+let badge = []
+for i = 0 to 31 [
+  let a = i * 360 / 32
+  append(badge, [25 * sin(a), 15 * cos(a)])
+]
+
+color '#2f7d8c'
+fillandborder(badge, 90, 1.1, 2)
 trim

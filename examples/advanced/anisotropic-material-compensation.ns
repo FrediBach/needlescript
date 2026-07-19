@@ -1,0 +1,49 @@
+// ANISOTROPIC MATERIAL-COMPENSATION SAMPLER
+// The top row uses legacy scalar widening. The bottom row uses the same
+// authored bars and pull magnitude projected through grain/stretch intent.
+// Compare each vertical, diagonal, and horizontal pair after hoop release.
+// SEW-OUT ASSUMPTIONS (4x4 hoop): two-way stretch knit, one cutaway
+// stabilizer, polyester 40 wt, NM 75 ballpoint embroidery needle, no topping.
+// The 0.6 mm pull value and anisotropy are experimental, not profile defaults.
+
+hoop '4x4'
+preflight 'warn'
+
+palette ['#6a4c93', '#1982c4']
+background '#f4efe6'
+fabric 'stretch'
+fabricgrain 0
+fabricstretch 0.2 0.8
+pullcomp 0.6
+compensation 'directional'
+threadprofile 'polyester-40wt'
+needle 75
+stabilizer 'cutaway'
+topping 0
+
+density 0.4
+underlaypasses ['center']
+underlaylen 2.5
+lock 0.7
+
+def bar(x, y, angle, mode) [
+  up setxy x y down
+  seth angle
+  stitchscope [
+    compensation mode
+    satin 3
+    fd 18
+    satin 0
+  ]
+  trim
+]
+
+color '#6a4c93'
+bar(-28, 18, 0, 'legacy')
+bar(-7, 18, 45, 'legacy')
+bar(20, 18, 90, 'legacy')
+
+color '#1982c4'
+bar(-28, -30, 0, 'directional')
+bar(-7, -30, 45, 'directional')
+bar(20, -30, 90, 'directional')

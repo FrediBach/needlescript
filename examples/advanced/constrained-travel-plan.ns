@@ -1,0 +1,52 @@
+// CONSTRAINED TRAVEL-PLAN SAMPLER
+// The planner may reorder complete diamonds inside each route group, but an
+// atomic diamond cannot be split/reversed and the center barrier cannot be
+// crossed. Enable the console to inspect per-group before/after travel.
+// SEW-OUT ASSUMPTIONS (4x4 hoop): stable woven, one light tearaway
+// stabilizer, polyester 40 wt, NM 75 embroidery needle, no topping.
+
+hoop '4x4'
+preflight 'warn'
+plan 'reversing-nearest'
+
+palette ['#176087', '#d1495b']
+background '#f4efe6'
+fabric 'woven'
+threadprofile 'polyester-40wt'
+needle 75
+stabilizer 'tearaway'
+topping 0
+
+stitchlen 2.5
+lock 0.7
+autotrim 4
+
+def diamond(x, y) [
+  up setxy x y + 4 down
+  seth 135
+  repeat 4 [ fd 5.66 rt 90 ]
+  trim
+]
+
+color '#176087'
+routegroup [
+  atomic [ diamond(-36, 24) ]
+  atomic [ diamond(-12, 32) ]
+  atomic [ diamond(-30, 8) ]
+  atomic [ diamond(-8, 10) ]
+
+  // The two halves are independent planning segments.
+  planbarrier
+
+  atomic [ diamond(36, -24) ]
+  atomic [ diamond(10, -32) ]
+  atomic [ diamond(30, -7) ]
+  atomic [ diamond(8, -10) ]
+]
+
+// A different color remains outside the group and therefore authored last.
+color '#d1495b'
+up setxy -5 0 down
+seth 90
+fd 10
+trim

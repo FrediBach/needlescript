@@ -1804,6 +1804,8 @@ and successful execution through the real interpreter.
 
 ### Session 9.3 — Examples and sew-out suite
 
+Status: complete (2026-07-19)
+
 Add focused advanced examples rather than one kitchen-sink design:
 
 - density-neutral two- and multi-color gradient;
@@ -1817,6 +1819,22 @@ Add focused advanced examples rather than one kitchen-sink design:
 
 Each production example should state recommended fabric/stabilizer/thread assumptions and remain
 within a common hoop preset.
+
+Implementation note: the advanced catalog now has separate 4 × 4 examples for the two- and
+three-color density-neutral gradients, a complete topping-aware fleece patch over sparse knockdown,
+an inset fill with satin border, cap/corner policies, explicitly split wide columns, constrained
+route groups with atomics and a barrier, and legacy-versus-directional anisotropic compensation.
+Every production source declares fabric, thread, needle, stabilizer, and topping intent. A separate
+preflight teaching sampler is visibly labeled not export-ready and deliberately retains an
+unreachable penetration plus advisory issues.
+
+`embroidery-example-sewout-suite-v1.md` records the fixed source matrix, intended physical
+observations, setup protocol, and blank specimen record without presenting software output as
+physical evidence. Its fixture runs all production examples through the real pipeline, pins their
+material metadata and feature-specific behavior, enforces the common 94 × 94 mm sewable field,
+rejects error-severity preflight findings, and smoke-tests DST/PES/EXP output. It separately pins the
+unsafe sampler's `hoop.unreachable` error and keeps it out of the exporter matrix. Physical sew-out
+observations remain pending and no automatic material recommendation was promoted.
 
 ## 18. Testing strategy
 

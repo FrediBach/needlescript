@@ -1,0 +1,41 @@
+// PREFLIGHT ISSUE SAMPLER — INTENTIONALLY NOT EXPORT-READY
+// This is a diagnostic teaching fixture, not a production design. Keep
+// preflight in warn mode so the preview can show every issue at once. Do not
+// send it to a machine: the final target is physically outside the 4x4 hoop.
+
+hoop '4x4'
+preflight 'warn'
+
+palette ['#d1495b']
+background '#f4efe6'
+fabric 'woven'
+threadprofile 'polyester-40wt'
+needle 75
+stabilizer 'tearaway'
+topping 0
+
+lock 0
+autotrim 0
+
+// Cluster of movements below the preferred reliable length.
+stitchlen 0.5
+up setxy -30 25 down
+fd 4.5
+
+// Deliberately wide unsplit satin: snag-risk diagnostic.
+up setxy 8 -12 down
+seth 90
+satinwide 'warn'
+satin 11
+fd 18
+satin 0
+
+// Long untrimmed travel chain.
+up setxy -25 -32 down
+fd 1
+up setxy 25 -32 down
+fd 1
+
+// Hard blocker: this stitch is outside the physical 100 mm hoop.
+up setxy 55 0 down
+fd 1
