@@ -98,9 +98,9 @@ caller's line, when inside a procedure) so previews can highlight the responsibl
 Planner constraints do not extend this public shape. During finalization the travel planner wraps
 each authored event in a private `{ event, tags }` record, performs routing on those records, and
 unwraps them before auto-trim, locks, `RunResult`, or an exporter can observe the stream. Future
-zero-emission barriers and group/atomic spans will be recorded as sparse authored event-boundary
-offsets while the machine stream is append-only, then compiled into wrapper tags at that one
-lowering boundary. See the Session 6.1 decision record in
+group/atomic spans can follow `planbarrier`, which records sparse authored event-boundary offsets
+while the machine stream is append-only; finalization compiles the offsets into wrapper segment tags
+at that one lowering boundary. See the Session 6.1 decision record in
 `embroidery-results-implementation-plan.md`.
 
 ---
@@ -539,7 +539,8 @@ After execution the interpreter runs the machine's `events` through pure passes 
 `postprocess.ts`:
 
 - **`applyTravelPlan`** (`travel-planner.ts`) — partition color blocks into atomic
-  runs and reorder private planner event wrappers through the generic strategy registry. The
+  runs, split them into independent `planbarrier` segments, and reorder private planner event
+  wrappers through the generic strategy registry. The
   `reversing-nearest` strategy also considers both endpoints of eligible stitch-only
   runs. Connector jumps are rebuilt for the chosen entry direction so the later lock
   pass retains its tie-in direction; stitch geometry and explicit trims are retained. The wrappers

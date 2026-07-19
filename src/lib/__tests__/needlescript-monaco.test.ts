@@ -53,6 +53,19 @@ describe('NeedleScript Monaco symbol analysis', () => {
     expect(NS_ITEM_MAP.get('stitchscope')?.insertText).toContain('[\n');
   });
 
+  it('highlights planner directives as stitch commands', () => {
+    let tokenizer: { stitchCmds?: string[] } | undefined;
+    registerNeedlescriptTokenizer({
+      languages: {
+        setMonarchTokensProvider: (_language: string, definition: unknown) => {
+          tokenizer = definition as { stitchCmds?: string[] };
+        },
+      },
+    } as never);
+
+    expect(tokenizer?.stitchCmds).toEqual(expect.arrayContaining(['plan', 'planbarrier']));
+  });
+
   it('extracts modern and classic procedures and variables with source lines', () => {
     const symbols = extractUserSymbols(`let radius = 12
 def petal(size, angle) [

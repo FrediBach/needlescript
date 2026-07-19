@@ -143,6 +143,8 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'fillunderlayangle',
       'hoop', // hoop directive (§hoop)
       'override', // override directive (§override)
+      'plan',
+      'planbarrier',
     ],
 
     // ── Debug / neutral / data-world auxiliaries (amber) ────────────

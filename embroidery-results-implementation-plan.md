@@ -1137,6 +1137,8 @@ only after final route and auto-trim boundaries are known.
 
 ### Session 6.2 — `planbarrier`
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Add a zero-emission command that increments the active planner segment.
@@ -1149,6 +1151,24 @@ Acceptance criteria:
 - Runs never cross a barrier.
 - Barriers do not alter unplanned event output.
 - Consecutive/empty barriers are harmless.
+
+Implementation note: `planbarrier` is a zero-arity Core command and emits no public event. When an
+active plan mode is selected, it first flushes pending satin or reporter-driven running construction
+so the authored boundary is exact, then appends the current event offset to the sparse planner
+sidecar chosen in Session 6.1. Finalization compiles those offsets into monotonically increasing
+wrapper segment tags. Each color block is planned as one or more independent segments; explicit
+trim/autotrim run boundaries continue to be resolved inside each segment. Segment-local planning
+retains deterministic anchoring and routing, and plan statistics still count color blocks rather
+than multiplying colors by their barrier segments.
+
+With no `plan` directive or with `plan 'off'`, `planbarrier` returns before any flush or metadata
+write during normal sewing execution, making both events and buffered construction byte-identical to
+a program without the command. Barriers may execute through ordinary branches, loops, and
+procedures. They are always rejected inside `trace`, where sandboxed geometry has no place in the
+final authored stream. With planning active they are also rejected inside an open
+`beginfill…endfill`, whose boundary geometry is buffered and emitted as one construction only at
+`endfill`. Consecutive offsets, a barrier before the first event, and a barrier after the last event
+produce empty segments and have no effect. The command is drawless.
 
 ### Session 6.3 — `atomic` blocks
 

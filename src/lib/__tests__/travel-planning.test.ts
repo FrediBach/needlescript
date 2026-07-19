@@ -291,3 +291,112 @@ describe('plan directive', () => {
     expect(() => run("let p = trace [ plan 'nearest' ]")).toThrow(/program directive/i);
   });
 });
+
+describe('planbarrier', () => {
+  const stitchXs = (source: string) =>
+    run(source)
+      .events.filter((event) => event.t === 'stitch')
+      .map((event) => event.x);
+
+  const barrierFixture = (barriers: string) => `
+    plan 'nearest'
+    lock 0
+    autotrim 0
+    stitchlen 12
+    down fd 1 trim
+    up setxy 20 0 down fd 1 trim
+    ${barriers}
+    up setxy 5 0 down fd 1
+  `;
+
+  it('never routes a later segment across an authored barrier', () => {
+    expect(stitchXs(barrierFixture(''))).toEqual([0, 0, 5, 20]);
+    const result = run(barrierFixture('planbarrier'));
+    expect(result.events.filter((event) => event.t === 'stitch').map((event) => event.x)).toEqual([
+      0, 0, 20, 5,
+    ]);
+    expect(result.plan).toMatchObject({ runs: 3, colors: 1 });
+  });
+
+  it('plans independently within each barrier segment', () => {
+    expect(
+      stitchXs(`
+        plan 'nearest' lock 0 autotrim 0 stitchlen 12
+        down fd 1 trim
+        up setxy 20 0 down fd 1 trim
+        up setxy 5 0 down fd 1 trim
+        planbarrier
+        up setxy 100 0 down fd 1 trim
+        up setxy 120 0 down fd 1 trim
+        up setxy 105 0 down fd 1
+      `),
+    ).toEqual([0, 0, 5, 20, 100, 105, 120]);
+  });
+
+  it('records barriers reached through ordinary control flow and procedures', () => {
+    const direct = run(barrierFixture('planbarrier'));
+    const indirect = run(`
+      plan 'nearest'
+      def fence() [ if true [ planbarrier ] ]
+      lock 0 autotrim 0 stitchlen 12
+      down fd 1 trim
+      up setxy 20 0 down fd 1 trim
+      fence()
+      up setxy 5 0 down fd 1
+    `);
+    const withoutLines = (events: StitchEvent[]) =>
+      events.map(({ t, x, y, c, u, label }) => ({ t, x, y, c, u, label }));
+    expect(withoutLines(indirect.events)).toEqual(withoutLines(direct.events));
+    expect(indirect.plan).toEqual(direct.plan);
+  });
+
+  it('treats consecutive and empty beginning/end barriers as harmless', () => {
+    const fixture = (start: string, middle: string, end: string) => `
+      plan 'nearest'
+      ${start}
+      lock 0 autotrim 0 stitchlen 12
+      down fd 1 trim
+      up setxy 20 0 down fd 1 trim
+      ${middle}
+      up setxy 5 0 down fd 1
+      ${end}
+    `;
+    const single = run(fixture('planbarrier', 'planbarrier', 'planbarrier'));
+    const consecutive = run(
+      fixture(
+        'planbarrier planbarrier',
+        'planbarrier planbarrier planbarrier',
+        'planbarrier planbarrier',
+      ),
+    );
+    expect(consecutive.events).toEqual(single.events);
+    expect(consecutive.plan).toEqual(single.plan);
+  });
+
+  it('is byte-identical and does not flush buffered construction when planning is off', () => {
+    const plain = "lock 0 autotrim 0 underlay 'off' density 1 satin 4 fd 3 fd 3 satin 0";
+    const barrier =
+      "lock 0 autotrim 0 underlay 'off' density 1 satin 4 fd 3 planbarrier fd 3 satin 0";
+    expect(run(barrier).events).toEqual(run(plain).events);
+    expect(run(`plan 'off' ${barrier}`).events).toEqual(run(plain).events);
+
+    const plainFill =
+      "lock 0 autotrim 0 fillunderlay 'off' fillspacing 2 beginfill repeat 4 [ fd 8 rt 90 ] endfill";
+    const barrierFill =
+      "lock 0 autotrim 0 fillunderlay 'off' fillspacing 2 beginfill fd 8 planbarrier rt 90 repeat 3 [ fd 8 rt 90 ] endfill";
+    expect(run(barrierFill).events).toEqual(run(plainFill).events);
+    expect(run(`plan 'off' ${barrierFill}`).events).toEqual(run(plainFill).events);
+  });
+
+  it('rejects barriers in trace and inside an active fill recording', () => {
+    expect(() => run('let p = trace [ planbarrier fd 1 ]')).toThrow(
+      /planbarrier is not allowed inside trace/i,
+    );
+    expect(() => run("plan 'nearest' let p = trace [ planbarrier fd 1 ]")).toThrow(
+      /planbarrier is not allowed inside trace/i,
+    );
+    expect(() => run("plan 'nearest' beginfill fd 5 planbarrier rt 90 fd 5 endfill")).toThrow(
+      /cannot split a beginfill/i,
+    );
+  });
+});

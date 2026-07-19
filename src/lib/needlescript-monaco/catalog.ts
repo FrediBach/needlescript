@@ -1029,6 +1029,15 @@ export const NS_ITEMS: NSItem[] = [
     params: [['mode']],
   },
   {
+    label: 'planbarrier',
+    kindName: 'function',
+    detail: 'prevent travel planning across this authored boundary',
+    documentation:
+      "Start a new independent travel-planner segment at this point in the authored stitch stream. Planning may reorder runs on either side, but never moves a run across the barrier. `planbarrier` emits no stitch, jump, trim, color, or mark. During normal sewing execution it is completely inert when planning is absent or `plan 'off'`, including leaving buffered construction untouched. Consecutive barriers and barriers before/after all sewing are harmless. It may appear in normal control flow and procedures. It is always rejected inside `trace`; with planning active it is also rejected inside an open `beginfill…endfill` recording.",
+    insertText: 'planbarrier',
+    params: [[]],
+  },
+  {
     label: 'fabric',
     kindName: 'function',
     detail: 'fabric preset',

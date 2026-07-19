@@ -116,6 +116,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
   hoop: 1,
   override: 2,
   plan: 1,
+  planbarrier: 0,
 };
 
 /**

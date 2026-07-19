@@ -970,6 +970,21 @@ After execution, planning partitions every color block into atomic thread runs a
 
 Planning can change which overlapping same-color run lies on top. History queries still see program order because they execute before this final pass; density is unchanged. If a history query ran and planning materially reordered the design, the plan diagnostic states this authored-order/final-order mismatch. Active planning prints before/after travel and autotrim counts and exposes `planMode`, `travelBeforeMm`, and `travelAfterMm` through result statistics.
 
+#### `planbarrier`
+
+`planbarrier` starts a new independent planner segment at its authored position. Runs may reorder
+within either segment but never cross the barrier. The command has no arguments and emits no event;
+consecutive barriers and barriers before or after all sewing are harmless. It is drawless and may
+execute in ordinary branches, loops, or procedures.
+
+During normal sewing execution, when planning is absent or set to `off`, `planbarrier` is a
+byte-identical no-op and does not even flush buffered satin or reporter-driven running construction.
+With planning active, pending construction is flushed before recording the boundary. A barrier is
+always rejected inside `trace`, since trace output is sandboxed data rather than authored sewing.
+With planning active it is also rejected inside an open `beginfill…endfill`, because the complete
+buffered fill is committed only at `endfill`. Put the barrier before `beginfill` or after `endfill`
+instead.
+
 ### 16.3 Custom fill-path helpers
 
 These Library-tier functions are pure and call-syntax only. Region arguments accept one ring or a list of rings under the even-odd rule.

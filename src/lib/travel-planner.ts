@@ -236,40 +236,68 @@ function planBlock(
   return out;
 }
 
+/**
+ * Plan a completed public event stream. Barrier offsets address gaps in the
+ * authored stream: 0 is before the first event and `events.length` is after
+ * the last. They are compiled into private segment tags before routing.
+ */
 export function applyTravelPlan(
   events: StitchEvent[],
   mode: PlanMode,
   autoTrim: number,
   examine?: (count: number) => void,
+  barrierOffsets: readonly number[] = [],
 ): TravelPlanResult {
   const strategy = PLAN_STRATEGIES[mode];
-  const records: PlannerEventRecord[] = events.map((event) => ({
-    event,
-    tags: { segment: 0 },
-  }));
+  const barriers = barrierOffsets
+    .filter((offset) => Number.isInteger(offset) && offset >= 0 && offset <= events.length)
+    .toSorted((a, b) => a - b);
+  let barrierIndex = 0;
+  let plannerSegment = 0;
+  const records: PlannerEventRecord[] = events.map((event, eventIndex) => {
+    while (barriers[barrierIndex] <= eventIndex) {
+      plannerSegment++;
+      barrierIndex++;
+    }
+    return { event, tags: { segment: plannerSegment } };
+  });
   const output: PlannerEventRecord[] = [];
   let segment: PlannerEventRecord[] = [];
   let runs = 0;
   let colors = 0;
+  let colorHasRuns = false;
+  let activePlannerSegment: number | undefined;
 
-  const flush = () => {
+  const flushPlannerSegment = () => {
     const block = splitColorBlock(segment, autoTrim);
     runs += block.runs.length;
-    if (block.runs.length > 0) colors++;
+    if (block.runs.length > 0) colorHasRuns = true;
     output.push(...planBlock(block, strategy, examine));
     segment = [];
+  };
+
+  const finishColor = () => {
+    flushPlannerSegment();
+    if (colorHasRuns) colors++;
+    colorHasRuns = false;
+    activePlannerSegment = undefined;
   };
 
   for (const record of records) {
     const { event } = record;
     if (event.t === 'color') {
-      flush();
+      finishColor();
       output.push(record);
     } else {
+      if (activePlannerSegment === undefined) activePlannerSegment = record.tags.segment;
+      else if (record.tags.segment !== activePlannerSegment) {
+        flushPlannerSegment();
+        activePlannerSegment = record.tags.segment;
+      }
       segment.push(record);
     }
   }
-  flush();
+  finishColor();
 
   const outputEvents = output.map(({ event }) => event);
   const authoredStitches = records.filter(({ event }) => event.t === 'stitch');

@@ -37,6 +37,8 @@ export interface RunContext {
   structuralDepth: number;
   planMode: PlanMode | 'off' | null;
   planLine?: number;
+  /** Sparse authored event offsets at which a new planner segment begins. */
+  planBarrierOffsets: number[];
   palette: ColorTableEntry[];
   paletteSetLine?: number;
   background: string;

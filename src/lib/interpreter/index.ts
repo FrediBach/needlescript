@@ -76,6 +76,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     structuralDepth: 0,
     planMode: null,
     planLine: undefined,
+    planBarrierOffsets: [] as number[],
     palette: [] as ColorTableEntry[],
     paletteSetLine: undefined,
     background: DEFAULT_BACKGROUND,
@@ -161,8 +162,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   let planStats: TravelPlanStats | undefined;
   if (ctx.planMode && ctx.planMode !== 'off') {
     const beforeAutotrims = m.autoTrim > 0 ? applyAutoTrim(m.events, m.autoTrim).trims : 0;
-    const planned = applyTravelPlan(m.events, ctx.planMode, m.autoTrim, (n) =>
-      ctx.tickN(n, ctx.planLine),
+    const planned = applyTravelPlan(
+      m.events,
+      ctx.planMode,
+      m.autoTrim,
+      (n) => ctx.tickN(n, ctx.planLine),
+      ctx.planBarrierOffsets,
     );
     const afterAutotrims = m.autoTrim > 0 ? applyAutoTrim(planned.events, m.autoTrim).trims : 0;
     m.events = planned.events;

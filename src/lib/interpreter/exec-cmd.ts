@@ -538,6 +538,25 @@ export function initExecCmdHandler(
       ctx.planLine = st.line;
       return;
     }
+    // ---------- planbarrier — start a new authored planner segment ----------
+    if (st.name === 'planbarrier') {
+      if (ctx.insideTrace > 0)
+        throw new NeedlescriptError(
+          'planbarrier is not allowed inside trace — place the barrier in the sewing program',
+          st.line,
+        );
+      // A disabled or absent planner must be a true construction no-op. In
+      // particular, do not flush buffered satin/reporter-running output.
+      if (ctx.planMode === null || ctx.planMode === 'off') return;
+      if (ctx.m.recording)
+        throw new NeedlescriptError(
+          'planbarrier cannot split a beginfill…endfill recording — place it before beginfill or after endfill',
+          st.line,
+        );
+      ctx.m.flushSatin();
+      ctx.planBarrierOffsets.push(ctx.m.events.length);
+      return;
+    }
     // ---------- hoop — configure the sewable field (§hoop) ----------
     if (st.name === 'hoop') {
       const directiveGuard = (cmdName: string) => {
