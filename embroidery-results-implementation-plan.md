@@ -676,6 +676,8 @@ profile, and construction snapshots copy and restore it.
 
 ### Session 3.4 — Optional programmable underlay spike
 
+Status: complete (2026-07-19, design spike only)
+
 Investigate, but do not commit automatically, a future form such as:
 
 ```needlescript
@@ -693,6 +695,61 @@ Answer:
 
 End the session with either a small implementation specification or a documented rejection. This
 spike is not a dependency for later phases.
+
+#### Spike decision: defer the public commands
+
+Do not add `underlay paths` or `fillunderlay paths` in Phase 3. The fill form is technically
+straightforward, but the satin form does not yet have a single safe geometry contract shared by
+buffered fixed-width satin, `satin @fn`, and `satinbetween`. Shipping only the fill half would imply
+parity that the language cannot currently honor. This is a scoped deferral, not a rejection of
+programmable underlay as a concept, and it does not block Phase 4.
+
+The missing prerequisite is an internal realized-column abstraction containing a physical spine,
+paired physical rails, a closed clip envelope, representative/max width, and open/closed seam
+metadata after transforms, warp, reporter shaping, and pull compensation. Today each satin
+generator owns a different subset of that data. Without the abstraction, the engine would either
+expose inconsistent inputs or accept paths that can escape/cross a column without a reliable clip.
+
+#### Candidate contract after the prerequisite exists
+
+- `underlay paths @generator` would be sticky like other satin-underlay settings. The reporter
+  signature would be `generator(spine, rails, width) -> paths`: `spine` is one path, `rails` is
+  `[leftRail, rightRail]`, and `width` is the maximum realized full width in physical millimetres.
+  Inputs and returned paths would all be final hoop-space coordinates because the geometry has
+  already passed through affine transforms, nonlinear warp, shaping, and pull compensation.
+- `fillunderlay paths @generator` would be sticky like `fillunderlay`. Its reporter signature would
+  be `generator(region) -> paths`, using the same fill-local compound even-odd region and returned
+  local-path frame as existing `fill paths`. The machine would map only after validation and
+  clipping, preserving the established fill reporter model under transforms.
+- Both forms would replace the ordered built-in pass list rather than become another pass kind.
+  `underlaylen`/`fillunderlaylen` would remain the physical subdivision length. Inset, spacing, and
+  angle settings have no generic meaning for arbitrary returned paths and would be ignored with a
+  one-time note while the path generator is active. `underlay 'mode'`, `fillunderlay 'mode'`, their
+  `*passes` commands, and `fabric` would disengage the relevant generator. `stitchscope` would retain
+  reporter identity in its construction snapshot.
+
+#### Validation, clipping, sandbox, and metadata ownership
+
+- The interpreter would own engage-site arity checking, reporter invocation, finite nested
+  path-list validation, value/allocation budgets, and source-attributed contract errors.
+- The machine would own geometry-input/clip budgets, clipping, physical subdivision, connector
+  classification, stitch ceilings, density/history accounting, and final event order. Returned
+  paths would never be trusted as already safe. Fill paths would clip to the recorded even-odd
+  region. Satin paths would clip to the future realized column envelope. Separate paths and clipped
+  fragments would connect by jumps unless a later containment-aware connector policy proves the
+  whole segment safe.
+- Reporter execution would reuse the current custom-fill-generator sandbox: snapshot and restore
+  all machine state, set `noEmit`, discard machine commands with one note, ignore `seed`, allow
+  deliberate draws from the existing RNG stream, and restore even when validation or user code
+  throws. This avoids a second, subtly different reporter-side-effect model.
+- Reporters would return coordinates only—never event objects or metadata. The machine would emit
+  every resulting penetration through the underlay path with `u: 1`, including any generated
+  subdivision, while keeping connector jumps classified as underlay travel. User code could not
+  clear or forge the flag.
+
+Revisit the commands only after the realized satin-column geometry is shared by all three satin
+engines and characterized with affine/warp, crossing-rail, open/closed, clipping, sandbox, RNG, and
+`u: 1` tests. No parser, runtime, registry, Monaco, or public-API changes are made by this spike.
 
 ## 12. Phase 4: fill boundary and connector quality
 
