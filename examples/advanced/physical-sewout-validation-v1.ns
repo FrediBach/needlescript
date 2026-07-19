@@ -1,0 +1,145 @@
+// PHYSICAL SEW-OUT VALIDATION — VERSION 1
+// Reproduce this source without geometry edits. Change only the five setup
+// values below for each specimen listed in physical-sewout-validation-v1.md.
+
+hoop [130, 180]
+seed 7601
+
+let sheet_fabric = 'woven'
+let sheet_thread = 'polyester-40wt'
+let sheet_needle = 75
+let sheet_stabilizer = 'tearaway'
+let sheet_topping = 0
+
+palette ['#174a6e', '#2f8f83', '#d1495b']
+background '#f4efe6'
+
+fabric sheet_fabric
+fabricgrain 0
+fabricstretch 0 0
+threadprofile sheet_thread
+needle sheet_needle
+stabilizer sheet_stabilizer
+topping sheet_topping
+
+compensation 'directional'
+density 0.4
+stitchlen 2.5
+fillspacing 0.55
+filllen 2.5
+fillinset 0.4
+lock 0.8
+maxdensity 0
+
+print 'physical-sewout-validation-v1'
+
+def goto(x, y) [
+  up
+  setxy(x, y)
+  down
+]
+
+// The start and end are the intended centerline endpoints. Width is the
+// authored satin width before compensation and material deformation.
+def satinbar(id, x, y, heading, width, len) [
+  print id
+  goto(x, y)
+  seth heading
+  up bk len / 2 down
+  satin width
+  fd len
+  satin 0
+  trim
+]
+
+def lcolumn(id, x, y, width, leg) [
+  print id
+  goto(x - leg / 2, y - leg / 2)
+  seth 0
+  satin width
+  fd leg
+  rt 90
+  fd leg
+  satin 0
+  trim
+]
+
+// Kept separate from lcolumn so the two 90-degree corners remain one buffered
+// satin construction and expose accumulated push/pull at both turns.
+def zigcolumn(id, x, y, width, leg) [
+  print id
+  goto(x - leg / 2, y - leg)
+  seth 0
+  satin width
+  fd leg
+  rt 90
+  fd leg
+  lt 90
+  fd leg
+  satin 0
+  trim
+]
+
+def fillblock(id, x, y, size, angle) [
+  print id
+  fillangle angle
+  goto(x - size / 2, y - size / 2)
+  seth 0
+  beginfill
+    repeat 2 [ fd size rt 90 fd size rt 90 ]
+  endfill
+  trim
+]
+
+def registration(id, x, y, size, angle) [
+  print id
+
+  // Reserve exactly half the 2.4 mm border beneath the fill. Any visible gap
+  // after hoop release is therefore a physical registration observation.
+  color '#2f8f83'
+  fillinset 1.2
+  fillangle angle
+  goto(x - size / 2, y - size / 2)
+  seth 0
+  beginfill
+    repeat 2 [ fd size rt 90 fd size rt 90 ]
+  endfill
+  trim
+  fillinset 0.4
+
+  color '#d1495b'
+  goto(x - size / 2, y - size / 2)
+  seth 0
+  satin 2.4
+  repeat 2 [ fd size rt 90 fd size rt 90 ]
+  satin 0
+  trim
+]
+
+// S01-S09: 20 mm straight satin, three headings and three widths.
+color '#174a6e'
+satinbar('S01', -40, 70, 90, 1.5, 20)
+satinbar('S02', 0, 70, 90, 3, 20)
+satinbar('S03', 40, 70, 90, 6, 20)
+satinbar('S04', -40, 47, 0, 1.5, 20)
+satinbar('S05', 0, 47, 0, 3, 20)
+satinbar('S06', 40, 47, 0, 6, 20)
+satinbar('S07', -40, 24, 45, 1.5, 20)
+satinbar('S08', 0, 24, 45, 3, 20)
+satinbar('S09', 40, 24, 45, 6, 20)
+
+// C01-C03: corner response at two widths and with one/two 90-degree turns.
+lcolumn('C01', -40, 0, 3, 18)
+lcolumn('C02', 0, 0, 6, 18)
+zigcolumn('C03', 40, 0, 3, 12)
+
+// F01-F04: 18 mm square fill boundaries at the four required row angles.
+color '#2f8f83'
+fillblock('F01', -45, -30, 18, 0)
+fillblock('F02', -15, -30, 18, 45)
+fillblock('F03', 15, -30, 18, 90)
+fillblock('F04', 45, -30, 18, 135)
+
+// R01-R02: 24 mm authored boundaries with a 2.4 mm satin border.
+registration('R01', -25, -66, 24, 0)
+registration('R02', 25, -66, 24, 45)

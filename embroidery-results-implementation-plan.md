@@ -1466,6 +1466,8 @@ closed-contour stability, hole/boundary warnings, inset reservation, and legacy 
 
 ### Session 7.6 — Physical sew-out validation
 
+Status: in progress (2026-07-19; v1 sheet and protocol complete, physical measurements pending)
+
 Create a versioned test sheet covering:
 
 - horizontal/vertical/diagonal satin at several widths;
@@ -1480,6 +1482,19 @@ needle, machine, speed, and observations. Store measurements in a human-readable
 document, not as undocumented constants in code.
 
 Only promote profile recommendations to `auto` after this evidence exists.
+
+Implementation note: `examples/advanced/physical-sewout-validation-v1.ns` is the immutable v1
+geometry sheet. It contains target IDs for three satin headings at 1.5/3/6 mm, one- and two-corner
+columns, four fill-row headings, and two fill-plus-border registration targets. Its editable setup
+header records fabric, thread profile, needle, stabilizer, and topping intent while the geometry,
+grain orientation, neutral declared stretch, and directional compensation mode remain fixed.
+
+`physical-sewout-validation-v1.md` defines the target map, intended dimensions, minimum material and
+thread/needle matrix, post-hoop-release protocol, per-specimen machine/speed/setup record, blank
+measurement tables, and the evidence review gate. The blanks are explicitly pending rather than
+fabricated data. A fixture test pins the sheet's target order, default metadata, compensation modes,
+and 130 × 180 mm hoop containment. No profile recommendation was promoted: directional fabric defaults
+remain neutral and push remains zero until completed physical records are committed.
 
 ## 16. Phase 8: preflight and machine calibration
 
