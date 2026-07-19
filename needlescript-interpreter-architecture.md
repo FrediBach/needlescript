@@ -250,6 +250,14 @@ pending satin column under its old settings and replaces the immutable customiza
 record is copied by construction and trace snapshots; `underlay` and `fabric` clear it to restore a
 complete legacy/preset profile.
 
+`fillunderlaypasses` applies the same validation model to up to 16 case-insensitive `edge`/`tatami`
+names; duplicates and an empty list are meaningful. `fillunderlaylen`, `fillunderlayinset`, and
+`fillunderlayspacing` reject values outside the centralized physical ranges, while
+`fillunderlayangle` accepts any finite relative degree value. The commands replace an immutable
+`FillUnderlayCustomization` without causing fill emission; `endfill` resolves it after the physical
+compound region is known. `fillunderlay` and `fabric` clear the record. Construction and trace
+snapshots clone the pass list, so `stitchscope` and trace restoration retain value semantics.
+
 ### 5.1 The command dispatcher (`exec-cmd.ts`)
 
 `initExecCmdHandler` (`exec-cmd.ts:23`) returns the `execCmd` closure used by the

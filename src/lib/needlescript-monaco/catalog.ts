@@ -2,7 +2,7 @@
 
 import { FABRIC_MODES, FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery-registry.ts';
 import { PLAN_MODES } from '../travel-planner.ts';
-import { SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
+import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
 
 export type NSItemKind = 'keyword' | 'function' | 'variable' | 'constant';
 
@@ -964,6 +964,56 @@ export const NS_ITEMS: NSItem[] = [
     insertText: modeCommandSnippet('fillunderlay', FILL_UNDERLAY_MODES, '"'),
     isSnippet: true,
     params: [['mode']],
+  },
+  {
+    label: 'fillunderlaypasses',
+    kindName: 'function',
+    detail: 'ordered fill underlay passes',
+    documentation:
+      "Set the exact ordered passes generated from each recorded fill region. Accepted pass names are `'edge'` and `'tatami'`; duplicates repeat and an empty list disables underlay. Explicit order supersedes `fillunderlay 'auto'` and fabric doubling. Custom path fills still generate these passes from the recorded compound region, not from returned decorative paths.\n\n```\nfillunderlaypasses ['edge', 'tatami']\nfillunderlaylen 3\nfillunderlayinset 0.8\nfillunderlayspacing 2.2\nfillunderlayangle 90\n```",
+    insertText: `fillunderlaypasses ['\${1|${FILL_UNDERLAY_PASS_KINDS.join(',')}|}']`,
+    isSnippet: true,
+    params: [['passes']],
+  },
+  {
+    label: 'fillunderlaylen',
+    kindName: 'function',
+    detail: 'fill underlay stitch length (mm)',
+    documentation:
+      'Set edge-walk and tatami-underlay stitch length in physical hoop millimetres. Range 1–7 mm. It tunes the selected legacy passes unless `fillunderlaypasses` supplies an explicit order.',
+    insertText: 'fillunderlaylen ${1:3}',
+    isSnippet: true,
+    params: [['mm']],
+  },
+  {
+    label: 'fillunderlayinset',
+    kindName: 'function',
+    detail: 'fill underlay inset (mm)',
+    documentation:
+      'Set the inward physical inset for edge and tatami fill-underlay passes. Range 0–10 mm. Custom edge passes use a compound even-odd inset, preserving holes, concavities, and disconnected components.',
+    insertText: 'fillunderlayinset ${1:0.8}',
+    isSnippet: true,
+    params: [['mm']],
+  },
+  {
+    label: 'fillunderlayspacing',
+    kindName: 'function',
+    detail: 'fill underlay row spacing (mm)',
+    documentation:
+      'Set tatami-underlay row spacing in physical hoop millimetres. Range 0.25–5 mm. Edge passes are unaffected.',
+    insertText: 'fillunderlayspacing ${1:2.2}',
+    isSnippet: true,
+    params: [['mm']],
+  },
+  {
+    label: 'fillunderlayangle',
+    kindName: 'function',
+    detail: 'fill underlay relative angle (degrees)',
+    documentation:
+      'Set the tatami-underlay angle relative to the topping direction. Plain fills use `fillangle + offset`; directional fills rotate the local direction field by the same offset before mapping it to hoop space. Any finite degree value is accepted.',
+    insertText: 'fillunderlayangle ${1:90}',
+    isSnippet: true,
+    params: [['degrees']],
   },
   // Debug commands
   {

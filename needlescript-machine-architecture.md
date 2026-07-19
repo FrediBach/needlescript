@@ -119,7 +119,8 @@ touching the shared constants.
 constructed, and `restoreConstructionConfig(snapshot)` restores only those settings. The typed
 `ConstructionConfigSnapshot` includes running-stitch numeric/list/reporter forms and list progress;
 bean and E-stitch modes; satin width/reporter, spacing, alternating side, and optional custom
-underlay pass/length/inset/spacing overrides; fill angle, spacing,
+underlay pass/length/inset/spacing overrides; fill angle, spacing, fill-underlay
+pass/length/inset/spacing/relative-angle overrides,
 length forms, and an unused one-shot fill arm; and the lock, pull-compensation, underlay,
 short-stitch, auto-trim, and density settings. Current `fabric` presets resolve into these same
 physics fields, so their construction effects are scoped without treating warning notes as state.
@@ -269,6 +270,12 @@ perturbing a precise rail wrecks the column — with a one-time warning.
   topping spacing, doubling, and generator variant into ordered edge/tatami passes carrying inset,
   stitch length, row spacing, angle intent, minimum area, and direction-field behavior. Existing
   `auto` gates and fleece ordering remain exact.
+  Parameter commands layer a `FillUnderlayCustomization` over this lowering. Numeric-only
+  customization retains the legacy pass selection; an explicit pass list supplies the exact order
+  and removes legacy area/doubling gates. Plain scanline, direction/shape, and custom path fills all
+  resolve through the same profile. Custom scanline edge passes use the Clipper-backed compound
+  even-odd inset, and separate resulting contours are joined only by jumps. Tatami parameters are
+  physical millimetres; its angle remains relative to the topping or local direction field.
 - **Programmable fill** — `_generateProgrammableFill` (`2165`), armed by
   `fill dir @d shape @s` via the `fillarm` statement. A direction reporter returns a
   per-point heading (a flow field) and a shape reporter returns `[spacing, len, phase]`.
@@ -282,6 +289,9 @@ perturbing a precise rail wrecks the column — with a one-time warning.
   invokes or reads the frozen generator, clips open/closed paths by even-odd parity,
   extends open ends for pull compensation, lays normal region underlay, subdivides
   through the active fill-length form, and sews only short safe connectors.
+  Region underlay is deliberately independent of those returned paths: it is generated from the
+  recorded compound region before decorative path emission, preserving holes and disconnected
+  components.
 
 Extended `filllen`/`stitchlen` list and reporter forms also route a plain fill through
 the programmable generator so the per-row length function is honored (`2448`).

@@ -5,10 +5,15 @@ import { NeedlescriptError } from '../errors.ts';
 import { IDENTITY, apply, invert, linApply } from '../affine.ts';
 import { vfromheading, vheading } from '../genmath.ts';
 import { pathlen, segdist, segisect } from '../genmath.ts';
-import { clipClosedPaths, clipOpenPaths } from '../geometry.ts';
+import { clipClosedPaths, clipOpenPaths, offsetCompoundRegion } from '../geometry.ts';
 import { LIMITS } from './limits.ts';
 import { SatinMachine } from './machine-satin.ts';
-import { lowerLegacyFillUnderlay } from '../underlay-profile.ts';
+import { resolveFillUnderlayProfile } from '../underlay-profile.ts';
+import type {
+  FillEdgeUnderlayPass,
+  FillUnderlayProfile,
+  LegacyFillGenerator,
+} from '../underlay-profile.ts';
 
 export class FillMachine extends SatinMachine {
   beginFill() {
@@ -127,6 +132,121 @@ export class FillMachine extends SatinMachine {
         });
     }
     return out;
+  }
+
+  _fillRegionArea(rings: [number, number][][]): number {
+    const ringArea = (ring: [number, number][]) => {
+      let area = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i],
+          b = ring[(i + 1) % ring.length];
+        area += a[0] * b[1] - b[0] * a[1];
+      }
+      return Math.abs(area / 2);
+    };
+    return Math.max(0, ...rings.map(ringArea));
+  }
+
+  _resolveFillUnderlay(
+    rings: [number, number][][],
+    toppingRowSpacingMM: number,
+    generator: LegacyFillGenerator,
+  ) {
+    return resolveFillUnderlayProfile(
+      this.fillUnderlayMode,
+      {
+        regionAreaMM2: this._fillRegionArea(rings),
+        toppingRowSpacingMM,
+        doubled: this.doubleUnderlay,
+        generator,
+      },
+      this.fillUnderlayCustomization,
+    );
+  }
+
+  _emitFillEdgeUnderlay(
+    rings: [number, number][][],
+    pass: FillEdgeUnderlayPass,
+    robustCompoundInset: boolean,
+  ) {
+    if (!robustCompoundInset) {
+      for (const ring of rings) {
+        const inset = this._insetRing(ring, rings, pass.insetMM);
+        if (inset.length) this._emitFillPts(this._subdividePts(inset, pass.stitchLengthMM), true);
+      }
+      return;
+    }
+
+    const insetRings = offsetCompoundRegion(
+      rings,
+      -pass.insetMM,
+      undefined,
+      this.effectiveLimits.maxClipVerts,
+    );
+    for (const ring of insetRings) {
+      if (ring.length < 3) continue;
+      const closed: FillPoint[] = ring.map(([x, y]) => ({ x, y, jump: false }));
+      closed.push({ ...closed[0] });
+      const first = closed[0];
+      if (
+        this.started &&
+        this.lastEmit &&
+        Math.hypot(first.x - this.lastEmit.x, first.y - this.lastEmit.y) > 0.05
+      )
+        this._push('jump', first.x, first.y, true);
+      this._emitFillPts(this._subdividePts(closed, pass.stitchLengthMM), true);
+    }
+  }
+
+  _emitScanlineFillUnderlay(
+    profile: FillUnderlayProfile & { readonly source: 'legacy' | 'custom' },
+    rings: [number, number][][],
+    toppingAngle: number,
+    endNear: { x: number; y: number },
+  ) {
+    for (const pass of profile.passes) {
+      if (pass.kind === 'edge') {
+        this._emitFillEdgeUnderlay(rings, pass, profile.source === 'custom');
+      } else {
+        this._emitFillPts(
+          generateFill(rings, {
+            angle: toppingAngle + pass.angle.degrees,
+            spacing: pass.rowSpacingMM,
+            stitchLen: pass.stitchLengthMM,
+            endNear,
+            comp: -pass.insetMM,
+          }),
+          true,
+        );
+      }
+    }
+  }
+
+  _insetStreamline(poly: [number, number][], insetMM: number): [number, number][] {
+    if (!(insetMM > 0) || poly.length < 2) return poly;
+    const cumulative = [0];
+    for (let i = 1; i < poly.length; i++)
+      cumulative.push(
+        cumulative[i - 1] + Math.hypot(poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]),
+      );
+    const total = cumulative[cumulative.length - 1];
+    if (total - insetMM * 2 < 0.5) return [];
+    const at = (distance: number): [number, number] => {
+      let i = 1;
+      while (i < cumulative.length && cumulative[i] < distance) i++;
+      const a = poly[i - 1],
+        b = poly[i];
+      const span = cumulative[i] - cumulative[i - 1] || 1;
+      const t = (distance - cumulative[i - 1]) / span;
+      return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    };
+    const start = insetMM,
+      end = total - insetMM;
+    return [
+      at(start),
+      ...poly.filter((_point, index) => cumulative[index] > start && cumulative[index] < end),
+      at(end),
+    ];
   }
 
   // ---- Programmable fill (`fill dir @d shape @s`, §7–§9) -------------------
@@ -392,16 +512,20 @@ export class FillMachine extends SatinMachine {
    * handled upstream by the byte-identical tatami short-circuit.
    *
    * `dir`/`shape` are the user reporters (local-space). `constAngle` is the
-   * heading used when there is no direction field. `rotate90`/`coarse` drive the
-   * cross-grain underlay pass (§9); `underlay` flags the emitted stitches.
+   * heading used when there is no direction field. The angle offset and optional
+   * spacing/length/inset fields drive custom underlay; `coarse` retains the exact
+   * legacy cross-grain path. `underlay` flags the emitted stitches.
    */
   _generateProgrammableFill(opts: {
     dir: ((lx: number, ly: number) => number) | null;
     shape: ((lx: number, ly: number, row: number, v: number) => [number, number, number]) | null;
     constAngle: number;
-    rotate90: boolean;
+    angleOffsetDegrees: number;
     coarse: boolean;
     underlay: boolean;
+    spacingMM?: number;
+    stitchLengthMM?: number;
+    insetMM?: number;
   }) {
     const inv = invert(this.fillCTM);
     if (!inv) {
@@ -436,7 +560,7 @@ export class FillMachine extends SatinMachine {
 
     const localOf = (x: number, y: number): [number, number] => apply(inv, x, y);
     const baseSpacing = this.fillSpacing > 0 ? this.fillSpacing : 0.4;
-    const topSpacing = opts.coarse ? Math.min(baseSpacing * 4, 5) : baseSpacing;
+    const topSpacing = opts.spacingMM ?? (opts.coarse ? Math.min(baseSpacing * 4, 5) : baseSpacing);
     // `v` is the cross-field position, assigned by placement order (§14),
     // normalized by an estimate of the row count so it spans ~0..1.
     const estRows = Math.max(1, Math.round(diameter / Math.max(0.25, topSpacing)));
@@ -451,7 +575,7 @@ export class FillMachine extends SatinMachine {
         theta = opts.dir(lx, ly);
       } else theta = opts.constAngle;
       if (!isFinite(theta)) return null;
-      if (opts.rotate90) theta += 90;
+      theta += opts.angleOffsetDegrees;
       const [vx, vy] = vfromheading(theta, 1);
       const [hxv, hyv] = linApply(this.fillCTM, vx, vy);
       const L = Math.hypot(hxv, hyv);
@@ -492,6 +616,7 @@ export class FillMachine extends SatinMachine {
 
     // Build the lenFn for this fill. Saved CTM is restored inside any reporter call.
     const lenFn = (lx: number, ly: number, rowIdx: number, v: number, si: number): number => {
+      if (opts.stitchLengthMM !== undefined) return opts.stitchLengthMM;
       if (opts.coarse) return 4;
       if (opts.shape) return opts.shape(lx, ly, rowIdx, v)[1];
       if (fillLenReporter !== null) {
@@ -513,7 +638,7 @@ export class FillMachine extends SatinMachine {
       return Math.min(Math.max(stitchLen, 1), 7);
     };
     const phaseFn = (lx: number, ly: number, rowIdx: number, v: number): number => {
-      if (opts.coarse || !opts.shape) return 0.5;
+      if (opts.underlay || !opts.shape) return 0.5;
       return opts.shape(lx, ly, rowIdx, v)[2];
     };
 
@@ -548,7 +673,11 @@ export class FillMachine extends SatinMachine {
       let poly = rows[r];
       // Boustrophedon: alternate row direction in placement order (§8/§14).
       if (r % 2 === 1) poly = poly.slice().reverse();
-      poly = this._extendForPullComp(poly);
+      poly =
+        opts.underlay && opts.insetMM !== undefined
+          ? this._insetStreamline(poly, opts.insetMM)
+          : this._extendForPullComp(poly);
+      if (poly.length < 2) continue;
       const v = vOf(r);
       const pen = this._walkStreamline(poly, r, v, cumPhase, lenFn, localOf);
       // Advance the cumulative brick phase by this row's phase (§8).
@@ -725,6 +854,10 @@ export class FillMachine extends SatinMachine {
           this.stitchLenList !== null ||
           this.stitchLenReporter !== null)
       ) {
+        if (this.fillUnderlayCustomization) {
+          const profile = this._resolveFillUnderlay(rings, this.fillSpacing, 'scanline');
+          this._emitScanlineFillUnderlay(profile, rings, this.fillAngle, endNear);
+        }
         const savedLocalRings = this.localRings;
         this.localRings = rings.map((ring) =>
           ring.map((point) => apply(inv, point[0], point[1]) as [number, number]),
@@ -734,7 +867,7 @@ export class FillMachine extends SatinMachine {
             dir: null,
             shape: null,
             constAngle: this.fillAngle,
-            rotate90: false,
+            angleOffsetDegrees: 0,
             coarse: false,
             underlay: false,
           });
@@ -753,42 +886,8 @@ export class FillMachine extends SatinMachine {
         this.stitchLenReporter === null
       ) {
         const stitchLen = this.fillLen ?? Math.min(Math.max(this.stitchLen, 1), 7);
-        const areaOf = (ring: [number, number][]) => {
-          let value = 0;
-          for (let i = 0; i < ring.length; i++) {
-            const a = ring[i],
-              b = ring[(i + 1) % ring.length];
-            value += a[0] * b[1] - b[0] * a[1];
-          }
-          return Math.abs(value / 2);
-        };
-        const area = Math.max(...rings.map(areaOf));
-        const underlayProfile = lowerLegacyFillUnderlay(this.fillUnderlayMode, {
-          regionAreaMM2: area,
-          toppingRowSpacingMM: this.fillSpacing,
-          doubled: this.doubleUnderlay,
-          generator: 'scanline',
-        });
-        for (const pass of underlayProfile.passes) {
-          if (pass.kind === 'edge') {
-            for (const ring of rings) {
-              const inset = this._insetRing(ring, rings, pass.insetMM);
-              if (inset.length)
-                this._emitFillPts(this._subdividePts(inset, pass.stitchLengthMM), true);
-            }
-          } else {
-            this._emitFillPts(
-              generateFill(rings, {
-                angle: this.fillAngle + pass.angle.degrees,
-                spacing: pass.rowSpacingMM,
-                stitchLen: pass.stitchLengthMM,
-                endNear,
-                comp: -pass.insetMM,
-              }),
-              true,
-            );
-          }
-        }
+        const underlayProfile = this._resolveFillUnderlay(rings, this.fillSpacing, 'scanline');
+        this._emitScanlineFillUnderlay(underlayProfile, rings, this.fillAngle, endNear);
         const points = generateFill(rings, {
           angle: this.fillAngle,
           spacing: this.fillSpacing,
@@ -832,43 +931,10 @@ export class FillMachine extends SatinMachine {
       if (this.pullComp > 0 && clipped.some((p) => p.closed))
         this.warnings.push('pullcomp does not widen closed contour rings — open row ends only');
 
-      // Region-based underlay remains identical to a plain fill.
-      const ringArea = (ring: [number, number][]) => {
-        let area = 0;
-        for (let i = 0; i < ring.length; i++) {
-          const a = ring[i],
-            b = ring[(i + 1) % ring.length];
-          area += a[0] * b[1] - b[0] * a[1];
-        }
-        return Math.abs(area / 2);
-      };
-      const area = Math.max(...rings.map(ringArea));
-      const underlayProfile = lowerLegacyFillUnderlay(this.fillUnderlayMode, {
-        regionAreaMM2: area,
-        toppingRowSpacingMM: this.fillSpacing,
-        doubled: this.doubleUnderlay,
-        generator: 'scanline',
-      });
-      for (const pass of underlayProfile.passes) {
-        if (pass.kind === 'edge') {
-          for (const ring of rings) {
-            const inset = this._insetRing(ring, rings, pass.insetMM);
-            if (inset.length)
-              this._emitFillPts(this._subdividePts(inset, pass.stitchLengthMM), true);
-          }
-        } else {
-          this._emitFillPts(
-            generateFill(rings, {
-              angle: this.fillAngle + pass.angle.degrees,
-              spacing: pass.rowSpacingMM,
-              stitchLen: pass.stitchLengthMM,
-              endNear,
-              comp: -pass.insetMM,
-            }),
-            true,
-          );
-        }
-      }
+      // Underlay is always generated from the recorded compound region, never
+      // from the decorative paths returned by the custom generator.
+      const underlayProfile = this._resolveFillUnderlay(rings, this.fillSpacing, 'scanline');
+      this._emitScanlineFillUnderlay(underlayProfile, rings, this.fillAngle, endNear);
 
       const lengthAt = (si: number, p: [number, number]) => {
         if (this.fillLenReporter) return this.fillLenReporter(0, 0, si, this._mapFill(p[0], p[1]));
@@ -954,6 +1020,10 @@ export class FillMachine extends SatinMachine {
     // localRings from the hoop-space rings with an identity fillCTM so the
     // generator can work without a real arm-site transform snapshot.
     if (!this.fillArmed && effLen === null) {
+      if (this.fillUnderlayCustomization) {
+        const profile = this._resolveFillUnderlay(rings, this.fillSpacing, 'scanline');
+        this._emitScanlineFillUnderlay(profile, rings, this.fillAngle, endNear);
+      }
       const savedLocalRings = this.localRings;
       const savedFillCTM = this.fillCTM;
       const savedFillHasWarp = this.fillHasWarp;
@@ -967,7 +1037,7 @@ export class FillMachine extends SatinMachine {
           dir: null,
           shape: null,
           constAngle: this.fillAngle,
-          rotate90: false,
+          angleOffsetDegrees: 0,
           coarse: false,
           underlay: false,
         });
@@ -1070,37 +1140,29 @@ export class FillMachine extends SatinMachine {
       } else {
         // General streamline fill. Underlay first (cross-grain rotated field,
         // coarser spacing), then the topping. Mirrors the built-in order.
-        const ringArea = (r: [number, number][]) => {
-          let s = 0;
-          for (let i = 0; i < r.length; i++) {
-            const a = r[i],
-              b = r[(i + 1) % r.length];
-            s += a[0] * b[1] - b[0] * a[1];
-          }
-          return Math.abs(s / 2);
-        };
-        const area = Math.max(0, ...rings.map(ringArea));
-        const underlayProfile = lowerLegacyFillUnderlay(this.fillUnderlayMode, {
-          regionAreaMM2: area,
-          toppingRowSpacingMM: this.fillSpacing,
-          doubled: this.doubleUnderlay,
-          generator: 'direction-field',
-        });
+        const underlayProfile = this._resolveFillUnderlay(
+          rings,
+          this.fillSpacing,
+          'direction-field',
+        );
         for (const pass of underlayProfile.passes) {
           if (pass.kind === 'edge') {
-            for (const ring of rings) {
-              const inset = this._insetRing(ring, rings, pass.insetMM);
-              if (inset.length)
-                this._emitFillPts(this._subdividePts(inset, pass.stitchLengthMM), true);
-            }
+            this._emitFillEdgeUnderlay(rings, pass, underlayProfile.source === 'custom');
           } else {
             this._generateProgrammableFill({
               dir,
               shape: null,
               constAngle: this.fillAngle,
-              rotate90: pass.angle.degrees === 90,
-              coarse: true,
+              angleOffsetDegrees: pass.angle.degrees,
+              coarse: underlayProfile.source === 'legacy',
               underlay: true,
+              ...(underlayProfile.source === 'custom'
+                ? {
+                    spacingMM: pass.rowSpacingMM,
+                    stitchLengthMM: pass.stitchLengthMM,
+                    insetMM: pass.insetMM,
+                  }
+                : {}),
             });
           }
         }
@@ -1108,7 +1170,7 @@ export class FillMachine extends SatinMachine {
           dir,
           shape,
           constAngle: this.fillAngle,
-          rotate90: false,
+          angleOffsetDegrees: 0,
           coarse: false,
           underlay: false,
         });
@@ -1120,41 +1182,8 @@ export class FillMachine extends SatinMachine {
     }
 
     // ---- Underlay (sewn first, so the topping rides on a stable base) ----
-    const ringArea = (r: [number, number][]) => {
-      let s = 0;
-      for (let i = 0; i < r.length; i++) {
-        const a = r[i],
-          b = r[(i + 1) % r.length];
-        s += a[0] * b[1] - b[0] * a[1];
-      }
-      return Math.abs(s / 2);
-    };
-    const area = Math.max(...rings.map(ringArea));
-    const underlayProfile = lowerLegacyFillUnderlay(this.fillUnderlayMode, {
-      regionAreaMM2: area,
-      toppingRowSpacingMM: useSpacing,
-      doubled: this.doubleUnderlay,
-      generator: 'scanline',
-    });
-    for (const pass of underlayProfile.passes) {
-      if (pass.kind === 'edge') {
-        for (const ring of rings) {
-          const inset = this._insetRing(ring, rings, pass.insetMM);
-          if (inset.length) this._emitFillPts(this._subdividePts(inset, pass.stitchLengthMM), true);
-        }
-      } else {
-        this._emitFillPts(
-          generateFill(rings, {
-            angle: useAngle + pass.angle.degrees,
-            spacing: pass.rowSpacingMM,
-            stitchLen: pass.stitchLengthMM,
-            endNear,
-            comp: -pass.insetMM,
-          }),
-          true,
-        );
-      }
-    }
+    const underlayProfile = this._resolveFillUnderlay(rings, useSpacing, 'scanline');
+    this._emitScanlineFillUnderlay(underlayProfile, rings, useAngle, endNear);
 
     // ---- Topping ----
     const pts = generateFill(rings, {

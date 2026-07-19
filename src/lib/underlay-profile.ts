@@ -3,14 +3,24 @@ import { defineModes } from './mode-registry.ts';
 
 export const SATIN_UNDERLAY_PASS_KINDS = defineModes(['center', 'edge', 'zigzag']);
 export type SatinUnderlayPassKind = (typeof SATIN_UNDERLAY_PASS_KINDS)[number];
-export type FillUnderlayPassKind = 'edge' | 'tatami';
+export const FILL_UNDERLAY_PASS_KINDS = defineModes(['edge', 'tatami']);
+export type FillUnderlayPassKind = (typeof FILL_UNDERLAY_PASS_KINDS)[number];
 
 export const SATIN_UNDERLAY_MAX_PASSES = 16;
+export const FILL_UNDERLAY_MAX_PASSES = 16;
 
 export const SATIN_UNDERLAY_DEFAULTS = {
   edgeInsetMM: 0.5,
   zigzagWidthRatio: 0.6,
   zigzagSpacingMM: 2,
+} as const;
+
+export const FILL_UNDERLAY_DEFAULTS = {
+  edgeInsetMM: 0.5,
+  tatamiInsetMM: 0.6,
+  edgeStitchLengthMM: 2.5,
+  tatamiStitchLengthMM: 4,
+  relativeAngleDegrees: 90,
 } as const;
 
 export interface NumericRange {
@@ -137,12 +147,41 @@ export interface FillUnderlayProfile {
   readonly passes: readonly FillUnderlayPass[];
 }
 
-export interface ResolvedFillUnderlayProfile extends FillUnderlayProfile {
+export interface LegacyResolvedFillUnderlayProfile extends FillUnderlayProfile {
   readonly source: 'legacy';
   readonly requestedMode: FillUnderlayMode;
   readonly resolvedMode: 'off' | 'edge' | 'tatami' | 'both';
   readonly generator: LegacyFillGenerator;
   readonly doubled: boolean;
+}
+
+export interface CustomResolvedFillUnderlayProfile extends FillUnderlayProfile {
+  readonly source: 'custom';
+  readonly generator: LegacyFillGenerator;
+  readonly explicitPassOrder: boolean;
+}
+
+export type ResolvedFillUnderlayProfile =
+  LegacyResolvedFillUnderlayProfile | CustomResolvedFillUnderlayProfile;
+
+/** Sticky user overrides. Omitted fields continue to inherit the selected legacy profile. */
+export interface FillUnderlayCustomization {
+  readonly passKinds?: readonly FillUnderlayPassKind[];
+  readonly stitchLengthMM?: number;
+  readonly insetMM?: number;
+  readonly rowSpacingMM?: number;
+  readonly relativeAngleDegrees?: number;
+}
+
+export function cloneFillUnderlayCustomization(
+  customization: FillUnderlayCustomization | null,
+): FillUnderlayCustomization | null {
+  return customization
+    ? {
+        ...customization,
+        ...(customization.passKinds ? { passKinds: customization.passKinds.slice() } : {}),
+      }
+    : null;
 }
 
 export interface ProfileValidationIssue {
@@ -356,6 +395,78 @@ export function lowerLegacyFillUnderlay(
   };
 }
 
+const customFillPass = (
+  kind: FillUnderlayPassKind,
+  context: LegacyFillUnderlayContext,
+  customization: FillUnderlayCustomization,
+): FillUnderlayPass => {
+  const stitchLengthMM =
+    customization.stitchLengthMM ??
+    (kind === 'edge'
+      ? FILL_UNDERLAY_DEFAULTS.edgeStitchLengthMM
+      : FILL_UNDERLAY_DEFAULTS.tatamiStitchLengthMM);
+  const insetMM =
+    customization.insetMM ??
+    (kind === 'edge' ? FILL_UNDERLAY_DEFAULTS.edgeInsetMM : FILL_UNDERLAY_DEFAULTS.tatamiInsetMM);
+  if (kind === 'edge') return { kind, insetMM, stitchLengthMM, minimumRegionAreaMM2: 0 };
+  return {
+    kind,
+    insetMM,
+    stitchLengthMM,
+    rowSpacingMM: customization.rowSpacingMM ?? Math.min(context.toppingRowSpacingMM * 4, 5),
+    angle: {
+      kind: 'relative-to-topping',
+      degrees: customization.relativeAngleDegrees ?? FILL_UNDERLAY_DEFAULTS.relativeAngleDegrees,
+    },
+    minimumRegionAreaMM2: 0,
+    directionFieldBehavior: 'rotate-field',
+  };
+};
+
+/** Resolve optional user settings over the legacy profile once physical region area is known. */
+export function resolveFillUnderlayProfile(
+  mode: FillUnderlayMode,
+  context: LegacyFillUnderlayContext,
+  customization: FillUnderlayCustomization | null,
+): ResolvedFillUnderlayProfile {
+  const legacy = lowerLegacyFillUnderlay(mode, context);
+  if (!customization) return legacy;
+
+  const explicitPassOrder = customization.passKinds !== undefined;
+  const passes = explicitPassOrder
+    ? customization.passKinds!.map((kind) => customFillPass(kind, context, customization))
+    : legacy.passes.map((pass): FillUnderlayPass => {
+        if (pass.kind === 'edge')
+          return {
+            ...pass,
+            insetMM: customization.insetMM ?? pass.insetMM,
+            stitchLengthMM: customization.stitchLengthMM ?? pass.stitchLengthMM,
+          };
+        return {
+          ...pass,
+          insetMM: customization.insetMM ?? pass.insetMM,
+          stitchLengthMM: customization.stitchLengthMM ?? pass.stitchLengthMM,
+          rowSpacingMM: customization.rowSpacingMM ?? pass.rowSpacingMM,
+          angle:
+            customization.relativeAngleDegrees === undefined
+              ? pass.angle
+              : {
+                  kind: 'relative-to-topping',
+                  degrees: customization.relativeAngleDegrees,
+                },
+          directionFieldBehavior:
+            context.generator === 'direction-field' ? 'rotate-field' : pass.directionFieldBehavior,
+        };
+      });
+
+  return {
+    source: 'custom',
+    generator: context.generator ?? 'scanline',
+    explicitPassOrder,
+    passes,
+  };
+}
+
 export function lowerFabricUnderlay(
   preset: FabricPreset,
   satin: Omit<LegacySatinUnderlayContext, 'doubled'>,
@@ -430,6 +541,11 @@ export function validateFillUnderlayProfile(
   profile: FillUnderlayProfile,
 ): readonly ProfileValidationIssue[] {
   const issues: ProfileValidationIssue[] = [];
+  if (profile.passes.length > FILL_UNDERLAY_MAX_PASSES)
+    issues.push({
+      path: 'passes',
+      message: `must contain at most ${FILL_UNDERLAY_MAX_PASSES} passes`,
+    });
   profile.passes.forEach((pass, index) => {
     const base = `passes[${index}]`;
     if (!inRange(pass.insetMM, FILL_UNDERLAY_RANGES.insetMM))

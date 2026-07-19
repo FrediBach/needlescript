@@ -89,6 +89,11 @@ export const BUILTIN_ARITY: Record<string, number> = {
   underlayinset: 1,
   underlayspacing: 1,
   fillunderlay: 1,
+  fillunderlaypasses: 1,
+  fillunderlaylen: 1,
+  fillunderlayinset: 1,
+  fillunderlayspacing: 1,
+  fillunderlayangle: 1,
   // Hoop and override directives (§hoop, §override). Both are Core words and
   // accept mixed argument types (string / number / list for hoop; string +
   // number for override), so they are handled before the bulk num() conversion

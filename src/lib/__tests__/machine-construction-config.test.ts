@@ -41,6 +41,13 @@ describe('machine construction configuration snapshots', () => {
       zigzagSpacingMM: 1.8,
     };
     machine.fillUnderlayMode = 'tatami';
+    machine.fillUnderlayCustomization = {
+      passKinds: ['edge', 'tatami'],
+      stitchLengthMM: 3,
+      insetMM: 0.8,
+      rowSpacingMM: 2.2,
+      relativeAngleDegrees: 90,
+    };
     machine.doubleUnderlay = true;
     machine.shortStitch = false;
     machine.autoTrim = 12;
@@ -84,6 +91,7 @@ describe('machine construction configuration snapshots', () => {
     machine.underlayMode = 'off';
     machine.satinUnderlayCustomization = null;
     machine.fillUnderlayMode = 'off';
+    machine.fillUnderlayCustomization = null;
     machine.doubleUnderlay = false;
     machine.shortStitch = true;
     machine.autoTrim = 0;
@@ -125,6 +133,13 @@ describe('machine construction configuration snapshots', () => {
         zigzagSpacingMM: 1.8,
       },
       fillUnderlayMode: 'tatami',
+      fillUnderlayCustomization: {
+        passKinds: ['edge', 'tatami'],
+        stitchLengthMM: 3,
+        insetMM: 0.8,
+        rowSpacingMM: 2.2,
+        relativeAngleDegrees: 90,
+      },
       doubleUnderlay: true,
       shortStitch: false,
       autoTrim: 12,
@@ -152,6 +167,7 @@ describe('machine construction configuration snapshots', () => {
     const stitchPattern = [1, 2];
     const fillPattern = [3, 4];
     const underlayPasses = ['center', 'edge'] as const;
+    const fillUnderlayPasses: ('edge' | 'tatami')[] = ['edge', 'tatami'];
     const staticPaths: [number, number][][] = [
       [
         [0, 0],
@@ -161,22 +177,26 @@ describe('machine construction configuration snapshots', () => {
     machine.stitchLenList = stitchPattern;
     machine.fillLenList = fillPattern;
     machine.satinUnderlayCustomization = { passKinds: underlayPasses };
+    machine.fillUnderlayCustomization = { passKinds: fillUnderlayPasses };
     machine.fillPathsStatic = staticPaths;
 
     const snapshot = machine.snapshotConstructionConfig();
     expect(snapshot.stitchLenList).not.toBe(stitchPattern);
     expect(snapshot.fillLenList).not.toBe(fillPattern);
     expect(snapshot.satinUnderlayCustomization?.passKinds).not.toBe(underlayPasses);
+    expect(snapshot.fillUnderlayCustomization?.passKinds).not.toBe(fillUnderlayPasses);
     expect(snapshot.fillPathsStatic).not.toBe(staticPaths);
     expect(snapshot.fillPathsStatic?.[0]).not.toBe(staticPaths[0]);
     expect(snapshot.fillPathsStatic?.[0][0]).not.toBe(staticPaths[0][0]);
 
     stitchPattern[0] = 8;
     fillPattern[0] = 9;
+    fillUnderlayPasses[0] = 'tatami';
     staticPaths[0][0][0] = 10;
     machine.restoreConstructionConfig(snapshot);
     expect(machine.stitchLenList).toEqual([1, 2]);
     expect(machine.fillLenList).toEqual([3, 4]);
+    expect(machine.fillUnderlayCustomization?.passKinds).toEqual(['edge', 'tatami']);
     expect(machine.fillPathsStatic).toEqual([
       [
         [0, 0],
@@ -186,10 +206,12 @@ describe('machine construction configuration snapshots', () => {
 
     machine.stitchLenList![0] = 6;
     machine.fillLenList![0] = 7;
+    (machine.fillUnderlayCustomization!.passKinds as ('edge' | 'tatami')[])[0] = 'tatami';
     machine.fillPathsStatic![0][0][0] = 11;
     machine.restoreConstructionConfig(snapshot);
     expect(machine.stitchLenList).toEqual([1, 2]);
     expect(machine.fillLenList).toEqual([3, 4]);
+    expect(machine.fillUnderlayCustomization?.passKinds).toEqual(['edge', 'tatami']);
     expect(machine.fillPathsStatic![0][0]).toEqual([0, 0]);
   });
 

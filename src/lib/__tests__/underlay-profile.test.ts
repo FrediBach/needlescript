@@ -5,6 +5,7 @@ import {
   lowerLegacyFillUnderlay,
   lowerLegacySatinUnderlay,
   resolveSatinUnderlayProfile,
+  resolveFillUnderlayProfile,
   validateFillUnderlayProfile,
   validateSatinUnderlayProfile,
 } from '../underlay-profile.ts';
@@ -147,6 +148,52 @@ describe('legacy fill underlay profile lowering', () => {
         directionFieldBehavior: 'rotate-field',
       },
     ]);
+  });
+
+  it('resolves exact custom order and fill parameters without legacy area gates', () => {
+    const profile = resolveFillUnderlayProfile(
+      'auto',
+      {
+        regionAreaMM2: 10,
+        toppingRowSpacingMM: 0.4,
+        doubled: true,
+        generator: 'direction-field',
+      },
+      {
+        passKinds: ['edge', 'tatami', 'edge'],
+        stitchLengthMM: 3,
+        insetMM: 0.8,
+        rowSpacingMM: 2.2,
+        relativeAngleDegrees: 35,
+      },
+    );
+
+    expect(profile).toMatchObject({ source: 'custom', explicitPassOrder: true });
+    expect(profile.passes).toMatchObject([
+      { kind: 'edge', stitchLengthMM: 3, insetMM: 0.8, minimumRegionAreaMM2: 0 },
+      {
+        kind: 'tatami',
+        stitchLengthMM: 3,
+        insetMM: 0.8,
+        rowSpacingMM: 2.2,
+        angle: { kind: 'relative-to-topping', degrees: 35 },
+        directionFieldBehavior: 'rotate-field',
+      },
+      { kind: 'edge' },
+    ]);
+    expect(validateFillUnderlayProfile(profile)).toEqual([]);
+  });
+
+  it('layers numeric settings over the selected legacy fill passes', () => {
+    const profile = resolveFillUnderlayProfile(
+      'auto',
+      { regionAreaMM2: 200, toppingRowSpacingMM: 0.4, doubled: false },
+      { rowSpacingMM: 2.5 },
+    );
+
+    expect(profile.passes.map((pass) => pass.kind)).toEqual(['edge', 'tatami']);
+    expect(profile.passes[0]).toMatchObject({ insetMM: 0.5, stitchLengthMM: 2.5 });
+    expect(profile.passes[1]).toMatchObject({ rowSpacingMM: 2.5 });
   });
 });
 

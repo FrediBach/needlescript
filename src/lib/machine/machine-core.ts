@@ -9,8 +9,11 @@ import { DensityGrid } from '../postprocess.ts';
 import type { DeclumpState } from '../declump.ts';
 import { declumpFoldPoint, declumpResetRun } from '../declump.ts';
 import { DEFAULT_HOOP_INFO, inHoopField, inHoopOuter } from '../hoop-presets.ts';
-import { cloneSatinUnderlayCustomization } from '../underlay-profile.ts';
-import type { SatinUnderlayCustomization } from '../underlay-profile.ts';
+import {
+  cloneFillUnderlayCustomization,
+  cloneSatinUnderlayCustomization,
+} from '../underlay-profile.ts';
+import type { FillUnderlayCustomization, SatinUnderlayCustomization } from '../underlay-profile.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -70,6 +73,7 @@ export interface ConstructionConfigSnapshot {
   readonly underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
   readonly satinUnderlayCustomization: SatinUnderlayCustomization | null;
   readonly fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge';
+  readonly fillUnderlayCustomization: FillUnderlayCustomization | null;
   readonly doubleUnderlay: boolean;
   readonly shortStitch: boolean;
   readonly autoTrim: number;
@@ -119,6 +123,7 @@ interface MachineSnapshot {
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
   satinUnderlayCustomization: SatinUnderlayCustomization | null;
   fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge';
+  fillUnderlayCustomization: FillUnderlayCustomization | null;
   doubleUnderlay: boolean;
   shortStitch: boolean;
   autoTrim: number;
@@ -205,6 +210,7 @@ export abstract class MachineCore {
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag' = 'off';
   satinUnderlayCustomization: SatinUnderlayCustomization | null = null;
   fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge' = 'off';
+  fillUnderlayCustomization: FillUnderlayCustomization | null = null;
   doubleUnderlay = false; // fleece: stack center + zigzag passes
   shortStitch = true; // auto short-stitch on tight satin curves
   autoTrim = 7; // insert trim before jumps ≥ this (0 = off)
@@ -356,6 +362,7 @@ export abstract class MachineCore {
       underlayMode: this.underlayMode,
       satinUnderlayCustomization: cloneSatinUnderlayCustomization(this.satinUnderlayCustomization),
       fillUnderlayMode: this.fillUnderlayMode,
+      fillUnderlayCustomization: cloneFillUnderlayCustomization(this.fillUnderlayCustomization),
       doubleUnderlay: this.doubleUnderlay,
       shortStitch: this.shortStitch,
       autoTrim: this.autoTrim,
@@ -406,6 +413,9 @@ export abstract class MachineCore {
         snapshot.satinUnderlayCustomization,
       );
       this.fillUnderlayMode = snapshot.fillUnderlayMode;
+      this.fillUnderlayCustomization = cloneFillUnderlayCustomization(
+        snapshot.fillUnderlayCustomization,
+      );
       this.doubleUnderlay = snapshot.doubleUnderlay;
       this.shortStitch = snapshot.shortStitch;
       this.autoTrim = snapshot.autoTrim;
@@ -508,6 +518,7 @@ export abstract class MachineCore {
       underlayMode: this.underlayMode,
       satinUnderlayCustomization: cloneSatinUnderlayCustomization(this.satinUnderlayCustomization),
       fillUnderlayMode: this.fillUnderlayMode,
+      fillUnderlayCustomization: cloneFillUnderlayCustomization(this.fillUnderlayCustomization),
       doubleUnderlay: this.doubleUnderlay,
       shortStitch: this.shortStitch,
       autoTrim: this.autoTrim,
@@ -630,6 +641,7 @@ export abstract class MachineCore {
       snap.satinUnderlayCustomization,
     );
     this.fillUnderlayMode = snap.fillUnderlayMode;
+    this.fillUnderlayCustomization = cloneFillUnderlayCustomization(snap.fillUnderlayCustomization);
     this.doubleUnderlay = snap.doubleUnderlay;
     this.shortStitch = snap.shortStitch;
     this.autoTrim = snap.autoTrim;

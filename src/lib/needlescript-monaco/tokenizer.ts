@@ -132,6 +132,11 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'underlayinset',
       'underlayspacing',
       'fillunderlay',
+      'fillunderlaypasses',
+      'fillunderlaylen',
+      'fillunderlayinset',
+      'fillunderlayspacing',
+      'fillunderlayangle',
       'hoop', // hoop directive (§hoop)
       'override', // override directive (§override)
     ],

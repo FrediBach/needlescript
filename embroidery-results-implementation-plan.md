@@ -647,6 +647,8 @@ with a warning. Invalid lists and values fail before a buffered column is flushe
 
 ### Session 3.3 — User commands for fill underlay
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Implement `fillunderlaypasses`, `fillunderlaylen`, `fillunderlayinset`,
@@ -661,6 +663,16 @@ Acceptance criteria:
 - Cross-grain underlay follows `fillangle + relativeAngle` for plain fills.
 - Directional fills rotate the local field consistently.
 - Edge underlay never crosses holes or escapes a concave boundary.
+
+Implementation note: `fillunderlaypasses` installs an exact ordered list of up to 16 `edge` and
+`tatami` passes; duplicates repeat and an empty list disables underlay. The four numeric commands
+are independent sticky overrides for physical stitch length, inset, row spacing, and angle relative
+to the topping direction. Without an explicit list they tune the selected legacy mode; with one,
+legacy `auto` area gates and fabric doubling are superseded. Plain, directional/shape, and custom
+path fills resolve the same profile, with custom paths deriving underlay from the recorded compound
+region. Custom edge passes use a Clipper-backed even-odd inset and jump between separate contours;
+direction fields rotate locally before affine mapping. `fillunderlay` and `fabric` clear the custom
+profile, and construction snapshots copy and restore it.
 
 ### Session 3.4 — Optional programmable underlay spike
 
