@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
+  COMPENSATION_MODES,
   EMBROIDERY_MODE_REGISTRIES,
   FILL_UNDERLAY_MODES,
   SATIN_UNDERLAY_MODES,
@@ -37,11 +38,13 @@ describe('shared mode registries', () => {
   it('keeps every quoted embroidery command in the focused registry', () => {
     expect(Object.keys(EMBROIDERY_MODE_REGISTRIES)).toEqual([
       'fabric',
+      'compensation',
       'threadprofile',
       'stabilizer',
       'underlay',
       'fillunderlay',
     ]);
+    expect(EMBROIDERY_MODE_REGISTRIES.compensation).toBe(COMPENSATION_MODES);
     expect(FILL_CONSTRUCTION_MODE_REGISTRIES).toEqual({
       fillstagger: FILL_STAGGER_MODES,
       fillconnect: FILL_CONNECT_MODES,

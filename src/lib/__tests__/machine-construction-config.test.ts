@@ -44,6 +44,8 @@ describe('machine construction configuration snapshots', () => {
     machine.fillLenReporter = fillLenReporter;
     machine.lockLen = 0.9;
     machine.pullComp = 0.45;
+    machine.pullCompExplicit = true;
+    machine.compensationMode = 'directional';
     machine.underlayMode = 'edge';
     machine.satinUnderlayCustomization = {
       passKinds: ['center', 'edge'],
@@ -110,6 +112,8 @@ describe('machine construction configuration snapshots', () => {
     machine.fillLenReporter = null;
     machine.lockLen = 0;
     machine.pullComp = 0;
+    machine.pullCompExplicit = false;
+    machine.compensationMode = 'legacy';
     machine.underlayMode = 'off';
     machine.satinUnderlayCustomization = null;
     machine.fillUnderlayMode = 'off';
@@ -158,6 +162,8 @@ describe('machine construction configuration snapshots', () => {
       fillLenListPhase: 1,
       lockLen: 0.9,
       pullComp: 0.45,
+      pullCompExplicit: true,
+      compensationMode: 'directional',
       underlayMode: 'edge',
       satinUnderlayCustomization: {
         passKinds: ['center', 'edge'],

@@ -1164,31 +1164,44 @@ versioned sew-out evidence supports automatic directional values. Use `fabricgra
 `stitchscope` and trace snapshots, so scoped or sandboxed choices cannot leak into the final resolved
 intent.
 
-`RunResult.compensation` is a preview-only directional recommendation. It contains the current
-legacy scalar `pullcomp`, grain-aligned signed pull/push tensors, and their along/across projections
+`RunResult.compensation` contains the current scalar `pullcomp`, its magnitude source, grain-aligned
+signed pull/push tensors, and their along/across projections
 for headings parallel and perpendicular to the grain. The selected fabric preset supplies the
 existing pull magnitude. Unequal declared stretch redistributes that magnitude toward the more
 stretchy axis while preserving the two-axis average; equal or zero stretch remains isotropic. With
 no fabric preset the recommendation is zero. Push is represented as negative shortening but stays
 zero until physical sew-out data supports non-zero values.
 
-This diagnostic does not alter events. Application remains construction-specific: directional
-satin can later widen across a column, open tatami can extend along row endpoints, borders need an
-explicit inset/overlap rule, and running stitches receive no automatic correction. No generic affine
-scale is inferred from the tensor.
+The default `compensation 'legacy'` mode keeps this diagnostic comparison-only and preserves scalar
+geometry. Opt-in `'directional'` applies the across-column tensor projection to satin endpoints.
+Fill, borders, and running stitches remain scalar/unadjusted as before; no generic affine scale is
+inferred from the tensor.
+
+Directional satin works for numeric and reporter-driven spine columns plus `satinbetween`. The
+centerline/rails are mapped before projection, so design rotation is measured relative to fixed hoop-
+space grain. Rotating design and grain together preserves the result modulo rotation. Authored width
+follows affine scaling, including non-uniform scaling; compensation remains an unscaled physical
+millimetre amount. Compensated chords drive cap sizing, underlay choice/insets, curve warnings, wide-
+column splitting, snag warnings, and the 12 mm stitch ceiling.
+
+Override resolution follows source order. `fabric` supplies the directional mean pull and clears an
+earlier explicit override. A later `pullcomp` replaces that mean while retaining `fabricstretch`'s
+anisotropic ratio; a later `fabric` restores its profile magnitude and neutral stretch. Fill still
+uses the scalar `pullcomp`. Push remains zero pending sew-out evidence.
 
 ### Individual commands
 
 | Command                  | Effect                                                                                                                                                                                                                                                                                                                              |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fabricgrain deg`        | fabric-grain heading in turtle degrees (`0` = up, clockwise positive); finite values wrap into 0–360. Feeds preview diagnostics but does not change geometry                                                                                                                                                                        |
-| `fabricstretch a b`      | declared fractional stretch along/across the grain, each 0–1. A later `fabric` command restores its profile defaults; redistributes the preview pull recommendation without changing geometry                                                                                                                                       |
+| `fabricgrain deg`        | fabric-grain heading in turtle degrees (`0` = up, clockwise positive); finite values wrap into 0–360. Feeds preview diagnostics and opt-in directional satin                                                                                                                                                                        |
+| `fabricstretch a b`      | declared fractional stretch along/across the grain, each 0–1. A later `fabric` command restores its profile defaults; redistributes preview and opt-in satin pull while preserving the mean                                                                                                                                         |
 | `threadprofile 'name'`   | generic rayon/polyester 40 wt or 60 wt profile; resets resolved thread width to 0.4 mm or 0.3 mm respectively                                                                                                                                                                                                                       |
 | `threadwidth mm`         | explicit resolved thread-width approximation, 0.1–1 mm. Overrides the active profile in source order and scales coverage queries/heatmaps/warnings without changing stitch geometry                                                                                                                                                 |
 | `needle nm`              | advisory metric needle size: 60, 65, 70, 75, 80, or 90; `needle 0` clears the optional value. Does not affect construction                                                                                                                                                                                                          |
 | `stabilizer 'category'`  | portable category metadata: `'none'`, `'tearaway'`, `'cutaway'`, or `'washaway'`                                                                                                                                                                                                                                                    |
 | `topping 0/1`            | records whether topping is used; accepts `false`/`true` because booleans are numeric. Does not automatically add or recommend a product                                                                                                                                                                                             |
-| `pullcomp mm`            | 0–1.5 mm. Widens satin columns and extends fill rows at both ends to cancel thread-tension shrink                                                                                                                                                                                                                                   |
+| `compensation 'mode'`    | sticky `'legacy'` (default) or `'directional'`. Directional mode projects grain-aligned pull across physical satin headings; fill remains scalar. Included in `stitchscope`                                                                                                                                                         |
+| `pullcomp mm`            | 0–1.5 mm. Widens legacy satin and fill rows. In directional mode it replaces the tensor's mean pull magnitude while retaining stretch anisotropy; a later `fabric` restores its profile value                                                                                                                                       |
 | `underlay 'mode'`        | satin-column underlay: `'center'` (spine out-and-back), `'edge'` (runs offset ±30% width), `'zigzag'` (open zigzag at 60% width + return run), `'off'`, `'auto'` (by width: < 1.5 mm none, < 4 mm center, wider zigzag)                                                                                                             |
 | `underlaypasses xs`      | exact ordered satin passes from `'center'`, `'edge'`, and `'zigzag'`; duplicates repeat, up to 16 passes, and `[]` disables underlay. Explicit order supersedes `fabric` doubling and the pass choice from `underlay 'auto'`                                                                                                        |
 | `underlaylen mm`         | running length for center/edge passes and zigzag return runs, 0.4–12 mm                                                                                                                                                                                                                                                             |

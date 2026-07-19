@@ -7,6 +7,9 @@ export type SatinUnderlayMode = (typeof SATIN_UNDERLAY_MODES)[number];
 export const FILL_UNDERLAY_MODES = defineModes(['auto', 'tatami', 'edge', 'off']);
 export type FillUnderlayMode = (typeof FILL_UNDERLAY_MODES)[number];
 
+export const COMPENSATION_MODES = defineModes(['legacy', 'directional']);
+export type CompensationMode = (typeof COMPENSATION_MODES)[number];
+
 export interface FabricUnderlayPreset {
   satin: SatinUnderlayMode;
   fill: FillUnderlayMode;
@@ -187,6 +190,7 @@ export const DEFAULT_MATERIAL_INTENT: Readonly<MaterialIntent> = Object.freeze({
  */
 export const EMBROIDERY_MODE_REGISTRIES = {
   fabric: FABRIC_MODES,
+  compensation: COMPENSATION_MODES,
   threadprofile: THREAD_PROFILE_MODES,
   stabilizer: STABILIZER_MODES,
   underlay: SATIN_UNDERLAY_MODES,

@@ -473,6 +473,25 @@ export function initExecCmdHandler(
       ctx.m.satinWide = mode;
       return;
     }
+    if (st.name === 'compensation') {
+      ctx.traceNote(
+        'compensation',
+        'note: compensation inside trace has no effect on the captured path',
+      );
+      const modeVal = vals[0];
+      if (typeof modeVal !== 'string')
+        throw new NeedlescriptError(
+          `compensation expects a string mode, got ${describeVal(modeVal)} — e.g. compensation 'directional'`,
+          st.line,
+        );
+      const allowed = EMBROIDERY_MODE_REGISTRIES.compensation;
+      const mode = resolveMode(modeVal, allowed);
+      if (mode === undefined)
+        throw new NeedlescriptError(unknownModeMessage('compensation', modeVal, allowed), st.line);
+      ctx.m.flushSatin();
+      ctx.m.compensationMode = mode;
+      return;
+    }
     // Material profile selectors — handled before the bulk num() conversion.
     if (st.name === 'threadprofile' || st.name === 'stabilizer') {
       ctx.traceNote(st.name, `note: ${st.name} inside trace has no effect on the captured path`);
@@ -532,8 +551,10 @@ export function initExecCmdHandler(
         // fabric
         const profile = FABRIC_PROFILES[mode as FabricMode];
         const f: FabricPreset = profile.construction;
+        if (ctx.m.compensationMode === 'directional') ctx.m.flushSatin();
         if (ctx.m.satinUnderlayCustomization) ctx.m.flushSatin();
         ctx.m.pullComp = f.pull;
+        ctx.m.pullCompExplicit = false;
         ctx.m.underlayMode = f.underlay.satin;
         ctx.m.satinUnderlayCustomization = null;
         ctx.m.fillUnderlayMode = f.underlay.fill;
@@ -1249,6 +1270,7 @@ export function initExecCmdHandler(
         );
         if (!Number.isFinite(a[0]))
           throw new NeedlescriptError('fabricgrain must be a finite heading in degrees', st.line);
+        if (ctx.m.compensationMode === 'directional') ctx.m.flushSatin();
         ctx.m.materialIntent = {
           ...ctx.m.materialIntent,
           grainHeading: ((a[0] % 360) + 360) % 360,
@@ -1266,6 +1288,7 @@ export function initExecCmdHandler(
             `fabricstretch values must be finite fractions from ${min} to ${max}`,
             st.line,
           );
+        if (ctx.m.compensationMode === 'directional') ctx.m.flushSatin();
         ctx.m.materialIntent = {
           ...ctx.m.materialIntent,
           stretchAlong: a[0],
@@ -1313,7 +1336,9 @@ export function initExecCmdHandler(
         const v = Math.min(Math.max(a[0], 0), 1.5);
         if (v !== a[0])
           ctx.m.warnings.push(`pullcomp ${a[0]} clamped to ${v} mm (safe range 0–1.5)`);
+        if (ctx.m.compensationMode === 'directional') ctx.m.flushSatin();
         ctx.m.pullComp = v;
+        ctx.m.pullCompExplicit = true;
         return;
       }
       case 'shortstitch':

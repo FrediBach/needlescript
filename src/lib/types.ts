@@ -174,10 +174,11 @@ export interface DirectionalCompensationSample {
   pullDeltaAcrossStitchMM: number;
 }
 
-/** Preview-only comparison; geometry still uses legacy scalar compensation. */
+/** Resolved comparison plus the compensation mode active at the end of the run. */
 export interface DirectionalCompensationPreview {
-  appliedMode: 'legacy-scalar';
+  appliedMode: 'legacy-scalar' | 'directional-satin';
   currentScalarPullMM: number;
+  pullMagnitudeSource: 'fabric-profile' | 'explicit-pullcomp' | 'none';
   resolved: ResolvedDirectionalCompensation;
   samples: DirectionalCompensationSample[];
 }
@@ -191,7 +192,7 @@ export interface RunResult {
   density: DensityResult;
   /** Resolved material/thread intent after all source-order overrides. */
   material: MaterialIntent;
-  /** Directional material recommendation for previews; not applied to event geometry. */
+  /** Directional recommendation and active-mode diagnostic used by opt-in satin construction. */
   compensation: DirectionalCompensationPreview;
   /** The hoop configured by the `hoop` directive, if any. */
   activeHoop?: HoopInfo;

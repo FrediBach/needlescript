@@ -88,6 +88,7 @@ export {
 } from './commands.ts';
 export {
   DEFAULT_MATERIAL_INTENT,
+  COMPENSATION_MODES,
   DEFAULT_THREAD_PROFILE,
   DEFAULT_THREAD_WIDTH_MM,
   EMBROIDERY_MODE_REGISTRIES,
@@ -103,6 +104,7 @@ export {
   TOPPING_PROFILES,
 } from './embroidery-registry.ts';
 export type {
+  CompensationMode,
   FabricMaterialDefaults,
   FabricMode,
   FabricPreset,

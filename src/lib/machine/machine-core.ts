@@ -25,6 +25,7 @@ import type { FillConnectMode, FillConnectorRecord, FillStaggerMode } from '../f
 import { SATIN_CONSTRUCTION_RANGES } from '../satin-profile.ts';
 import type { SatinCapMode, SatinJoinMode, SatinWideMode } from '../satin-profile.ts';
 import { DEFAULT_MATERIAL_INTENT } from '../embroidery-registry.ts';
+import type { CompensationMode } from '../embroidery-registry.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -95,6 +96,8 @@ export interface ConstructionConfigSnapshot {
   readonly fillLenReporter: FillLengthReporter | null;
   readonly lockLen: number;
   readonly pullComp: number;
+  readonly pullCompExplicit: boolean;
+  readonly compensationMode: CompensationMode;
   readonly underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
   readonly satinUnderlayCustomization: SatinUnderlayCustomization | null;
   readonly fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge';
@@ -160,6 +163,8 @@ interface MachineSnapshot {
   fillLenReporter: FillLengthReporter | null;
   lockLen: number;
   pullComp: number;
+  pullCompExplicit: boolean;
+  compensationMode: CompensationMode;
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
   satinUnderlayCustomization: SatinUnderlayCustomization | null;
   fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge';
@@ -261,6 +266,8 @@ export abstract class MachineCore {
   fillLenReporter: FillLengthReporter | null = null; // per-stitch reporter for fill rows
   lockLen = 0.7;
   pullComp = 0; // pull compensation in mm
+  pullCompExplicit = false;
+  compensationMode: CompensationMode = 'legacy';
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag' = 'off';
   satinUnderlayCustomization: SatinUnderlayCustomization | null = null;
   fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge' = 'off';
@@ -428,6 +435,8 @@ export abstract class MachineCore {
       fillLenReporter: this.fillLenReporter,
       lockLen: this.lockLen,
       pullComp: this.pullComp,
+      pullCompExplicit: this.pullCompExplicit,
+      compensationMode: this.compensationMode,
       underlayMode: this.underlayMode,
       satinUnderlayCustomization: cloneSatinUnderlayCustomization(this.satinUnderlayCustomization),
       fillUnderlayMode: this.fillUnderlayMode,
@@ -492,6 +501,8 @@ export abstract class MachineCore {
       this.fillLenReporter = snapshot.fillLenReporter;
       this.lockLen = snapshot.lockLen;
       this.pullComp = snapshot.pullComp;
+      this.pullCompExplicit = snapshot.pullCompExplicit;
+      this.compensationMode = snapshot.compensationMode;
       this.underlayMode = snapshot.underlayMode;
       this.satinUnderlayCustomization = cloneSatinUnderlayCustomization(
         snapshot.satinUnderlayCustomization,
@@ -615,6 +626,8 @@ export abstract class MachineCore {
       fillLenReporter: this.fillLenReporter,
       lockLen: this.lockLen,
       pullComp: this.pullComp,
+      pullCompExplicit: this.pullCompExplicit,
+      compensationMode: this.compensationMode,
       underlayMode: this.underlayMode,
       satinUnderlayCustomization: cloneSatinUnderlayCustomization(this.satinUnderlayCustomization),
       fillUnderlayMode: this.fillUnderlayMode,
@@ -750,6 +763,8 @@ export abstract class MachineCore {
     this.fillLenReporter = snap.fillLenReporter;
     this.lockLen = snap.lockLen;
     this.pullComp = snap.pullComp;
+    this.pullCompExplicit = snap.pullCompExplicit;
+    this.compensationMode = snap.compensationMode;
     this.underlayMode = snap.underlayMode;
     this.satinUnderlayCustomization = cloneSatinUnderlayCustomization(
       snap.satinUnderlayCustomization,

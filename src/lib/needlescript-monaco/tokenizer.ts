@@ -125,6 +125,7 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'filllen',
       'lock',
       'pullcomp',
+      'compensation',
       'shortstitch',
       'autotrim',
       'maxdensity',

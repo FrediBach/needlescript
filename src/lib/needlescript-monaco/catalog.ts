@@ -1,6 +1,7 @@
 // Static catalog of all Needlescript built-ins used by Monaco language services.
 
 import {
+  COMPENSATION_MODES,
   FABRIC_MODES,
   FILL_UNDERLAY_MODES,
   MATERIAL_RANGES,
@@ -966,11 +967,21 @@ export const NS_ITEMS: NSItem[] = [
     params: [['size']],
   },
   {
+    label: 'compensation',
+    kindName: 'function',
+    detail: 'satin compensation mode',
+    documentation:
+      "Choose compensation semantics. `'legacy'` (default) preserves scalar `pullcomp` for satin and fill. `'directional'` applies the grain-aligned material tensor to satin rail endpoints in physical hoop space; fill remains scalar until its separate directional phase. `fabric` supplies the mean pull magnitude. A later explicit `pullcomp` replaces that mean while retaining the `fabricstretch` anisotropy; a later `fabric` restores its profile magnitude and neutral stretch defaults. Sticky, `stitchscope`-aware, and drawless.",
+    insertText: modeCommandSnippet('compensation', COMPENSATION_MODES, "'"),
+    isSnippet: true,
+    params: [['mode']],
+  },
+  {
     label: 'pullcomp',
     kindName: 'function',
     detail: 'pull compensation (mm)',
     documentation:
-      'Pull compensation 0–1.5 mm: widens satin columns and extends fill rows so shapes sew out at their digitized size.',
+      "Pull compensation 0–1.5 mm: widens satin columns and extends fill rows so shapes sew out at their digitized size. Under `compensation 'directional'`, it replaces the material tensor's mean pull magnitude while retaining declared stretch anisotropy; fill continues to use this scalar value.",
     insertText: 'pullcomp ${1:mm}',
     isSnippet: true,
     params: [['mm']],
@@ -1080,7 +1091,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'fabric grain heading (degrees)',
     documentation:
-      'Record the fabric grain heading as turtle degrees: 0 points up and positive angles turn clockwise. Values wrap to 0–360. This is metadata only until directional compensation is explicitly enabled in a later phase.',
+      "Record the fabric grain heading as turtle degrees: 0 points up and positive angles turn clockwise. Values wrap to 0–360. It feeds preview diagnostics and opt-in `compensation 'directional'` satin geometry.",
     insertText: 'fabricgrain ${1:0}',
     isSnippet: true,
     params: [['degrees']],
@@ -1089,7 +1100,7 @@ export const NS_ITEMS: NSItem[] = [
     label: 'fabricstretch',
     kindName: 'function',
     detail: 'declared along/across fabric stretch',
-    documentation: `Record fractional stretch along and across the grain, each from ${MATERIAL_RANGES.stretch.min} to ${MATERIAL_RANGES.stretch.max}. These values are metadata only in the current material phase. A later \`fabric\` command restores that profile's neutral stretch defaults.`,
+    documentation: `Record fractional stretch along and across the grain, each from ${MATERIAL_RANGES.stretch.min} to ${MATERIAL_RANGES.stretch.max}. The values redistribute directional preview and opt-in satin pull while preserving its mean magnitude. A later \`fabric\` command restores that profile's neutral stretch defaults.`,
     insertText: 'fabricstretch ${1:along} ${2:across}',
     isSnippet: true,
     params: [['along', 'across']],

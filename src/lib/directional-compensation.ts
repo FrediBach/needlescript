@@ -73,6 +73,7 @@ export function compensationForHeading(
  */
 export function resolveDirectionalCompensation(
   material: Readonly<MaterialIntent>,
+  meanPullOverrideMM?: number,
 ): ResolvedDirectionalCompensation {
   const { stretchAlong, stretchAcross } = material;
   if (
@@ -86,8 +87,13 @@ export function resolveDirectionalCompensation(
     throw new Error('material stretch must be finite fractions from 0 to 1');
   }
 
+  if (
+    meanPullOverrideMM !== undefined &&
+    (!Number.isFinite(meanPullOverrideMM) || meanPullOverrideMM < 0)
+  )
+    throw new Error('mean pull compensation override must be a non-negative finite number');
   const preset = FABRIC_PROFILES[material.fabricPreset as keyof typeof FABRIC_PROFILES];
-  const scalarPullMM = preset?.construction.pull ?? 0;
+  const scalarPullMM = meanPullOverrideMM ?? preset?.construction.pull ?? 0;
   const meanPreservingScale = 2 / (2 + stretchAlong + stretchAcross);
   const pullAlongGrainMM = scalarPullMM * (1 + stretchAlong) * meanPreservingScale;
   const pullAcrossGrainMM = scalarPullMM * (1 + stretchAcross) * meanPreservingScale;
@@ -109,16 +115,31 @@ export function resolveDirectionalCompensation(
 export function directionalCompensationPreview(
   material: Readonly<MaterialIntent>,
   currentScalarPullMM: number,
+  options: {
+    mode?: 'legacy' | 'directional';
+    pullCompExplicit?: boolean;
+  } = {},
 ): DirectionalCompensationPreview {
   validateAxisValue('current scalar pull compensation', currentScalarPullMM);
-  const resolved = resolveDirectionalCompensation(material);
+  const explicit = options.pullCompExplicit ?? false;
+  const applyExplicitToTensor = explicit && options.mode === 'directional';
+  const resolved = resolveDirectionalCompensation(
+    material,
+    applyExplicitToTensor ? currentScalarPullMM : undefined,
+  );
+  const preset = FABRIC_PROFILES[material.fabricPreset as keyof typeof FABRIC_PROFILES];
   const headings = [
     { axis: 'grain' as const, heading: resolved.grainHeading },
     { axis: 'cross-grain' as const, heading: normalizeHeading(resolved.grainHeading + 90) },
   ];
   return {
-    appliedMode: 'legacy-scalar',
+    appliedMode: options.mode === 'directional' ? 'directional-satin' : 'legacy-scalar',
     currentScalarPullMM,
+    pullMagnitudeSource: applyExplicitToTensor
+      ? 'explicit-pullcomp'
+      : preset
+        ? 'fabric-profile'
+        : 'none',
     resolved,
     samples: headings.map(({ axis, heading }) => {
       const pull = compensationForHeading(resolved.pullTensor, heading);

@@ -28,6 +28,11 @@ import {
   satinCapWidthFactor,
 } from '../satin-profile.ts';
 import type { SatinCapMode, SatinJoinMode } from '../satin-profile.ts';
+import {
+  compensationForHeading,
+  resolveDirectionalCompensation,
+} from '../directional-compensation.ts';
+import type { CompensationTensor } from '../types.ts';
 
 interface ResolvedSatinCaps {
   readonly start: SatinCapMode;
@@ -61,6 +66,24 @@ interface WideSatinLaneSample {
 
 export class SatinMachine extends MachineCore {
   // ---- Satin column: underlay + zigzag, sewn when the column ends ----
+
+  _directionalSatinPullTensor(): CompensationTensor | null {
+    if (this.compensationMode !== 'directional') return null;
+    return resolveDirectionalCompensation(
+      this.materialIntent,
+      this.pullCompExplicit ? this.pullComp : undefined,
+    ).pullTensor;
+  }
+
+  _satinPullForHeading(heading: number, tensor: CompensationTensor | null): number {
+    return tensor ? compensationForHeading(tensor, heading).acrossStitchMM : this.pullComp;
+  }
+
+  _satinPullForVector(dx: number, dy: number, tensor: CompensationTensor | null): number {
+    if (!tensor) return this.pullComp;
+    const heading = ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
+    return this._satinPullForHeading(heading, tensor);
+  }
 
   _resolveSatinCaps(
     lengthMM: number,
@@ -984,13 +1007,17 @@ export class SatinMachine extends MachineCore {
       b: this.mapOut(cp.b[0], cp.b[1]),
     }));
     const geometry = prepareRailPair(railA, railB, checkpoints, this.currentLine, chargeOps);
+    const pullTensor = this._directionalSatinPullTensor();
+    const pullAt = (sample: RailPairSample) =>
+      this._satinPullForHeading(sample.heading, pullTensor);
     const analysis = analyzeRailPairColumn(geometry.samples, {
       sharpTurnThresholdDeg: this.satinCornerAngle,
     });
     const caps = this._resolveSatinCaps(
       geometry.spineLength,
-      this._railWidth(geometry.samples[0]) + this.pullComp,
-      this._railWidth(geometry.samples[geometry.samples.length - 1]) + this.pullComp,
+      this._railWidth(geometry.samples[0]) + pullAt(geometry.samples[0]),
+      this._railWidth(geometry.samples[geometry.samples.length - 1]) +
+        pullAt(geometry.samples[geometry.samples.length - 1]),
       geometry.closed,
       'satinbetween',
     );
@@ -1011,12 +1038,13 @@ export class SatinMachine extends MachineCore {
 
     const rawWideSections = geometry.samples.map((sample, index): WideSatinSection => {
       const width = this._railWidth(sample);
+      const pull = pullAt(sample);
       const ux = width > 1e-9 ? (sample.b[0] - sample.a[0]) / width : 0;
       const uy = width > 1e-9 ? (sample.b[1] - sample.a[1]) / width : 0;
       return {
         arc: geometry.cumulative[index],
-        a: [sample.a[0] - (ux * this.pullComp) / 2, sample.a[1] - (uy * this.pullComp) / 2],
-        b: [sample.b[0] + (ux * this.pullComp) / 2, sample.b[1] + (uy * this.pullComp) / 2],
+        a: [sample.a[0] - (ux * pull) / 2, sample.a[1] - (uy * pull) / 2],
+        b: [sample.b[0] + (ux * pull) / 2, sample.b[1] + (uy * pull) / 2],
       };
     });
     const wideSections = hasCapPolicy
@@ -1095,7 +1123,7 @@ export class SatinMachine extends MachineCore {
       const uy = len > 1e-9 ? dy / len : 0;
       // Positive inset moves inward; pull compensation widens by the same
       // total amount as existing satin (half on each edge).
-      const move = safeInset - this.pullComp / 2;
+      const move = safeInset - pullAt(sample) / 2;
       return { x: base[0] + ux * move, y: base[1] + uy * move };
     };
 
@@ -1133,7 +1161,7 @@ export class SatinMachine extends MachineCore {
                 caps,
                 Math.min(arc, geometry.spineLength),
                 geometry.spineLength,
-                this._railWidth(sample) + this.pullComp,
+                this._railWidth(sample) + pullAt(sample),
               )
             : 1;
           topping.push({
@@ -1144,7 +1172,7 @@ export class SatinMachine extends MachineCore {
             arc: Math.min(arc, geometry.spineLength),
             centerX: sample.mid[0],
             centerY: sample.mid[1],
-            widthMM: (this._railWidth(sample) + this.pullComp) * factor,
+            widthMM: (this._railWidth(sample) + pullAt(sample)) * factor,
           });
         }
         cursor += advance * 2;
@@ -1164,7 +1192,7 @@ export class SatinMachine extends MachineCore {
               caps,
               arc,
               geometry.spineLength,
-              this._railWidth(sample) + this.pullComp,
+              this._railWidth(sample) + pullAt(sample),
             )
           : 1;
         topping.push({
@@ -1175,7 +1203,7 @@ export class SatinMachine extends MachineCore {
           arc,
           centerX: sample.mid[0],
           centerY: sample.mid[1],
-          widthMM: (this._railWidth(sample) + this.pullComp) * factor,
+          widthMM: (this._railWidth(sample) + pullAt(sample)) * factor,
         });
       }
     }
@@ -1199,10 +1227,15 @@ export class SatinMachine extends MachineCore {
     this.satinSide = side;
 
     this._shortenRailPairCrowding(topping);
-    const joinedTopping = this._applySatinCornerStrategy(topping, analysis, 'satinbetween');
+    const effectiveAnalysis = pullTensor ? wideAnalysis : analysis;
+    const joinedTopping = this._applySatinCornerStrategy(
+      topping,
+      effectiveAnalysis,
+      'satinbetween',
+    );
     this._warnRailPairCrossings(geometry, chargeOps);
-    this._warnRailPairCurvature(analysis);
-    this._emitRailPairColumn(geometry, joinedTopping, caps);
+    this._warnRailPairCurvature(effectiveAnalysis);
+    this._emitRailPairColumn(geometry, joinedTopping, caps, pullTensor);
 
     // The turtle remains in local space. Keep heading/pen/mode untouched and
     // place it at the authored endpoint corresponding to the final rail side.
@@ -1276,6 +1309,7 @@ export class SatinMachine extends MachineCore {
     geometry: RailPairGeometry,
     topping: { x: number; y: number; side: number; sample: RailPairSample; arc: number }[],
     caps: ResolvedSatinCaps,
+    pullTensor: CompensationTensor | null,
   ) {
     const start = geometry.samples[0].mid;
     const from = this.lastEmit ?? { x: 0, y: 0 };
@@ -1285,7 +1319,7 @@ export class SatinMachine extends MachineCore {
       this.started = true;
       this._push('stitch', start[0], start[1]);
     }
-    this._railPairUnderlay(geometry, caps);
+    this._railPairUnderlay(geometry, caps, pullTensor);
 
     if (caps.start === 'point' || caps.start === 'round')
       this._pushCappedTopping(start[0], start[1]);
@@ -1331,13 +1365,24 @@ export class SatinMachine extends MachineCore {
     }
   }
 
-  _railPairUnderlay(geometry: RailPairGeometry, caps: ResolvedSatinCaps) {
-    const width = geometry.meanWidth + this.pullComp;
+  _railPairUnderlay(
+    geometry: RailPairGeometry,
+    caps: ResolvedSatinCaps,
+    pullTensor: CompensationTensor | null,
+  ) {
+    const pullAt = (sample: RailPairSample) =>
+      this._satinPullForHeading(sample.heading, pullTensor);
+    const width = pullTensor
+      ? geometry.samples.reduce(
+          (sum, sample) => sum + this._railWidth(sample) + pullAt(sample),
+          0,
+        ) / geometry.samples.length
+      : geometry.meanWidth + this.pullComp;
     const profile = this._resolveSatinUnderlay(width, 'rail-pair');
     if (!profile.passes.length) return;
     this._warnCollapsedEdgeInset(
       profile,
-      Math.min(...geometry.samples.map((sample) => this._railWidth(sample) + this.pullComp)),
+      Math.min(...geometry.samples.map((sample) => this._railWidth(sample) + pullAt(sample))),
       'the narrowest satinbetween section',
     );
     const runningLengths = profile.passes.flatMap((pass) =>
@@ -1368,12 +1413,11 @@ export class SatinMachine extends MachineCore {
       } else if (pass.kind === 'edge') {
         const left = underlaySamples.map((sample) => {
           const railWidth = this._railWidth(sample);
+          const pull = pullAt(sample);
           const f =
             pass.inset.unit === 'mm'
               ? railWidth > 1e-9
-                ? (Math.min(pass.inset.value, (railWidth + this.pullComp) / 2) -
-                    this.pullComp / 2) /
-                  railWidth
+                ? (Math.min(pass.inset.value, (railWidth + pull) / 2) - pull / 2) / railWidth
                 : 0.5
               : railWidth < 1
                 ? 0
@@ -1385,12 +1429,11 @@ export class SatinMachine extends MachineCore {
         });
         const right = underlaySamples.map((sample) => {
           const railWidth = this._railWidth(sample);
+          const pull = pullAt(sample);
           const f =
             pass.inset.unit === 'mm'
               ? railWidth > 1e-9
-                ? (Math.min(pass.inset.value, (railWidth + this.pullComp) / 2) -
-                    this.pullComp / 2) /
-                  railWidth
+                ? (Math.min(pass.inset.value, (railWidth + pull) / 2) - pull / 2) / railWidth
                 : 0.5
               : railWidth < 1
                 ? 0
@@ -1409,9 +1452,10 @@ export class SatinMachine extends MachineCore {
           const sample = geometry.atArc(startArc + (underlayLength * i) / steps);
           const edge = i % 2 === 0 ? sample.a : sample.b;
           const railWidth = this._railWidth(sample);
+          const pull = pullAt(sample);
           const widthRatio =
-            profile.source === 'custom' && railWidth > 1e-9
-              ? pass.widthRatio * ((railWidth + this.pullComp) / railWidth)
+            (pullTensor || profile.source === 'custom') && railWidth > 1e-9
+              ? pass.widthRatio * ((railWidth + pull) / railWidth)
               : pass.widthRatio;
           zigzag.push({
             x: sample.mid[0] + (edge[0] - sample.mid[0]) * widthRatio,
@@ -1451,7 +1495,8 @@ export class SatinMachine extends MachineCore {
     // affine). With no transform and no warp the original (exact) path runs, so
     // existing output is byte-for-byte unchanged.
     if (this.satinReporter) this._flushSatinProgrammable(path);
-    else if (isIdentity(this.satinCTM) && !this.satinHasWarp) this._flushSatinPlain(path);
+    else if (this.compensationMode === 'legacy' && isIdentity(this.satinCTM) && !this.satinHasWarp)
+      this._flushSatinPlain(path);
     else this._flushSatinTransformed(path, this.satinCTM);
   }
 
@@ -1552,6 +1597,32 @@ export class SatinMachine extends MachineCore {
     return out;
   }
 
+  _directionalEdgePathT(
+    local: { x: number; y: number }[],
+    ctm: Mat,
+    designWidth: number,
+    inset: SatinEdgeInset,
+  ): { x: number; y: number }[] {
+    const tensor = this._directionalSatinPullTensor();
+    if (!tensor) return this._offsetPathT(local, ctm, this._edgeCenterOffset(designWidth, inset));
+    const hoop = this._toHoop(local);
+    return local.map((point, index) => {
+      const previous = local[Math.max(0, index - 1)];
+      const next = local[Math.min(local.length - 1, index + 1)];
+      const hoopPrevious = hoop[Math.max(0, index - 1)];
+      const hoopNext = hoop[Math.min(hoop.length - 1, index + 1)];
+      const { ox, oy, scale } = this._perpVec(ctm, previous.x, previous.y, next.x, next.y);
+      const pull = this._satinPullForVector(
+        hoopNext.x - hoopPrevious.x,
+        hoopNext.y - hoopPrevious.y,
+        tensor,
+      );
+      const offset = this._edgeCenterOffset(designWidth * scale + pull, inset);
+      const [x, y] = this._mapSatin(point.x, point.y);
+      return { x: x + (ox / scale) * offset, y: y + (oy / scale) * offset };
+    });
+  }
+
   _zigzagAlongT(
     local: { x: number; y: number }[],
     designWidth: number,
@@ -1560,8 +1631,10 @@ export class SatinMachine extends MachineCore {
     u: boolean,
     shortStitch: boolean,
     caps?: ResolvedSatinCaps,
+    directionalPullScale = 1,
   ) {
     if (local.length < 2) return;
+    const pullTensor = this._directionalSatinPullTensor();
     const hoop = this._toHoop(local);
     const halfDesign = designWidth / 2;
     const realizedWidths = local.map((point, index) => {
@@ -1570,7 +1643,16 @@ export class SatinMachine extends MachineCore {
       const a = index < local.length - 1 ? point : previous;
       const b = index < local.length - 1 ? next : point;
       const { scale } = this._perpVec(this.satinCTM, a.x, a.y, b.x, b.y);
-      return designWidth * scale + pull;
+      const hoopPrevious = hoop[Math.max(0, index - 1)];
+      const hoopNext = hoop[Math.min(hoop.length - 1, index + 1)];
+      const resolvedPull = pullTensor
+        ? this._satinPullForVector(
+            hoopNext.x - hoopPrevious.x,
+            hoopNext.y - hoopPrevious.y,
+            pullTensor,
+          ) * directionalPullScale
+        : pull;
+      return designWidth * scale + resolvedPull;
     });
     const analysis = analyzeSpineColumn(
       hoop.map((point) => [point.x, point.y]),
@@ -1609,7 +1691,10 @@ export class SatinMachine extends MachineCore {
       } = this._perpVec(this.satinCTM, local[i - 1].x, local[i - 1].y, local[i].x, local[i].y);
       const dirx = ovx / scale,
         diry = ovy / scale;
-      const halfBase = halfDesign * scale + pull / 2; // pull comp is never scaled
+      const resolvedPull = pullTensor
+        ? this._satinPullForVector(dxT, dyT, pullTensor) * directionalPullScale
+        : pull;
+      const halfBase = halfDesign * scale + resolvedPull / 2; // compensation is never scaled
       let innerSide = 0;
       let crowded = false;
       if (prevUx !== null) {
@@ -1683,6 +1768,7 @@ export class SatinMachine extends MachineCore {
       this.started = true;
       this._push('stitch', hoop0[0], hoop0[1]);
     }
+    const pullTensor = this._directionalSatinPullTensor();
     // Representative width (average perpendicular scale) for underlay choice.
     let scaleSum = 0,
       scaleN = 0;
@@ -1692,15 +1778,24 @@ export class SatinMachine extends MachineCore {
       scaleN++;
     }
     const avgScale = scaleN ? scaleSum / scaleN : 1;
-    const w = this.satinWidth * avgScale + this.pullComp;
     const hoopFull = this._toHoop(local);
     const realizedWidths = local.map((point, index) => {
       const previous = local[Math.max(0, index - 1)];
       const next = local[Math.min(local.length - 1, index + 1)];
       const a = index < local.length - 1 ? point : previous;
       const b = index < local.length - 1 ? next : point;
-      return this.satinWidth * this._perpVec(ctm, a.x, a.y, b.x, b.y).scale + this.pullComp;
+      const hoopPrevious = hoopFull[Math.max(0, index - 1)];
+      const hoopNext = hoopFull[Math.min(hoopFull.length - 1, index + 1)];
+      const pull = this._satinPullForVector(
+        hoopNext.x - hoopPrevious.x,
+        hoopNext.y - hoopPrevious.y,
+        pullTensor,
+      );
+      return this.satinWidth * this._perpVec(ctm, a.x, a.y, b.x, b.y).scale + pull;
     });
+    const w = pullTensor
+      ? realizedWidths.reduce((sum, width) => sum + width, 0) / realizedWidths.length
+      : this.satinWidth * avgScale + this.pullComp;
     const analysis = analyzeSpineColumn(
       hoopFull.map((point) => [point.x, point.y]),
       realizedWidths,
@@ -1743,11 +1838,19 @@ export class SatinMachine extends MachineCore {
       } else if (pass.kind === 'edge') {
         const off = this._edgeCenterOffset(w, pass.inset);
         this._runAlong(
-          this._offsetPathT(underlayLocal, ctm, off),
+          pullTensor
+            ? this._directionalEdgePathT(underlayLocal, ctm, this.satinWidth, pass.inset)
+            : this._offsetPathT(underlayLocal, ctm, off),
           pass.runningStitchLengthMM,
           true,
         );
-        this._runAlong(this._offsetPathT(revLocal, ctm, off), pass.runningStitchLengthMM, true);
+        this._runAlong(
+          pullTensor
+            ? this._directionalEdgePathT(revLocal, ctm, this.satinWidth, pass.inset)
+            : this._offsetPathT(revLocal, ctm, off),
+          pass.runningStitchLengthMM,
+          true,
+        );
       } else {
         this._zigzagAlongT(
           underlayLocal,
@@ -1756,6 +1859,8 @@ export class SatinMachine extends MachineCore {
           pass.spacingMM,
           true,
           false,
+          undefined,
+          pass.widthRatio,
         );
         if (pass.returnRun === 'reverse-center')
           this._runAlong(revHoop, pass.returnRunStitchLengthMM, true);
@@ -1797,6 +1902,7 @@ export class SatinMachine extends MachineCore {
     const reporter = this.satinReporter!;
     const n = local.length;
     if (n < 2) return;
+    const pullTensor = this._directionalSatinPullTensor();
 
     // Cumulative arc length of the spine in the *CTM-mapped* (hoop-affine)
     // frame (§4 step 1: the CTM maps the spine before generation). Walking this
@@ -1845,13 +1951,24 @@ export class SatinMachine extends MachineCore {
     // Place one rail endpoint: anchor at the lagged arc-length, offset along the
     // (CTM-mapped) spine normal there by the half-width, signed by the rail.
     // Mirrors _zigzagAlongT exactly so the identity case is byte-identical.
-    const place = (arcLen: number, halfW: number, side: number): [number, number] => {
+    const place = (arcLen: number, halfW: number, side: number) => {
       const sp = resolve(arcLen);
       const [ovx, ovy] = linApply(this.satinCTM, sp.nx, sp.ny);
       const scale = Math.hypot(ovx, ovy) || 1;
       const [cx, cy] = this._mapSatin(sp.x, sp.y);
-      const h = halfW * scale + this.pullComp / 2; // pull comp is never scaled
-      return [cx + (ovx / scale) * h * side, cy + (ovy / scale) * h * side];
+      const segmentStart = capSpine[sp.segment - 1];
+      const segmentEnd = capSpine[sp.segment];
+      const pull = this._satinPullForVector(
+        segmentEnd[0] - segmentStart[0],
+        segmentEnd[1] - segmentStart[1],
+        pullTensor,
+      );
+      const h = halfW * scale + pull / 2; // compensation is never scaled
+      return {
+        x: cx + (ovx / scale) * h * side,
+        y: cy + (ovy / scale) * h * side,
+        pull,
+      };
     };
 
     // Single walk: buffer the topping penetrations (so underlay can be emitted
@@ -1914,7 +2031,8 @@ export class SatinMachine extends MachineCore {
         if (stepPos > L + 1e-9) break;
         side = -side;
         const left = side > 0; // side=+1 → left rail (lw/ll); −1 → right (rw/rl)
-        const [hx, hy] = place(stepPos + (left ? ll : rl), left ? lw : rw, side);
+        const placed = place(stepPos + (left ? ll : rl), left ? lw : rw, side);
+        const { x: hx, y: hy } = placed;
         const center = resolve(stepPos);
         const [centerX, centerY] = this._mapSatin(center.x, center.y);
         const capArc =
@@ -1947,8 +2065,8 @@ export class SatinMachine extends MachineCore {
           centerY,
           arc: capArc,
           capArc,
-          realizedWidth: (lw + rw) * widthScale + this.pullComp,
-          widthMM: (lw + rw) * widthScale + this.pullComp,
+          realizedWidth: (lw + rw) * widthScale + placed.pull,
+          widthMM: (lw + rw) * widthScale + placed.pull,
           side,
         };
         topping.push(pen);
@@ -1971,8 +2089,18 @@ export class SatinMachine extends MachineCore {
       local[n - 1].x,
       local[n - 1].y,
     ).scale;
-    const startWidth = maxFullW * startScale + this.pullComp;
-    const endWidth = maxFullW * endScale + this.pullComp;
+    const startPull = this._satinPullForVector(
+      capSpine[1][0] - capSpine[0][0],
+      capSpine[1][1] - capSpine[0][1],
+      pullTensor,
+    );
+    const endPull = this._satinPullForVector(
+      capSpine[n - 1][0] - capSpine[n - 2][0],
+      capSpine[n - 1][1] - capSpine[n - 2][1],
+      pullTensor,
+    );
+    const startWidth = maxFullW * startScale + startPull;
+    const endWidth = maxFullW * endScale + endPull;
     const widestProgrammable = Math.max(
       startWidth,
       endWidth,
@@ -1983,9 +2111,29 @@ export class SatinMachine extends MachineCore {
         'programmable satin',
         'reporter-defined width and rake make the split topology ambiguous',
       );
-    const mappedAnalysis = analyzeSpineColumn(capSpine, maxFullW + this.pullComp, {
-      sharpTurnThresholdDeg: this.satinCornerAngle,
+    const mappedWidths = local.map((point, index) => {
+      const previous = local[Math.max(0, index - 1)];
+      const next = local[Math.min(local.length - 1, index + 1)];
+      const a = index < local.length - 1 ? point : previous;
+      const b = index < local.length - 1 ? next : point;
+      const hoopPrevious = capSpine[Math.max(0, index - 1)];
+      const hoopNext = capSpine[Math.min(capSpine.length - 1, index + 1)];
+      return (
+        maxFullW * this._perpVec(this.satinCTM, a.x, a.y, b.x, b.y).scale +
+        this._satinPullForVector(
+          hoopNext[0] - hoopPrevious[0],
+          hoopNext[1] - hoopPrevious[1],
+          pullTensor,
+        )
+      );
     });
+    const mappedAnalysis = analyzeSpineColumn(
+      capSpine,
+      pullTensor ? mappedWidths : maxFullW + this.pullComp,
+      {
+        sharpTurnThresholdDeg: this.satinCornerAngle,
+      },
+    );
     const caps = this._resolveSatinCaps(
       capLength,
       startWidth,
@@ -2046,7 +2194,8 @@ export class SatinMachine extends MachineCore {
     // Curvature guard: a column wider than the arc it follows can't sew — let it
     // warn honestly on the realized representative width (§7.5), reusing the
     // built-in "wider than radius" phrasing.
-    this._warnIfWiderThanRadius(local, (maxFullW + this.pullComp) / 2);
+    const representativeWidth = pullTensor ? Math.max(...mappedWidths) : maxFullW + this.pullComp;
+    this._warnIfWiderThanRadius(local, representativeWidth / 2);
 
     // Snag: keys off the realized chord, which for a raked stitch is the
     // hypotenuse across width and longitudinal span — not leftw + rightw (§5.2).
@@ -2062,7 +2211,12 @@ export class SatinMachine extends MachineCore {
       const [hx, hy] = this._mapSatin(local[0].x, local[0].y);
       this._push('stitch', hx, hy);
     }
-    this._programmableUnderlay(local, maxFullW + this.pullComp, hasCapPolicy ? caps : undefined);
+    this._programmableUnderlay(
+      local,
+      maxFullW,
+      representativeWidth,
+      hasCapPolicy ? caps : undefined,
+    );
     if (hasCapPolicy && (caps.start === 'point' || caps.start === 'round')) {
       const start = resolve(0);
       const [x, y] = this._mapSatin(start.x, start.y);
@@ -2100,10 +2254,15 @@ export class SatinMachine extends MachineCore {
   }
 
   /** Underlay for a programmable column, sized by the max realized width (§9). */
-  _programmableUnderlay(local: { x: number; y: number }[], w: number, caps?: ResolvedSatinCaps) {
-    const profile = this._resolveSatinUnderlay(w, 'programmable');
+  _programmableUnderlay(
+    local: { x: number; y: number }[],
+    designWidth: number,
+    realizedWidth: number,
+    caps?: ResolvedSatinCaps,
+  ) {
+    const profile = this._resolveSatinUnderlay(realizedWidth, 'programmable');
     if (!profile.passes.length) return;
-    this._warnCollapsedEdgeInset(profile, w, 'the programmable satin column');
+    this._warnCollapsedEdgeInset(profile, realizedWidth, 'the programmable satin column');
     const underlayLocal = caps ? this._trimLocalPathForCaps(local, caps) : local;
     const hoop = this._toHoop(underlayLocal);
     const revHoop = hoop.slice().reverse();
@@ -2113,26 +2272,37 @@ export class SatinMachine extends MachineCore {
         this._runAlong(hoop, pass.runningStitchLengthMM, true);
         this._runAlong(revHoop, pass.runningStitchLengthMM, true);
       } else if (pass.kind === 'edge') {
-        const off = this._edgeCenterOffset(w, pass.inset);
+        const off = this._edgeCenterOffset(realizedWidth, pass.inset);
         this._runAlong(
-          this._offsetPathT(underlayLocal, this.satinCTM, off),
+          this.compensationMode === 'directional'
+            ? this._directionalEdgePathT(underlayLocal, this.satinCTM, designWidth, pass.inset)
+            : this._offsetPathT(underlayLocal, this.satinCTM, off),
           pass.runningStitchLengthMM,
           true,
         );
         this._runAlong(
-          this._offsetPathT(revLocal, this.satinCTM, off),
+          this.compensationMode === 'directional'
+            ? this._directionalEdgePathT(revLocal, this.satinCTM, designWidth, pass.inset)
+            : this._offsetPathT(revLocal, this.satinCTM, off),
           pass.runningStitchLengthMM,
           true,
         );
       } else {
-        const designWidth = profile.source === 'custom' ? Math.max(0, w - this.pullComp) : w;
+        const passDesignWidth =
+          this.compensationMode === 'directional'
+            ? designWidth
+            : profile.source === 'custom'
+              ? Math.max(0, realizedWidth - this.pullComp)
+              : realizedWidth;
         this._zigzagAlongT(
           underlayLocal,
-          designWidth * pass.widthRatio,
+          passDesignWidth * pass.widthRatio,
           this.pullComp * pass.widthRatio,
           pass.spacingMM,
           true,
           false,
+          undefined,
+          pass.widthRatio,
         );
         if (pass.returnRun === 'reverse-center')
           this._runAlong(revHoop, pass.returnRunStitchLengthMM, true);

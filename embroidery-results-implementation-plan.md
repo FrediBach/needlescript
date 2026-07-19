@@ -1386,6 +1386,8 @@ grain-axis swapping, signed projections, material resolution, and unchanged even
 
 ### Session 7.4 — Opt-in directional satin compensation
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Add an explicit mode such as `compensation 'directional'`; retain legacy scalar behavior by
@@ -1400,6 +1402,27 @@ Acceptance criteria:
 - Rotating the design relative to grain changes compensation predictably.
 - Rotating both design and grain together preserves geometry modulo rotation.
 - Width ceilings and snag warnings observe compensated chords.
+
+Implementation note: `compensation 'legacy'|'directional'` is a sticky, scoped Core selector.
+`'legacy'` is the default and retains the existing scalar event stream. In directional mode, every
+numeric and programmable spine-satin endpoint and every `satinbetween` endpoint resolves the
+material pull tensor against the local physical column heading, then widens half the across-column
+recommendation on each rail. Centerlines are mapped first, so headings and compensation remain hoop-
+space quantities through rotation, non-uniform affine transforms, and warped centerlines.
+
+The override rule is source-ordered. `fabric` supplies its profile pull as the tensor's mean
+magnitude and clears any earlier explicit override. A later `pullcomp` replaces that mean while
+retaining the along/across ratio declared by `fabricstretch`; a later `fabric` restores the profile
+magnitude and neutral stretch defaults. An explicit magnitude also lets an otherwise unspecified
+fabric use authored grain/stretch. Fill continues to consume the scalar `pullcomp` in this session.
+
+Compensated physical widths feed caps, automatic underlay choice, custom insets, curve analysis,
+wide-column splitting, rail-pair snag detection, and the 12 mm stitch ceiling. Mode, override
+provenance, and material intent participate in construction and trace snapshots. Valid mode/material
+changes flush an active directional satin buffer before replacing its physics. The implementation is
+drawless. Tests pin legacy compatibility, source-order overrides, relative rotation, co-rotation,
+non-uniform transforms, spine/rail-pair parity, scoped restoration, and diagnostics crossing only at
+their compensated thresholds.
 
 ### Session 7.5 — Opt-in directional fill and border compensation
 

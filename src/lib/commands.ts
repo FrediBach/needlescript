@@ -83,6 +83,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
   filllen: 1,
   lock: 1,
   pullcomp: 1,
+  compensation: 1,
   shortstitch: 1,
   autotrim: 1,
   maxdensity: 1,

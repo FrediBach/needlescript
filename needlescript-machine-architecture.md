@@ -61,7 +61,7 @@ Tightly-coupled collaborators live one level up:
 - `embroidery-registry.ts` — compatible legacy fabric construction settings plus typed fabric,
   thread, needle, stabilizer, and topping profiles/defaults.
 - `directional-compensation.ts` — pure grain-aligned compensation tensors, heading projections,
-  material resolution, and preview diagnostics; it does not alter stitch geometry.
+  material resolution, and preview diagnostics shared by opt-in satin construction.
 - `fill-profile.ts` — fill inset/edge/stagger ranges, connector/stagger mode registries, internal
   connector classification types, and pure drawless row-phase calculation including geometry
   hashing.
@@ -120,7 +120,7 @@ The public `Machine` class is a small facade over `FillMachine`, `SatinMachine`,
 | Stitch config   | `stitchLen`, `stitchLenList`/`Reporter`, `mode`, `beanRepeats`                                                                                                                                 | one of numeric / list / reporter stitch-length forms active at a time  |
 | Satin           | `satinWidth`, `satinSpacing`, `satinSide`, cap/join settings, `satinWide`/`MaxWidth`/`SplitOverlap`, `eWidth`, `satinReporter`, `satinPath`                                                    | buffered column                                                        |
 | Fill            | `fillAngle`, `fillSpacing`, `fillInset`, `fillEdgeRun`, `fillEdgeShort`, `fillStagger`/`Amount`, `fillConnect`, `fillLen`(+list/reporter), `fillArmed`, `fillDirReporter`, `fillShapeReporter` | tatami + programmable                                                  |
-| Physics         | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity`                                                                           | selectors lower to typed profiles at generation time                   |
+| Physics         | `lockLen`, `pullComp`/provenance, `compensationMode`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity`                                            | selectors lower to typed profiles at generation time                   |
 | Material        | `materialIntent`                                                                                                                                                                               | thread width feeds coverage; legacy `fabric` also affects construction |
 | Output          | `events`, `warnings`, `colorIdx`, `lastEmit`, `started`                                                                                                                                        | accumulation                                                           |
 | Transform stack | `ctm`, `outLayers`, `hasWarp`, `penLayers`, `declumpStack`                                                                                                                                     | see §6                                                                 |
@@ -143,7 +143,7 @@ cap transition length, corner policy/threshold, wide-column policy/ceiling/inter
 underlay pass/length/inset/spacing overrides; fill angle, spacing, construction inset, edge-run
 inset, minimum useful row-fragment length, stagger mode and amount, connector policy,
 fill-underlay pass/length/inset/spacing/relative-angle overrides,
-length forms, and an unused one-shot fill arm; the lock, pull-compensation, underlay,
+length forms, and an unused one-shot fill arm; the lock, pull-compensation value/provenance/mode, underlay,
 short-stitch, auto-trim, and density settings; and a copied resolved material-intent record. Current
 `fabric` presets resolve into these same physics fields, so their construction effects and material
 metadata are scoped without treating warning notes as state.
@@ -193,14 +193,15 @@ recommendation. Push tensors use negative values for shortening and currently re
 physical sew-out measurements exist.
 
 Finalization calls `directionalCompensationPreview` once and exposes the result as
-`RunResult.compensation`: the current legacy scalar, the resolved signed tensors, and projections at
-the grain and cross-grain headings. The field is preview-only. No machine or generator reads it, so
-event geometry, coverage, warnings, locks, exports, and RNG behavior remain unchanged.
+`RunResult.compensation`: the current scalar, its source, the resolved signed tensors, and
+projections at the grain and cross-grain headings. With the default `compensationMode = 'legacy'`,
+this remains comparison-only. The opt-in `'directional'` mode uses the same pure resolver for satin
+geometry. Fill, borders, and running stitches still do not read the tensor.
 
-Application policy is construction-specific rather than a generic affine scale. A future satin
-mode may use positive across-column pull to widen rails and evidence-backed negative along-column
-push. Open tatami rows may use positive along-row pull to extend endpoints, with push still deferred.
-Borders need explicit inset/overlap handling, and running stitches receive no automatic correction.
+Directional satin replaces the preset tensor's mean magnitude when `pullCompExplicit` is true; it
+does not replace the stretch-derived axis ratio. `fabric` restores its profile scalar and clears the
+flag, so later source wins in both directions. Push stays zero and is not applied. This is a
+construction-specific rail widening, never a generic affine scale.
 
 ---
 
@@ -312,6 +313,20 @@ absolute hoop-space millimetres; ratio insets exist only in lowered legacy profi
 programmable satin, and rail-pair satin consume the same pass objects. A requested absolute inset
 that reaches the center of a narrow column is clamped there and warns once per column. Every pass
 emits through the existing underlay paths with `u: 1`.
+
+`compensation 'directional'` resolves a pull tensor once per satin construction and projects it
+across each physical column heading. Numeric and programmable spine columns map their centerline to
+hoop space before measuring the heading; the resulting amount is then added in physical millimetres
+along the realized rail direction, after authored width scaling. `satinbetween` maps and pairs both
+rails first, then widens each physical rung by the same projection. Rotation therefore changes the
+result only relative to fixed fabric grain, while rotating grain and design together preserves the
+column modulo rotation. Non-uniform transforms scale authored width but never scale compensation.
+
+The resolved per-rung widths are shared by caps, underlay selection/insets, curve analysis, wide-
+column splitting, short-stitch relief, rail-pair snag checks, and ceiling subdivision. Legacy mode
+does not enter this branch and retains its exact scalar paths. Directional mode is drawless; changing
+the mode, fabric, grain, stretch, or explicit pull while a directional spine is buffered flushes the
+old construction first.
 
 For an open column with a non-legacy `satincap`, the shared analyzed physical length and realized
 endpoint widths resolve independent start/end cap constructions before topping emission. `butt`

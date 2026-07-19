@@ -409,7 +409,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     locks,
     density,
     material: { ...m.materialIntent },
-    compensation: directionalCompensationPreview(m.materialIntent, m.pullComp),
+    compensation: directionalCompensationPreview(m.materialIntent, m.pullComp, {
+      mode: m.compensationMode,
+      pullCompExplicit: m.pullCompExplicit,
+    }),
     activeHoop,
     activeOverrides,
     globals: ctx.globals,
