@@ -927,6 +927,8 @@ existing non-fill declump paths retain their prior event streams.
 
 ### Session 5.1 — Column analysis model
 
+Status: complete (2026-07-19)
+
 Purpose: identify tips, sharp corners, continuous curvature, and unsafe widths before emission.
 
 Tasks:
@@ -943,6 +945,19 @@ Acceptance criteria:
 - Analysis is deterministic and drawless.
 - Straight, smooth curve, cusp, U-turn, taper, and closed-column fixtures classify predictably.
 - Existing warnings can be reproduced from the new analysis without changing their defaults.
+
+Implementation note: `column-analysis.ts` now builds one pure, hoop-space `AnalyzedColumn` model
+from either a realized spine or an oriented rail correspondence. Each sample records cumulative arc
+length, incoming/outgoing and bisector tangents, signed turn and corner angles, signed curvature,
+radius, realized width, width slope/taper direction, width-to-limiting-radius ratio, endpoint/tip,
+continuous-curve, cusp, U-turn, sharp-corner, and unsafe-width classifications. Rail-pair samples
+also retain per-rail curvature, and compatibility radius estimates reproduce the historical
+buffered-satin and `satinbetween` width-warning predicates. Declared sample indices and the default
+60-degree detected-turn threshold split open or closed columns into geometry-only segments that
+share the boundary corner and emit no events. The buffered plain/transformed and rail-pair warning
+paths consume the shared analyzer, while underlay and topping still run through the unchanged
+legacy generators. Analysis copies its inputs, consumes no RNG draws, and is exported as a
+platform-neutral library utility for the cap, corner, and wide-column sessions.
 
 ### Session 5.2 — Cap strategies
 

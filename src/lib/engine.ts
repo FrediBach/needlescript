@@ -87,6 +87,26 @@ export { NsList, isList, isString } from './list.ts';
 export type { Val } from './list.ts';
 export type { Pt } from './genmath.ts';
 export {
+  DEFAULT_SATIN_SHARP_TURN_DEG,
+  DEFAULT_SATIN_UNSAFE_WIDTH_RATIO,
+  DEFAULT_SATIN_TIP_WIDTH_MM,
+  analyzeSpineColumn,
+  analyzeRailPairColumn,
+  legacySpineWidthIssue,
+  legacyRailWidthIssue,
+} from './column-analysis.ts';
+export type {
+  ColumnSource,
+  ColumnPointKind,
+  ColumnTaperDirection,
+  ColumnAnalysisOptions,
+  ColumnRailSample,
+  AnalyzedRailCurvature,
+  AnalyzedColumnSample,
+  AnalyzedColumnSegment,
+  AnalyzedColumn,
+} from './column-analysis.ts';
+export {
   FILL_CONSTRUCTION_RANGES,
   FILL_STAGGER_MODES,
   FILL_CONSTRUCTION_MODE_REGISTRIES,

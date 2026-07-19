@@ -14,6 +14,12 @@ import type {
   ResolvedSatinUnderlayProfile,
   SatinEdgeInset,
 } from '../underlay-profile.ts';
+import {
+  analyzeRailPairColumn,
+  analyzeSpineColumn,
+  legacyRailWidthIssue,
+} from '../column-analysis.ts';
+import type { AnalyzedColumn } from '../column-analysis.ts';
 
 export class SatinMachine extends MachineCore {
   // ---- Satin column: underlay + zigzag, sewn when the column ends ----
@@ -97,6 +103,11 @@ export class SatinMachine extends MachineCore {
     shortStitch: boolean,
   ) {
     const half = width / 2;
+    const analysis = analyzeSpineColumn(
+      path.map((point) => [point.x, point.y]),
+      width,
+    );
+    const analyzedByInput = new Map(analysis.samples.map((sample) => [sample.inputIndex, sample]));
     let prevUx: number | null = null,
       prevUy = 0;
     let innerCounter = 0;
@@ -115,13 +126,18 @@ export class SatinMachine extends MachineCore {
       let innerSide = 0;
       let crowded = false;
       if (prevUx !== null) {
+        const analyzed = analyzedByInput.get(i - 1);
         const cross = prevUx * uy - prevUy * ux; // > 0 = turning left
         const dot = Math.max(-1, Math.min(1, prevUx * ux + prevUy * uy));
         const theta = Math.acos(dot);
         // Only treat gentle, continuous turns as curvature — sharp corners
         // and reversals (retraced columns) are not curves.
         if (theta > 1e-3 && theta < 2.1) {
-          const R = len / theta; // local curvature radius of the chord sequence
+          const analyzedTheta = analyzed ? (analyzed.turnAngleDeg * Math.PI) / 180 : 0;
+          const R =
+            analyzed && Math.abs(analyzedTheta - theta) <= 1e-12
+              ? analyzed.legacyCurvatureRadiusMM
+              : len / theta;
           if (R < half && !u && !warnedTight) {
             this.warnings.push(
               `satin ${width.toFixed(1)} mm is wider than the curve it follows (radius ~${R.toFixed(1)} mm) — split the column or widen the curve`,
@@ -191,6 +207,7 @@ export class SatinMachine extends MachineCore {
       b: this.mapOut(cp.b[0], cp.b[1]),
     }));
     const geometry = prepareRailPair(railA, railB, checkpoints, this.currentLine, chargeOps);
+    const analysis = analyzeRailPairColumn(geometry.samples);
     if (geometry.railBReversed)
       this.warnings.push(
         geometry.closed
@@ -301,7 +318,7 @@ export class SatinMachine extends MachineCore {
 
     this._shortenRailPairCrowding(topping);
     this._warnRailPairCrossings(geometry, chargeOps);
-    this._warnRailPairCurvature(geometry);
+    this._warnRailPairCurvature(analysis);
     this._emitRailPairColumn(geometry, topping);
 
     // The turtle remains in local space. Keep heading/pen/mode untouched and
@@ -362,28 +379,14 @@ export class SatinMachine extends MachineCore {
       );
   }
 
-  _warnRailPairCurvature(geometry: RailPairGeometry) {
-    for (const rail of ['a', 'b'] as const) {
-      for (let i = 1; i < geometry.samples.length - 1; i++) {
-        const p0 = geometry.samples[i - 1][rail];
-        const p1 = geometry.samples[i][rail];
-        const p2 = geometry.samples[i + 1][rail];
-        const ax = p1[0] - p0[0];
-        const ay = p1[1] - p0[1];
-        const bx = p2[0] - p1[0];
-        const by = p2[1] - p1[1];
-        const la = Math.hypot(ax, ay);
-        const lb = Math.hypot(bx, by);
-        if (la < 1e-9 || lb < 1e-9) continue;
-        const theta = Math.acos(Math.max(-1, Math.min(1, (ax * bx + ay * by) / (la * lb))));
-        if (theta > 1e-3 && theta < 2.1 && lb / theta < this._railWidth(geometry.samples[i])) {
-          this.warnings.push(
-            `satinbetween column is wider than the curve it follows near (${p1[0].toFixed(1)}, ${p1[1].toFixed(1)}) — split the column or widen the curve`,
-          );
-          return;
-        }
-      }
-    }
+  _warnRailPairCurvature(analysis: AnalyzedColumn) {
+    const issue = legacyRailWidthIssue(analysis);
+    if (!issue) return;
+    const point = issue.rail === 'a' ? issue.sample.railA : issue.sample.railB;
+    if (!point) return;
+    this.warnings.push(
+      `satinbetween column is wider than the curve it follows near (${point[0].toFixed(1)}, ${point[1].toFixed(1)}) — split the column or widen the curve`,
+    );
   }
 
   _emitRailPairColumn(
@@ -643,6 +646,19 @@ export class SatinMachine extends MachineCore {
   ) {
     const hoop = this._toHoop(local);
     const halfDesign = designWidth / 2;
+    const realizedWidths = local.map((point, index) => {
+      const previous = local[Math.max(0, index - 1)];
+      const next = local[Math.min(local.length - 1, index + 1)];
+      const a = index < local.length - 1 ? point : previous;
+      const b = index < local.length - 1 ? next : point;
+      const { scale } = this._perpVec(this.satinCTM, a.x, a.y, b.x, b.y);
+      return designWidth * scale + pull;
+    });
+    const analysis = analyzeSpineColumn(
+      hoop.map((point) => [point.x, point.y]),
+      realizedWidths,
+    );
+    const analyzedByInput = new Map(analysis.samples.map((sample) => [sample.inputIndex, sample]));
     let prevUx: number | null = null,
       prevUy = 0;
     let innerCounter = 0;
@@ -668,11 +684,16 @@ export class SatinMachine extends MachineCore {
       let innerSide = 0;
       let crowded = false;
       if (prevUx !== null) {
+        const analyzed = analyzedByInput.get(i - 1);
         const cross = prevUx * uy - prevUy * ux;
         const dot = Math.max(-1, Math.min(1, prevUx * ux + prevUy * uy));
         const theta = Math.acos(dot);
         if (theta > 1e-3 && theta < 2.1) {
-          const R = len / theta;
+          const analyzedTheta = analyzed ? (analyzed.turnAngleDeg * Math.PI) / 180 : 0;
+          const R =
+            analyzed && Math.abs(analyzedTheta - theta) <= 1e-12
+              ? analyzed.legacyCurvatureRadiusMM
+              : len / theta;
           if (R < halfBase && !u && !warnedTight) {
             this.warnings.push(
               `satin ${(halfBase * 2).toFixed(1)} mm is wider than the curve it follows (radius ~${R.toFixed(1)} mm) — split the column or widen the curve`,

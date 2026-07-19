@@ -61,6 +61,8 @@ Tightly-coupled collaborators live one level up:
 - `fill-profile.ts` — fill inset/edge/stagger ranges, connector/stagger mode registries, internal
   connector classification types, and pure drawless row-phase calculation including geometry
   hashing.
+- `column-analysis.ts` — pure hoop-space spine/rail analysis for satin tips, tangents, curvature,
+  realized widths, corners, tapers, unsafe width/radius ratios, and emission-free segmentation.
 - `rail-pair.ts` — pure rail orientation, seam/checkpoint projection, arc-length pairing, and derived-spine interpolation shared by `satinbetween` and `railspine`.
 - `postprocess.ts` — `DensityGrid` (the live coverage index the machine feeds), plus
   the post-run `applyLocks`, `applyAutoTrim`, and `designStats` passes.
@@ -261,6 +263,18 @@ After-split effects (humanize/snaptogrid/declump) deliberately **skip** satin ra
 perturbing a precise rail wrecks the column — with a one-time warning.
 
 `sewSatinBetween` is the immediate rail-pair sibling. It flushes a buffered spine column without changing the sticky mode, maps both rails and checkpoints through the active output stack first, then pairs them in physical hoop space. Its realized endpoints reuse satin underlay, pull compensation, short-stitch relief, tip merging, snag/ceiling checks, density accounting, and effect-skip conventions; history is committed before the call returns. Orientation, closed seams, checkpoints, and crossing diagnostics are deterministic and drawless.
+
+Before future cap/join/wide policies select a construction, `column-analysis.ts` can lower either an
+already mapped spine plus realized widths or the oriented samples from `prepareRailPair` into the
+same `AnalyzedColumn`. Cumulative arc length and all radii/widths are physical hoop millimetres.
+Samples retain incoming/outgoing and bisector tangents, signed curvature and turn, corner angle,
+width slope, taper/tip state, continuous-versus-sharp classification, and width-to-limiting-radius
+ratio. Rail inputs additionally retain each rail's curvature. Declared indices or detected turns
+split the model into corner-sharing open segments; a closed column without corners remains one
+closed segment. This pass copies input geometry, emits no events, and reads no RNG. The current
+plain/transformed buffered satin and rail-pair curvature guards consume its compatibility metrics,
+but stitch generation stays on the byte-compatible legacy paths until a later non-legacy policy is
+selected.
 
 ### 7.2 Fills (`beginFill`/`endFill`, `machine/machine-fill.ts`)
 
