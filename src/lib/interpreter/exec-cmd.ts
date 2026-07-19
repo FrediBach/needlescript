@@ -319,10 +319,10 @@ export function initExecCmdHandler(
         // fabric
         const f: FabricPreset = FABRICS[mode];
         ctx.m.pullComp = f.pull;
-        ctx.m.underlayMode = 'auto';
-        ctx.m.fillUnderlayMode = 'auto';
+        ctx.m.underlayMode = f.underlay.satin;
+        ctx.m.fillUnderlayMode = f.underlay.fill;
         ctx.m.maxDensity = f.maxDensity;
-        ctx.m.doubleUnderlay = !!f.doubleUnderlay;
+        ctx.m.doubleUnderlay = f.underlay.doubled;
         if (f.densityFloor && ctx.m.satinSpacing < f.densityFloor)
           ctx.m.satinSpacing = f.densityFloor;
         if (f.note && !ctx.m.warnings.includes(f.note)) ctx.m.warnings.push(f.note);

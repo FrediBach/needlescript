@@ -933,6 +933,11 @@ Applies pull comp, underlay policy, satin density floor, and coverage limit in o
 | `maxdensity n`        | coverage warning threshold in layers (default 3.5; `maxdensity 0` silences). Coverage = thread layers on a 1 mm grid (1 layer ≈ one clean satin/fill pass); hotspots warn with coordinates and source lines; ≥ 5 penetrations within 0.15 mm flagged separately. Past ~2.5–3.5 layers fabric fails — raise the limit only knowingly |
 | `autotrim mm`         | travels ≥ this length (default 7, configurable 3–30, `autotrim 0` off) get an automatic `trim` before the jump; never inserted when nothing was sewn since the last cut                                                                                                                                                             |
 
+Internally, these legacy mode names and each `fabric` preset lower to ordered typed pass profiles
+after the satin width or fill area is known. This representation adds no syntax and does not change
+events, warnings, exports, or RNG draws. Profile validation is pure and uses centralized physical
+ranges so later parameter commands share one set of bounds.
+
 ### Stitch-history queries (pure reporters, call-syntax, shadowable)
 
 Read back the committed coverage grid mid-program for closed-loop generation (adaptive density, avoidance, self-levelling stipple).

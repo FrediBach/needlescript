@@ -8,6 +8,7 @@ import { pathlen, segdist, segisect } from '../genmath.ts';
 import { clipClosedPaths, clipOpenPaths } from '../geometry.ts';
 import { LIMITS } from './limits.ts';
 import { SatinMachine } from './machine-satin.ts';
+import { lowerLegacyFillUnderlay } from '../underlay-profile.ts';
 
 export class FillMachine extends SatinMachine {
   beginFill() {
@@ -762,31 +763,31 @@ export class FillMachine extends SatinMachine {
           return Math.abs(value / 2);
         };
         const area = Math.max(...rings.map(areaOf));
-        let mode: 'off' | 'tatami' | 'edge' | 'both' = 'off';
-        if (this.fillUnderlayMode === 'auto') mode = area > 100 ? 'both' : 'tatami';
-        else if (this.fillUnderlayMode === 'tatami') mode = 'tatami';
-        else if (this.fillUnderlayMode === 'edge') mode = 'edge';
-        if ((mode === 'edge' || mode === 'both') && area >= 30)
-          for (const ring of rings) {
-            const inset = this._insetRing(ring, rings, 0.5);
-            if (inset.length) this._emitFillPts(this._subdividePts(inset, 2.5), true);
-          }
-        if (mode === 'tatami' || mode === 'both') {
-          const underlayOptions = {
-            spacing: Math.min(this.fillSpacing * 4, 5),
-            stitchLen: 4,
-            endNear,
-            comp: -0.6,
-          };
-          if (this.doubleUnderlay)
+        const underlayProfile = lowerLegacyFillUnderlay(this.fillUnderlayMode, {
+          regionAreaMM2: area,
+          toppingRowSpacingMM: this.fillSpacing,
+          doubled: this.doubleUnderlay,
+          generator: 'scanline',
+        });
+        for (const pass of underlayProfile.passes) {
+          if (pass.kind === 'edge') {
+            for (const ring of rings) {
+              const inset = this._insetRing(ring, rings, pass.insetMM);
+              if (inset.length)
+                this._emitFillPts(this._subdividePts(inset, pass.stitchLengthMM), true);
+            }
+          } else {
             this._emitFillPts(
-              generateFill(rings, { ...underlayOptions, angle: this.fillAngle }),
+              generateFill(rings, {
+                angle: this.fillAngle + pass.angle.degrees,
+                spacing: pass.rowSpacingMM,
+                stitchLen: pass.stitchLengthMM,
+                endNear,
+                comp: -pass.insetMM,
+              }),
               true,
             );
-          this._emitFillPts(
-            generateFill(rings, { ...underlayOptions, angle: this.fillAngle + 90 }),
-            true,
-          );
+          }
         }
         const points = generateFill(rings, {
           angle: this.fillAngle,
@@ -842,35 +843,31 @@ export class FillMachine extends SatinMachine {
         return Math.abs(area / 2);
       };
       const area = Math.max(...rings.map(ringArea));
-      let underlayMode: 'off' | 'tatami' | 'edge' | 'both' = 'off';
-      if (this.fillUnderlayMode === 'auto') underlayMode = area > 100 ? 'both' : 'tatami';
-      else if (this.fillUnderlayMode === 'tatami') underlayMode = 'tatami';
-      else if (this.fillUnderlayMode === 'edge') underlayMode = 'edge';
-      if ((underlayMode === 'edge' || underlayMode === 'both') && area >= 30) {
-        for (const ring of rings) {
-          const inset = this._insetRing(ring, rings, 0.5);
-          if (inset.length) this._emitFillPts(this._subdividePts(inset, 2.5), true);
+      const underlayProfile = lowerLegacyFillUnderlay(this.fillUnderlayMode, {
+        regionAreaMM2: area,
+        toppingRowSpacingMM: this.fillSpacing,
+        doubled: this.doubleUnderlay,
+        generator: 'scanline',
+      });
+      for (const pass of underlayProfile.passes) {
+        if (pass.kind === 'edge') {
+          for (const ring of rings) {
+            const inset = this._insetRing(ring, rings, pass.insetMM);
+            if (inset.length)
+              this._emitFillPts(this._subdividePts(inset, pass.stitchLengthMM), true);
+          }
+        } else {
+          this._emitFillPts(
+            generateFill(rings, {
+              angle: this.fillAngle + pass.angle.degrees,
+              spacing: pass.rowSpacingMM,
+              stitchLen: pass.stitchLengthMM,
+              endNear,
+              comp: -pass.insetMM,
+            }),
+            true,
+          );
         }
-      }
-      if (underlayMode === 'tatami' || underlayMode === 'both') {
-        const underlay = generateFill(rings, {
-          angle: this.fillAngle + 90,
-          spacing: Math.min(this.fillSpacing * 4, 5),
-          stitchLen: 4,
-          endNear,
-          comp: -0.6,
-        });
-        if (this.doubleUnderlay) {
-          const cross = generateFill(rings, {
-            angle: this.fillAngle,
-            spacing: Math.min(this.fillSpacing * 4, 5),
-            stitchLen: 4,
-            endNear,
-            comp: -0.6,
-          });
-          this._emitFillPts(cross, true);
-        }
-        this._emitFillPts(underlay, true);
       }
 
       const lengthAt = (si: number, p: [number, number]) => {
@@ -1083,25 +1080,29 @@ export class FillMachine extends SatinMachine {
           return Math.abs(s / 2);
         };
         const area = Math.max(0, ...rings.map(ringArea));
-        let uMode: 'off' | 'tatami' | 'edge' | 'both' = 'off';
-        if (this.fillUnderlayMode === 'auto') uMode = area > 100 ? 'both' : 'tatami';
-        else if (this.fillUnderlayMode === 'tatami') uMode = 'tatami';
-        else if (this.fillUnderlayMode === 'edge') uMode = 'edge';
-        if ((uMode === 'edge' || uMode === 'both') && area >= 30) {
-          for (const ring of rings) {
-            const inset = this._insetRing(ring, rings, 0.5);
-            if (inset.length) this._emitFillPts(this._subdividePts(inset, 2.5), true);
+        const underlayProfile = lowerLegacyFillUnderlay(this.fillUnderlayMode, {
+          regionAreaMM2: area,
+          toppingRowSpacingMM: this.fillSpacing,
+          doubled: this.doubleUnderlay,
+          generator: 'direction-field',
+        });
+        for (const pass of underlayProfile.passes) {
+          if (pass.kind === 'edge') {
+            for (const ring of rings) {
+              const inset = this._insetRing(ring, rings, pass.insetMM);
+              if (inset.length)
+                this._emitFillPts(this._subdividePts(inset, pass.stitchLengthMM), true);
+            }
+          } else {
+            this._generateProgrammableFill({
+              dir,
+              shape: null,
+              constAngle: this.fillAngle,
+              rotate90: pass.angle.degrees === 90,
+              coarse: true,
+              underlay: true,
+            });
           }
-        }
-        if (uMode === 'tatami' || uMode === 'both') {
-          this._generateProgrammableFill({
-            dir,
-            shape: null,
-            constAngle: this.fillAngle,
-            rotate90: true,
-            coarse: true,
-            underlay: true,
-          });
         }
         this._generateProgrammableFill({
           dir,
@@ -1129,35 +1130,30 @@ export class FillMachine extends SatinMachine {
       return Math.abs(s / 2);
     };
     const area = Math.max(...rings.map(ringArea));
-    let uMode: 'off' | 'tatami' | 'edge' | 'both' = 'off';
-    if (this.fillUnderlayMode === 'auto') uMode = area > 100 ? 'both' : 'tatami';
-    else if (this.fillUnderlayMode === 'tatami') uMode = 'tatami';
-    else if (this.fillUnderlayMode === 'edge') uMode = 'edge';
-    if ((uMode === 'edge' || uMode === 'both') && area >= 30) {
-      for (const ring of rings) {
-        const inset = this._insetRing(ring, rings, 0.5);
-        if (inset.length) this._emitFillPts(this._subdividePts(inset, 2.5), true);
+    const underlayProfile = lowerLegacyFillUnderlay(this.fillUnderlayMode, {
+      regionAreaMM2: area,
+      toppingRowSpacingMM: useSpacing,
+      doubled: this.doubleUnderlay,
+      generator: 'scanline',
+    });
+    for (const pass of underlayProfile.passes) {
+      if (pass.kind === 'edge') {
+        for (const ring of rings) {
+          const inset = this._insetRing(ring, rings, pass.insetMM);
+          if (inset.length) this._emitFillPts(this._subdividePts(inset, pass.stitchLengthMM), true);
+        }
+      } else {
+        this._emitFillPts(
+          generateFill(rings, {
+            angle: useAngle + pass.angle.degrees,
+            spacing: pass.rowSpacingMM,
+            stitchLen: pass.stitchLengthMM,
+            endNear,
+            comp: -pass.insetMM,
+          }),
+          true,
+        );
       }
-    }
-    if (uMode === 'tatami' || uMode === 'both') {
-      const uPts = generateFill(rings, {
-        angle: useAngle + 90, // cross-grain so the topping doesn't sink between rows
-        spacing: Math.min(useSpacing * 4, 5),
-        stitchLen: 4,
-        endNear,
-        comp: -0.6, // inset so the underlay never peeks out of the topping
-      });
-      if (this.doubleUnderlay && uPts.length) {
-        const uPts2 = generateFill(rings, {
-          angle: useAngle,
-          spacing: Math.min(useSpacing * 4, 5),
-          stitchLen: 4,
-          endNear,
-          comp: -0.6,
-        });
-        this._emitFillPts(uPts2, true);
-      }
-      this._emitFillPts(uPts, true);
     }
 
     // ---- Topping ----

@@ -237,6 +237,12 @@ error rather than a hang — the project's "loud beats convenient" rule.
 Loops enforce `ctx.m.effectiveLimits.maxLoopIters` up front, and `while` calls
 `ctx.tick` each iteration so a non-terminating loop hits the op budget.
 
+The quoted `underlay` and `fillunderlay` commands retain legacy selectors until the relevant
+generator knows the physical width or region area, then lower to ordered typed profiles.
+`fabric` presets explicitly provide satin mode, fill mode, and doubled-pass policy rather than
+relying on implicit dispatcher defaults. Lowering and validation are pure functions in
+`underlay-profile.ts`; they require neither interpreter context nor program execution.
+
 ### 5.1 The command dispatcher (`exec-cmd.ts`)
 
 `initExecCmdHandler` (`exec-cmd.ts:23`) returns the `execCmd` closure used by the

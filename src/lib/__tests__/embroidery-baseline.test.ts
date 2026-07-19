@@ -207,15 +207,37 @@ describe('fabric preset characterization', () => {
       'fleece',
     ]);
     expect(FABRICS).toEqual({
-      woven: { pull: 0.2, maxDensity: 3.5 },
-      knit: { pull: 0.5, maxDensity: 3, densityFloor: 0.45 },
-      stretch: { pull: 0.6, maxDensity: 2.8, densityFloor: 0.5 },
-      denim: { pull: 0.15, maxDensity: 4 },
-      canvas: { pull: 0.15, maxDensity: 4 },
+      woven: {
+        pull: 0.2,
+        maxDensity: 3.5,
+        underlay: { satin: 'auto', fill: 'auto', doubled: false },
+      },
+      knit: {
+        pull: 0.5,
+        maxDensity: 3,
+        densityFloor: 0.45,
+        underlay: { satin: 'auto', fill: 'auto', doubled: false },
+      },
+      stretch: {
+        pull: 0.6,
+        maxDensity: 2.8,
+        densityFloor: 0.5,
+        underlay: { satin: 'auto', fill: 'auto', doubled: false },
+      },
+      denim: {
+        pull: 0.15,
+        maxDensity: 4,
+        underlay: { satin: 'auto', fill: 'auto', doubled: false },
+      },
+      canvas: {
+        pull: 0.15,
+        maxDensity: 4,
+        underlay: { satin: 'auto', fill: 'auto', doubled: false },
+      },
       fleece: {
         pull: 0.3,
         maxDensity: 2.6,
-        doubleUnderlay: true,
+        underlay: { satin: 'auto', fill: 'auto', doubled: true },
         note: 'fleece: consider a water-soluble topping so stitches don’t sink into the pile',
       },
     });

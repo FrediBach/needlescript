@@ -575,6 +575,8 @@ Acceptance criteria:
 
 ### Session 3.1 — Typed profiles and legacy lowering
 
+Status: complete (2026-07-19)
+
 Purpose: make current underlay modes explicit data without changing output.
 
 Tasks:
@@ -609,6 +611,12 @@ Acceptance criteria:
 
 - Resolving every legacy mode reproduces current events exactly.
 - Profile validation is pure and testable without running a program.
+
+Implementation note: `src/lib/underlay-profile.ts` owns the ordered satin/fill pass types,
+shared validation ranges, pure validators, and legacy/fabric lowering. Generator variants are
+explicit inputs because the historical doubled-center and directional-fill paths are not identical.
+Satin and fill emission consume the lowered pass order while retaining the legacy constants and
+arithmetic; the characterization and exporter baselines remain unchanged.
 
 ### Session 3.2 — User commands for satin underlay
 

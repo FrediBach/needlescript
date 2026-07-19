@@ -86,6 +86,40 @@ export { linkStandardModules } from './module-linker.ts';
 export { NsList, isList, isString } from './list.ts';
 export type { Val } from './list.ts';
 export type { Pt } from './genmath.ts';
+export {
+  SATIN_UNDERLAY_RANGES,
+  FILL_UNDERLAY_RANGES,
+  lowerLegacySatinUnderlay,
+  lowerLegacyFillUnderlay,
+  lowerFabricUnderlay,
+  validateSatinUnderlayProfile,
+  validateFillUnderlayProfile,
+} from './underlay-profile.ts';
+export type {
+  NumericRange,
+  SatinUnderlayPassKind,
+  SatinEdgeInset,
+  SatinReturnRunPolicy,
+  SatinCenterUnderlayPass,
+  SatinEdgeUnderlayPass,
+  SatinZigzagUnderlayPass,
+  SatinUnderlayPass,
+  SatinUnderlayProfile,
+  LegacySatinGenerator,
+  LegacySatinUnderlayContext,
+  ResolvedSatinUnderlayProfile,
+  FillUnderlayPassKind,
+  FillUnderlayAngle,
+  FillDirectionFieldBehavior,
+  FillEdgeUnderlayPass,
+  FillTatamiUnderlayPass,
+  FillUnderlayPass,
+  FillUnderlayProfile,
+  LegacyFillGenerator,
+  LegacyFillUnderlayContext,
+  ResolvedFillUnderlayProfile,
+  ProfileValidationIssue,
+} from './underlay-profile.ts';
 export { LIMITS, STOCK_LIMITS, OVERRIDE_CEILINGS, OVERRIDE_FLOORS } from './machine.ts';
 export type { BudgetKey } from './machine.ts';
 export {

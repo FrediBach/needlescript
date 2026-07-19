@@ -8,6 +8,7 @@ import { MachineCore } from './machine-core.ts';
 import type { Pt } from '../genmath.ts';
 import { prepareRailPair } from '../rail-pair.ts';
 import type { RailCheckpoint, RailPairGeometry, RailPairSample } from '../rail-pair.ts';
+import { lowerLegacySatinUnderlay } from '../underlay-profile.ts';
 
 export class SatinMachine extends MachineCore {
   // ---- Satin column: underlay + zigzag, sewn when the column ends ----
@@ -402,15 +403,13 @@ export class SatinMachine extends MachineCore {
 
   _railPairUnderlay(geometry: RailPairGeometry) {
     const width = geometry.meanWidth + this.pullComp;
-    const mode: 'off' | 'center' | 'edge' | 'zigzag' =
-      this.underlayMode === 'auto'
-        ? width < 1.5
-          ? 'off'
-          : width < 4
-            ? 'center'
-            : 'zigzag'
-        : this.underlayMode;
-    if (mode === 'off') return;
+    const profile = lowerLegacySatinUnderlay(this.underlayMode, {
+      columnWidthMM: width,
+      runningStitchLengthMM: this.stitchLen,
+      doubled: this.doubleUnderlay,
+      generator: 'rail-pair',
+    });
+    if (!profile.passes.length) return;
     const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
     const underlaySteps = Math.max(1, Math.ceil(geometry.spineLength / uLen));
     const underlaySamples: RailPairSample[] = [];
@@ -422,46 +421,58 @@ export class SatinMachine extends MachineCore {
       this._runAlong(spine, uLen, true);
       this._runAlong(reverseSpine, uLen, true);
     };
-    if (this.doubleUnderlay && mode !== 'center') runCenter();
-    if (mode === 'center') {
-      runCenter();
-      return;
+    for (const pass of profile.passes) {
+      if (pass.kind === 'center') {
+        runCenter();
+      } else if (pass.kind === 'edge') {
+        const left = underlaySamples.map((sample) => {
+          const railWidth = this._railWidth(sample);
+          const f =
+            railWidth < 1
+              ? 0
+              : pass.inset.unit === 'mm'
+                ? pass.inset.value / railWidth
+                : pass.inset.value;
+          return {
+            x: sample.a[0] + (sample.b[0] - sample.a[0]) * f,
+            y: sample.a[1] + (sample.b[1] - sample.a[1]) * f,
+          };
+        });
+        const right = underlaySamples.map((sample) => {
+          const railWidth = this._railWidth(sample);
+          const f =
+            railWidth < 1
+              ? 0
+              : pass.inset.unit === 'mm'
+                ? pass.inset.value / railWidth
+                : pass.inset.value;
+          return {
+            x: sample.b[0] + (sample.a[0] - sample.b[0]) * f,
+            y: sample.b[1] + (sample.a[1] - sample.b[1]) * f,
+          };
+        });
+        this._runAlong(left, pass.runningStitchLengthMM, true);
+        this._runAlong(right.reverse(), pass.runningStitchLengthMM, true);
+      } else {
+        const steps = Math.max(1, Math.ceil(geometry.spineLength / pass.spacingMM));
+        const zigzag: { x: number; y: number }[] = [];
+        for (let i = 0; i <= steps; i++) {
+          const sample = geometry.atArc((geometry.spineLength * i) / steps);
+          const edge = i % 2 === 0 ? sample.a : sample.b;
+          zigzag.push({
+            x: sample.mid[0] + (edge[0] - sample.mid[0]) * pass.widthRatio,
+            y: sample.mid[1] + (edge[1] - sample.mid[1]) * pass.widthRatio,
+          });
+        }
+        for (const point of zigzag) {
+          const previous = this.lastEmit;
+          if (previous && Math.hypot(point.x - previous.x, point.y - previous.y) < 0.1) continue;
+          this._push('stitch', point.x, point.y, true);
+        }
+        if (pass.returnRun === 'reverse-center')
+          this._runAlong(reverseSpine, pass.returnRunStitchLengthMM, true);
+      }
     }
-    if (mode === 'edge') {
-      const left = underlaySamples.map((sample) => {
-        const f = this._railWidth(sample) < 1 ? 0 : 0.3;
-        return {
-          x: sample.a[0] + (sample.b[0] - sample.a[0]) * f,
-          y: sample.a[1] + (sample.b[1] - sample.a[1]) * f,
-        };
-      });
-      const right = underlaySamples.map((sample) => {
-        const f = this._railWidth(sample) < 1 ? 0 : 0.3;
-        return {
-          x: sample.b[0] + (sample.a[0] - sample.b[0]) * f,
-          y: sample.b[1] + (sample.a[1] - sample.b[1]) * f,
-        };
-      });
-      this._runAlong(left, uLen, true);
-      this._runAlong(right.reverse(), uLen, true);
-      return;
-    }
-    const steps = Math.max(1, Math.ceil(geometry.spineLength / 2));
-    const zigzag: { x: number; y: number }[] = [];
-    for (let i = 0; i <= steps; i++) {
-      const sample = geometry.atArc((geometry.spineLength * i) / steps);
-      const edge = i % 2 === 0 ? sample.a : sample.b;
-      zigzag.push({
-        x: sample.mid[0] + (edge[0] - sample.mid[0]) * 0.6,
-        y: sample.mid[1] + (edge[1] - sample.mid[1]) * 0.6,
-      });
-    }
-    for (const point of zigzag) {
-      const previous = this.lastEmit;
-      if (previous && Math.hypot(point.x - previous.x, point.y - previous.y) < 0.1) continue;
-      this._push('stitch', point.x, point.y, true);
-    }
-    this._runAlong(reverseSpine, uLen, true);
   }
 
   /** Sew the buffered satin column: underlay passes first, then the zigzag. */
@@ -498,35 +509,29 @@ export class SatinMachine extends MachineCore {
     const w = this.satinWidth + this.pullComp;
     // Resolve underlay: physics says thin columns need none, medium columns a
     // spine, wide columns a zigzag that lofts the topping and grips the fabric.
-    const mode: 'off' | 'center' | 'edge' | 'zigzag' =
-      this.underlayMode === 'auto'
-        ? w < 1.5
-          ? 'off'
-          : w < 4
-            ? 'center'
-            : 'zigzag'
-        : this.underlayMode;
-    const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
+    const profile = lowerLegacySatinUnderlay(this.underlayMode, {
+      columnWidthMM: w,
+      runningStitchLengthMM: this.stitchLen,
+      doubled: this.doubleUnderlay,
+      generator: 'spine',
+    });
     const rev = path.slice().reverse();
-    if (mode !== 'off' && this.doubleUnderlay && mode !== 'center') {
-      // heavy-pile fabrics: spine first, then the resolved pass
-      this._runAlong(path, uLen, true);
-      this._runAlong(rev, uLen, true);
-    }
-    if (mode === 'center') {
-      this._runAlong(path, uLen, true);
-      this._runAlong(rev, uLen, true);
-      if (this.doubleUnderlay) {
-        this._zigzagAlong(path, w * 0.6, 2, true, false);
-        this._runAlong(rev, uLen, true);
+    for (const pass of profile.passes) {
+      if (pass.kind === 'center') {
+        this._runAlong(path, pass.runningStitchLengthMM, true);
+        this._runAlong(rev, pass.runningStitchLengthMM, true);
+      } else if (pass.kind === 'edge') {
+        const off = Math.max(
+          0.3,
+          pass.inset.unit === 'mm' ? w / 2 - pass.inset.value : w * (0.5 - pass.inset.value),
+        );
+        this._runAlong(this._offsetPath(path, off), pass.runningStitchLengthMM, true);
+        this._runAlong(this._offsetPath(rev, off), pass.runningStitchLengthMM, true);
+      } else {
+        this._zigzagAlong(path, w * pass.widthRatio, pass.spacingMM, true, false);
+        if (pass.returnRun === 'reverse-center')
+          this._runAlong(rev, pass.returnRunStitchLengthMM, true);
       }
-    } else if (mode === 'edge') {
-      const off = Math.max(0.3, w * 0.3);
-      this._runAlong(this._offsetPath(path, off), uLen, true);
-      this._runAlong(this._offsetPath(rev, off), uLen, true);
-    } else if (mode === 'zigzag') {
-      this._zigzagAlong(path, w * 0.6, 2, true, false);
-      this._runAlong(rev, uLen, true);
     }
     // The topping
     this._zigzagAlong(path, w, this.satinSpacing, false, this.shortStitch);
@@ -668,36 +673,38 @@ export class SatinMachine extends MachineCore {
     }
     const avgScale = scaleN ? scaleSum / scaleN : 1;
     const w = this.satinWidth * avgScale + this.pullComp;
-    const mode: 'off' | 'center' | 'edge' | 'zigzag' =
-      this.underlayMode === 'auto'
-        ? w < 1.5
-          ? 'off'
-          : w < 4
-            ? 'center'
-            : 'zigzag'
-        : this.underlayMode;
-    const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
+    const profile = lowerLegacySatinUnderlay(this.underlayMode, {
+      columnWidthMM: w,
+      runningStitchLengthMM: this.stitchLen,
+      doubled: this.doubleUnderlay,
+      generator: 'spine',
+    });
     const hoop = this._toHoop(local);
     const revLocal = local.slice().reverse();
     const revHoop = hoop.slice().reverse();
-    if (mode !== 'off' && this.doubleUnderlay && mode !== 'center') {
-      this._runAlong(hoop, uLen, true);
-      this._runAlong(revHoop, uLen, true);
-    }
-    if (mode === 'center') {
-      this._runAlong(hoop, uLen, true);
-      this._runAlong(revHoop, uLen, true);
-      if (this.doubleUnderlay) {
-        this._zigzagAlongT(local, this.satinWidth * 0.6, this.pullComp * 0.6, 2, true, false);
-        this._runAlong(revHoop, uLen, true);
+    for (const pass of profile.passes) {
+      if (pass.kind === 'center') {
+        this._runAlong(hoop, pass.runningStitchLengthMM, true);
+        this._runAlong(revHoop, pass.runningStitchLengthMM, true);
+      } else if (pass.kind === 'edge') {
+        const off = Math.max(
+          0.3,
+          pass.inset.unit === 'mm' ? w / 2 - pass.inset.value : w * (0.5 - pass.inset.value),
+        );
+        this._runAlong(this._offsetPathT(local, ctm, off), pass.runningStitchLengthMM, true);
+        this._runAlong(this._offsetPathT(revLocal, ctm, off), pass.runningStitchLengthMM, true);
+      } else {
+        this._zigzagAlongT(
+          local,
+          this.satinWidth * pass.widthRatio,
+          this.pullComp * pass.widthRatio,
+          pass.spacingMM,
+          true,
+          false,
+        );
+        if (pass.returnRun === 'reverse-center')
+          this._runAlong(revHoop, pass.returnRunStitchLengthMM, true);
       }
-    } else if (mode === 'edge') {
-      const off = Math.max(0.3, w * 0.3);
-      this._runAlong(this._offsetPathT(local, ctm, off), uLen, true);
-      this._runAlong(this._offsetPathT(revLocal, ctm, off), uLen, true);
-    } else if (mode === 'zigzag') {
-      this._zigzagAlongT(local, this.satinWidth * 0.6, this.pullComp * 0.6, 2, true, false);
-      this._runAlong(revHoop, uLen, true);
     }
     // The topping
     this._zigzagAlongT(
@@ -900,33 +907,47 @@ export class SatinMachine extends MachineCore {
 
   /** Underlay for a programmable column, sized by the max realized width (§9). */
   _programmableUnderlay(local: { x: number; y: number }[], w: number) {
-    const mode: 'off' | 'center' | 'edge' | 'zigzag' =
-      this.underlayMode === 'auto'
-        ? w < 1.5
-          ? 'off'
-          : w < 4
-            ? 'center'
-            : 'zigzag'
-        : this.underlayMode;
-    if (mode === 'off') return;
-    const uLen = Math.max(1.5, Math.min(this.stitchLen, 3));
+    const profile = lowerLegacySatinUnderlay(this.underlayMode, {
+      columnWidthMM: w,
+      runningStitchLengthMM: this.stitchLen,
+      doubled: this.doubleUnderlay,
+      generator: 'programmable',
+    });
+    if (!profile.passes.length) return;
     const hoop = this._toHoop(local);
     const revHoop = hoop.slice().reverse();
     const revLocal = local.slice().reverse();
-    if (this.doubleUnderlay && mode !== 'center') {
-      this._runAlong(hoop, uLen, true);
-      this._runAlong(revHoop, uLen, true);
-    }
-    if (mode === 'center') {
-      this._runAlong(hoop, uLen, true);
-      this._runAlong(revHoop, uLen, true);
-    } else if (mode === 'edge') {
-      const off = Math.max(0.3, w * 0.3);
-      this._runAlong(this._offsetPathT(local, this.satinCTM, off), uLen, true);
-      this._runAlong(this._offsetPathT(revLocal, this.satinCTM, off), uLen, true);
-    } else if (mode === 'zigzag') {
-      this._zigzagAlongT(local, w * 0.6, this.pullComp * 0.6, 2, true, false);
-      this._runAlong(revHoop, uLen, true);
+    for (const pass of profile.passes) {
+      if (pass.kind === 'center') {
+        this._runAlong(hoop, pass.runningStitchLengthMM, true);
+        this._runAlong(revHoop, pass.runningStitchLengthMM, true);
+      } else if (pass.kind === 'edge') {
+        const off = Math.max(
+          0.3,
+          pass.inset.unit === 'mm' ? w / 2 - pass.inset.value : w * (0.5 - pass.inset.value),
+        );
+        this._runAlong(
+          this._offsetPathT(local, this.satinCTM, off),
+          pass.runningStitchLengthMM,
+          true,
+        );
+        this._runAlong(
+          this._offsetPathT(revLocal, this.satinCTM, off),
+          pass.runningStitchLengthMM,
+          true,
+        );
+      } else {
+        this._zigzagAlongT(
+          local,
+          w * pass.widthRatio,
+          this.pullComp * pass.widthRatio,
+          pass.spacingMM,
+          true,
+          false,
+        );
+        if (pass.returnRun === 'reverse-center')
+          this._runAlong(revHoop, pass.returnRunStitchLengthMM, true);
+      }
     }
   }
 

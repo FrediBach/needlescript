@@ -56,6 +56,8 @@ machine/
 Tightly-coupled collaborators live one level up:
 
 - `affine.ts` — the 2×3 matrix math shared by the transform stack.
+- `underlay-profile.ts` — ordered satin/fill underlay pass types, centralized numeric ranges, pure
+  validation, and context-aware lowering of legacy modes and `fabric` presets.
 - `rail-pair.ts` — pure rail orientation, seam/checkpoint projection, arc-length pairing, and derived-spine interpolation shared by `satinbetween` and `railspine`.
 - `postprocess.ts` — `DensityGrid` (the live coverage index the machine feeds), plus
   the post-run `applyLocks`, `applyAutoTrim`, and `designStats` passes.
@@ -99,7 +101,7 @@ The public `Machine` class is a small facade over `FillMachine`, `SatinMachine`,
 | Stitch config   | `stitchLen`, `stitchLenList`/`Reporter`, `mode`, `beanRepeats`                                                       | one of numeric / list / reporter stitch-length forms active at a time |
 | Satin           | `satinWidth`, `satinSpacing`, `satinSide`, `eWidth`, `satinReporter`, `satinPath`                                    | buffered column                                                       |
 | Fill            | `fillAngle`, `fillSpacing`, `fillLen`(+list/reporter), `fillArmed`, `fillDirReporter`, `fillShapeReporter`           | tatami + programmable                                                 |
-| Physics         | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity` | fabric-tunable                                                        |
+| Physics         | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity` | selectors lower to typed profiles at generation time                  |
 | Output          | `events`, `warnings`, `colorIdx`, `lastEmit`, `started`                                                              | accumulation                                                          |
 | Transform stack | `ctm`, `outLayers`, `hasWarp`, `penLayers`, `declumpStack`                                                           | see §6                                                                |
 | Hoop            | `hoopInfo`, `hoopSet`, `fieldLocked`, `fieldOverflows`                                                               | see §9                                                                |
@@ -230,7 +232,11 @@ explicit flush). `flushSatin` first flushes any running-stitch buffer, then disp
 - `_flushSatinTransformed` — maps the centerline to hoop space (warp deforms the spine;
   width stays affine).
 
-Underlay passes are laid first, then the zigzag (`_zigzagAlong`, `1054`). The zigzag
+Before emission, the legacy mode, realized physical width, running-stitch length, generator variant,
+and doubled flag lower to an ordered `SatinUnderlayPass[]`. Pass data carries kind, running length,
+edge inset intent, zigzag width/spacing, and return-run policy. The explicit variant preserves the
+historical buffered-spine, rail-pair, and programmable doubled-center differences. The passes are
+laid first, then the topping zigzag (`_zigzagAlong`, `1054`). The topping
 applies the **short-stitch** curve fix: on tight curves the inner-edge penetrations
 bunch up (breaking thread and damaging fabric), so alternate inner stitches are pulled
 in to 60% width, and an over-wide-for-the-curve column raises a warning.
@@ -250,8 +256,10 @@ perturbing a precise rail wrecks the column — with a one-time warning.
   span crossings with even-odd inside testing, applies pull compensation (`comp`),
   orders rows/segments greedily by nearest endpoint, subdivides to stitch length with a
   per-row phase offset (`row % 3`) to avoid tramline artifacts, and unrotates. `endFill`
-  wraps it with underlay logic (`edge`/`tatami`/`both`, area-gated; `doubleUnderlay` for
-  fleece) and the topping pass.
+  wraps it with profile-driven underlay and the topping pass. Legacy lowering resolves mode, area,
+  topping spacing, doubling, and generator variant into ordered edge/tatami passes carrying inset,
+  stitch length, row spacing, angle intent, minimum area, and direction-field behavior. Existing
+  `auto` gates and fleece ordering remain exact.
 - **Programmable fill** — `_generateProgrammableFill` (`2165`), armed by
   `fill dir @d shape @s` via the `fillarm` statement. A direction reporter returns a
   per-point heading (a flow field) and a shape reporter returns `[spacing, len, phase]`.
