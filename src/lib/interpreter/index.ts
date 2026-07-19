@@ -407,6 +407,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     printed: ctx.printed,
     locks,
     density,
+    material: { ...m.materialIntent },
     activeHoop,
     activeOverrides,
     globals: ctx.globals,

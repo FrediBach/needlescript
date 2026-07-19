@@ -537,7 +537,9 @@ Immutable character sequences in single quotes; must close on the same line. Esc
 
 ### Mode consumers
 
-`fabric`, `underlay`, `fillunderlay`, `clippaths`, `hoop`, `routesort`, and `plan` accept any string expression for their mode argument, matched case-insensitively. Unknown modes error with did-you-mean.
+`fabric`, `threadprofile`, `stabilizer`, `underlay`, `fillunderlay`, `clippaths`, `hoop`,
+`routesort`, and `plan` accept any string expression for their mode argument, matched
+case-insensitively. Unknown modes error with did-you-mean.
 
 Strings inside lists: allowed; rendered single-quoted; `pick`/`shuffle`/`contains`/`indexof`/`for…in`/destructuring work; numeric aggregates (`sum`, `sort`, …) error on string elements.
 
@@ -1122,7 +1124,9 @@ Opt-in — without these, programs sew exactly as written.
 
 ### `fabric 'preset'`
 
-Applies pull comp, underlay policy, satin density floor, and coverage limit in one command. Explicit commands after `fabric` override the preset.
+Applies pull comp, underlay policy, satin density floor, and coverage limit in one command. It also
+records the preset in the resolved material intent and restores that profile's neutral grain/stretch
+defaults. Explicit commands after `fabric` override the preset in source order.
 
 | Fabric                 | Pull comp | Coverage limit | Notes                             |
 | ---------------------- | --------- | -------------- | --------------------------------- |
@@ -1132,10 +1136,38 @@ Applies pull comp, underlay policy, satin density floor, and coverage limit in o
 | `'denim'` / `'canvas'` | 0.15 mm   | 4.0            | stable, tolerates dense stitching |
 | `'fleece'`             | 0.3 mm    | 2.6            | doubled underlay                  |
 
+### Material and thread intent
+
+Material commands record a portable, brand-neutral setup in `RunResult.material`. The resolved
+object contains `fabricPreset`, grain heading, along/across stretch, thread profile and width,
+optional needle size, stabilizer category, and topping state. Profiles and explicit values apply in
+source order: `threadprofile 'rayon-60wt' threadwidth 0.35` resolves to 0.35 mm, while the reverse
+order resolves back to the profile's 0.3 mm default.
+
+The four generic thread profiles are `'rayon-40wt'`, `'rayon-60wt'`,
+`'polyester-40wt'`, and `'polyester-60wt'`. Their planning approximations are 0.4 mm for 40 wt and
+0.3 mm for 60 wt. These values, grain/stretch, needle, stabilizer, and topping are metadata only in
+Session 7.1: they do not alter events, geometry, current coverage, exports, warnings, or RNG draws.
+Only the pre-existing construction behavior of `fabric` changes stitches. Thread-aware coverage is
+introduced separately in Session 7.2.
+
+Fabric profile grain/stretch defaults are deliberately neutral (`0°`, zero declared stretch) until
+versioned sew-out evidence supports automatic directional values. Use `fabricgrain` and
+`fabricstretch` to record measured or intended values explicitly. Material state is included in
+`stitchscope` and trace snapshots, so scoped or sandboxed choices cannot leak into the final resolved
+intent.
+
 ### Individual commands
 
 | Command                  | Effect                                                                                                                                                                                                                                                                                                                              |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fabricgrain deg`        | fabric-grain heading in turtle degrees (`0` = up, clockwise positive); finite values wrap into 0–360. Metadata only in this phase                                                                                                                                                                                                   |
+| `fabricstretch a b`      | declared fractional stretch along/across the grain, each 0–1. A later `fabric` command restores its profile defaults; metadata only in this phase                                                                                                                                                                                   |
+| `threadprofile 'name'`   | generic rayon/polyester 40 wt or 60 wt profile; resets resolved thread width to 0.4 mm or 0.3 mm respectively                                                                                                                                                                                                                       |
+| `threadwidth mm`         | explicit resolved thread-width approximation, 0.1–1 mm. Overrides the active profile in source order; does not affect coverage until Session 7.2                                                                                                                                                                                    |
+| `needle nm`              | advisory metric needle size: 60, 65, 70, 75, 80, or 90; `needle 0` clears the optional value. Does not affect construction                                                                                                                                                                                                          |
+| `stabilizer 'category'`  | portable category metadata: `'none'`, `'tearaway'`, `'cutaway'`, or `'washaway'`                                                                                                                                                                                                                                                    |
+| `topping 0/1`            | records whether topping is used; accepts `false`/`true` because booleans are numeric. Does not automatically add or recommend a product                                                                                                                                                                                             |
 | `pullcomp mm`            | 0–1.5 mm. Widens satin columns and extends fill rows at both ends to cancel thread-tension shrink                                                                                                                                                                                                                                   |
 | `underlay 'mode'`        | satin-column underlay: `'center'` (spine out-and-back), `'edge'` (runs offset ±30% width), `'zigzag'` (open zigzag at 60% width + return run), `'off'`, `'auto'` (by width: < 1.5 mm none, < 4 mm center, wider zigzag)                                                                                                             |
 | `underlaypasses xs`      | exact ordered satin passes from `'center'`, `'edge'`, and `'zigzag'`; duplicates repeat, up to 16 passes, and `[]` disables underlay. Explicit order supersedes `fabric` doubling and the pass choice from `underlay 'auto'`                                                                                                        |

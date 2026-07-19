@@ -1257,6 +1257,8 @@ automatic geometry correction.
 
 ### Session 7.1 — Material intent and profile registry
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Introduce typed fabric, thread, stabilizer, and topping registries.
@@ -1282,6 +1284,22 @@ Acceptance criteria:
 - Existing `fabric` programs resolve to current scalar physics.
 - Explicit `threadwidth` changes only coverage calculations in the next session, not stitch geometry.
 - Unknown profiles have did-you-mean diagnostics.
+
+Implementation note: `embroidery-registry.ts` now exposes full typed fabric profiles while retaining
+the exact legacy `FABRICS` construction view. Directional fabric defaults intentionally remain
+neutral pending sew-out evidence. Generic rayon/polyester 40 wt and 60 wt profiles resolve to 0.4 mm
+and 0.3 mm planning widths; common NM needle sizes, none/tearaway/cutaway/washaway stabilizers, and
+boolean topping choices are advisory metadata without brand-specific claims.
+
+The machine owns one resolved `MaterialIntent`. `fabric`, `fabricgrain`, `fabricstretch`,
+`threadprofile`, `threadwidth`, `needle`, `stabilizer`, and `topping` replace the relevant fields in
+source order. A profile command therefore restores its defaults only for fields that profile owns,
+and a later explicit value wins. Construction and trace snapshots copy the record, and
+`RunResult.material` exposes a final copy to the playground/library boundary.
+
+Compatibility is explicit: only the existing `fabric` lowering still changes scalar construction
+physics. Thread width is not connected to `DensityGrid` until Session 7.2, and every other new
+material command leaves events, current coverage, warnings, exports, and RNG draws unchanged.
 
 ### Session 7.2 — Thread-aware coverage
 

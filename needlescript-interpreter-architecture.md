@@ -266,6 +266,18 @@ names; duplicates and an empty list are meaningful. `fillunderlaylen`, `fillunde
 compound region is known. `fillunderlay` and `fabric` clear the record. Construction and trace
 snapshots clone the pass list, so `stitchscope` and trace restoration retain value semantics.
 
+Material intent lives on the machine as one immutable-by-replacement `MaterialIntent` record.
+`fabric` selects the richer `FABRIC_PROFILES` entry while continuing to lower its exact legacy
+construction view through the compatible `FABRICS` export. `threadprofile` resolves a generic
+rayon/polyester weight and resets its width default; `threadwidth`, `fabricgrain`, `fabricstretch`,
+`needle`, `stabilizer`, and `topping` then replace only their resolved metadata fields. This makes
+profile/default precedence ordinary source order. Directional fabric defaults remain neutral and
+none of the new metadata commands feeds geometry or `DensityGrid` in Session 7.1.
+
+Both construction and trace snapshots copy the material record. `stitchscope` therefore restores
+outer material intent with its other sticky construction settings, and material commands evaluated
+inside `trace` cannot leak. Finalization copies the resolved record to `RunResult.material`.
+
 ### 5.1 The command dispatcher (`exec-cmd.ts`)
 
 `initExecCmdHandler` (`exec-cmd.ts:23`) returns the `execCmd` closure used by the
@@ -274,7 +286,7 @@ and turtle commands:
 
 - **Output-mode-sensitive commands checked first**: `print`/`printloc`, the
   reporter/list forms of `satin`, `stitchlen`, `filllen`, and the string-mode commands
-  `fabric`/`underlay`/`fillunderlay` — all before the bulk `num()` conversion, because
+  `fabric`/`threadprofile`/`stabilizer`/`underlay`/`fillunderlay` — all before the bulk `num()` conversion, because
   their arguments are not plain scalars.
 - **Program directives** `hoop` and `override` (`exec-cmd.ts:171`, `249`) — guarded to
   the top level: not inside a loop/if/procedure (`structuralDepth > 0 || depth > 0`),
@@ -286,7 +298,7 @@ and turtle commands:
 - **Scalar turtle/machine commands** — the final `switch` after
   `vals.map(v => num(...))`: `fd`, `bk`, `rt`, `lt`, `up`, `down`, `home`, `setxy`,
   `arc`, `moveto`, `circle`, `push`/`pop`, plus the embroidery-parameter setters
-  (`stitchlen`, `density`, `fillspacing`, `lock`, `bean`, `color`, `trim`, `seed`, …).
+  (`stitchlen`, `density`, `fillspacing`, material metadata, `lock`, `bean`, `color`, `trim`, `seed`, …).
   Values are clamped to machine-safe ranges with warnings when clamped.
 
 The satin construction string dispatch also handles `satinwide 'warn'|'split'` through the shared
@@ -615,7 +627,7 @@ than an exporter filtering rule.
 | `interpreter/string-func.ts` | string library dispatcher                                        |
 | `list.ts`                    | value model (`Val`, `NsList`, `FuncRef`) + value utilities       |
 | `colormath.ts`               | CSS colors, normalization, HSL/RGB, OKLab math and defaults      |
-| `embroidery-registry.ts`     | fabric profiles and accepted embroidery construction modes       |
+| `embroidery-registry.ts`     | material profiles and accepted embroidery construction modes     |
 | `mode-registry.ts`           | typed mode resolution and standard unknown-mode diagnostics      |
 | `machine/`                   | the stitch machine (side-effect target, budgets, events)         |
 

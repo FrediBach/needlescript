@@ -6,8 +6,15 @@ import type { OverrideKey } from '../types.ts';
 import { LIMITS, STOCK_LIMITS, OVERRIDE_CEILINGS, OVERRIDE_FLOORS } from '../machine.ts';
 import type { BudgetKey } from '../machine.ts';
 import { QWORD_BUILTINS } from '../commands.ts';
-import { EMBROIDERY_MODE_REGISTRIES, FABRICS } from '../embroidery-registry.ts';
-import type { FabricPreset } from '../embroidery-registry.ts';
+import {
+  EMBROIDERY_MODE_REGISTRIES,
+  FABRIC_PROFILES,
+  MATERIAL_RANGES,
+  NEEDLE_SIZES,
+  STABILIZER_PROFILES,
+  THREAD_PROFILES,
+} from '../embroidery-registry.ts';
+import type { FabricMode, FabricPreset } from '../embroidery-registry.ts';
 import { lookupHoopPreset, HOOP_PRESET_NAMES, buildHoopInfo } from '../hoop-presets.ts';
 import type { HoopInfo } from '../types.ts';
 import { makeRNG, makeNoise } from '../prng.ts';
@@ -466,7 +473,41 @@ export function initExecCmdHandler(
       ctx.m.satinWide = mode;
       return;
     }
-    // String-argument mode commands — handled before the bulk num() conversion.
+    // Material profile selectors — handled before the bulk num() conversion.
+    if (st.name === 'threadprofile' || st.name === 'stabilizer') {
+      ctx.traceNote(st.name, `note: ${st.name} inside trace has no effect on the captured path`);
+      const modeVal = vals[0];
+      if (typeof modeVal !== 'string')
+        throw new NeedlescriptError(
+          `${st.name} expects a string profile, got ${describeVal(modeVal)} — e.g. ${st.name} '${QWORD_BUILTINS[st.name][0]}'`,
+          st.line,
+        );
+      if (st.name === 'threadprofile') {
+        const allowed = EMBROIDERY_MODE_REGISTRIES.threadprofile;
+        const mode = resolveMode(modeVal, allowed);
+        if (mode === undefined)
+          throw new NeedlescriptError(
+            unknownModeMessage('thread profile', modeVal, allowed),
+            st.line,
+          );
+        ctx.m.materialIntent = {
+          ...ctx.m.materialIntent,
+          threadProfile: mode,
+          threadWidthMM: THREAD_PROFILES[mode].widthMM,
+        };
+      } else {
+        const allowed = EMBROIDERY_MODE_REGISTRIES.stabilizer;
+        const mode = resolveMode(modeVal, allowed);
+        if (mode === undefined)
+          throw new NeedlescriptError(unknownModeMessage('stabilizer', modeVal, allowed), st.line);
+        ctx.m.materialIntent = {
+          ...ctx.m.materialIntent,
+          stabilizer: STABILIZER_PROFILES[mode].category,
+        };
+      }
+      return;
+    }
+    // String-argument construction mode commands — handled before bulk num() conversion.
     if (st.name === 'fabric' || st.name === 'underlay' || st.name === 'fillunderlay') {
       ctx.traceNote(st.name, `note: ${st.name} inside trace has no effect on the captured path`);
       const modeVal = vals[0];
@@ -488,7 +529,8 @@ export function initExecCmdHandler(
         ctx.m.fillUnderlayCustomization = null;
       } else {
         // fabric
-        const f: FabricPreset = FABRICS[mode];
+        const profile = FABRIC_PROFILES[mode as FabricMode];
+        const f: FabricPreset = profile.construction;
         if (ctx.m.satinUnderlayCustomization) ctx.m.flushSatin();
         ctx.m.pullComp = f.pull;
         ctx.m.underlayMode = f.underlay.satin;
@@ -500,6 +542,11 @@ export function initExecCmdHandler(
         if (f.densityFloor && ctx.m.satinSpacing < f.densityFloor)
           ctx.m.satinSpacing = f.densityFloor;
         if (f.note && !ctx.m.warnings.includes(f.note)) ctx.m.warnings.push(f.note);
+        ctx.m.materialIntent = {
+          ...ctx.m.materialIntent,
+          fabricPreset: mode,
+          ...profile.material,
+        };
       }
       return;
     }
@@ -1194,6 +1241,71 @@ export function initExecCmdHandler(
         };
         return;
       }
+      case 'fabricgrain': {
+        ctx.traceNote(
+          'fabricgrain',
+          'note: fabricgrain inside trace has no effect on the captured path',
+        );
+        if (!Number.isFinite(a[0]))
+          throw new NeedlescriptError('fabricgrain must be a finite heading in degrees', st.line);
+        ctx.m.materialIntent = {
+          ...ctx.m.materialIntent,
+          grainHeading: ((a[0] % 360) + 360) % 360,
+        };
+        return;
+      }
+      case 'fabricstretch': {
+        ctx.traceNote(
+          'fabricstretch',
+          'note: fabricstretch inside trace has no effect on the captured path',
+        );
+        const { min, max } = MATERIAL_RANGES.stretch;
+        if (a.some((value) => !Number.isFinite(value) || value < min || value > max))
+          throw new NeedlescriptError(
+            `fabricstretch values must be finite fractions from ${min} to ${max}`,
+            st.line,
+          );
+        ctx.m.materialIntent = {
+          ...ctx.m.materialIntent,
+          stretchAlong: a[0],
+          stretchAcross: a[1],
+        };
+        return;
+      }
+      case 'threadwidth': {
+        ctx.traceNote(
+          'threadwidth',
+          'note: threadwidth inside trace has no effect on the captured path',
+        );
+        const { min, max } = MATERIAL_RANGES.threadWidthMM;
+        if (!Number.isFinite(a[0]) || a[0] < min || a[0] > max)
+          throw new NeedlescriptError(`threadwidth must be between ${min} and ${max} mm`, st.line);
+        ctx.m.materialIntent = { ...ctx.m.materialIntent, threadWidthMM: a[0] };
+        return;
+      }
+      case 'needle': {
+        ctx.traceNote('needle', 'note: needle inside trace has no effect on the captured path');
+        const size = a[0];
+        if (size === 0) {
+          const next = { ...ctx.m.materialIntent };
+          delete next.needleSize;
+          ctx.m.materialIntent = next;
+          return;
+        }
+        if (!Number.isInteger(size) || !(NEEDLE_SIZES as readonly number[]).includes(size))
+          throw new NeedlescriptError(
+            `needle must be 0 (unspecified) or a common NM size: ${NEEDLE_SIZES.join(', ')}`,
+            st.line,
+          );
+        ctx.m.materialIntent = { ...ctx.m.materialIntent, needleSize: size };
+        return;
+      }
+      case 'topping':
+        ctx.traceNote('topping', 'note: topping inside trace has no effect on the captured path');
+        if (a[0] !== 0 && a[0] !== 1)
+          throw new NeedlescriptError('topping expects 0/1 or false/true', st.line);
+        ctx.m.materialIntent = { ...ctx.m.materialIntent, topping: a[0] === 1 };
+        return;
       case 'pullcomp': {
         ctx.traceNote('pullcomp', 'note: pullcomp inside trace has no effect on the captured path');
         const v = Math.min(Math.max(a[0], 0), 1.5);

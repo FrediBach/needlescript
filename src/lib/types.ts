@@ -116,6 +116,27 @@ export interface ReferenceDataVar {
   environment: Array<{ name: string; value: string }>;
 }
 
+/**
+ * Resolved source-level material choices for a run. These values describe the
+ * author's intent; only the legacy `fabric` construction settings affect
+ * stitch geometry in the initial material-profile phase.
+ */
+export interface MaterialIntent {
+  fabricPreset: string;
+  /** Turtle heading of the fabric grain: 0 = up/north, clockwise positive. */
+  grainHeading: number;
+  /** Declared fractional stretch parallel to the grain, from 0 to 1. */
+  stretchAlong: number;
+  /** Declared fractional stretch perpendicular to the grain, from 0 to 1. */
+  stretchAcross: number;
+  threadProfile: string;
+  threadWidthMM: number;
+  /** Metric needle size (NM), when explicitly selected. */
+  needleSize?: number;
+  stabilizer?: string;
+  topping: boolean;
+}
+
 export interface RunResult {
   events: StitchEvent[];
   warnings: string[];
@@ -123,6 +144,8 @@ export interface RunResult {
   printed: string[];
   locks: number;
   density: DensityResult;
+  /** Resolved material/thread intent after all source-order overrides. */
+  material: MaterialIntent;
   /** The hoop configured by the `hoop` directive, if any. */
   activeHoop?: HoopInfo;
   /** Budget limits raised or lowered by `override` directives, if any. */

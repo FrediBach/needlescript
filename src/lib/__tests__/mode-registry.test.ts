@@ -35,7 +35,13 @@ describe('shared mode registries', () => {
   });
 
   it('keeps every quoted embroidery command in the focused registry', () => {
-    expect(Object.keys(EMBROIDERY_MODE_REGISTRIES)).toEqual(['fabric', 'underlay', 'fillunderlay']);
+    expect(Object.keys(EMBROIDERY_MODE_REGISTRIES)).toEqual([
+      'fabric',
+      'threadprofile',
+      'stabilizer',
+      'underlay',
+      'fillunderlay',
+    ]);
     expect(FILL_CONSTRUCTION_MODE_REGISTRIES).toEqual({
       fillstagger: FILL_STAGGER_MODES,
       fillconnect: FILL_CONNECT_MODES,

@@ -1,7 +1,13 @@
 // ---------- Stitch machine core ----------
 
 import { LIMITS, STOCK_LIMITS, OVERRIDE_CEILINGS } from './limits.ts';
-import type { StitchEvent, EventType, HoopInfo, WarningLocation } from '../types.ts';
+import type {
+  StitchEvent,
+  EventType,
+  HoopInfo,
+  MaterialIntent,
+  WarningLocation,
+} from '../types.ts';
 import { NeedlescriptError } from '../errors.ts';
 import { IDENTITY, apply, linApply, compose } from '../affine.ts';
 import type { Mat } from '../affine.ts';
@@ -18,6 +24,7 @@ import { FILL_CONSTRUCTION_RANGES } from '../fill-profile.ts';
 import type { FillConnectMode, FillConnectorRecord, FillStaggerMode } from '../fill-profile.ts';
 import { SATIN_CONSTRUCTION_RANGES } from '../satin-profile.ts';
 import type { SatinCapMode, SatinJoinMode, SatinWideMode } from '../satin-profile.ts';
+import { DEFAULT_MATERIAL_INTENT } from '../embroidery-registry.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -96,6 +103,7 @@ export interface ConstructionConfigSnapshot {
   readonly shortStitch: boolean;
   readonly autoTrim: number;
   readonly maxDensity: number;
+  readonly materialIntent: Readonly<MaterialIntent>;
   readonly fillArmed: boolean;
   readonly fillDirReporter: FillDirectionReporter | null;
   readonly fillShapeReporter: FillShapeReporter | null;
@@ -160,6 +168,7 @@ interface MachineSnapshot {
   shortStitch: boolean;
   autoTrim: number;
   maxDensity: number;
+  materialIntent: MaterialIntent;
   colorIdx: number;
   eventsLen: number;
   lastEmit: { x: number; y: number } | null;
@@ -260,6 +269,7 @@ export abstract class MachineCore {
   shortStitch = true; // auto short-stitch on tight satin curves
   autoTrim = 7; // insert trim before jumps ≥ this (0 = off)
   maxDensity = 3.5; // coverage warning threshold, in layers of thread
+  materialIntent: MaterialIntent = { ...DEFAULT_MATERIAL_INTENT };
   satinPath: { x: number; y: number }[] | null = null; // buffered satin column
   // Programmable satin (`satin @fn`): a user shape reporter that supersedes the
   // built-in generator, queried once per stitch pair at flush time. null = the
@@ -426,6 +436,7 @@ export abstract class MachineCore {
       shortStitch: this.shortStitch,
       autoTrim: this.autoTrim,
       maxDensity: this.maxDensity,
+      materialIntent: { ...this.materialIntent },
       fillArmed: this.fillArmed,
       fillDirReporter: this.fillDirReporter,
       fillShapeReporter: this.fillShapeReporter,
@@ -493,6 +504,7 @@ export abstract class MachineCore {
       this.shortStitch = snapshot.shortStitch;
       this.autoTrim = snapshot.autoTrim;
       this.maxDensity = snapshot.maxDensity;
+      this.materialIntent = { ...snapshot.materialIntent };
       this.fillArmed = snapshot.fillArmed;
       this.fillDirReporter = snapshot.fillDirReporter;
       this.fillShapeReporter = snapshot.fillShapeReporter;
@@ -610,6 +622,7 @@ export abstract class MachineCore {
       shortStitch: this.shortStitch,
       autoTrim: this.autoTrim,
       maxDensity: this.maxDensity,
+      materialIntent: { ...this.materialIntent },
       colorIdx: this.colorIdx,
       // Emission
       eventsLen: this.events.length,
@@ -746,6 +759,7 @@ export abstract class MachineCore {
     this.shortStitch = snap.shortStitch;
     this.autoTrim = snap.autoTrim;
     this.maxDensity = snap.maxDensity;
+    this.materialIntent = { ...snap.materialIntent };
     this.colorIdx = snap.colorIdx;
     // Emission — truncate events back; density was never fed (noEmit)
     this.events.length = snap.eventsLen;

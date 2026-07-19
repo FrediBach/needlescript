@@ -96,8 +96,15 @@ export const BUILTIN_ARITY: Record<string, number> = {
   printloc: 0,
   // mark, assert handled specially in the parser (optional/variadic args)
   // chalk is also special-cased (one required + two optional arguments)
-  // fabric, underlay, fillunderlay handled specially (string mode args)
+  // Material profiles and underlay selectors are handled specially (string mode args).
   fabric: 1,
+  fabricgrain: 1,
+  fabricstretch: 2,
+  threadprofile: 1,
+  threadwidth: 1,
+  needle: 1,
+  stabilizer: 1,
+  topping: 1,
   underlay: 1,
   underlaypasses: 1,
   underlaylen: 1,

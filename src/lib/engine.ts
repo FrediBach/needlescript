@@ -45,6 +45,7 @@ export type {
   ChalkDataVar,
   ReferenceDataVar,
   ColorTableEntry,
+  MaterialIntent,
 } from './types.ts';
 export {
   COLOR_NAMES,
@@ -80,6 +81,34 @@ export {
   LIBRARY_FUNCS,
   RESERVED,
 } from './commands.ts';
+export {
+  DEFAULT_MATERIAL_INTENT,
+  DEFAULT_THREAD_PROFILE,
+  EMBROIDERY_MODE_REGISTRIES,
+  FABRIC_MODES,
+  FABRIC_PROFILES,
+  MATERIAL_RANGES,
+  NEEDLE_PROFILES,
+  NEEDLE_SIZES,
+  STABILIZER_MODES,
+  STABILIZER_PROFILES,
+  THREAD_PROFILE_MODES,
+  THREAD_PROFILES,
+  TOPPING_PROFILES,
+} from './embroidery-registry.ts';
+export type {
+  FabricMaterialDefaults,
+  FabricMode,
+  FabricPreset,
+  FabricProfile,
+  NeedleProfile,
+  NeedleSize,
+  StabilizerMode,
+  StabilizerProfile,
+  ThreadProfile,
+  ThreadProfileMode,
+  ToppingMode,
+} from './embroidery-registry.ts';
 export { suggest } from './suggestions.ts';
 export { tokenize } from './tokenizer.ts';
 export { parse } from './parser/index.ts';

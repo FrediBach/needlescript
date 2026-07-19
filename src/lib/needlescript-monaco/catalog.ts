@@ -1,6 +1,14 @@
 // Static catalog of all Needlescript built-ins used by Monaco language services.
 
-import { FABRIC_MODES, FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery-registry.ts';
+import {
+  FABRIC_MODES,
+  FILL_UNDERLAY_MODES,
+  MATERIAL_RANGES,
+  NEEDLE_SIZES,
+  SATIN_UNDERLAY_MODES,
+  STABILIZER_MODES,
+  THREAD_PROFILE_MODES,
+} from '../embroidery-registry.ts';
 import { PLAN_MODES } from '../travel-planner.ts';
 import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
 import {
@@ -1066,6 +1074,73 @@ export const NS_ITEMS: NSItem[] = [
     insertText: modeCommandSnippet('fabric', FABRIC_MODES, '"'),
     isSnippet: true,
     params: [['preset']],
+  },
+  {
+    label: 'fabricgrain',
+    kindName: 'function',
+    detail: 'fabric grain heading (degrees)',
+    documentation:
+      'Record the fabric grain heading as turtle degrees: 0 points up and positive angles turn clockwise. Values wrap to 0–360. This is metadata only until directional compensation is explicitly enabled in a later phase.',
+    insertText: 'fabricgrain ${1:0}',
+    isSnippet: true,
+    params: [['degrees']],
+  },
+  {
+    label: 'fabricstretch',
+    kindName: 'function',
+    detail: 'declared along/across fabric stretch',
+    documentation: `Record fractional stretch along and across the grain, each from ${MATERIAL_RANGES.stretch.min} to ${MATERIAL_RANGES.stretch.max}. These values are metadata only in the current material phase. A later \`fabric\` command restores that profile's neutral stretch defaults.`,
+    insertText: 'fabricstretch ${1:along} ${2:across}',
+    isSnippet: true,
+    params: [['along', 'across']],
+  },
+  {
+    label: 'threadprofile',
+    kindName: 'function',
+    detail: 'generic thread profile',
+    documentation:
+      "Select generic `'rayon-40wt'`, `'rayon-60wt'`, `'polyester-40wt'`, or `'polyester-60wt'` metadata. 40 wt resolves to an approximate 0.4 mm width and 60 wt to 0.3 mm. A later `threadwidth` overrides that default. Width does not affect stitches or coverage until Session 7.2.",
+    insertText: modeCommandSnippet('threadprofile', THREAD_PROFILE_MODES, "'"),
+    isSnippet: true,
+    params: [['profile']],
+  },
+  {
+    label: 'threadwidth',
+    kindName: 'function',
+    detail: 'resolved thread width metadata (mm)',
+    documentation: `Override the active thread profile's approximate width with ${MATERIAL_RANGES.threadWidthMM.min}–${MATERIAL_RANGES.threadWidthMM.max} mm. This is metadata only in Session 7.1 and does not alter stitch geometry or current coverage calculations.`,
+    insertText: 'threadwidth ${1:0.4}',
+    isSnippet: true,
+    params: [['mm']],
+  },
+  {
+    label: 'needle',
+    kindName: 'function',
+    detail: 'advisory metric needle size',
+    documentation: `Record an advisory NM needle size: ${NEEDLE_SIZES.join(', ')}. Use \`needle 0\` to leave the size unspecified. Needle metadata does not alter stitch generation.`,
+    insertText: 'needle ${1|' + NEEDLE_SIZES.join(',') + '|}',
+    isSnippet: true,
+    params: [['sizeNM']],
+  },
+  {
+    label: 'stabilizer',
+    kindName: 'function',
+    detail: 'stabilizer category metadata',
+    documentation:
+      "Record the generic stabilizer category: `'none'`, `'tearaway'`, `'cutaway'`, or `'washaway'`. This is portable intent metadata, not a brand or automatic construction recommendation.",
+    insertText: modeCommandSnippet('stabilizer', STABILIZER_MODES, "'"),
+    isSnippet: true,
+    params: [['category']],
+  },
+  {
+    label: 'topping',
+    kindName: 'function',
+    detail: 'topping used (0/1)',
+    documentation:
+      'Record whether a topping is part of the material setup. Use `topping 1`/`true` when present and `topping 0`/`false` when absent. This advisory metadata does not alter construction.',
+    insertText: 'topping ${1|true,false|}',
+    isSnippet: true,
+    params: [['enabled']],
   },
   {
     label: 'underlay',

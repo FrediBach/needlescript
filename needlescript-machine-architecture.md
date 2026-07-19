@@ -58,6 +58,8 @@ Tightly-coupled collaborators live one level up:
 - `affine.ts` — the 2×3 matrix math shared by the transform stack.
 - `underlay-profile.ts` — ordered satin/fill underlay pass types, centralized numeric ranges, pure
   validation, and context-aware lowering of legacy modes and `fabric` presets.
+- `embroidery-registry.ts` — compatible legacy fabric construction settings plus typed fabric,
+  thread, needle, stabilizer, and topping profiles/defaults.
 - `fill-profile.ts` — fill inset/edge/stagger ranges, connector/stagger mode registries, internal
   connector classification types, and pure drawless row-phase calculation including geometry
   hashing.
@@ -117,6 +119,7 @@ The public `Machine` class is a small facade over `FillMachine`, `SatinMachine`,
 | Satin           | `satinWidth`, `satinSpacing`, `satinSide`, cap/join settings, `satinWide`/`MaxWidth`/`SplitOverlap`, `eWidth`, `satinReporter`, `satinPath`                                                    | buffered column                                                       |
 | Fill            | `fillAngle`, `fillSpacing`, `fillInset`, `fillEdgeRun`, `fillEdgeShort`, `fillStagger`/`Amount`, `fillConnect`, `fillLen`(+list/reporter), `fillArmed`, `fillDirReporter`, `fillShapeReporter` | tatami + programmable                                                 |
 | Physics         | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity`                                                                           | selectors lower to typed profiles at generation time                  |
+| Material        | `materialIntent`                                                                                                                                                                               | resolved source intent; metadata-only except legacy `fabric` effects  |
 | Output          | `events`, `warnings`, `colorIdx`, `lastEmit`, `started`                                                                                                                                        | accumulation                                                          |
 | Transform stack | `ctm`, `outLayers`, `hasWarp`, `penLayers`, `declumpStack`                                                                                                                                     | see §6                                                                |
 | Hoop            | `hoopInfo`, `hoopSet`, `fieldLocked`, `fieldOverflows`                                                                                                                                         | see §9                                                                |
@@ -138,15 +141,23 @@ cap transition length, corner policy/threshold, wide-column policy/ceiling/inter
 underlay pass/length/inset/spacing overrides; fill angle, spacing, construction inset, edge-run
 inset, minimum useful row-fragment length, stagger mode and amount, connector policy,
 fill-underlay pass/length/inset/spacing/relative-angle overrides,
-length forms, and an unused one-shot fill arm; and the lock, pull-compensation, underlay,
-short-stitch, auto-trim, and density settings. Current `fabric` presets resolve into these same
-physics fields, so their construction effects are scoped without treating warning notes as state.
+length forms, and an unused one-shot fill arm; the lock, pull-compensation, underlay,
+short-stitch, auto-trim, and density settings; and a copied resolved material-intent record. Current
+`fabric` presets resolve into these same physics fields, so their construction effects and material
+metadata are scoped without treating warning notes as state.
 
 Snapshots deliberately exclude turtle and push/pop state, output and coverage history, warning
 history, color, transforms/effects, hoop and field state, budgets/overrides, and trace state. Reporter
 functions retain reference identity. Mutable stitch/fill length patterns and static armed-fill paths
 are copied when taking and restoring a snapshot, so later mutation of live configuration cannot
 alter the saved value.
+
+The initial material phase keeps source intent separate from generated physics. `materialIntent`
+records the fabric preset, grain and stretch axes, generic thread profile/width, optional needle,
+stabilizer category, and topping boolean. Only `fabric` continues to update the legacy scalar
+physics above. The other material commands replace metadata fields without flushing construction,
+feeding coverage, or changing events. Trace snapshots also copy the record, and finalization exposes
+a fresh copy as `RunResult.material`.
 
 An active `beginfill` recording cannot cross either boundary. A pending satin column or
 reporter-driven running stretch is flushed before the snapshot or restore; otherwise the methods are
@@ -604,6 +615,7 @@ analysed _before_ locks (so tie-offs don't read as hotspots), then locks are app
 | `travel-planner.ts`        | thread-run partitioning, plan modes, and connector reconstruction      |
 | `effects.ts`, `declump.ts` | after-split effect maps and declump fold state                         |
 | `hoop-presets.ts`          | hoop presets and sewable-field geometry                                |
+| `embroidery-registry.ts`   | material profiles plus the compatible `FABRICS` construction view      |
 | `types.ts`                 | `StitchEvent`, `HoopInfo`, `RunResult`, `DesignStats`, density types   |
 
 Machine behavior is exercised by tests in `src/lib/__tests__/` — notably
