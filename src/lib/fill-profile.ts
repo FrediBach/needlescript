@@ -26,6 +26,9 @@ export interface FillConnectorRecord {
 /** Conservative clearance from a sewn connector to the compound-region edge. */
 export const FILL_CONNECT_EDGE_MARGIN_MM = 0.1;
 
+/** Minimum clearance retained by a declump-shifted fill penetration. */
+export const FILL_DECLUMP_EDGE_MARGIN_MM = 0.1;
+
 /** Used by `fillconnect 'trim'` when ordinary automatic trimming is disabled. */
 export const FILL_CONNECT_TRIM_DEFAULT_MM = 7;
 

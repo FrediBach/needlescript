@@ -22,7 +22,7 @@
 import type { DensityGrid } from './postprocess.ts';
 
 /** mm-floor below which a stitch must not collapse (comfortably above the 0.4 mm tiny-stitch threshold). */
-const STITCH_FLOOR = 0.6;
+export const DECLUMP_STITCH_FLOOR = 0.6;
 
 /** Line-search step size in mm. */
 const SEARCH_STEP = 0.25;
@@ -45,6 +45,14 @@ export interface DeclumpState {
   lastAxis: [number, number];
   /** Count of penetrations that stayed put because no along-axis relief was found. */
   saturationCount: number;
+}
+
+/** Optional guards used by construction-aware callers such as fill generation. */
+export interface DeclumpFoldOptions {
+  /** Reject a proposed shifted penetration before coverage is considered. */
+  acceptCandidate?: (candidate: [number, number]) => boolean;
+  /** Keep the eased point between its emitted predecessor and planned successor. */
+  preserveOrder?: boolean;
 }
 
 /** Create a fresh fold state with clamped parameters. */
@@ -80,6 +88,7 @@ export function declumpFoldPoint(
   pt: [number, number],
   nextPt: [number, number] | null,
   density: DensityGrid,
+  options: DeclumpFoldOptions = {},
 ): [number, number] {
   const { limit, maxshift } = state;
   const [px, py] = pt;
@@ -124,7 +133,7 @@ export function declumpFoldPoint(
   if (state.prev !== null) {
     bckCap = Math.max(
       0,
-      Math.min(maxshift, Math.hypot(px - state.prev[0], py - state.prev[1]) - STITCH_FLOOR),
+      Math.min(maxshift, Math.hypot(px - state.prev[0], py - state.prev[1]) - DECLUMP_STITCH_FLOOR),
     );
   }
 
@@ -133,7 +142,7 @@ export function declumpFoldPoint(
   if (nextPt !== null) {
     fwdCap = Math.max(
       0,
-      Math.min(maxshift, Math.hypot(px - nextPt[0], py - nextPt[1]) - STITCH_FLOOR),
+      Math.min(maxshift, Math.hypot(px - nextPt[0], py - nextPt[1]) - DECLUMP_STITCH_FLOOR),
     );
   }
 
@@ -151,11 +160,36 @@ export function declumpFoldPoint(
   let minCov = covAtPt;
   let minCovPt: [number, number] = pt;
 
+  const candidateAllowed = (candidate: [number, number]) => {
+    if (options.preserveOrder) {
+      if (state.prev !== null) {
+        const inX = px - state.prev[0],
+          inY = py - state.prev[1];
+        if (
+          inX * inX + inY * inY > 1e-12 &&
+          (candidate[0] - state.prev[0]) * inX + (candidate[1] - state.prev[1]) * inY < -1e-9
+        )
+          return false;
+      }
+      if (nextPt !== null) {
+        const outX = nextPt[0] - px,
+          outY = nextPt[1] - py;
+        if (
+          outX * outX + outY * outY > 1e-12 &&
+          (nextPt[0] - candidate[0]) * outX + (nextPt[1] - candidate[1]) * outY < -1e-9
+        )
+          return false;
+      }
+    }
+    return options.acceptCandidate?.(candidate) ?? true;
+  };
+
   // Scan backward
   for (let j = 1; j <= bckSteps; j++) {
     const d = j * SEARCH_STEP;
     const cx = px - d * ux;
     const cy = py - d * uy;
+    if (!candidateAllowed([cx, cy])) continue;
     const cov = density.coverAvg(cx, cy, 1);
     if (cov < minCov) {
       minCov = cov;
@@ -173,6 +207,7 @@ export function declumpFoldPoint(
     const d = j * SEARCH_STEP;
     const cx = px + d * ux;
     const cy = py + d * uy;
+    if (!candidateAllowed([cx, cy])) continue;
     const cov = density.coverAvg(cx, cy, 1);
     if (cov < minCov) {
       minCov = cov;

@@ -893,6 +893,8 @@ no RNG draws, and preserve the legacy event stream when disabled.
 
 ### Session 4.5 — Containment-aware fill declump
 
+Status: complete (2026-07-19)
+
 Purpose: remove the current limitation where `declump` skips fill blocks.
 
 Tasks:
@@ -908,6 +910,18 @@ Acceptance criteria:
 - No shifted point crosses an outer boundary or hole.
 - Coverage is reduced in convergence fixtures without new tiny stitches.
 - Existing `declump` behavior outside fills is unchanged.
+
+Implementation note: generated fill penetrations now pass through the active `declump` stack at
+commit time, after stateless penetration effects and before density history is fed. The same active
+limit and greedy state are retained in normal sew order across fill underlay, edge run, topping, and
+sewn topping connectors; fill jumps and trims reset the run state. Every proposed 0.25 mm relief
+candidate must remain in the resolved compound construction region with 0.1 mm boundary/hole
+clearance, and the complete segment from the planned point to the candidate must remain contained.
+Local predecessor/successor projections prevent point order reversal, while the existing 0.6 mm
+stitch floor also applies to the first penetration after a fill jump. If no contained,
+order-preserving candidate improves coverage, the authored point is emitted unchanged and counts
+toward the existing saturation note. The path remains drawless; fills outside `declump` and all
+existing non-fill declump paths retain their prior event streams.
 
 ## 13. Phase 5: satin caps, joins, and wide columns
 

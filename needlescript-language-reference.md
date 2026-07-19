@@ -686,7 +686,15 @@ After-split effects (`humanize`, `snaptogrid`, `declump`) deliberately **skip sa
 - **`warp @fn`** — reporter takes a point `[x, y]`, returns a point; must have exactly one parameter and return a point on every path. Deforms the pre-split path, so the result is still split into clean stitches. Hoop-overflow/density/long-stitch checks run on post-warp geometry (warn, don't forbid).
 - **`humanize amount`** — offsets each penetration by up to `amount` mm (clamped 0–2) using **coherent** seeded `snoise2` (hand-drift, not white noise). Forks: draws exactly 1 main-stream value, so editing block contents never reshuffles the rest.
 - **`snaptogrid …`** — quantizes penetrations to a lattice in **fixed hoop space, outside any enclosing transform** (a grid belongs to the fabric, not the motif — copies stamped via `translate` share one lattice). Arity overloads: `snaptogrid cell` · `cellx celly` · `cellx celly ox oy` · `cellx celly ox oy ang`. Pure and drawless. Snapped coincident penetrations merge with the tiny-stitch warning.
-- **`declump limit [maxshift]`** — eases crowded penetrations **along their own line of travel** (never sideways) once coverage exceeds `limit` layers. `maxshift` default 1.5 mm, clamped 0–5. Greedy: earlier stitches win. Drawless. Typical: limit 1.5–2.5, declump **outermost**: `declump 2 [ humanize 0.3 [ … ] ]`. `maxshift 0` cancels easing without changing seed state (A/B testing).
+- **`declump limit [maxshift]`** — eases crowded penetrations **along their own line of travel**
+  (never sideways) once coverage exceeds `limit` layers. `maxshift` defaults to 1.5 mm and is
+  clamped to 0–5. Greedy: earlier stitches win. Generated fill underlay, edge-run, topping, and sewn
+  topping connectors use the same active limit in sew order. A shifted fill point and its relief
+  segment must remain inside the resolved compound region; shifted points retain 0.1 mm clearance
+  from outer and hole boundaries, preserve local row order, and otherwise fall back unchanged.
+  Fill jumps/trims reset the run. Satin columns still warn and skip the effect. Drawless. Typical:
+  limit 1.5–2.5, declump **outermost**: `declump 2 [ humanize 0.3 [ … ] ]`. `maxshift 0` cancels
+  easing without changing seed state (A/B testing).
 
 ### Effect-path functions (pure, on point lists)
 

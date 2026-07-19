@@ -177,7 +177,6 @@ interface MachineSnapshot {
   tinyDroppedSpotsLen: number;
   noEmit: boolean;
   _warnedSatinEffect: boolean;
-  _warnedDeclumpFill: boolean;
   // Declump stack state (for trace sandbox restoration)
   declumpStack: DeclumpState[];
   // Trace recording state (for nesting)
@@ -340,10 +339,6 @@ export abstract class MachineCore {
   satinLayers: OutLayer[] = [];
   satinHasWarp = false;
   protected _warnedSatinEffect = false;
-  // One-time note that declump skips fill boundary recording (fills are emitted
-  // via a separate path and a region-containment guard would be needed to ease
-  // near edges — deferred to a future version).
-  private _warnedDeclumpFill = false;
 
   /** Flush buffered satin or reporter-mode running stitches at motion boundaries. */
   abstract flushSatin(): void;
@@ -605,7 +600,6 @@ export abstract class MachineCore {
       tinyDroppedSpotsLen: this.tinyDroppedSpots.length,
       noEmit: this.noEmit,
       _warnedSatinEffect: this._warnedSatinEffect,
-      _warnedDeclumpFill: this._warnedDeclumpFill,
       // Declump stack (for trace sandbox restoration)
       declumpStack: this.declumpStack.slice(),
       // Trace recording (for nesting)
@@ -736,7 +730,6 @@ export abstract class MachineCore {
     this.tinyDroppedSpots.length = snap.tinyDroppedSpotsLen;
     this.noEmit = snap.noEmit;
     this._warnedSatinEffect = snap._warnedSatinEffect;
-    this._warnedDeclumpFill = snap._warnedDeclumpFill;
     // Trace recording (for nesting): restore the outer trace's state
     this.traceRecording = snap.traceRecording;
     this.traceRuns = snap.traceRuns.map((r) => r.slice());
@@ -827,7 +820,7 @@ export abstract class MachineCore {
    * pre-applied). Performs the tiny-stitch merge check then calls _push.
    * Never applies penLayers — the caller is responsible for pre-applying them.
    */
-  _emitRaw(x: number, y: number) {
+  _emitRaw(x: number, y: number, u = false) {
     if (this.lastEmit) {
       const d = Math.hypot(x - this.lastEmit.x, y - this.lastEmit.y);
       if (d < LIMITS.minStitch * 0.5) {
@@ -835,7 +828,7 @@ export abstract class MachineCore {
         return;
       }
     }
-    this._push('stitch', x, y);
+    this._push('stitch', x, y, u);
   }
 
   /** Record a merged sub-minimum move so it can be located later. */
@@ -1015,14 +1008,6 @@ export abstract class MachineCore {
         if (this.fillArmed) {
           if (!this.curLocalRing) this.curLocalRing = [[ox, oy]];
           this.curLocalRing.push([nx, ny]);
-        }
-        // declump cannot ease fill penetrations near a region edge without a
-        // containment guard — skipped with a one-time note.
-        if (this.declumpStack.length && !this._warnedDeclumpFill) {
-          this.warnings.push(
-            'declump skips fill blocks — use fill shape @fn reading coverat to widen spacing in fills',
-          );
-          this._warnedDeclumpFill = true;
         }
       } else {
         this._closeRing();

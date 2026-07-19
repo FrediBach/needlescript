@@ -14,6 +14,8 @@
 import { describe, it, expect } from 'vitest';
 import { run } from '../engine.ts';
 import type { StitchEvent } from '../engine.ts';
+import { pointInsideCompoundRegion, segmentInsideCompoundRegion } from '../machine/fill.ts';
+import { FILL_DECLUMP_EDGE_MARGIN_MM } from '../fill-profile.ts';
 
 const ev = (s: string) => run(s).events;
 const warnings = (s: string) => run(s).warnings;
@@ -195,11 +197,109 @@ describe('declump skips satin columns', () => {
   });
 });
 
-// ── Fill skip ─────────────────────────────────────────────────────────────────
-describe('declump skips fill boundary recording', () => {
-  it('emits a note when a fill is inside a declump block', () => {
-    const w = warnings('declump 2 [ beginfill\ndown repeat 4 [ fd 10 rt 90 ]\nendfill ]');
-    expect(w.some((s) => /declump skips fill/.test(s))).toBe(true);
+// ── Containment-aware fill declump ────────────────────────────────────────────
+describe('declump eases generated fill penetrations', () => {
+  const squareFill = `
+    up moveto 0 0
+    fillunderlay 'off'
+    fillspacing 2
+    filllen 1
+    beginfill
+    down repeat 4 [ fd 12 rt 90 ]
+    endfill
+  `;
+
+  it('reduces a convergence peak without adding tiny stitches or changing point count', () => {
+    const bare = run(`lock 0\n${squareFill}\ncolor 1\n${squareFill}`);
+    const eased = run(`lock 0\n${squareFill}\ncolor 1\ndeclump 0.2 2 [ ${squareFill} ]`);
+    const bareTopping = bare.events.filter((e) => e.t === 'stitch' && e.c === 1);
+    const easedTopping = eased.events.filter((e) => e.t === 'stitch' && e.c === 1);
+
+    expect(easedTopping).toHaveLength(bareTopping.length);
+    expect(
+      easedTopping.some(
+        (point, index) =>
+          Math.hypot(point.x - bareTopping[index].x, point.y - bareTopping[index].y) > 1e-8,
+      ),
+    ).toBe(true);
+    expect(eased.density.peak).toBeLessThan(bare.density.peak);
+    expect(eased.warnings.some((warning) => /sub-0\.4 mm moves merged/.test(warning))).toBe(false);
+    expect(eased.warnings.some((warning) => /declump skips fill/.test(warning))).toBe(false);
+  });
+
+  it('keeps every shifted point and its relief segment inside an outer ring with a hole', () => {
+    const compoundFill = `
+      up moveto 0 0
+      fillunderlay 'off'
+      fillspacing 1
+      filllen 1
+      beginfill
+      down repeat 4 [ fd 16 rt 90 ]
+      up moveto 5 5
+      down repeat 4 [ fd 6 rt 90 ]
+      endfill
+    `;
+    const bare = run(`lock 0\n${compoundFill}\ncolor 1\n${compoundFill}`);
+    const eased = run(`lock 0\n${compoundFill}\ncolor 1\ndeclump 0.2 2 [ ${compoundFill} ]`);
+    const bareTopping = bare.events.filter((e) => e.t === 'stitch' && e.c === 1);
+    const easedTopping = eased.events.filter((e) => e.t === 'stitch' && e.c === 1);
+    const rings: [number, number][][] = [
+      [
+        [0, 0],
+        [0, 16],
+        [16, 16],
+        [16, 0],
+      ],
+      [
+        [5, 5],
+        [5, 11],
+        [11, 11],
+        [11, 5],
+      ],
+    ];
+
+    expect(easedTopping).toHaveLength(bareTopping.length);
+    const shifted = easedTopping
+      .map((point, index) => ({ point, original: bareTopping[index] }))
+      .filter(
+        ({ point, original }) => Math.hypot(point.x - original.x, point.y - original.y) > 1e-8,
+      );
+    expect(shifted.length).toBeGreaterThan(0);
+    for (const { point, original } of shifted) {
+      const easedPoint: [number, number] = [point.x, point.y];
+      expect(pointInsideCompoundRegion(rings, easedPoint, FILL_DECLUMP_EDGE_MARGIN_MM)).toBe(true);
+      expect(segmentInsideCompoundRegion(rings, [original.x, original.y], easedPoint, 0)).toBe(
+        true,
+      );
+    }
+  });
+
+  it('preserves monotonic progress within each straight topping row', () => {
+    const result = run(`lock 0\n${squareFill}\ncolor 1\ndeclump 0.2 2 [ ${squareFill} ]`);
+    const rows: StitchEvent[][] = [];
+    let row: StitchEvent[] = [];
+    for (const event of result.events) {
+      if (event.t !== 'stitch' || event.c !== 1) {
+        if (row.length >= 3) rows.push(row);
+        row = [];
+        continue;
+      }
+      if (row.length && Math.abs(event.y - row[row.length - 1].y) > 1e-8) {
+        if (row.length >= 3) rows.push(row);
+        row = [];
+      }
+      row.push(event);
+    }
+    if (row.length >= 3) rows.push(row);
+
+    expect(rows.length).toBeGreaterThan(0);
+    for (const points of rows) {
+      const directions = points
+        .slice(1)
+        .map((point, index) => Math.sign(point.x - points[index].x))
+        .filter((direction) => direction !== 0);
+      expect(new Set(directions).size).toBeLessThanOrEqual(1);
+    }
   });
 });
 

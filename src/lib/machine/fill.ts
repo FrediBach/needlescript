@@ -144,6 +144,20 @@ export function evenOddInside(rings: [number, number][][], px: number, py: numbe
   return inside;
 }
 
+/** Return whether a point lies in filled material with physical clearance from every boundary. */
+export function pointInsideCompoundRegion(
+  rings: [number, number][][],
+  point: [number, number],
+  edgeMarginMM = 0,
+): boolean {
+  if (!evenOddInside(rings, point[0], point[1])) return false;
+  if (!(edgeMarginMM > 0)) return true;
+  for (const ring of rings)
+    for (let i = 0; i < ring.length; i++)
+      if (segdist(point, ring[i], ring[(i + 1) % ring.length]) < edgeMarginMM - 1e-6) return false;
+  return true;
+}
+
 const pointOnCompoundBoundary = (
   rings: [number, number][][],
   point: [number, number],

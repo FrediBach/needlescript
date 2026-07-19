@@ -1145,6 +1145,12 @@ declump 2 1.5 [
 
 `declump` is **drawless**: it consumes zero values from the seeded stream, so adding or removing the block never reshuffles downstream randomness. A/B test by setting `maxshift` to 0 (cancels all easing without changing seed state) and comparing the heatmap.
 
+Inside a fill block, `declump` runs over the generated underlay, edge run, topping, and any sewn
+topping connectors in their normal sew order. A proposed shift is accepted only when the point
+retains 0.1 mm clearance from the compound region's outer and hole boundaries, the relief segment
+stays contained, and local row order is preserved. If no safe improving position exists, the point
+stays unchanged. Fill jumps and trims begin a fresh declump run; satin columns remain excluded.
+
 Typical values: `limit` 1.5–2.5 (under the default `maxdensity` warn threshold of 3.5), `maxshift` 0.5 for subtle relief or 1.5 (default) for standard use. **Recommended nesting:** `declump` outermost — `declump 2 [ humanize 0.3 [ … ] ]` eases the points where they actually land.
 
 ### Effect paths — `warppath` / `humanizepath` / `snappath` / `declumppath`

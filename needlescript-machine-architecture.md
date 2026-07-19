@@ -183,7 +183,8 @@ Points are emitted through a short chain:
 
 - **`_emitPen(x, y, u)`** (`543`) — applies the after-split `penLayers`
   (humanize/snaptogrid) then the tiny-stitch check.
-- **`_emitRaw(x, y)`** (`587`) — for the declump path, where layers are pre-applied.
+- **`_emitRaw(x, y, u)`** (`587`) — for the declump path, where layers are pre-applied; the optional
+  underlay flag lets generated fill underlay retain its preview classification.
 - **`_dropTiny`** (`599`) — sub-half-minimum moves are merged into neighbours and
   recorded (capped at 200) so a "N sub-0.4 mm moves merged" warning can point at them.
 - **`_push(t, x, y, u)`** (`605`) — the single choke point that appends a `StitchEvent`.
@@ -210,7 +211,8 @@ The machine maintains three separate stacks, all block-scoped by the interpreter
   to each _final_ penetration point (`pushPen`/`popPen`, `282-287`).
 - **Declump stack** (`declumpStack`) — stateful along-axis crowd-relief folds that need
   lookahead over the full split sequence, so they run on a pre-computed point list
-  (`pushDeclump`/`popDeclump`, `290-295`).
+  (`pushDeclump`/`popDeclump`, `290-295`). Fill generation uses the same fold at commit time with
+  additional compound-region and monotonic-order candidate guards.
 
 The affine math lives in `affine.ts`: `Mat` is a 2×3 matrix `[a,b,c,d,e,f]`; `compose`
 composes inside-out (OpenSCAD reading); `apply`/`linApply` map points/directions; and
@@ -345,6 +347,18 @@ physical polylines before splitting and connector classification. Omitted fragme
 spatial/source warning per fill. Underlay and closed custom contours bypass the policy. Because the
 filter runs before connector routing, sidecar records and coverage never contain phantom travel to
 an omitted fragment.
+
+When `endFill` runs inside `declump`, every generated penetration—including underlay, edge run,
+topping, and an actually sewn topping connector—is folded immediately before commit. Stateless
+penetration effects are applied first, matching ordinary running-stitch effect order. Candidate
+shifts must retain 0.1 mm clearance from every outer or hole boundary of the resolved compound
+construction region, and the relief segment itself must remain contained. Predecessor/successor
+projection guards preserve local row direction and prevent penetrations from swapping order; the
+0.6 mm declump stitch floor also guards the first point after a fill jump. Unsafe or non-improving
+candidates fall back to the planned point and contribute to the normal saturation note. Underlay,
+edge run, and topping intentionally share the block's active limit and greedy history in their sew
+order; jumps and trims reset each declump run. The policy is drawless and bypassed entirely when no
+declump block is active, preserving legacy fill output.
 
 Extended `filllen`/`stitchlen` list and reporter forms also route a plain fill through
 the programmable generator so the per-row length function is honored (`2448`).
