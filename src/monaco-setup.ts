@@ -24,6 +24,7 @@ import 'monaco-editor/esm/vs/editor/contrib/comment/browser/comment.js';
 import 'monaco-editor/esm/vs/editor/contrib/cursorUndo/browser/cursorUndo.js';
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController.js';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding.js';
+import 'monaco-editor/esm/vs/editor/contrib/format/browser/formatActions.js';
 import 'monaco-editor/esm/vs/editor/contrib/gotoSymbol/browser/goToCommands.js';
 import 'monaco-editor/esm/vs/editor/contrib/gotoSymbol/browser/link/goToDefinitionAtPosition.js';
 import 'monaco-editor/esm/vs/editor/contrib/hover/browser/hoverContribution.js';

@@ -374,6 +374,7 @@ export default function EditorPane({
         paste: () => runEditorAction('editor.action.clipboardPasteAction'),
         goToDefinition: () => runEditorAction('editor.action.revealDefinition'),
         changeAll: () => runEditorAction('editor.action.changeAll'),
+        formatDocument: () => runEditorAction('editor.action.formatDocument'),
       });
     });
   }, []);

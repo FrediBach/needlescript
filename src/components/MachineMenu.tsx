@@ -5,6 +5,7 @@ import {
   ClipboardIcon,
   CopyIcon,
   CpuIcon,
+  FileCode2Icon,
   LocateFixedIcon,
   ReplaceAllIcon,
   ScissorsIcon,
@@ -39,6 +40,7 @@ export interface EditorContextActions {
   paste: () => void;
   goToDefinition: () => void;
   changeAll: () => void;
+  formatDocument: () => void;
 }
 
 interface Actions {
@@ -172,6 +174,7 @@ export function MachineContextMenu({
               ['Paste', ClipboardIcon, props.editorActions.paste],
               ['Go to Definition', LocateFixedIcon, props.editorActions.goToDefinition],
               ['Change All Occurrences', ReplaceAllIcon, props.editorActions.changeAll],
+              ['Format Document', FileCode2Icon, props.editorActions.formatDocument],
             ] as const
           ).map(([label, Icon, action]) => (
             <button

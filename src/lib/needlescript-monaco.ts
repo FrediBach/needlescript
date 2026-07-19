@@ -1,5 +1,6 @@
 import type { Monaco } from '@monaco-editor/react';
 import { registerNeedlescriptConfiguration } from './needlescript-monaco/configuration.ts';
+import { registerNeedlescriptFormattingProvider } from './needlescript-monaco/formatting.ts';
 import {
   registerNeedlescriptDefinitionProvider,
   registerNeedlescriptProviders as registerProviders,
@@ -34,6 +35,7 @@ export function registerNeedlescript(monaco: Monaco): void {
   registerNeedlescriptTokenizer(monaco);
   registerNeedlescriptDarkTheme(monaco);
   registerNeedlescriptConfiguration(monaco);
+  registerNeedlescriptFormattingProvider(monaco);
   registerNeedlescriptLightTheme(monaco);
 }
 
