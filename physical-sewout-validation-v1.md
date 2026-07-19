@@ -87,6 +87,27 @@ The slash-separated values correspond to `sheet_fabric`, `sheet_thread`, `sheet_
 the specimen ID and sheet version, for example `W01-physical-sewout-v1.dst`. Record any conversion
 software; do not compensate by scaling in that software.
 
+### Reproducible source and machine-file exports
+
+Generate configured source copies plus DST, PES, and EXP files for the entire matrix:
+
+```sh
+npm run sewout:v1
+```
+
+The ignored output directory is `sewout-output/physical-sewout-v1`. Generate only one specimen and
+machine format when appropriate:
+
+```sh
+npm run sewout:v1 -- --specimen W01 --format dst --out /path/to/sewout-artifacts
+```
+
+Every run writes the configured `.ns` file and `manifest.json`. The manifest records canonical and
+configured source SHA-256 values, artifact checksums, material setup, event/stitch counts, and runtime
+warnings. Existing artifacts are not replaced unless `--force` is explicit. Archive the manifest
+with the physical specimen record and copy its machine-file checksum into the setup record below.
+Checksums and successful software exports establish provenance only; they are not physical evidence.
+
 ## Specimen setup record
 
 Duplicate this section for every completed specimen. Do not collapse records that used different

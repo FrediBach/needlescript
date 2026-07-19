@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import source from '../../../examples/advanced/physical-sewout-validation-v1.ns?raw';
-import { run } from '../engine.ts';
+import { run, toDST, toEXP, toPES } from '../engine.ts';
 
 const TARGETS = [
   'S01',
@@ -155,5 +155,10 @@ describe('physical sew-out validation v1', () => {
     expect(Math.min(...positions.map((event) => event.y))).toBeGreaterThanOrEqual(-87);
     expect(Math.max(...positions.map((event) => event.y))).toBeLessThanOrEqual(87);
     expect(result.warnings.some((warning) => /outside the .*field/.test(warning))).toBe(false);
+    expect(toDST(result.events, `${specimen.id}-SEWOUT-V1`).byteLength).toBeGreaterThan(512);
+    expect(
+      toPES(result.events, `${specimen.id}-SEWOUT-V1`, result.colorTable).byteLength,
+    ).toBeGreaterThan(512);
+    expect(toEXP(result.events, `${specimen.id}-SEWOUT-V1`).byteLength).toBeGreaterThan(0);
   });
 });

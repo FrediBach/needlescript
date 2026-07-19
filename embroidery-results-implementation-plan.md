@@ -1497,6 +1497,12 @@ the complete woven/knit/stretch/denim/canvas/fleece specimen matrix, and 130 × 
 containment. No profile recommendation was promoted: directional fabric defaults remain neutral and
 push remains zero until completed physical records are committed.
 
+`npm run sewout:v1` reproducibly materializes configured `.ns` sources and selected DST/PES/EXP
+machine formats without modifying the canonical sheet. Its manifest records source and artifact
+SHA-256 checksums, setup metadata, stitch/event counts, and warnings; output is ignored by Git and
+replacement requires explicit `--force`. Export tests cover every format for every specimen. These
+artifacts improve physical-test provenance but do not count as sew-out evidence.
+
 ## 16. Phase 8: preflight and machine calibration
 
 ### Session 8.1 — Structured preflight result

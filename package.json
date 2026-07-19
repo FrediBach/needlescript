@@ -13,6 +13,7 @@
     "build:lib": "tsdown && node scripts/make-publish-package.mjs",
     "check:lib": "publint ./dist-lib && attw --pack ./dist-lib --ignore-rules cjs-resolves-to-esm",
     "release:lib": "npm run build:lib && npm test && npm run check:lib",
+    "sewout:v1": "node --experimental-strip-types scripts/export-physical-sewout-v1.mjs",
     "format": "prettier --write .",
     "lint": "eslint .",
     "preview": "vite preview",

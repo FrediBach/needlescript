@@ -82,6 +82,7 @@ out
 .nuxt
 dist
 dist-lib
+sewout-output/
 .output
 
 # Gatsby files
