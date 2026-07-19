@@ -8,7 +8,7 @@ import { makeRNG, makeNoise } from '../prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { tokenize } from '../tokenizer.ts';
 import { linkStandardModules } from '../module-linker.ts';
-import { applyAutoTrim, applyLocks } from '../postprocess.ts';
+import { applyAutoTrim, applyLocks, densityMap } from '../postprocess.ts';
 import { applyTravelPlan } from '../travel-planner.ts';
 import type { PlanAtomicSpan, PlanRouteGroupSpan } from '../travel-planner.ts';
 import type { TravelPlanStats } from '../types.ts';
@@ -17,7 +17,7 @@ import type { Val } from '../list.ts';
 import type { ASTNode } from '../types.ts';
 import { LIMITS } from '../machine.ts';
 import { NeedlescriptError } from '../errors.ts';
-import { fieldDescription, hoopDescription } from '../hoop-presets.ts';
+import { fieldDescription, hoopDescription, inHoopField, inHoopOuter } from '../hoop-presets.ts';
 import { LoopSignal } from './signals.ts';
 import type { RunContext } from './context.ts';
 import { initBudget } from './budget.ts';
@@ -35,6 +35,14 @@ import { DEFAULT_BACKGROUND, defaultSlotColor } from '../colormath.ts';
 import type { ColorTableEntry } from '../types.ts';
 import { directionalCompensationPreview } from '../directional-compensation.ts';
 import { buildPreflightResult } from '../preflight.ts';
+import {
+  applyMachineCalibration,
+  applyMachineCalibrationToConstructionRecords,
+  applyMachineCalibrationToPoints,
+  enforceMaximumMovement,
+  isIdentityMachineCalibration,
+  resolveMachineProfile,
+} from '../machine-profile.ts';
 
 export function run(source: string, opts: RunOptions = {}): RunResult {
   const startedAt = performance.now();
@@ -44,6 +52,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   const program = linkStandardModules(tokens, parseNotes);
   const parsedAt = performance.now();
   const m = new Machine();
+  const initialMachineProfile = resolveMachineProfile(m.maxDensity, opts.machineProfile);
   m.warnings.push(...parseNotes);
 
   const seed0 = opts.seed !== undefined ? opts.seed : 42;
@@ -168,6 +177,27 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     );
   }
 
+  const machineProfile = {
+    ...initialMachineProfile,
+    maximumDensityLayers: m.maxDensity,
+  };
+  const calibrationActive = !isIdentityMachineCalibration(machineProfile.calibration);
+  let constructionRecords = m.constructionRecords;
+  if (calibrationActive) {
+    const calibrated = applyMachineCalibration(m.events, machineProfile.calibration);
+    m.events = calibrated.events;
+    constructionRecords = applyMachineCalibrationToConstructionRecords(
+      constructionRecords,
+      machineProfile.calibration,
+      calibrated.eventMap,
+    );
+    for (const location of warningLocations)
+      location.points = applyMachineCalibrationToPoints(
+        location.points,
+        machineProfile.calibration,
+      );
+  }
+
   let planStats: TravelPlanStats | undefined;
   if (ctx.planMode && ctx.planMode !== 'off') {
     const beforeAutotrims = m.autoTrim > 0 ? applyAutoTrim(m.events, m.autoTrim).trims : 0;
@@ -207,6 +237,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     );
   }
 
+  if (calibrationActive)
+    m.events = enforceMaximumMovement(m.events, machineProfile.maximumStitchMM);
+
   if (m.autoTrim > 0) {
     const at = applyAutoTrim(m.events, m.autoTrim);
     m.events = at.events;
@@ -214,7 +247,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
 
   // Analyse coverage before the lock pass: tie-offs are deliberate micro
   // stitches and would otherwise read as false hotspots at every thread end.
-  const density = m.density.finalize(m.maxDensity);
+  const density = calibrationActive
+    ? densityMap(m.events, m.density.cellMM, m.maxDensity, m.materialIntent.threadWidthMM)
+    : m.density.finalize(m.maxDensity);
   if (m.maxDensity > 0) {
     const dens = density.hotspots.filter((h) => h.kind === 'density').slice(0, 3);
     for (const h of dens) {
@@ -257,9 +292,20 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   }
 
   // ---------- Overflow warnings (§hoop §2.5) ----------
-  if (m.fieldOverflows.length > 0) {
-    const fieldHits = m.fieldOverflows.filter((o) => o.kind === 'field');
-    const hoopHits = m.fieldOverflows.filter((o) => o.kind === 'hoop');
+  const fieldOverflows = calibrationActive
+    ? preflightEvents
+        .filter((event) => event.t === 'stitch' && !inHoopField(m.hoopInfo, event.x, event.y))
+        .slice(0, 50)
+        .map((event) => ({
+          x: event.x,
+          y: event.y,
+          line: event.line,
+          kind: inHoopOuter(m.hoopInfo, event.x, event.y) ? ('field' as const) : ('hoop' as const),
+        }))
+    : m.fieldOverflows;
+  if (fieldOverflows.length > 0) {
+    const fieldHits = fieldOverflows.filter((o) => o.kind === 'field');
+    const hoopHits = fieldOverflows.filter((o) => o.kind === 'hoop');
     if (fieldHits.length > 0) {
       const pts = fieldHits.slice(0, 10);
       const lines = [
@@ -411,8 +457,9 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     warningLocations,
     hoop: m.hoopInfo,
     maximumDensityLayers: m.maxDensity,
+    profile: machineProfile,
     mode: ctx.preflightMode,
-    constructionRecords: m.constructionRecords,
+    constructionRecords,
   });
   if (ctx.preflightMode === 'strict') {
     const blockingIssue = preflight.issues.find(({ severity }) => severity === 'error');
@@ -436,6 +483,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       mode: m.compensationMode,
       pullCompExplicit: m.pullCompExplicit,
     }),
+    machineProfile,
     activeHoop,
     activeOverrides,
     globals: ctx.globals,

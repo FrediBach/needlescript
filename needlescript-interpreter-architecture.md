@@ -53,6 +53,11 @@ and synchronous, so normal library results and deterministic language behavior a
 unchanged. The playground worker adds statistics, worker-total, and message
 round-trip timings in `CompileResponse.timings`.
 
+`RunOptions.machineProfile` is the other non-source input. It is a serializable local machine
+profile resolved and validated by `machine-profile.ts`; it never enters the AST, globals, share URL,
+or source text. The resolved identity/default or caller profile is returned in
+`RunResult.machineProfile` and reused by structured preflight.
+
 The interpreter is a **tree-walker**: it recursively evaluates `ASTNode`/`ExprNode`
 values directly, with no bytecode or intermediate compilation step. CPU-heavy runs are
 kept off the UI thread by running the whole compiler/interpreter in a Web Worker at the
@@ -550,7 +555,11 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
 
 1. **Flush and close**: `m.flushSatin()`; if a fill was left open, close it with a
    warning (`index.ts:90-95`).
-2. **Tiny-stitch merge warnings**, then optional **travel planning**. Planning sees
+2. **Tiny-stitch merge warnings**, then optional **local calibration** and **travel planning**. A
+   supplied `RunOptions.machineProfile` is validated before source execution; after execution its
+   bounded affine correction is applied to a copied event stream plus explicit construction regions,
+   rail sections, connector endpoints, and existing warning points. Event identity is remapped so
+   construction order checks remain exact. Identity correction bypasses this pass. Planning sees
    the closed raw event stream, lowers it to private event-plus-tag wrappers, and runs before every
    order-sensitive pass. Sparse `planbarrier` offsets become segment tags and outermost `atomic`
    spans become atomic IDs, and route-group spans become eligibility IDs during this lowering. Trims
@@ -561,13 +570,15 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    window, 4,096 candidates, at most eight accepted passes). Every examined distance charges the
    operation budget. Because the current representation cannot move one item across independently
    routed color blocks, an atomic span containing a color event errors with its source line. Planning
-   unwraps to plain `StitchEvent[]` before returning.
+   unwraps to plain `StitchEvent[]` before returning. After planning, corrected movements beyond the
+   hard 12 mm ceiling are deterministically re-split before auto-trim.
 3. **Auto-trim**, then **density analysis** with the resolved thread width before locks (so tie-offs don't read as false hotspots), then
    density/stack hotspot warnings with `WarningLocation` spatial data
    (`index.ts:121-153`).
 4. **Lock (tie-off) pass** via `applyLocks` (`index.ts:155-160`).
-5. **Hoop-overflow warnings** for stitches outside the sewable field / physical hoop
-   (`index.ts:163-203`).
+5. **Hoop-overflow warnings** for stitches outside the sewable field / physical hoop. With active
+   calibration these are recomputed from corrected pre-lock penetrations, replacing authored-space
+   overflow hits; only corrected coordinates determine final field validity.
 6. **Override-raise warnings** — one per raised budget, emitted every run
    (`index.ts:206-241`).
 7. **Finalize preview data**: translate each chalk command's raw event-stream offset
@@ -577,7 +588,9 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    deterministic hoop-space points and source lines, then, when `preflight 'warn'` or `'strict'` is
    active, appends the fixed-order results from the pure event-stream and construction analyzers and
    counts severities. With no directive or `preflight 'off'`, only the structured counterparts to
-   legacy always-on diagnostics remain. Event-stream analysis sees planned/autotrimmed
+   legacy always-on diagnostics remain. Explicit local trim/color-change capability mismatches are
+   included regardless of extended-check mode because they describe the selected machine rather than
+   a subjective construction recommendation. Event-stream analysis sees planned/autotrimmed
    events before `applyLocks`, excluding deliberate tie-off micro-stitches. It does not mutate the
    completed events or the legacy warning array. Density hotspots, same-hole stacks, merged tiny
    movements, field/physical-hoop overflow, satin snag advisories, short/reversal/near-hole and
@@ -589,27 +602,31 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    finalization only when this completed list contains severity `error`; warning/info
    recommendations are never fatal. The check reads the completed stream and does not mutate it.
 9. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
-   `warningLocations`, optional `preflight`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `activeHoop`, `activeOverrides`,
+   `warningLocations`, optional `preflight`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `machineProfile`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional
    `plan` statistics. Explicit groups add per-group line, eligibility/movement, accepted-improvement,
    and before/after-travel records.
 
-The load-bearing finalize order is `flush → plan → autotrim → density → locks`.
+The load-bearing finalize order is
+`flush → calibration → plan → hard-limit split → autotrim → density → locks`.
 Planning therefore prevents unnecessary automatic cuts, while locks see only final
 run boundaries. The live density grid and history queries intentionally remain in
 program order; density accumulation is order-independent. If a history reporter ran and planning
 materially reorders the stream, the planner diagnostic explicitly notes that the reporter observed
 authored order rather than final sew order.
 
+With local calibration, the live density grid and history reporters likewise retain portable
+authored coordinates during execution, while final density is rebuilt from the corrected pre-lock
+stream. This prevents a user's private correction from feeding back into NeedleScript control flow.
+
 The `RunResult` shape is defined in `types.ts`; downstream, the exporters
 (`svg.ts`, `dst.ts`, `pes.ts`, `exp.ts`) consume `events` to produce files.
 Because chalk never enters `events`, machine-export inertness is structural rather
 than an exporter filtering rule.
 
-`RunResult.preflight.profile` currently records the built-in movement, stitch, satin, density, and
-same-hole thresholds plus preferred jump and continuous-run ceilings. It is intentionally a
-resolved value object so a later local machine profile can extend the result without embedding
-machine-specific correction in NeedleScript source. The event-stream spatial/window metrics live in
+`RunResult.machineProfile` and `RunResult.preflight.profile` record the same complete resolved local
+configuration: provenance, movement preferences, operation capabilities, speed class, and bounded
+affine correction. Default resolution is identity. The event-stream spatial/window metrics live in
 the exported `EVENT_STREAM_PREFLIGHT_THRESHOLDS` registry rather than being repeated through the
 analyzer.
 
@@ -628,7 +645,7 @@ show-info toggle filters only rendered findings and never recompiles or changes 
 - **Loud over convenient** — type mismatches, out-of-range indices, cycles, and
   never-returning reporters all throw `NeedlescriptError` with a hint, rather than
   producing surprising silent output that only shows up after sewing.
-- **Deterministic** — same seed ⇒ same design. RNG lives on `ctx.rng` (reseedable only
+- **Deterministic** — same seed plus the same explicit run configuration ⇒ same design. RNG lives on `ctx.rng` (reseedable only
   outside `trace`), generative noise is seeded on its own streams, and the trace
   sandbox restores RNG state so captures don't perturb the main stream.
 - **Color as metadata** — `RunContext` owns the declared/auto-extended palette and

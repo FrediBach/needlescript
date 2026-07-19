@@ -1,4 +1,4 @@
-import type { RunResult, DesignStats, RunTimings } from './lib/types.ts';
+import type { RunResult, DesignStats, MachineProfile, RunTimings } from './lib/types.ts';
 
 interface CompileTimings extends RunTimings {
   statsMs: number;
@@ -10,6 +10,7 @@ export interface CompileRequest {
   id: number;
   source: string;
   seed?: number;
+  machineProfile?: MachineProfile;
 }
 
 export type CompileResponse =

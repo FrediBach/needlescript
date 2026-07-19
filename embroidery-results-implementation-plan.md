@@ -1672,8 +1672,9 @@ pin identical event arrays and legacy warnings between `off` and `warn`.
 
 `strict` builds the same deterministic issue list as `warn` and fails finalization only on the first
 issue already classified as severity `error`. Recommendation-only `warning` and `info` findings are
-never promoted by the mode. The current strict errors are physical-hoop unreachability and explicit
-construction layer-order violations.
+never promoted by the mode. The initial Session 8.4 strict errors were physical-hoop unreachability
+and explicit construction layer-order violations; Session 8.5 additionally allows an explicitly
+selected local profile to reject trim or color-change operations it marks unsupported.
 
 The playground console now presents the current run's issues in severity groups with nested stable
 code groups. Hovering previews all known design points on the stage; selecting a finding persists
@@ -1683,6 +1684,8 @@ control filters info findings without changing source, invoking the compiler, or
 cover the new directive and all three registered modes.
 
 ### Session 8.5 — Local machine profile and calibration
+
+Status: complete (2026-07-19)
 
 Purpose: support actual machine constraints without polluting portable source.
 
@@ -1712,6 +1715,32 @@ Acceptance criteria:
 - Calibration is bounded; absurd scale/skew values are rejected.
 - Applied profile appears in `RunResult` and export metadata where possible.
 - Sharing source alone does not silently embed a user's local machine correction.
+
+Implementation note: `RunOptions.machineProfile` now accepts a named, JSON-serializable local
+profile with reliable/preferred movement thresholds, trim and color-change capabilities, advisory
+speed class, and an optional six-scalar affine correction. Resolution supplies the existing
+NeedleScript constraints and identity correction when the option is absent. Scale is bounded to
+0.9–1.1, skew coefficients to −0.05–0.05, offsets to ±5 mm, and movement preferences to documented
+finite ranges; invalid values are rejected rather than clamped. The compiler worker and shared
+compile hook carry this explicit option without deriving it from source.
+
+Correction runs on a copied completed event stream and explicit construction sidecars before travel
+planning, autotrim, final density, locks, structured preflight, statistics, preview, export, and
+final field/physical-hoop validation. It does not feed back into turtle state, history/coverage
+reporters, trace, or source control flow. Corrected stitch and jump movements stretched beyond the
+hard 12 mm ceiling are deterministically re-split. Identity correction bypasses the calibration
+pass, preserving existing event and exporter fixtures byte-for-byte.
+
+Every result retains the complete resolved profile in `RunResult.machineProfile` and
+`RunResult.preflight.profile`. Explicit manual machine operations add info findings; operations
+marked unsupported add error findings and fail source-selected strict preflight without rewriting
+events. Speed class remains metadata only: this session adds no speed or tension events. SVG can
+retain the complete resolved profile as escaped JSON metadata, DST can retain the sanitized profile
+name in its header, and PES/EXP retain corrected coordinates without inventing a non-portable
+metadata channel. Export metadata is opt-in and source text never embeds or selects the local
+profile. The playground profile editor/import/export UI remains the explicitly deferred follow-up;
+the core API, worker plumbing, exporter support, documentation, and bounded regression tests are in
+place first.
 
 ## 17. Phase 9: integration, importer exposure, and examples
 
@@ -1930,10 +1959,13 @@ directional auto compensation waits for sew-out validation.
 7. Does `atomic` permit internal color changes, or should that require a separate multi-color group?
 8. Which preflight checks are objective enough for `strict` mode?
 9. Which thread widths and material coefficients have sufficient evidence to ship as recommendations?
-10. Should calibrated hoop overflow be checked only after correction or both before and after?
-11. Should material intent be included in exported sidecar metadata even when the stitch format cannot
-    encode it?
-12. What naming best distinguishes source-portable `fabric` intent from local machine profiles?
+10. Resolved in Session 8.5: final hoop overflow is checked only after local correction; authored
+    coordinates remain visible to source-time reporters but do not produce duplicate final warnings.
+11. Resolved in Session 8.5 for local profiles: retain the resolved profile in `RunResult`; SVG stores
+    the complete JSON record and DST stores its name when exporter metadata is supplied. PES/EXP
+    retain corrected coordinates only because the current encoders have no safe metadata slot.
+12. Resolved in Session 8.5: `material`/source commands remain portable design intent;
+    `machineProfile` is caller-local `RunOptions` configuration and never source syntax.
 
 Resolve these in the first session that depends on them. Record the result in the relevant
 architecture document and update this plan rather than leaving decisions only in issue or chat

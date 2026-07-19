@@ -65,6 +65,7 @@ export interface PreflightIssue {
  * calibration while the default profile continues to describe today's rules.
  */
 export interface ResolvedMachineProfile {
+  source: 'default' | 'run-options';
   name: string;
   minimumReliableMovementMM: number;
   maximumStitchMM: number;
@@ -74,6 +75,46 @@ export interface ResolvedMachineProfile {
   maximumConsecutiveStitches: number;
   maximumDensityLayers: number;
   sameHolePenetrationLimit: number;
+  trimCapability: MachineOperationCapability;
+  colorChangeCapability: MachineOperationCapability;
+  speedClass: MachineSpeedClass;
+  calibration: ResolvedMachineCalibration;
+}
+
+export type MachineOperationCapability = 'automatic' | 'manual' | 'none';
+export type MachineSpeedClass = 'slow' | 'standard' | 'high-speed';
+
+/** Serializable local correction, applied only through explicit RunOptions. */
+export interface MachineCalibration {
+  scaleX?: number;
+  scaleY?: number;
+  /** x' += skewX × y. */
+  skewX?: number;
+  /** y' += skewY × x. */
+  skewY?: number;
+  offsetXMM?: number;
+  offsetYMM?: number;
+}
+
+export interface ResolvedMachineCalibration {
+  scaleX: number;
+  scaleY: number;
+  skewX: number;
+  skewY: number;
+  offsetXMM: number;
+  offsetYMM: number;
+}
+
+/** Caller-owned local machine constraints; never parsed from NeedleScript source. */
+export interface MachineProfile {
+  name: string;
+  minimumReliableMovementMM?: number;
+  maximumPreferredStitchMM?: number;
+  maximumPreferredJumpMM?: number;
+  trimCapability?: MachineOperationCapability;
+  colorChangeCapability?: MachineOperationCapability;
+  speedClass?: MachineSpeedClass;
+  calibration?: MachineCalibration;
 }
 
 export interface PreflightResult {
@@ -240,6 +281,8 @@ export interface RunResult {
   material: MaterialIntent;
   /** Directional recommendation and active-mode diagnostic used by opt-in satin/fill construction. */
   compensation: DirectionalCompensationPreview;
+  /** Complete local machine configuration applied to this result. */
+  machineProfile: ResolvedMachineProfile;
   /** The hoop configured by the `hoop` directive, if any. */
   activeHoop?: HoopInfo;
   /** Budget limits raised or lowered by `override` directives, if any. */
@@ -266,6 +309,11 @@ export interface ColorTableEntry {
   firstUseLine?: number;
   stitchCount: number;
   pathLenMm: number;
+}
+
+/** Optional metadata for exporters whose container format can retain it. */
+export interface ExportMetadata {
+  machineProfile?: ResolvedMachineProfile;
 }
 
 export interface TravelPlanStats {
@@ -400,6 +448,8 @@ export interface DensityResult {
 
 export interface RunOptions {
   seed?: number;
+  /** Explicit caller-local constraints and calibration; never sourced from the program text. */
+  machineProfile?: MachineProfile;
   /** Optional synchronous timing sink for profiling the language pipeline. */
   onTiming?: (timings: RunTimings) => void;
 }

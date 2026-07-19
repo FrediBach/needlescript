@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import * as Comlink from 'comlink';
 import type { CompilerWorkerApi } from '../compiler.worker.ts';
 import type { CompileResponse } from '../compiler.worker.types.ts';
+import type { MachineProfile } from '../lib/types.ts';
 
 // Import the worker via Vite's native ?worker syntax so it gets bundled as a
 // separate chunk and never runs on the main thread.
@@ -12,6 +13,7 @@ const COMPILE_TIMEOUT_MS = 5000;
 interface QueuedCompile {
   source: string;
   seed?: number;
+  machineProfile?: MachineProfile;
   isStale: () => boolean;
   resolve: (response: CompileResponse | null) => void;
 }
@@ -75,7 +77,7 @@ function runNextJob(): void {
   }, COMPILE_TIMEOUT_MS);
 
   proxy
-    .compile(job.source, job.seed)
+    .compile(job.source, job.seed, job.machineProfile)
     .then((response) => {
       if (settled) return;
       settled = true;
@@ -96,10 +98,11 @@ function runNextJob(): void {
 function enqueueCompile(
   source: string,
   seed: number | undefined,
+  machineProfile: MachineProfile | undefined,
   isStale: () => boolean,
 ): Promise<CompileResponse | null> {
   return new Promise((resolve) => {
-    queue.push({ source, seed, isStale, resolve });
+    queue.push({ source, seed, machineProfile, isStale, resolve });
     runNextJob();
   });
 }
@@ -134,26 +137,35 @@ export function useCompiler() {
     return releaseCompiler;
   }, []);
 
-  const compile = useCallback((source: string, seed?: number): Promise<CompileResponse | null> => {
-    const id = ++latestIdRef.current;
-    const startedAt = performance.now();
+  const compile = useCallback(
+    (
+      source: string,
+      seed?: number,
+      machineProfile?: MachineProfile,
+    ): Promise<CompileResponse | null> => {
+      const id = ++latestIdRef.current;
+      const startedAt = performance.now();
 
-    return enqueueCompile(source, seed, () => latestIdRef.current !== id).then((response) => {
-      if (response === null || latestIdRef.current !== id) return null;
-      return {
-        ...response,
-        id,
-        ...(response.ok
-          ? {
-              timings: {
-                ...response.timings,
-                roundTripMs: performance.now() - startedAt,
-              },
-            }
-          : {}),
-      };
-    });
-  }, []);
+      return enqueueCompile(source, seed, machineProfile, () => latestIdRef.current !== id).then(
+        (response) => {
+          if (response === null || latestIdRef.current !== id) return null;
+          return {
+            ...response,
+            id,
+            ...(response.ok
+              ? {
+                  timings: {
+                    ...response.timings,
+                    roundTripMs: performance.now() - startedAt,
+                  },
+                }
+              : {}),
+          };
+        },
+      );
+    },
+    [],
+  );
 
   return { compile };
 }

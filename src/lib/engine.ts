@@ -32,6 +32,11 @@ export type {
   PreflightIssue,
   PreflightResult,
   ResolvedMachineProfile,
+  MachineProfile,
+  MachineCalibration,
+  ResolvedMachineCalibration,
+  MachineOperationCapability,
+  MachineSpeedClass,
   DesignStats,
   ASTNode,
   ExprNode,
@@ -50,6 +55,7 @@ export type {
   ChalkDataVar,
   ReferenceDataVar,
   ColorTableEntry,
+  ExportMetadata,
   MaterialIntent,
   CompensationTensor,
   HeadingCompensationComponents,
@@ -57,8 +63,16 @@ export type {
   DirectionalCompensationSample,
   DirectionalCompensationPreview,
 } from './types.ts';
-export { buildPreflightResult, PREFLIGHT_MODES, resolveMachineProfile } from './preflight.ts';
+export { buildPreflightResult, PREFLIGHT_MODES } from './preflight.ts';
 export type { PreflightInput } from './preflight.ts';
+export {
+  applyMachineCalibration,
+  enforceMaximumMovement,
+  isIdentityMachineCalibration,
+  machineCalibrationMatrix,
+  MACHINE_PROFILE_LIMITS,
+  resolveMachineProfile,
+} from './machine-profile.ts';
 export {
   analyzeEventStreamPreflight,
   EVENT_STREAM_PREFLIGHT_THRESHOLDS,

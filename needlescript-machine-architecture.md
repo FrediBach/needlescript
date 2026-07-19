@@ -654,6 +654,20 @@ The interpreter orders these deliberately: planning runs before autotrim, densit
 analysed _before_ locks (so tie-offs don't read as hotspots), then locks are applied. The results populate the final
 `RunResult` (`types.ts:76-89`), which the exporters consume.
 
+When `RunOptions.machineProfile` supplies a non-identity correction, `machine-profile.ts` inserts a
+pure boundary between authored generation and final planning. It maps the completed event stream by
+the bounded affine `(scaleX, scaleY, skewX, skewY, offsetXMM, offsetYMM)`, maps construction regions,
+satin envelopes, connector endpoints, and diagnostic points through the same matrix, then remaps
+construction event identities. Planning and every later physical pass see corrected coordinates.
+Corrected moves are split again after planning when scaling would exceed the 12 mm hard ceiling.
+
+The live machine density/history state is intentionally not rebuilt during program execution:
+source reporters observe portable authored hoop space and cannot branch on a user's private local
+correction. Final density is rebuilt from corrected pre-lock events, and field/outer-hoop overflow is
+recomputed from those events. Therefore corrected coordinates alone decide final reachability. With
+identity correction the extra mapping/rebuild is bypassed and legacy event/warning/export bytes stay
+unchanged.
+
 After physical diagnostics are complete, `preflight.ts` purely adapts their internal
 `WarningLocation` sidecars into `RunResult.preflight`. Stable codes currently cover density,
 same-hole penetration stacks, merged tiny movements, sewable-field and physical-hoop overflow, and
@@ -662,6 +676,10 @@ endpoints; width-only satin/E-stitch advisories have source attribution but no i
 Issues follow legacy warning-index order, so ordering and copied hoop-space coordinates are
 deterministic. Exporters still consume only `events`, and preflight never rewrites them. With no
 directive or `preflight 'off'`, these compatibility diagnostics are the complete structured result.
+An explicitly selected local profile also adds objective trim/color-change capability findings:
+manual operations are info-level worksheet reminders, unsupported operations are errors, and neither
+changes the event stream. The resolved speed class remains advisory metadata pending sew-out-backed
+thresholds.
 
 `preflight 'warn'` and `'strict'` additionally run `preflight-event-stream.ts` over the final
 planned/autotrimmed stream captured immediately before locks. Its bounded, fixed-order checks cover
@@ -705,8 +723,9 @@ No preflight mode rewrites, reorders, inserts, or removes an event.
   no-transform path byte-identical.
 - **Buffer-then-generate** — satin columns and fills are buffered and generated at their
   natural boundary (`flushSatin`, `endFill`), always under one snapshotted transform.
-- **One grid, one truth** — the same `DensityGrid` feeds both live queries and the final
-  heatmap; only committed penetrations count.
+- **One grid, one truth** — without local correction, the same `DensityGrid` feeds both live queries
+  and the final heatmap. With explicit calibration, source queries intentionally stay portable and
+  the final heatmap is rebuilt from corrected penetrations.
 - **Loud over convenient** — over-budget designs, unreachable stitches, and out-of-range
   parameters throw or warn with actionable messages rather than silently producing bad
   stitch-outs.
@@ -723,6 +742,7 @@ No preflight mode rewrites, reorders, inserts, or removes an event.
 | `machine.ts`                | re-export shim → `machine/index.ts`                                    |
 | `machine/index.ts`          | barrel: `LIMITS`, `STOCK_LIMITS`, `OVERRIDE_*`, `BudgetKey`, `Machine` |
 | `machine/limits.ts`         | physics constants + overridable per-run budgets                        |
+| `machine-profile.ts`        | local profile validation, affine correction, sidecar mapping, re-split |
 | `machine/machine.ts`        | public `Machine` facade and color/trim commands                        |
 | `machine/machine-core.ts`   | shared state, turtle motion, stacks, emission, trace, and `travel`     |
 | `machine/machine-satin.ts`  | satin columns and buffered running stitches                            |

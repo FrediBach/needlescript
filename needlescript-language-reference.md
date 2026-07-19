@@ -13,7 +13,8 @@ Language reference for NeedleScript — a Logo-inspired language for generative 
 - **Comments:** `//`, `#`, `;` each run to end of line. A lone `/` is division. `..` is reserved and errors.
 - **Three value types:** numbers, strings (immutable, single-quoted), lists (nestable). Lists and strings never reach the stitch stream.
 - **Truthiness:** `0` false, anything else true. Comparisons return `1`/`0`. `true`/`false` are literals for `1`/`0`. A string or list in a condition is an **error** (use `len(x) > 0`).
-- **Determinism contract:** same source + same seed + same hoop → same stitches (§17).
+- **Determinism contract:** same source + same seed + same hoop + same explicit run configuration →
+  same stitches (§17). Local machine calibration belongs to `RunOptions`, never source text.
 
 ### Negative literals vs subtraction (classic prefix syntax)
 
@@ -929,7 +930,10 @@ Non-positive, non-number, or NaN returns are line-numbered errors; values outsid
 
 All randomness is seeded and deterministic; default seed 42. `seed n` reseeds (top-level; forbidden inside `trace`).
 
-**Contract: same source + same seed + same hoop → same stitches.** `scatter`/`voronoi`/`relax` are functions of the field, so changing `hoop` changes the design.
+**Contract: same source + same seed + same hoop + same explicit `RunOptions` → same stitches.**
+`scatter`/`voronoi`/`relax` are functions of the field, so changing `hoop` changes the design. A
+local machine profile may correct final coordinates, so reproducing calibrated output also requires
+the same serialized profile.
 
 Draw accounting (the **fork convention** — edits stay local):
 
@@ -989,14 +993,73 @@ once. Modes are case-insensitive and consume zero RNG draws.
   one issue has severity `error`. It reports the first error in deterministic issue order. Severity
   `warning` and `info` findings are recommendations and can never fail strict mode. The current
   strict errors are a penetration outside the physical hoop (`hoop.unreachable`) and a known
-  construction planned with topping before underlay (`construction.layer-order`). Adding another
-  strict-failing code requires promoting that code to severity `error` in a reviewed policy change.
+  construction planned with topping before underlay (`construction.layer-order`), plus an operation
+  that an explicitly selected local machine profile marks unsupported (`machine.trim-unsupported`
+  or `machine.color-change-unsupported`). Adding another strict-failing code requires promoting that
+  code to severity `error` in a reviewed policy change.
 
 All modes analyze completed output without rewriting it. Consequently `off`, `warn`, and a
-successful `strict` run produce identical event arrays for identical source and seed. In the
+successful `strict` run produce identical event arrays for identical source, seed, and explicit run
+configuration. In the
 playground, findings are grouped by severity and stable code; selecting one selects every attributed
 source line and highlights its known hoop-space design points. Info findings can be hidden locally
 without recompiling.
+
+### Local machine profile (`RunOptions`, not language syntax)
+
+Machine-specific constraints and measured correction are deliberately outside portable
+NeedleScript source. Library callers may pass a serializable `MachineProfile` through
+`run(source, { machineProfile })`:
+
+```ts
+const profile = {
+  name: 'Studio machine A',
+  minimumReliableMovementMM: 0.5,
+  maximumPreferredStitchMM: 7,
+  maximumPreferredJumpMM: 10,
+  trimCapability: 'automatic', // automatic | manual | none
+  colorChangeCapability: 'manual', // automatic | manual | none
+  speedClass: 'slow', // advisory metadata
+  calibration: {
+    scaleX: 1.012,
+    scaleY: 0.996,
+    skewX: 0.003, // x' += skewX × y
+    skewY: -0.002, // y' += skewY × x
+    offsetXMM: 0,
+    offsetYMM: 0,
+  },
+};
+const result = run(source, { machineProfile: profile });
+```
+
+The resolved profile is always returned as `RunResult.machineProfile` and
+`RunResult.preflight.profile`. With no profile, the name is `NeedleScript default`, correction is
+identity, existing limits/capabilities remain active, and events/exports are unchanged. Input bounds
+are exported as `MACHINE_PROFILE_LIMITS`: scale 0.9–1.1, each skew coefficient −0.05–0.05, offsets
+−5–5 mm, reliable movement 0.1–2 mm, preferred sewn stitch 1–12 mm, and preferred jump 1–50 mm.
+Values are rejected rather than clamped. Correction is deterministic and consumes no RNG draws.
+The reliable-movement and preferred-length values are diagnostic thresholds: they do not rewrite
+construction. The separate hard 12 mm movement ceiling remains enforced, including a deterministic
+re-split when calibration stretches a completed movement beyond it.
+
+Finalization applies the affine correction to completed events and explicit construction sidecars
+before travel planning. Corrected movements stretched beyond the hard 12 mm ceiling are split again;
+auto-trim, final density, locks, structured preflight, statistics, preview, exporters, and final
+field/physical-hoop validation therefore observe the corrected coordinates. Source execution,
+turtle reporters, trace, coverage/history reporters, and source-authored warning text observe the
+portable uncorrected design. This is an intentional boundary: calibration cannot feed back into or
+silently change program control flow.
+
+Manual trim/color-change capabilities produce structured info findings; unsupported operations are
+severity errors and can fail `preflight 'strict'`. They never delete or rewrite events. Speed class
+is recorded for future evidence-backed advisories and currently changes no geometry or threshold.
+
+Exporters always receive already-corrected `RunResult.events`. Callers may additionally pass
+`{ machineProfile: result.machineProfile }` as exporter metadata: SVG retains the full resolved JSON
+record and DST retains the local profile name in an `NS:` header field. PES/PEC and EXP have no safe
+portable metadata slot in the current encoders, so they retain corrected coordinates only. Sharing
+source text alone never embeds or selects a local profile; share the serialized profile separately
+when calibrated reproduction is intended.
 
 ### `plan` directive
 

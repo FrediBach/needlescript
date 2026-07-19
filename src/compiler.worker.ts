@@ -1,15 +1,16 @@
 import * as Comlink from 'comlink';
 import { run, designStats, NeedlescriptError } from './lib/engine.ts';
-import type { RunOptions } from './lib/types.ts';
+import type { MachineProfile, RunOptions } from './lib/types.ts';
 import type { RunTimings } from './lib/types.ts';
 import type { CompileResponse } from './compiler.worker.types.ts';
 
 const compiler = {
-  compile(source: string, seed?: number): CompileResponse {
+  compile(source: string, seed?: number, machineProfile?: MachineProfile): CompileResponse {
     const startedAt = performance.now();
     let runTimings: RunTimings | undefined;
     const opts: RunOptions = {
       ...(seed !== undefined ? { seed } : {}),
+      ...(machineProfile !== undefined ? { machineProfile } : {}),
       onTiming(timings) {
         runTimings = timings;
       },

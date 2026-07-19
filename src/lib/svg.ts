@@ -9,7 +9,7 @@
 // the exporter flips Y so the SVG is Y-down (standard SVG).
 // ============================================================
 
-import type { ColorTableEntry, StitchEvent } from './types.ts';
+import type { ColorTableEntry, ExportMetadata, StitchEvent } from './types.ts';
 import { DEFAULT_BACKGROUND, defaultSlotColor } from './colormath.ts';
 
 function escapeXml(s: string): string {
@@ -51,6 +51,7 @@ export function toSVG(
   name: string,
   threads: readonly string[] | readonly ColorTableEntry[] = [],
   background = DEFAULT_BACKGROUND,
+  metadata?: ExportMetadata,
 ): string {
   const palette = threads.map((entry) => (typeof entry === 'string' ? entry : entry.hex));
 
@@ -75,6 +76,9 @@ export function toSVG(
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10mm" height="10mm">\n' +
       `  <title>${escapeXml(name)}</title>\n` +
+      (metadata?.machineProfile?.source === 'run-options'
+        ? `  <metadata id="needlescript-metadata">${escapeXml(JSON.stringify({ machineProfile: metadata.machineProfile }))}</metadata>\n`
+        : '') +
       '</svg>'
     );
   }
@@ -180,6 +184,10 @@ export function toSVG(
       ` width="${f2(W)}mm" height="${f2(H)}mm">`,
   );
   out.push(`  <title>${escapeXml(name)}</title>`);
+  if (metadata?.machineProfile?.source === 'run-options')
+    out.push(
+      `  <metadata id="needlescript-metadata">${escapeXml(JSON.stringify({ machineProfile: metadata.machineProfile }))}</metadata>`,
+    );
   out.push(`  <rect width="100%" height="100%" fill="${background}"/>`);
 
   for (const run of runs) {

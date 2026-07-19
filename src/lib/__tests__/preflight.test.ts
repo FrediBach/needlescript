@@ -20,6 +20,7 @@ describe('structured preflight result', () => {
       mode: 'off',
       issues: [],
       profile: {
+        source: 'default',
         name: 'NeedleScript default',
         minimumReliableMovementMM: 0.4,
         maximumStitchMM: 12,
@@ -29,6 +30,17 @@ describe('structured preflight result', () => {
         maximumConsecutiveStitches: 20_000,
         maximumDensityLayers: 3.5,
         sameHolePenetrationLimit: 5,
+        trimCapability: 'automatic',
+        colorChangeCapability: 'automatic',
+        speedClass: 'standard',
+        calibration: {
+          scaleX: 1,
+          scaleY: 1,
+          skewX: 0,
+          skewY: 0,
+          offsetXMM: 0,
+          offsetYMM: 0,
+        },
       },
       summary: { total: 0, info: 0, warning: 0, error: 0 },
     });

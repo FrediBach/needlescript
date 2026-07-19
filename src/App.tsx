@@ -22,6 +22,7 @@ import type {
   ColorTableEntry,
   PreflightIssue,
   PreflightResult,
+  ResolvedMachineProfile,
 } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
 import { toDST } from './lib/dst.ts';
@@ -134,6 +135,7 @@ export interface DesignState {
   stats: DesignStats | null;
   warnings: string[];
   preflight?: PreflightResult;
+  machineProfile?: ResolvedMachineProfile;
   name: string;
   ok: boolean;
   /** Set by the `hoop` directive; undefined = default round100. */
@@ -503,6 +505,7 @@ export default function App() {
         stats,
         warnings,
         preflight: result.preflight,
+        machineProfile: result.machineProfile,
         name: designName,
         ok: true,
         activeHoop: result.activeHoop,
@@ -905,9 +908,19 @@ export default function App() {
       }
       try {
         const slug = design.name.replace(/[^a-z0-9_-]+/gi, '_').toLowerCase();
+        const exportMetadata =
+          design.machineProfile?.source === 'run-options'
+            ? { machineProfile: design.machineProfile }
+            : undefined;
 
         if (format === 'svg') {
-          const svgStr = toSVG(design.events, design.name, design.colorTable, design.background);
+          const svgStr = toSVG(
+            design.events,
+            design.name,
+            design.colorTable,
+            design.background,
+            exportMetadata,
+          );
           const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
@@ -926,7 +939,7 @@ export default function App() {
         } else if (format === 'exp') {
           bytes = toEXP(design.events, design.name);
         } else {
-          bytes = toDST(design.events, design.name);
+          bytes = toDST(design.events, design.name, exportMetadata);
         }
         const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/octet-stream' });
         const a = document.createElement('a');

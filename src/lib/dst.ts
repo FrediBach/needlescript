@@ -4,7 +4,7 @@
 // No DOM dependencies.
 // ============================================================
 
-import type { StitchEvent } from './engine.ts';
+import type { ExportMetadata, StitchEvent } from './types.ts';
 
 function dstBit(b: number) {
   return 1 << b;
@@ -100,7 +100,11 @@ function dstEncodeDelta(x: number, y: number, jump: boolean): [number, number, n
   return [b0, b1, b2];
 }
 
-export function toDST(events: StitchEvent[], label?: string): Uint8Array {
+export function toDST(
+  events: StitchEvent[],
+  label?: string,
+  metadata?: ExportMetadata,
+): Uint8Array {
   const records: [number, number, number][] = [];
   let cx = 0,
     cy = 0;
@@ -189,6 +193,13 @@ export function toDST(events: StitchEvent[], label?: string): Uint8Array {
   header += field('MX:' + signedNum(0, 5));
   header += field('MY:' + signedNum(0, 5));
   header += field('PD:******');
+  if (metadata?.machineProfile?.source === 'run-options') {
+    const profileName = metadata.machineProfile.name
+      .toUpperCase()
+      .replace(/[^A-Z0-9_. -]/g, '_')
+      .slice(0, 40);
+    header += field('NS:' + profileName);
+  }
 
   const bytes = new Uint8Array(512 + records.length * 3);
   for (let i = 0; i < header.length; i++) bytes[i] = header.charCodeAt(i);

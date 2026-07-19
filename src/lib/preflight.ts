@@ -1,10 +1,9 @@
 import { inHoopOuter } from './hoop-presets.ts';
-import { LIMITS } from './machine/limits.ts';
 import { analyzeEventStreamPreflight } from './preflight-event-stream.ts';
 import { analyzeConstructionPreflight } from './preflight-construction.ts';
 import type { ConstructionRecord } from './construction-metadata.ts';
-import { DEFAULT_PREFERRED_SATIN_CHORD_MM } from './satin-profile.ts';
 import { defineModes } from './mode-registry.ts';
+import { resolveMachineProfile } from './machine-profile.ts';
 import type {
   HoopInfo,
   PreflightIssue,
@@ -16,7 +15,6 @@ import type {
   WarningLocation,
 } from './types.ts';
 
-const SAME_HOLE_PENETRATION_LIMIT = 5;
 export const PREFLIGHT_MODES: readonly PreflightMode[] = defineModes(['off', 'warn', 'strict']);
 
 export interface PreflightInput {
@@ -25,23 +23,9 @@ export interface PreflightInput {
   warningLocations: readonly WarningLocation[];
   hoop: HoopInfo;
   maximumDensityLayers: number;
+  profile?: ResolvedMachineProfile;
   mode?: PreflightMode;
   constructionRecords?: readonly ConstructionRecord[];
-}
-
-/** Resolve the current built-in diagnostic envelope without retaining machine state. */
-export function resolveMachineProfile(maximumDensityLayers: number): ResolvedMachineProfile {
-  return {
-    name: 'NeedleScript default',
-    minimumReliableMovementMM: LIMITS.minStitch,
-    maximumStitchMM: LIMITS.maxStitch,
-    maximumPreferredSewnStitchMM: DEFAULT_PREFERRED_SATIN_CHORD_MM,
-    maximumPreferredSatinStitchMM: DEFAULT_PREFERRED_SATIN_CHORD_MM,
-    maximumPreferredJumpMM: LIMITS.maxStitch,
-    maximumConsecutiveStitches: 20_000,
-    maximumDensityLayers,
-    sameHolePenetrationLimit: SAME_HOLE_PENETRATION_LIMIT,
-  };
 }
 
 function overflowCode(
@@ -104,13 +88,51 @@ function uniqueLines(lines: readonly number[]): number[] {
   return [...new Set(lines)];
 }
 
+function capabilityIssue(
+  event: StitchEvent,
+  profile: ResolvedMachineProfile,
+  operation: 'trim' | 'color change',
+  capability: ResolvedMachineProfile['trimCapability'],
+): PreflightIssue | undefined {
+  if (capability === 'automatic') return undefined;
+  const codeOperation = operation === 'trim' ? 'trim' : 'color-change';
+  const manual = capability === 'manual';
+  return {
+    severity: manual ? 'info' : 'error',
+    code: `machine.${codeOperation}-${manual ? 'manual' : 'unsupported'}`,
+    message: manual
+      ? `${profile.name} requires operator action for each ${operation}.`
+      : `${profile.name} does not support the design's ${operation} operation.`,
+    points: [{ x: event.x, y: event.y }],
+    lines: event.line === undefined ? [] : [event.line],
+    suggestion: manual
+      ? `Include the ${operation} in the sew-out worksheet and pause at this point.`
+      : `Remove the ${operation} or choose a local machine profile that supports it.`,
+  };
+}
+
+function analyzeMachineCapabilities(
+  events: readonly StitchEvent[],
+  profile: ResolvedMachineProfile,
+): PreflightIssue[] {
+  if (profile.source === 'default') return [];
+  const trim = events.find((event) => event.t === 'trim');
+  const color = events.find((event) => event.t === 'color');
+  return [
+    ...(trim ? [capabilityIssue(trim, profile, 'trim', profile.trimCapability)] : []),
+    ...(color
+      ? [capabilityIssue(color, profile, 'color change', profile.colorChangeCapability)]
+      : []),
+  ].filter((issue): issue is PreflightIssue => issue !== undefined);
+}
+
 /**
  * Build structured issues from completed, internal diagnostic metadata.
  * This function is deliberately pure: it neither rewrites events nor warnings.
  */
 export function buildPreflightResult(input: PreflightInput): PreflightResult {
   const mode = input.mode ?? 'off';
-  const profile = resolveMachineProfile(input.maximumDensityLayers);
+  const profile = input.profile ?? resolveMachineProfile(input.maximumDensityLayers);
   const legacyIssues: PreflightIssue[] = input.warningLocations
     .toSorted((a, b) => a.index - b.index)
     .flatMap((location) => {
@@ -127,6 +149,7 @@ export function buildPreflightResult(input: PreflightInput): PreflightResult {
       ];
     });
 
+  const capabilityIssues = analyzeMachineCapabilities(input.events, profile);
   const extendedIssues =
     mode === 'off'
       ? []
@@ -134,7 +157,7 @@ export function buildPreflightResult(input: PreflightInput): PreflightResult {
           ...analyzeEventStreamPreflight(input.events, profile),
           ...analyzeConstructionPreflight(input.constructionRecords ?? [], input.events),
         ];
-  const issues = [...legacyIssues, ...extendedIssues];
+  const issues = [...legacyIssues, ...capabilityIssues, ...extendedIssues];
   const count = (severity: PreflightSeverity) =>
     issues.reduce((total, issue) => total + Number(issue.severity === severity), 0);
   return {
