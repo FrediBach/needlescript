@@ -60,6 +60,8 @@ Tightly-coupled collaborators live one level up:
   validation, and context-aware lowering of legacy modes and `fabric` presets.
 - `embroidery-registry.ts` — compatible legacy fabric construction settings plus typed fabric,
   thread, needle, stabilizer, and topping profiles/defaults.
+- `directional-compensation.ts` — pure grain-aligned compensation tensors, heading projections,
+  material resolution, and preview diagnostics; it does not alter stitch geometry.
 - `fill-profile.ts` — fill inset/edge/stagger ranges, connector/stagger mode registries, internal
   connector classification types, and pure drawless row-phase calculation including geometry
   hashing.
@@ -156,9 +158,9 @@ Material intent stays separate from generated geometry. `materialIntent`
 records the fabric preset, grain and stretch axes, generic thread profile/width, optional needle,
 stabilizer category, and topping boolean. Only `fabric` continues to update the legacy scalar
 construction physics above. `threadprofile` and `threadwidth` also synchronize the live coverage
-grid's width; the other material commands remain metadata-only. None of them changes events. Trace
-and construction snapshots copy the record and restore the grid width, and finalization exposes a
-fresh material copy as `RunResult.material`.
+grid's width; grain and stretch additionally feed the pure directional preview model. None of them
+changes events. Trace and construction snapshots copy the record and restore the grid width, and
+finalization exposes a fresh material copy as `RunResult.material`.
 
 An active `beginfill` recording cannot cross either boundary. A pending satin column or
 reporter-driven running stretch is flushed before the snapshot or restore; otherwise the methods are
@@ -170,6 +172,35 @@ The interpreter's `stitchscope [ … ]` node pairs these methods in `try/finally
 Nested scopes therefore restore LIFO through procedure returns, loop-control signals,
 and runtime errors. Restoration itself reinstates the snapshot in a `finally`, so an
 error raised while flushing an inner buffered reporter cannot strand its configuration.
+
+### 4.2 Directional compensation preview
+
+`directional-compensation.ts` models compensation as a signed symmetric tensor in physical hoop
+space. For grain heading `g`, its principal axes are the turtle-heading unit vectors at `g` and
+`g + 90°`. If their signed recommendations are `a` and `c`, the tensor is
+`T = R(g) diag(a, c) R(g)ᵀ`. `compensationForHeading` projects `T` onto any construction heading and
+its clockwise perpendicular using quadratic forms. Rotating grain and construction together leaves
+both projections unchanged; rotating grain by 90° while swapping `a`/`c` leaves the hoop tensor
+unchanged.
+
+Resolution is intentionally conservative. The selected fabric preset supplies its established
+legacy pull magnitude `p`. Declared stretch weights `1 + stretchAlong` and `1 + stretchAcross`
+redistribute `p` between the axes, normalized so the two recommendations still average to `p`.
+Neutral stretch therefore reproduces the scalar recommendation, while unequal stretch makes it
+anisotropic without inventing an unmeasured total increase. An unspecified fabric has no calibrated
+magnitude and resolves to zero. Thread, needle, stabilizer, and topping metadata do not modify the
+recommendation. Push tensors use negative values for shortening and currently resolve to zero until
+physical sew-out measurements exist.
+
+Finalization calls `directionalCompensationPreview` once and exposes the result as
+`RunResult.compensation`: the current legacy scalar, the resolved signed tensors, and projections at
+the grain and cross-grain headings. The field is preview-only. No machine or generator reads it, so
+event geometry, coverage, warnings, locks, exports, and RNG behavior remain unchanged.
+
+Application policy is construction-specific rather than a generic affine scale. A future satin
+mode may use positive across-column pull to widen rails and evidence-backed negative along-column
+push. Open tatami rows may use positive along-row pull to extend endpoints, with push still deferred.
+Borders need explicit inset/overlap handling, and running stitches receive no automatic correction.
 
 ---
 

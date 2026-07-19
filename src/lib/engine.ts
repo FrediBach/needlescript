@@ -46,6 +46,11 @@ export type {
   ReferenceDataVar,
   ColorTableEntry,
   MaterialIntent,
+  CompensationTensor,
+  HeadingCompensationComponents,
+  ResolvedDirectionalCompensation,
+  DirectionalCompensationSample,
+  DirectionalCompensationPreview,
 } from './types.ts';
 export {
   COLOR_NAMES,
@@ -110,6 +115,12 @@ export type {
   ThreadProfileMode,
   ToppingMode,
 } from './embroidery-registry.ts';
+export {
+  compensationForHeading,
+  compensationTensor,
+  directionalCompensationPreview,
+  resolveDirectionalCompensation,
+} from './directional-compensation.ts';
 export { suggest } from './suggestions.ts';
 export { tokenize } from './tokenizer.ts';
 export { parse } from './parser/index.ts';

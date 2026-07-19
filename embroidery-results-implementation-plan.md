@@ -1339,6 +1339,8 @@ density analysis still runs before `applyLocks`, so tie-offs remain excluded for
 
 ### Session 7.3 — Directional compensation model
 
+Status: complete (2026-07-19)
+
 Purpose: calculate practical anisotropic compensation without applying it yet.
 
 Tasks:
@@ -1360,6 +1362,27 @@ Acceptance criteria:
 
 - The model is pure, deterministic, and documented.
 - No event geometry changes in this session.
+
+Implementation note: `directional-compensation.ts` defines a signed symmetric 2D tensor in hoop
+space. The fabric grain and cross-grain headings are its eigenvectors. A fabric preset supplies the
+existing scalar pull magnitude, while explicit along/across stretch redistributes that magnitude
+between the two axes without changing their arithmetic mean. This creates anisotropy without
+claiming an unmeasured increase in total compensation. An unspecified fabric resolves to zero, and
+push remains an explicit zero recommendation until versioned sew-out evidence supports negative
+along/across shortening values.
+
+The pure helpers build tensors, project them onto any construction heading and its clockwise
+perpendicular, resolve final material intent, and build preview data. `RunResult.compensation`
+reports the applied legacy scalar, the resolved pull/push tensors, and grain/cross-grain samples for
+comparison. This result is additive diagnostics only: no generator reads it and no stitch, warning,
+coverage value, export, or RNG draw changes.
+
+Construction semantics remain deliberately separate. A future directional satin mode may use
+positive across-column pull to widen rail endpoints and evidence-backed negative along-column push.
+Open tatami rows may use their positive along-row component to extend endpoints; push remains
+deferred. Borders require explicit inset/overlap behavior rather than a generic affine scale, and
+running stitches receive no automatic correction. Synthetic tests pin heading rotation invariance,
+grain-axis swapping, signed projections, material resolution, and unchanged event geometry.
 
 ### Session 7.4 — Opt-in directional satin compensation
 

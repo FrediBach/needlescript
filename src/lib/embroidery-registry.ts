@@ -101,7 +101,7 @@ export type FabricMode = (typeof FABRIC_MODES)[number];
 export interface ThreadProfile {
   fiber: 'rayon' | 'polyester';
   weight: 40 | 60;
-  /** Planning approximation only; Session 7.2 will connect this to coverage. */
+  /** Physical width approximation used by coverage analysis. */
   widthMM: number;
 }
 

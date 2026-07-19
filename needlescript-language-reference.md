@@ -1147,9 +1147,9 @@ order resolves back to the profile's 0.3 mm default.
 The four generic thread profiles are `'rayon-40wt'`, `'rayon-60wt'`,
 `'polyester-40wt'`, and `'polyester-60wt'`. Their coverage approximations are 0.4 mm for 40 wt and
 0.3 mm for 60 wt. Resolved width scales `coverat`, final heatmap layers, and density warnings; it
-does not alter stitch geometry, exports, penetration counts, locks, or RNG draws. Grain/stretch,
-needle, stabilizer, and topping remain advisory metadata. Only the pre-existing construction
-behavior of `fabric` changes stitches.
+does not alter stitch geometry, exports, penetration counts, locks, or RNG draws. Grain/stretch
+also feeds the directional compensation preview described below; needle, stabilizer, and topping
+remain advisory metadata. Only the pre-existing construction behavior of `fabric` changes stitches.
 
 The live coverage grid retains raw thread-path length and applies one active resolved width to every
 coverage read. Changing `threadprofile` or `threadwidth` therefore reinterprets already committed
@@ -1164,12 +1164,25 @@ versioned sew-out evidence supports automatic directional values. Use `fabricgra
 `stitchscope` and trace snapshots, so scoped or sandboxed choices cannot leak into the final resolved
 intent.
 
+`RunResult.compensation` is a preview-only directional recommendation. It contains the current
+legacy scalar `pullcomp`, grain-aligned signed pull/push tensors, and their along/across projections
+for headings parallel and perpendicular to the grain. The selected fabric preset supplies the
+existing pull magnitude. Unequal declared stretch redistributes that magnitude toward the more
+stretchy axis while preserving the two-axis average; equal or zero stretch remains isotropic. With
+no fabric preset the recommendation is zero. Push is represented as negative shortening but stays
+zero until physical sew-out data supports non-zero values.
+
+This diagnostic does not alter events. Application remains construction-specific: directional
+satin can later widen across a column, open tatami can extend along row endpoints, borders need an
+explicit inset/overlap rule, and running stitches receive no automatic correction. No generic affine
+scale is inferred from the tensor.
+
 ### Individual commands
 
 | Command                  | Effect                                                                                                                                                                                                                                                                                                                              |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fabricgrain deg`        | fabric-grain heading in turtle degrees (`0` = up, clockwise positive); finite values wrap into 0–360. Metadata only in this phase                                                                                                                                                                                                   |
-| `fabricstretch a b`      | declared fractional stretch along/across the grain, each 0–1. A later `fabric` command restores its profile defaults; metadata only in this phase                                                                                                                                                                                   |
+| `fabricgrain deg`        | fabric-grain heading in turtle degrees (`0` = up, clockwise positive); finite values wrap into 0–360. Feeds preview diagnostics but does not change geometry                                                                                                                                                                        |
+| `fabricstretch a b`      | declared fractional stretch along/across the grain, each 0–1. A later `fabric` command restores its profile defaults; redistributes the preview pull recommendation without changing geometry                                                                                                                                       |
 | `threadprofile 'name'`   | generic rayon/polyester 40 wt or 60 wt profile; resets resolved thread width to 0.4 mm or 0.3 mm respectively                                                                                                                                                                                                                       |
 | `threadwidth mm`         | explicit resolved thread-width approximation, 0.1–1 mm. Overrides the active profile in source order and scales coverage queries/heatmaps/warnings without changing stitch geometry                                                                                                                                                 |
 | `needle nm`              | advisory metric needle size: 60, 65, 70, 75, 80, or 90; `needle 0` clears the optional value. Does not affect construction                                                                                                                                                                                                          |

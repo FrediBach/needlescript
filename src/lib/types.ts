@@ -118,8 +118,8 @@ export interface ReferenceDataVar {
 
 /**
  * Resolved source-level material choices for a run. These values describe the
- * author's intent; only the legacy `fabric` construction settings affect
- * stitch geometry in the initial material-profile phase.
+ * author's intent. Grain/stretch also feed preview-only directional physics;
+ * only legacy `fabric` construction settings affect stitch geometry.
  */
 export interface MaterialIntent {
   fabricPreset: string;
@@ -137,6 +137,51 @@ export interface MaterialIntent {
   topping: boolean;
 }
 
+/** A signed symmetric 2D compensation tensor in hoop-space millimetres. */
+export interface CompensationTensor {
+  xx: number;
+  xy: number;
+  yy: number;
+}
+
+/** Signed tensor projections onto the heading axis and its clockwise perpendicular. */
+export interface HeadingCompensationComponents {
+  heading: number;
+  alongStitchMM: number;
+  acrossStitchMM: number;
+}
+
+/** Material-derived directional recommendations before construction-specific application. */
+export interface ResolvedDirectionalCompensation {
+  grainHeading: number;
+  pullAlongGrainMM: number;
+  pullAcrossGrainMM: number;
+  /** Push is a negative adjustment (shortening) when non-zero. */
+  pushAlongGrainMM: number;
+  /** Push is a negative adjustment (shortening) when non-zero. */
+  pushAcrossGrainMM: number;
+  pullTensor: CompensationTensor;
+  pushTensor: CompensationTensor;
+}
+
+export interface DirectionalCompensationSample {
+  axis: 'grain' | 'cross-grain';
+  heading: number;
+  scalarPullMM: number;
+  pull: HeadingCompensationComponents;
+  push: HeadingCompensationComponents;
+  pullDeltaAlongStitchMM: number;
+  pullDeltaAcrossStitchMM: number;
+}
+
+/** Preview-only comparison; geometry still uses legacy scalar compensation. */
+export interface DirectionalCompensationPreview {
+  appliedMode: 'legacy-scalar';
+  currentScalarPullMM: number;
+  resolved: ResolvedDirectionalCompensation;
+  samples: DirectionalCompensationSample[];
+}
+
 export interface RunResult {
   events: StitchEvent[];
   warnings: string[];
@@ -146,6 +191,8 @@ export interface RunResult {
   density: DensityResult;
   /** Resolved material/thread intent after all source-order overrides. */
   material: MaterialIntent;
+  /** Directional material recommendation for previews; not applied to event geometry. */
+  compensation: DirectionalCompensationPreview;
   /** The hoop configured by the `hoop` directive, if any. */
   activeHoop?: HoopInfo;
   /** Budget limits raised or lowered by `override` directives, if any. */

@@ -33,6 +33,7 @@ import { initExecStmt } from './exec-stmt.ts';
 import { inspectChalkValue } from '../chalk.ts';
 import { DEFAULT_BACKGROUND, defaultSlotColor } from '../colormath.ts';
 import type { ColorTableEntry } from '../types.ts';
+import { directionalCompensationPreview } from '../directional-compensation.ts';
 
 export function run(source: string, opts: RunOptions = {}): RunResult {
   const startedAt = performance.now();
@@ -408,6 +409,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     locks,
     density,
     material: { ...m.materialIntent },
+    compensation: directionalCompensationPreview(m.materialIntent, m.pullComp),
     activeHoop,
     activeOverrides,
     globals: ctx.globals,
