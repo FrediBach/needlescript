@@ -48,6 +48,8 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'stitchscope',
       // Travel-planner indivisible span.
       'atomic',
+      // Travel-planner explicit reorder collection.
+      'routegroup',
       // Transform block commands (CTM stack) — mutate the stitch transform.
       'translate',
       'rotate',

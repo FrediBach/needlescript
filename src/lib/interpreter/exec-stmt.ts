@@ -336,6 +336,51 @@ export function initExecStmt(ctx: RunContext): void {
         if (bodyThrew) throw bodyError;
         return;
       }
+      case 'routegroup': {
+        if (ctx.insideTrace > 0)
+          throw new NeedlescriptError(
+            'routegroup is not allowed inside trace — apply it where the captured path is sewn',
+            st.line,
+          );
+        const planning = ctx.planMode !== null && ctx.planMode !== 'off';
+        const ownsSpan = planning && ctx.routeGroupDepth === 0;
+        if (ownsSpan && ctx.atomicDepth > 0)
+          throw new NeedlescriptError(
+            'routegroup cannot start inside atomic — put the atomic block inside the routegroup instead',
+            st.line,
+          );
+        if (ownsSpan && ctx.m.recording)
+          throw new NeedlescriptError(
+            'routegroup cannot start inside a beginfill…endfill recording — wrap the complete fill instead',
+            st.line,
+          );
+        if (ownsSpan) ctx.m.flushSatin();
+        const start = ctx.m.events.length;
+        ctx.routeGroupDepth++;
+        ctx.structuralDepth++;
+        let bodyError: unknown;
+        let bodyThrew = false;
+        try {
+          ctx.execBlock(st.body, env, repcount, depth, contextLine);
+        } catch (error) {
+          bodyError = error;
+          bodyThrew = true;
+        } finally {
+          ctx.structuralDepth--;
+          ctx.routeGroupDepth--;
+        }
+        if (ownsSpan) {
+          if (ctx.m.recording)
+            throw new NeedlescriptError(
+              'routegroup cannot end inside a beginfill…endfill recording — close the fill inside the routegroup block',
+              st.line,
+            );
+          ctx.m.flushSatin();
+          ctx.planRouteGroupSpans.push({ start, end: ctx.m.events.length, line: st.line });
+        }
+        if (bodyThrew) throw bodyError;
+        return;
+      }
       case 'transform': {
         // Build the delta matrix from the args, compose it onto the CTM for
         // the duration of the block, then restore. flushSatin on both edges

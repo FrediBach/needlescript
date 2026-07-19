@@ -10,7 +10,7 @@ import { tokenize } from '../tokenizer.ts';
 import { linkStandardModules } from '../module-linker.ts';
 import { applyAutoTrim, applyLocks } from '../postprocess.ts';
 import { applyTravelPlan } from '../travel-planner.ts';
-import type { PlanAtomicSpan } from '../travel-planner.ts';
+import type { PlanAtomicSpan, PlanRouteGroupSpan } from '../travel-planner.ts';
 import type { TravelPlanStats } from '../types.ts';
 import { formatVal, isFuncRef } from '../list.ts';
 import type { Val } from '../list.ts';
@@ -72,7 +72,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     insideTrace: 0,
     insideFillGenerator: 0,
     traceNoted: new Set<string>(),
-    // Structural block depth: incremented inside repeat/for/while/forin/if/atomic/transform/effect
+    // Structural block depth: incremented inside loops/if/planner/transform/effect blocks
     // so that the `hoop` and `override` placement guards can detect nested placement.
     structuralDepth: 0,
     planMode: null,
@@ -80,6 +80,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     planBarrierOffsets: [] as number[],
     planAtomicSpans: [] as PlanAtomicSpan[],
     atomicDepth: 0,
+    planRouteGroupSpans: [] as PlanRouteGroupSpan[],
+    routeGroupDepth: 0,
     palette: [] as ColorTableEntry[],
     paletteSetLine: undefined,
     background: DEFAULT_BACKGROUND,
@@ -172,6 +174,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       (n) => ctx.tickN(n, ctx.planLine),
       ctx.planBarrierOffsets,
       ctx.planAtomicSpans,
+      ctx.planRouteGroupSpans,
     );
     const afterAutotrims = m.autoTrim > 0 ? applyAutoTrim(planned.events, m.autoTrim).trims : 0;
     m.events = planned.events;
@@ -181,11 +184,18 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       travelAfterMm: planned.travelAfterMm,
       runs: planned.runs,
       colors: planned.colors,
+      ...(planned.groups.length > 0 ? { groups: planned.groups } : {}),
     };
     const historyNote =
       planned.reordered && m.usedQuery
         ? '; history queries used authored order, before this final sew-order plan'
         : '';
+    for (const group of planned.groups) {
+      const source = group.line === undefined ? '' : ` on line ${group.line}`;
+      ctx.printed.push(
+        `routegroup ${group.id}${source}: travel ${group.travelBeforeMm.toFixed(1)} mm → ${group.travelAfterMm.toFixed(1)} mm (eligible runs: ${group.eligibleRuns}, moved: ${group.movedRuns}, 2-opt swaps: ${group.improvementSwaps})`,
+      );
+    }
     ctx.printed.push(
       planned.reordered
         ? `plan '${planned.mode}': travel ${planned.travelBeforeMm.toFixed(1)} mm → ${planned.travelAfterMm.toFixed(1)} mm, autotrims ${beforeAutotrims} → ${afterAutotrims} (runs: ${planned.runs}, colors: ${planned.colors}${historyNote})`

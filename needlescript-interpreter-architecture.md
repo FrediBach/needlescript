@@ -89,7 +89,8 @@ interpreter/
 The value model those modules operate on lives one level up in `list.ts`.
 
 Travel routing deliberately lives outside the evaluator modules. `routing.ts` owns the
-generic deterministic algorithm registry and spatial-bucket nearest implementation;
+generic deterministic algorithm registry, spatial-bucket nearest implementation, and bounded
+nearest-plus-2-opt improvement;
 `travel-planner.ts` adapts final `StitchEvent` runs to that interface. `gen-func.ts`
 adapts NeedleScript point/path values to the same interface for `routesort`. This
 keeps future algorithms additive: implement one `RouteAlgorithm`, register it, then
@@ -106,28 +107,30 @@ state from it and installs its functions onto it.
 
 ### 3.1 Mutable state (`context.ts:15-33`)
 
-| Field                | Purpose                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------- |
-| `globals`            | top-level variable bindings (`Record<string, Val>`)                                                     |
-| `globalLines`        | first assignment/declaration line for each global, used by the Data inspector                           |
-| `chalk`              | preview-only affine-mapped snapshots plus their raw event-stream anchors                                |
-| `chalkVertices`      | run-total vertex counter for the dedicated preview budget                                               |
-| `procs`              | procedure name → its `to` AST node (populated as `to` statements execute)                               |
-| `rng`                | main PRNG stream; reassigned by `seed`                                                                  |
-| `noise`              | legacy coherent noise; reassigned by `seed`                                                             |
-| `snoise2/snoise3`    | seeded simplex noise streams                                                                            |
-| `ops`                | operation counter (the anti-infinite-loop budget)                                                       |
-| `cells`              | live list-cell counter                                                                                  |
-| `stringChars`        | cumulative string-char allocation counter                                                               |
-| `printed`            | accumulated `print`/`printloc` output                                                                   |
-| `insideTrace`        | trace-sandbox nesting depth                                                                             |
-| `traceNoted`         | one-time notes already emitted inside trace                                                             |
-| `structuralDepth`    | structural block nesting (loop/if/stitchscope/atomic/transform/effect) — for directive placement guards |
-| `planMode/planLine`  | selected post-run travel strategy and its source line                                                   |
-| `planBarrierOffsets` | sparse authored event offsets recorded by active `planbarrier` commands                                 |
-| `planAtomicSpans`    | sparse outermost `[start,end)` event spans recorded by active `atomic` blocks                           |
-| `atomicDepth`        | runtime nesting depth; only depth zero owns and records a span                                          |
-| `m`                  | the `Machine` — the side-effect target                                                                  |
+| Field                 | Purpose                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `globals`             | top-level variable bindings (`Record<string, Val>`)                                                                |
+| `globalLines`         | first assignment/declaration line for each global, used by the Data inspector                                      |
+| `chalk`               | preview-only affine-mapped snapshots plus their raw event-stream anchors                                           |
+| `chalkVertices`       | run-total vertex counter for the dedicated preview budget                                                          |
+| `procs`               | procedure name → its `to` AST node (populated as `to` statements execute)                                          |
+| `rng`                 | main PRNG stream; reassigned by `seed`                                                                             |
+| `noise`               | legacy coherent noise; reassigned by `seed`                                                                        |
+| `snoise2/snoise3`     | seeded simplex noise streams                                                                                       |
+| `ops`                 | operation counter (the anti-infinite-loop budget)                                                                  |
+| `cells`               | live list-cell counter                                                                                             |
+| `stringChars`         | cumulative string-char allocation counter                                                                          |
+| `printed`             | accumulated `print`/`printloc` output                                                                              |
+| `insideTrace`         | trace-sandbox nesting depth                                                                                        |
+| `traceNoted`          | one-time notes already emitted inside trace                                                                        |
+| `structuralDepth`     | structural block nesting (loop/if/stitchscope/atomic/routegroup/transform/effect) — for directive placement guards |
+| `planMode/planLine`   | selected post-run travel strategy and its source line                                                              |
+| `planBarrierOffsets`  | sparse authored event offsets recorded by active `planbarrier` commands                                            |
+| `planAtomicSpans`     | sparse outermost `[start,end)` event spans recorded by active `atomic` blocks                                      |
+| `atomicDepth`         | runtime nesting depth; only depth zero owns and records a span                                                     |
+| `planRouteGroupSpans` | sparse outermost `[start,end)` spans recorded by active `routegroup` blocks                                        |
+| `routeGroupDepth`     | runtime nesting depth; only depth zero owns and records a group                                                    |
+| `m`                   | the `Machine` — the side-effect target                                                                             |
 
 ### 3.2 Function slots and init ordering
 
@@ -229,6 +232,7 @@ error rather than a hang — the project's "loud beats convenient" rule.
 | `if`                                 | conditional with optional `elseBody`                                                                                                                               |
 | `stitchscope`                        | snapshots construction configuration, executes its body, and restores in `finally` through all control transfers and errors                                        |
 | `atomic`                             | executes with exception-safe nesting; active planning flushes/records only the outermost span, while planning off is a construction no-op wrapper                  |
+| `routegroup`                         | records an exception-safe outermost eligibility span; when groups exist, ungrouped records bypass routing in authored order                                        |
 | `transform`                          | composes a CTM matrix onto the machine's stack for the block's duration; `flushSatin` on both edges                                                                |
 | `effect`                             | `warp`/`humanize`/`snaptogrid`/`declump` — pushes an effect onto the machine's pen/warp stack for the block                                                        |
 | `output`                             | throws `ReturnSignal` (guarded: only inside a procedure, `depth > 0`)                                                                                              |
@@ -305,6 +309,11 @@ planning, the outermost block flushes pending satin/reporter-running constructio
 records one sparse event span. Nested blocks share that owner. With planning absent or `off`, neither
 edge flushes and no span is stored. Trace use and fill-boundary crossings are rejected; an active
 `planbarrier` inside the block is rejected before it can split the span.
+
+`routegroup` follows the same planning-off identity and exception-safe outermost-owner discipline.
+Active boundaries flush pending construction and record one sparse span. Groups may contain atomics,
+color changes, and barriers; finalization intersects those constraints. A group cannot begin inside
+an atomic, run in trace, or cross an open fill boundary.
 
 ---
 
@@ -523,11 +532,15 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
 2. **Tiny-stitch merge warnings**, then optional **travel planning**. Planning sees
    the closed raw event stream, lowers it to private event-plus-tag wrappers, and runs before every
    order-sensitive pass. Sparse `planbarrier` offsets become segment tags and outermost `atomic`
-   spans become atomic IDs during this lowering. Trims and autotrim-sized jumps inside one atomic ID
-   no longer split route items, and those items never expose reverse endpoints. Each color/segment
-   intersection is routed independently. Because the current representation cannot move one item
-   across independently routed color blocks, an atomic span containing a color event errors with its
-   source line. Planning unwraps to plain `StitchEvent[]` before returning.
+   spans become atomic IDs, and route-group spans become eligibility IDs during this lowering. Trims
+   and autotrim-sized jumps inside one atomic ID no longer split route items, and those items never
+   expose reverse endpoints. With no groups the compatibility whole-design route remains; with any
+   groups, untagged records are copied in authored order and each tagged color/segment intersection
+   routes independently. Group routes use stable nearest ordering followed by bounded 2-opt (32-item
+   window, 4,096 candidates, at most eight accepted passes). Every examined distance charges the
+   operation budget. Because the current representation cannot move one item across independently
+   routed color blocks, an atomic span containing a color event errors with its source line. Planning
+   unwraps to plain `StitchEvent[]` before returning.
 3. **Auto-trim**, then **density analysis** before locks (so tie-offs don't read as false hotspots), then
    density/stack hotspot warnings with `WarningLocation` spatial data
    (`index.ts:121-153`).
@@ -541,7 +554,8 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
 8. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
    `warningLocations`, `printed`, `locks`, `density`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional
-   `plan` statistics.
+   `plan` statistics. Explicit groups add per-group line, eligibility/movement, accepted-improvement,
+   and before/after-travel records.
 
 The load-bearing finalize order is `flush → plan → autotrim → density → locks`.
 Planning therefore prevents unnecessary automatic cuts, while locks see only final

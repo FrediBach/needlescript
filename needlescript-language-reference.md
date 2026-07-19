@@ -35,7 +35,7 @@ The most common code-generation errors, in order of frequency:
 
 ### 2.1 Blocks use `[ ]`, never `{ }`
 
-Every block — loop bodies, `if`/`else`, `def` bodies, `stitchscope`, `atomic`, and transform/effect blocks — is delimited by square brackets. The characters `{` and `}` must appear **nowhere**.
+Every block — loop bodies, `if`/`else`, `def` bodies, `stitchscope`, `atomic`, `routegroup`, and transform/effect blocks — is delimited by square brackets. The characters `{` and `}` must appear **nowhere**.
 
 ```text
 repeat 6 [ fd 10 rt 60 ]        // correct
@@ -60,7 +60,7 @@ break continue return exit output true false and or not
 | `shape` | `fill … shape @proc` — immediately after `fill` | ordinary name                       |
 | `paths` | `fill paths @proc                               | expr`— immediately after`fill`      | ordinary name |
 
-**Core tier** (hard error if redefined): all movement, stitching, thread, fill, control-flow, transform and effect commands, `@name` references, and the zero-arg reporters — e.g. `fd`, `rt`, `circle`, `color`, `satin`, `satinbetween`, `stitchscope`, `atomic`, `scale`, `rotate`, `translate`, `transform`, `warp`, `humanize`, `snaptogrid`, `declump`, `pos`, `heading`, `xcor`, `ycor`, `repcount`, `random`, `trace`, `tracerings`. Cannot be used as variable, parameter, or procedure names.
+**Core tier** (hard error if redefined): all movement, stitching, thread, fill, control-flow, transform and effect commands, `@name` references, and the zero-arg reporters — e.g. `fd`, `rt`, `circle`, `color`, `satin`, `satinbetween`, `stitchscope`, `atomic`, `routegroup`, `scale`, `rotate`, `translate`, `transform`, `warp`, `humanize`, `snaptogrid`, `declump`, `pos`, `heading`, `xcor`, `ycor`, `repcount`, `random`, `trace`, `tracerings`. Cannot be used as variable, parameter, or procedure names.
 
 **Library tier** (soft reservation): every list, string, generative-math, and stitch-history function (`len`, `clamp`, `scatter`, `str`, `upper`, `coverat`, `satinpair`, `tatamirow`, …). Variables and parameters **may** reuse these names (builtins resolve only at glued-call position); a user `def` of the same name shadows the builtin for the whole program with a one-time console note. **Best practice for generated code: avoid reusing any builtin name.** Safe alternatives:
 
@@ -216,6 +216,7 @@ Reads: plain names (`fd x`) or classic (`fd :x`) resolve identically. Plain `x =
 | `continue`                                | next iteration of innermost loop                                                        |
 | `stitchscope [ … ]`                       | temporarily override stitch-construction settings; always restore them on exit          |
 | `atomic [ … ]`                            | keep the block's planned output contiguous and in authored order                        |
+| `routegroup [ … ]`                        | explicitly allow independent runs in the block to reorder                               |
 
 - `to` and `step` end the bound expressions naturally: `for i = 1 to n * 2 [ … ]` needs no parens.
 - The loop variable doesn't leak.
@@ -967,7 +968,7 @@ Hoop-agnostic margin idiom: `let margin = first(offsetpath(fieldpath(), -6))`.
 
 `plan 'nearest'` enables whole-design travel planning. `plan 'reversing-nearest'` uses the same route but may reverse eligible runs when their exit is the nearer entry point. `plan 'off'` is the default and a byte-identical no-op. Like `hoop`, it is top-level only, before any committed stitch, forbidden in `trace`, and allowed at most once.
 
-After execution, planning partitions every color block into atomic thread runs at explicit trims and at jumps that active autotrim would cut. Each color's first run stays first and keeps its authored direction; remaining runs are chained by nearest entry point, with deterministic original-index ties. `nearest` never reverses runs. `reversing-nearest` may reverse stitch-only runs without internal jumps, mixed underlay/top-stitch ordering, or mid-run marks; this includes ordinary straight running-stitch lines and preserves their stitch geometry. Explicit trims remain, and color boundaries are never crossed. Connector jumps are rebuilt for the new adjacency and direction so the later lock pass retains a valid tie-in direction. The pass runs before autotrim, density finalization, and locks, so automatic trims and locks see the shortened route.
+After execution, planning partitions every color block into atomic thread runs at explicit trims and at jumps that active autotrim would cut. With no executed `routegroup`, compatibility behavior remains whole-design planning: each color/`planbarrier` intersection's first run stays first and keeps its authored direction; remaining runs are chained by nearest entry point, with deterministic original-index ties. If one or more route groups execute, only runs inside those spans are eligible and all output outside them stays in authored order. `nearest` never reverses runs. `reversing-nearest` may reverse stitch-only runs without internal jumps, mixed underlay/top-stitch ordering, or mid-run marks; this includes ordinary straight running-stitch lines and preserves their stitch geometry. Explicit trims remain, and color boundaries are never crossed. Connector jumps are rebuilt for the new adjacency and direction so the later lock pass retains a valid tie-in direction. The pass runs before autotrim, density finalization, and locks, so automatic trims and locks see the shortened route.
 
 Planning can change which overlapping same-color run lies on top. History queries still see program order because they execute before this final pass; density is unchanged. If a history query ran and planning materially reordered the design, the plan diagnostic states this authored-order/final-order mismatch. Active planning prints before/after travel and autotrim counts and exposes `planMode`, `travelBeforeMm`, and `travelAfterMm` through result statistics.
 
@@ -1015,6 +1016,39 @@ An active atomic cannot contain a color change because the current planner route
 blocks; use one atomic per color. It also cannot contain `planbarrier`, run inside `trace`, start
 inside an open `beginfill…endfill`, or leave a fill open when it ends. A complete fill may be wrapped
 as `atomic [ beginfill … endfill ]`.
+
+#### `routegroup`
+
+`routegroup [ … ]` marks an explicit collection whose independent thread runs may reorder. The group
+itself stays at its authored position; only complete runs inside it move. Once any group executes,
+ungrouped output is no longer globally planned:
+
+```text
+routegroup [
+  flower_at(20) trim
+  flower_at(5) trim
+  flower_at(12)
+]
+```
+
+Each group first uses the selected nearest strategy, then a deterministic bounded 2-opt improvement.
+The first run of every color/segment intersection remains anchored. Improvement retains every item's
+chosen direction, accepts only strict travel reductions, searches at most 32 neighboring positions,
+examines at most 4,096 exchanges, and accepts at most eight passes per intersection. Distance checks
+are charged to the normal operation budget, so planning cannot bypass the run envelope. Equal-cost
+candidates retain deterministic original-index order. The pass consumes no RNG draws.
+
+Color changes and `planbarrier` split a group into independently planned intersections; runs never
+cross either boundary. An `atomic` contained by the group remains one forward-only item, so its
+internal construction never splits or reverses. A group cannot begin inside an active atomic; put
+the complete `atomic [ … ]` inside `routegroup` instead. Nested route groups share the outermost
+owner.
+
+With planning absent or `off`, `routegroup` is byte-identical to its body and does not flush pending
+construction. Active groups cannot run inside `trace`, start inside an open fill recording, or leave
+a fill open at exit; a complete `routegroup [ beginfill … endfill ]` is valid. Each executed group
+reports its source line, eligible and moved run counts, accepted 2-opt swaps, and before/after travel
+in both console output and `RunResult.plan.groups`.
 
 ### 16.3 Custom fill-path helpers
 

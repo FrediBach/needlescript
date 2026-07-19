@@ -1,6 +1,5 @@
 import type { ASTNode, ChalkEvent, ExprNode, ColorTableEntry } from '../types.ts';
-import type { PlanMode } from '../travel-planner.ts';
-import type { PlanAtomicSpan } from '../travel-planner.ts';
+import type { PlanAtomicSpan, PlanMode, PlanRouteGroupSpan } from '../travel-planner.ts';
 import type { Machine } from '../machine.ts';
 import type { Val, NsList, FuncRef, ComposedRef, RefSignature } from '../list.ts';
 import type { Pt } from '../genmath.ts';
@@ -43,6 +42,9 @@ export interface RunContext {
   /** Outermost authored atomic spans; nested atomic blocks share their owner's span. */
   planAtomicSpans: PlanAtomicSpan[];
   atomicDepth: number;
+  /** Outermost authored route-group spans; nested groups share their owner's span. */
+  planRouteGroupSpans: PlanRouteGroupSpan[];
+  routeGroupDepth: number;
   palette: ColorTableEntry[];
   paletteSetLine?: number;
   background: string;

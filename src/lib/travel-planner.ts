@@ -11,6 +11,17 @@ export interface TravelPlanResult {
   runs: number;
   colors: number;
   reordered: boolean;
+  groups: TravelPlanGroupResult[];
+}
+
+export interface TravelPlanGroupResult {
+  id: number;
+  line?: number;
+  eligibleRuns: number;
+  movedRuns: number;
+  improvementSwaps: number;
+  travelBeforeMm: number;
+  travelAfterMm: number;
 }
 
 interface ThreadRun {
@@ -28,6 +39,13 @@ interface ColorBlock {
 
 /** Sparse authored event span recorded by an outermost `atomic` block. */
 export interface PlanAtomicSpan {
+  start: number;
+  end: number;
+  line?: number;
+}
+
+/** Sparse authored event span recorded by an outermost `routegroup` block. */
+export interface PlanRouteGroupSpan {
   start: number;
   end: number;
   line?: number;
@@ -69,8 +87,8 @@ export const PLAN_MODES: readonly (PlanMode | 'off')[] = defineModes([
   'off',
 ] as (PlanMode | 'off')[]);
 
-function travelLength(events: StitchEvent[]): number {
-  let previous: StitchEvent | null = null;
+function travelLength(events: StitchEvent[], start: StitchEvent | null = null): number {
+  let previous = start;
   let total = 0;
   for (const event of events) {
     if (event.t === 'jump' && previous)
@@ -79,6 +97,12 @@ function travelLength(events: StitchEvent[]): number {
     if (event.t === 'stitch' || event.t === 'jump') previous = event;
   }
   return total;
+}
+
+interface PlanBlockResult {
+  records: PlannerEventRecord[];
+  movedRuns: number;
+  improvementSwaps: number;
 }
 
 function splitColorBlock(records: PlannerEventRecord[], autoTrim: number): ColorBlock {
@@ -234,10 +258,17 @@ function planBlock(
   block: ColorBlock,
   strategy: PlanStrategy,
   examine?: (count: number) => void,
-): PlannerEventRecord[] {
-  if (block.runs.length <= 1) return [...block.prefix, ...block.runs.flatMap((run) => run.records)];
+  algorithm: keyof typeof ROUTE_ALGORITHMS = strategy.algorithm,
+): PlanBlockResult {
+  if (block.runs.length <= 1)
+    return {
+      records: [...block.prefix, ...block.runs.flatMap((run) => run.records)],
+      movedRuns: 0,
+      improvementSwaps: 0,
+    };
+  let improvementSwaps = 0;
   const ordered = routeItems(
-    strategy.algorithm,
+    algorithm,
     block.runs.map((run) => ({
       value: run,
       index: run.index,
@@ -246,7 +277,19 @@ function planBlock(
       reverseEntry: run.reversible ? run.exit : undefined,
       reverseExit: run.reversible ? run.entry : undefined,
     })),
-    { anchorFirst: true, allowReverse: strategy.reverseRuns, examine },
+    {
+      anchorFirst: true,
+      allowReverse: strategy.reverseRuns,
+      examine,
+      onImprove: (count) => {
+        improvementSwaps += count;
+      },
+    },
+  );
+  const movedRuns = ordered.reduce(
+    (count, routed, index) =>
+      count + (routed.item.value.index !== index || routed.reversed ? 1 : 0),
+    0,
   );
   const out = [...block.prefix];
   let previous: ThreadRun | null = null;
@@ -273,14 +316,25 @@ function planBlock(
     out.push(...runRecords);
     previous = run;
   }
-  return out;
+  return { records: out, movedRuns, improvementSwaps };
+}
+
+function groupedTravelLengths(records: PlannerEventRecord[], count: number): number[] {
+  const totals = Array.from({ length: count }, () => 0);
+  let previous: StitchEvent | null = null;
+  for (const { event, tags } of records) {
+    if (event.t === 'jump' && previous && tags.group !== undefined)
+      totals[tags.group - 1] += Math.hypot(event.x - previous.x, event.y - previous.y);
+    if (event.t === 'stitch' || event.t === 'jump') previous = event;
+  }
+  return totals;
 }
 
 /**
  * Plan a completed public event stream. Barrier offsets address gaps in the
  * authored stream: 0 is before the first event and `events.length` is after
- * the last. Atomic spans use the same gap-addressed offsets. Both are compiled
- * into private planner tags before routing.
+ * the last. Atomic and route-group spans use the same gap-addressed offsets.
+ * All constraints are compiled into private planner tags before routing.
  */
 export function applyTravelPlan(
   events: StitchEvent[],
@@ -289,12 +343,23 @@ export function applyTravelPlan(
   examine?: (count: number) => void,
   barrierOffsets: readonly number[] = [],
   atomicSpans: readonly PlanAtomicSpan[] = [],
+  routeGroupSpans: readonly PlanRouteGroupSpan[] = [],
 ): TravelPlanResult {
   const strategy = PLAN_STRATEGIES[mode];
   const barriers = barrierOffsets
     .filter((offset) => Number.isInteger(offset) && offset >= 0 && offset <= events.length)
     .toSorted((a, b) => a - b);
   const atomics = atomicSpans
+    .filter(
+      ({ start, end }) =>
+        Number.isInteger(start) &&
+        Number.isInteger(end) &&
+        start >= 0 &&
+        start <= end &&
+        end <= events.length,
+    )
+    .toSorted((a, b) => a.start - b.start || a.end - b.end);
+  const routeGroups = routeGroupSpans
     .filter(
       ({ start, end }) =>
         Number.isInteger(start) &&
@@ -319,9 +384,33 @@ export function applyTravelPlan(
         atomic.line,
       );
   }
+  for (let i = 0; i < routeGroups.length; i++) {
+    const group = routeGroups[i];
+    if (i > 0 && group.start < routeGroups[i - 1].end)
+      throw new NeedlescriptError('routegroup planner spans cannot overlap', group.line);
+    for (const atomic of atomics) {
+      const overlaps = group.start < atomic.end && atomic.start < group.end;
+      const containsAtomic = group.start <= atomic.start && atomic.end <= group.end;
+      if (overlaps && !containsAtomic)
+        throw new NeedlescriptError(
+          'routegroup cannot split an atomic span — put the complete atomic block inside the routegroup',
+          group.line,
+        );
+    }
+  }
+  const groups: TravelPlanGroupResult[] = routeGroups.map(({ line }, index) => ({
+    id: index + 1,
+    line,
+    eligibleRuns: 0,
+    movedRuns: 0,
+    improvementSwaps: 0,
+    travelBeforeMm: 0,
+    travelAfterMm: 0,
+  }));
   let barrierIndex = 0;
   let plannerSegment = 0;
   let atomicIndex = 0;
+  let routeGroupIndex = 0;
   const records: PlannerEventRecord[] = events.map((event, eventIndex) => {
     while (barriers[barrierIndex] <= eventIndex) {
       plannerSegment++;
@@ -329,9 +418,15 @@ export function applyTravelPlan(
     }
     while (atomics[atomicIndex] && atomics[atomicIndex].end <= eventIndex) atomicIndex++;
     const atomic = atomics[atomicIndex];
-    return atomic && atomic.start <= eventIndex && eventIndex < atomic.end
-      ? { event, tags: { segment: plannerSegment, atomic: atomicIndex + 1 } }
-      : { event, tags: { segment: plannerSegment } };
+    while (routeGroups[routeGroupIndex] && routeGroups[routeGroupIndex].end <= eventIndex)
+      routeGroupIndex++;
+    const routeGroup = routeGroups[routeGroupIndex];
+    const tags: PlannerTags = { segment: plannerSegment };
+    if (atomic && atomic.start <= eventIndex && eventIndex < atomic.end)
+      tags.atomic = atomicIndex + 1;
+    if (routeGroup && routeGroup.start <= eventIndex && eventIndex < routeGroup.end)
+      tags.group = routeGroupIndex + 1;
+    return { event, tags };
   });
   const output: PlannerEventRecord[] = [];
   let segment: PlannerEventRecord[] = [];
@@ -341,10 +436,36 @@ export function applyTravelPlan(
   let activePlannerSegment: number | undefined;
 
   const flushPlannerSegment = () => {
-    const block = splitColorBlock(segment, autoTrim);
-    runs += block.runs.length;
-    if (block.runs.length > 0) colorHasRuns = true;
-    output.push(...planBlock(block, strategy, examine));
+    if (routeGroups.length === 0) {
+      const block = splitColorBlock(segment, autoTrim);
+      runs += block.runs.length;
+      if (block.runs.length > 0) colorHasRuns = true;
+      output.push(...planBlock(block, strategy, examine).records);
+      segment = [];
+      return;
+    }
+
+    let start = 0;
+    while (start < segment.length) {
+      const group = segment[start].tags.group;
+      let end = start + 1;
+      while (end < segment.length && segment[end].tags.group === group) end++;
+      const chunk = segment.slice(start, end);
+      if (group === undefined) {
+        output.push(...chunk);
+      } else {
+        const block = splitColorBlock(chunk, autoTrim);
+        const planned = planBlock(block, strategy, examine, 'nearest-2opt');
+        const stats = groups[group - 1];
+        stats.eligibleRuns += block.runs.length;
+        stats.movedRuns += planned.movedRuns;
+        stats.improvementSwaps += planned.improvementSwaps;
+        runs += block.runs.length;
+        if (block.runs.length > 0) colorHasRuns = true;
+        output.push(...planned.records);
+      }
+      start = end;
+    }
     segment = [];
   };
 
@@ -371,6 +492,13 @@ export function applyTravelPlan(
   }
   finishColor();
 
+  const groupTravelBefore = groupedTravelLengths(records, groups.length);
+  const groupTravelAfter = groupedTravelLengths(output, groups.length);
+  for (const group of groups) {
+    group.travelBeforeMm = groupTravelBefore[group.id - 1];
+    group.travelAfterMm = groupTravelAfter[group.id - 1];
+  }
+
   const outputEvents = output.map(({ event }) => event);
   const authoredStitches = records.filter(({ event }) => event.t === 'stitch');
   const plannedStitches = output.filter(({ event }) => event.t === 'stitch');
@@ -386,5 +514,6 @@ export function applyTravelPlan(
     runs,
     colors,
     reordered,
+    groups,
   };
 }

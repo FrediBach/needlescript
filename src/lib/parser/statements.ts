@@ -410,6 +410,12 @@ export function parseStatement(ctx: ParseContext): ASTNode {
     return { k: 'atomic', body, line: tok.line };
   }
 
+  if (name === 'routegroup') {
+    ctx.next();
+    const body = parseBracketBlock(ctx);
+    return { k: 'routegroup', body, line: tok.line };
+  }
+
   // Trace block expressions (RFC-trace): trace/tracerings are expression-only;
   // using them as a bare statement is an error — the value would be discarded.
   if (name === 'trace' || name === 'tracerings') {

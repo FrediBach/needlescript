@@ -38,6 +38,7 @@ export type {
   HoopInfo,
   OverrideKey,
   TravelPlanStats,
+  TravelPlanGroupStats,
   ChalkStyle,
   ChalkStroke,
   ChalkEvent,
@@ -197,7 +198,14 @@ export {
 } from './hoop-presets.ts';
 export { applyLocks, applyAutoTrim, densityMap, designStats, DensityGrid } from './postprocess.ts';
 export { applyTravelPlan, PLAN_STRATEGIES } from './travel-planner.ts';
-export type { PlanAtomicSpan, PlanMode, PlanStrategy, TravelPlanResult } from './travel-planner.ts';
+export type {
+  PlanAtomicSpan,
+  PlanMode,
+  PlanRouteGroupSpan,
+  PlanStrategy,
+  TravelPlanGroupResult,
+  TravelPlanResult,
+} from './travel-planner.ts';
 export { routeItems, ROUTE_ALGORITHMS, ROUTESORT_MODES } from './routing.ts';
 export type {
   RouteAlgorithm,

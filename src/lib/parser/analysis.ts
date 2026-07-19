@@ -46,6 +46,7 @@ function collectValueUsesStmt(st: ASTNode, out: Set<string>): void {
       break;
     case 'stitchscope':
     case 'atomic':
+    case 'routegroup':
       collectValueUses(st.body, out);
       break;
     case 'transform':
@@ -131,7 +132,8 @@ function collectValueUsesExpr(expr: ExprNode, out: Set<string>): void {
  */
 export function stmtAlwaysReturns(stmt: ASTNode): boolean {
   if (stmt.k === 'output') return stmt.value !== null; // valued return
-  if (stmt.k === 'stitchscope' || stmt.k === 'atomic') return allPathsReturn(stmt.body);
+  if (stmt.k === 'stitchscope' || stmt.k === 'atomic' || stmt.k === 'routegroup')
+    return allPathsReturn(stmt.body);
   if (stmt.k === 'if') {
     // Covers iff there is a final else AND both branches always return.
     return stmt.elseBody !== null && allPathsReturn(stmt.body) && allPathsReturn(stmt.elseBody);

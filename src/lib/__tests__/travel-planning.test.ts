@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { applyTravelPlan, designStats, run, toDST, toEXP, toPES, toSVG } from '../engine.ts';
+import {
+  applyTravelPlan,
+  designStats,
+  routeItems,
+  run,
+  toDST,
+  toEXP,
+  toPES,
+  toSVG,
+} from '../engine.ts';
+import type { RouteItem } from '../engine.ts';
 import type { StitchEvent } from '../types.ts';
 
 const printed = (source: string) => run(source).printed;
@@ -502,5 +512,192 @@ describe('atomic', () => {
     expect(() => run("plan 'nearest' atomic [ beginfill fd 5 ] endfill")).toThrow(
       /cannot end inside a beginfill/i,
     );
+  });
+});
+
+describe('routegroup', () => {
+  const stitchXs = (source: string) =>
+    run(source)
+      .events.filter((event) => event.t === 'stitch')
+      .map((event) => event.x);
+
+  it('reorders only eligible runs inside the explicit group', () => {
+    const result = run(`
+      plan 'nearest' lock 0 autotrim 0 stitchlen 20
+      down fd 1 trim
+      up setxy 20 0 down fd 1 trim
+      routegroup [
+        up setxy 100 0 down fd 1 trim
+        up setxy 82 0 down fd 1 trim
+        up setxy 85 0 down fd 1 trim
+      ]
+      up setxy 5 0 down fd 1
+    `);
+    expect(result.events.filter((event) => event.t === 'stitch').map((event) => event.x)).toEqual([
+      0, 0, 20, 100, 85, 82, 5,
+    ]);
+    expect(result.plan?.groups).toEqual([
+      expect.objectContaining({
+        id: 1,
+        eligibleRuns: 3,
+        movedRuns: 2,
+        travelBeforeMm: expect.any(Number),
+        travelAfterMm: expect.any(Number),
+      }),
+    ]);
+    expect(result.plan?.groups?.[0].travelAfterMm).toBeLessThan(
+      result.plan?.groups?.[0].travelBeforeMm ?? 0,
+    );
+    expect(result.printed).toContainEqual(
+      expect.stringMatching(
+        /routegroup 1 on line \d+: travel .*eligible runs: 3, moved: 2, 2-opt swaps:/,
+      ),
+    );
+  });
+
+  it('keeps color and barrier intersections independent', () => {
+    expect(
+      stitchXs(`
+        plan 'nearest' lock 0 autotrim 0 stitchlen 20
+        routegroup [
+          up setxy 10 0 down fd 1 trim
+          up setxy 2 0 down fd 1 trim
+          up setxy 5 0 down fd 1 trim
+          planbarrier
+          up setxy 100 0 down fd 1 trim
+          up setxy 120 0 down fd 1 trim
+          up setxy 105 0 down fd 1 trim
+          color 2
+          up setxy 200 0 down fd 1 trim
+          up setxy 220 0 down fd 1 trim
+          up setxy 205 0 down fd 1
+        ]
+      `),
+    ).toEqual([10, 10, 5, 2, 100, 105, 120, 200, 205, 220]);
+  });
+
+  it('keeps an atomic construction indivisible inside a group', () => {
+    expect(
+      stitchXs(`
+        plan 'reversing-nearest' lock 0 autotrim 0 stitchlen 20
+        routegroup [
+          up setxy 10 0 down fd 1 trim
+          atomic [
+            up setxy 20 0 down fd 1 trim
+            up setxy 2 0 down fd 1 trim
+          ]
+          up setxy 5 0 down fd 1 trim
+        ]
+      `),
+    ).toEqual([10, 10, 20, 2, 5]);
+  });
+
+  it('uses the outermost nested group and restores nesting after return', () => {
+    const nested = run(`
+      plan 'nearest' lock 0 autotrim 0 stitchlen 20
+      routegroup [
+        up setxy 10 0 down fd 1 trim
+        routegroup [ up setxy 2 0 down fd 1 trim ]
+        up setxy 5 0 down fd 1 trim
+      ]
+    `);
+    expect(nested.plan?.groups).toHaveLength(1);
+    expect(nested.events.filter((event) => event.t === 'stitch').map((event) => event.x)).toEqual([
+      10, 10, 5, 2,
+    ]);
+
+    const returned = run(`
+      plan 'nearest' lock 0 autotrim 0 stitchlen 20
+      def grouped(x) [ routegroup [ up setxy x 0 down fd 1 trim return ] ]
+      grouped(20)
+      routegroup [
+        up setxy 10 0 down fd 1 trim
+        up setxy 2 0 down fd 1 trim
+        up setxy 5 0 down fd 1 trim
+      ]
+    `);
+    expect(returned.plan?.groups).toHaveLength(2);
+  });
+
+  it('is byte-identical without planning and enforces sandbox/boundary rules', () => {
+    const plain = "lock 0 underlay 'off' density 1 satin 4 fd 3 fd 3 satin 0";
+    const grouped = "lock 0 underlay 'off' density 1 satin 4 fd 3 routegroup [ fd 3 ] satin 0";
+    expect(run(grouped).events).toEqual(run(plain).events);
+    expect(run(`plan 'off' ${grouped}`).events).toEqual(run(plain).events);
+
+    expect(() => run('let p = trace [ routegroup [ fd 1 ] ]')).toThrow(
+      /routegroup is not allowed inside trace/i,
+    );
+    expect(() => run("plan 'nearest' atomic [ routegroup [ fd 1 ] ]")).toThrow(
+      /routegroup cannot start inside atomic/i,
+    );
+    expect(() => run("plan 'nearest' beginfill routegroup [ fd 5 ] endfill")).toThrow(
+      /cannot start inside a beginfill/i,
+    );
+    expect(() => run("plan 'nearest' routegroup [ beginfill fd 5 ] endfill")).toThrow(
+      /cannot end inside a beginfill/i,
+    );
+    expect(() =>
+      run(`
+        plan 'nearest' fillunderlay 'off' fillspacing 2
+        routegroup [ beginfill repeat 4 [ fd 8 rt 90 ] endfill trim ]
+      `),
+    ).not.toThrow();
+  });
+});
+
+describe('bounded route improvement', () => {
+  const points: RouteItem<number>[] = [
+    [0, 0],
+    [0, 3],
+    [3, 2],
+    [2, 2],
+    [2, 3],
+    [4, 0],
+  ].map(([x, y], index) => ({ value: index, index, entry: [x, y], exit: [x, y] }));
+
+  const routeTravel = (route: ReturnType<typeof routeItems<number>>) =>
+    route.slice(1).reduce((total, current, index) => {
+      const previous = route[index];
+      return (
+        total +
+        Math.hypot(
+          current.item.entry[0] - previous.item.exit[0],
+          current.item.entry[1] - previous.item.exit[1],
+        )
+      );
+    }, 0);
+
+  it('strictly improves a stable nearest route with deterministic ties', () => {
+    let swaps = 0;
+    const nearest = routeItems('nearest', points, { anchorFirst: true });
+    const improved = routeItems('nearest-2opt', points, {
+      anchorFirst: true,
+      onImprove: (count) => {
+        swaps += count;
+      },
+    });
+    expect(improved[0].item.index).toBe(0);
+    expect(routeTravel(improved)).toBeLessThan(routeTravel(nearest));
+    expect(swaps).toBeGreaterThan(0);
+    expect(routeItems('nearest-2opt', points, { anchorFirst: true })).toEqual(improved);
+  });
+
+  it('keeps improvement work capped and charges examined distances', () => {
+    const many: RouteItem<number>[] = Array.from({ length: 1000 }, (_, index) => {
+      const point = [((index * 73) % 997) - 498, ((index * 193) % 991) - 495] as const;
+      return { value: index, index, entry: point, exit: point };
+    });
+    let nearestExamined = 0;
+    let improvedExamined = 0;
+    let swaps = 0;
+    routeItems('nearest', many, { examine: (count) => (nearestExamined += count) });
+    routeItems('nearest-2opt', many, {
+      examine: (count) => (improvedExamined += count),
+      onImprove: (count) => (swaps += count),
+    });
+    expect(improvedExamined).toBeGreaterThan(nearestExamined);
+    expect(improvedExamined - nearestExamined).toBeLessThanOrEqual(270_000);
+    expect(swaps).toBeLessThanOrEqual(8);
   });
 });

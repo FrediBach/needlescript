@@ -22,6 +22,8 @@ export interface RouteOptions {
   allowReverse?: boolean;
   /** Budget hook. Called once per endpoint whose distance is examined. */
   examine?: (count: number) => void;
+  /** Optional diagnostic hook, called once per accepted improvement. */
+  onImprove?: (count: number) => void;
 }
 
 export type RouteAlgorithm = <T>(items: RouteItem<T>[], options: RouteOptions) => RoutedItem<T>[];
@@ -148,12 +150,82 @@ function nearestRoute<T>(items: RouteItem<T>[], options: RouteOptions): RoutedIt
   return result;
 }
 
+const TWO_OPT_WINDOW = 32;
+const TWO_OPT_MAX_CANDIDATES = 4096;
+const TWO_OPT_MAX_PASSES = 8;
+
+function routedEntry<T>({ item, reversed }: RoutedItem<T>): RoutePoint {
+  return reversed ? (item.reverseEntry ?? item.entry) : item.entry;
+}
+
+function routedExit<T>({ item, reversed }: RoutedItem<T>): RoutePoint {
+  return reversed ? (item.reverseExit ?? item.exit) : item.exit;
+}
+
+function connectionLength<T>(
+  left: RoutedItem<T>,
+  right: RoutedItem<T>,
+  options: RouteOptions,
+): number {
+  options.examine?.(1);
+  const exit = routedExit(left);
+  const entry = routedEntry(right);
+  return Math.hypot(entry[0] - exit[0], entry[1] - exit[1]);
+}
+
+/**
+ * Deterministic bounded 2-opt pass over an already stable nearest route.
+ * Item directions are retained; only the order of a bounded subsequence is
+ * reversed. This keeps forward-only/atomic items valid. The first strict
+ * improvement wins, so equal-cost candidates preserve original tie order.
+ */
+function improveTwoOpt<T>(nearest: RoutedItem<T>[], options: RouteOptions): RoutedItem<T>[] {
+  if (nearest.length < 3) return nearest;
+  const route = [...nearest];
+  let candidates = 0;
+
+  for (let pass = 0; pass < TWO_OPT_MAX_PASSES; pass++) {
+    let improved = false;
+    scan: for (let start = 1; start < route.length - 1; start++) {
+      const maxEnd = Math.min(route.length - 1, start + TWO_OPT_WINDOW);
+      for (let end = start + 1; end <= maxEnd; end++) {
+        if (candidates++ >= TWO_OPT_MAX_CANDIDATES) return route;
+
+        let before = 0;
+        for (let index = start - 1; index < end; index++)
+          before += connectionLength(route[index], route[index + 1], options);
+        if (end + 1 < route.length) before += connectionLength(route[end], route[end + 1], options);
+
+        let after = connectionLength(route[start - 1], route[end], options);
+        for (let index = end; index > start; index--)
+          after += connectionLength(route[index], route[index - 1], options);
+        if (end + 1 < route.length)
+          after += connectionLength(route[start], route[end + 1], options);
+
+        if (after < before - TIE_EPSILON) {
+          route.splice(start, end - start + 1, ...route.slice(start, end + 1).toReversed());
+          options.onImprove?.(1);
+          improved = true;
+          break scan;
+        }
+      }
+    }
+    if (!improved) break;
+  }
+  return route;
+}
+
+function nearestTwoOptRoute<T>(items: RouteItem<T>[], options: RouteOptions): RoutedItem<T>[] {
+  return improveTwoOpt(nearestRoute(items, options), options);
+}
+
 /**
  * Central algorithm registry. Data routing and event planning both resolve
  * through this table, so new algorithms do not need parser/interpreter edits.
  */
 export const ROUTE_ALGORITHMS = {
   nearest: nearestRoute,
+  'nearest-2opt': nearestTwoOptRoute,
 } satisfies Record<string, RouteAlgorithm>;
 
 export interface RouteSortMode {

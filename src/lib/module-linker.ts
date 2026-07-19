@@ -205,6 +205,7 @@ function rewriteStatements(stmts: ASTNode[], names: ReadonlyMap<string, string>)
         break;
       case 'stitchscope':
       case 'atomic':
+      case 'routegroup':
         rewriteStatements(stmt.body, names);
         break;
       case 'transform':

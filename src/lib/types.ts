@@ -157,6 +157,17 @@ export interface TravelPlanStats {
   travelAfterMm: number;
   runs: number;
   colors: number;
+  groups?: TravelPlanGroupStats[];
+}
+
+export interface TravelPlanGroupStats {
+  id: number;
+  line?: number;
+  eligibleRuns: number;
+  movedRuns: number;
+  improvementSwaps: number;
+  travelBeforeMm: number;
+  travelAfterMm: number;
 }
 
 export interface DesignStats {
@@ -199,6 +210,7 @@ export type ASTNode =
   | { k: 'if'; cond: ExprNode; body: ASTNode[]; elseBody: ASTNode[] | null; line: number }
   | { k: 'stitchscope'; body: ASTNode[]; line: number }
   | { k: 'atomic'; body: ASTNode[]; line: number }
+  | { k: 'routegroup'; body: ASTNode[]; line: number }
   | { k: 'transform'; name: string; args: ExprNode[]; body: ASTNode[]; line: number }
   | { k: 'effect'; name: string; args: ExprNode[]; body: ASTNode[]; line: number }
   | { k: 'make'; name: string; value: ExprNode; line: number }

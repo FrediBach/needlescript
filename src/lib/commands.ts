@@ -429,6 +429,7 @@ export const CORE_COMMAND_NAMES: ReadonlySet<string> = new Set([
   ...Object.keys(EFFECT_ARITY),
   'stitchscope',
   'atomic',
+  'routegroup',
   'fill',
   'satinbetween',
   'mark',
@@ -475,6 +476,7 @@ export const RESERVED = new Set<string>([
   'stitchscope',
   // Planner constraint block.
   'atomic',
+  'routegroup',
   // Programmable fills: `fill dir @d shape @s` arms the next beginfill…endfill.
   // `dir`/`shape` are only positional keywords after `fill`, so they are NOT
   // reserved globally — existing variables named dir/shape keep working.

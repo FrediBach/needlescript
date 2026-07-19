@@ -366,9 +366,9 @@ tailored error messages (e.g. the `push` vs `append` hint).
 - **Construction scope**: `stitchscope [ … ]` produces a dedicated block node. It
   preserves the surrounding `loopDepth`, so lexical `break`/`continue` validation
   works through the wrapper exactly as it does through `if`.
-- **Planner constraint**: `atomic [ … ]` produces a dedicated block node with the same lexical
-  control-flow transparency. Runtime execution decides whether it is an inert wrapper or records an
-  authored planner span.
+- **Planner constraints**: `atomic [ … ]` and `routegroup [ … ]` produce dedicated block nodes with
+  the same lexical control-flow transparency. Runtime execution decides whether each is an inert
+  wrapper or records an authored planner span.
 - **Special commands**: `print`/`printloc`, `assert`, `mark`, `chalk` (one required
   plus two optional expressions), and the programmable
   `fill dir @d shape @s` and exclusive `fill paths @gen|expr` arming forms (`statements.ts`). Static path expressions remain AST expressions; reporter references participate in the all-paths-return analysis.
@@ -433,9 +433,10 @@ running unchanged.
 
 `satinbetween` is the one Core call-only entry in `GEN_CMDS`: that table supplies its ranged call arity (2–4), while its explicit `RESERVED` entry keeps bindings and definitions illegal. Like every statement-only command, `@satinbetween` is rejected.
 
-`stitchscope` and `atomic` are special Core block forms rather than arity-table commands. They are
-listed explicitly in both `CORE_COMMAND_NAMES` (so Monaco completion/hover/signature coverage is
-mandatory) and `RESERVED` (so bindings and definitions cannot shadow them).
+`stitchscope`, `atomic`, and `routegroup` are special Core block forms rather than arity-table
+commands. They are listed explicitly in both `CORE_COMMAND_NAMES` (so Monaco
+completion/hover/signature coverage is mandatory) and `RESERVED` (so bindings and definitions cannot
+shadow them).
 
 ### 4.6 Static analysis (`analysis.ts`)
 
@@ -450,7 +451,7 @@ After the full program is parsed, `parseProgram` performs a parse-time
 
 `stmtAlwaysReturns` (`analysis.ts:128`) is conservative: a valued `output` always
 returns; an `if` covers only if it has a final `else` and both branches always return;
-an unconditional `stitchscope` or `atomic` covers when its body covers;
+an unconditional `stitchscope`, `atomic`, or `routegroup` covers when its body covers;
 and a `return` reachable only inside a loop body does **not** count (the loop may run
 zero times), matching the engine's runtime semantics. This rejects strictly fewer
 programs than the runtime would — anything it flags would have thrown "never reached
@@ -488,7 +489,7 @@ The parser emits `ASTNode[]`. The node union is defined in `types.ts:110-152`.
 
 **Statement nodes** (`ASTNode`) include: `to`, `repeat`, `while`, `for`, `forin`,
 `if`, `transform`, `effect`, `make`, `local`, `letlist`, `setindex`, `output`,
-`break`, `continue`, `stitchscope`, `atomic`, `cmd`, `listcmd`, `fillarm`, `call`.
+`break`, `continue`, `stitchscope`, `atomic`, `routegroup`, `cmd`, `listcmd`, `fillarm`, `call`.
 
 **Expression nodes** (`ExprNode`) include: `num`, `str`, `var`, `neg`, `bin`, `func`,
 `listfunc`, `list`, `index`, `callval`, `callexpr`, `procref`, `trace`.

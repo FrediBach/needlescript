@@ -1023,7 +1023,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'reorder independent thread runs to shorten travel',
     documentation:
-      "Top-level travel-planning directive. `plan 'nearest'` greedily reorders whole thread runs within each color block after execution and before autotrim/locks. `plan 'reversing-nearest'` may also enter eligible stitch-only runs from their nearer endpoint. Planning never crosses a color change, changes stitch geometry, or removes an explicit `trim`. Use `plan 'off'` for an explicit no-op. Must appear before the first stitch and at most once.",
+      "Top-level travel-planning directive. With no `routegroup`, `plan 'nearest'` greedily reorders whole thread runs within each color block after execution and before autotrim/locks. Once any route group executes, only grouped runs are eligible and ungrouped output remains authored; grouped intersections also receive bounded 2-opt improvement. `plan 'reversing-nearest'` may enter eligible stitch-only runs from their nearer endpoint. Planning never crosses a color change, changes stitch geometry, or removes an explicit `trim`. Use `plan 'off'` for an explicit no-op. Must appear before the first stitch and at most once.",
     insertText: modeCommandSnippet('plan', PLAN_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
@@ -1044,6 +1044,16 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       "Treat every routable run emitted by the block as one indivisible, forward-only travel-planner item. Internal stitches, jumps, trims, marks, underlay, and topping retain their authored order while the complete item may move within its color and `planbarrier` segment. Nested `atomic` blocks belong to the outermost span. With planning absent or `plan 'off'`, the block is byte-identical to its body and does not flush buffered construction. Active atomics cannot cross a color change or `planbarrier`, start/end inside an open `beginfill…endfill`, or run inside `trace`.\n\n```\natomic [\n  // foundation and decorative pass stay together\n  underlay 'edge'\n  satin 4\n  fd 20\n  trim\n]\n```",
     insertText: 'atomic [\n\t$0\n]',
+    isSnippet: true,
+    params: [[]],
+  },
+  {
+    label: 'routegroup',
+    kindName: 'function',
+    detail: 'limit travel reordering to an explicit collection',
+    documentation:
+      "Make the block's independent thread runs eligible for deterministic nearest routing followed by a bounded 2-opt improvement pass. The group's position is fixed: only runs inside it reorder, and when any `routegroup` executes, output outside all groups stays in authored order. Color changes and `planbarrier` boundaries split planning into independent intersections. An `atomic` inside the group remains one forward-only item. Nested groups belong to the outermost group. With planning absent or `plan 'off'`, the wrapper is byte-identical and does not flush construction. Active groups cannot start inside `atomic`, cross an open `beginfill…endfill` boundary, or run inside `trace`.\n\n```\nroutegroup [\n  motif(20) trim\n  motif(5) trim\n  motif(12)\n]\n```",
+    insertText: 'routegroup [\n\t$0\n]',
     isSnippet: true,
     params: [[]],
   },

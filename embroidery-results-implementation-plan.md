@@ -1210,6 +1210,8 @@ execution remains unaffected, including internal color changes.
 
 ### Session 6.4 — `routegroup` and improved algorithms
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Define route groups as explicit collections within which runs may reorder.
@@ -1223,6 +1225,30 @@ Acceptance criteria:
 - Group planning never crosses colors, barriers, or atomic boundaries.
 - Large groups remain bounded and responsive in the worker.
 - Planner statistics explain what was eligible and what moved.
+
+Implementation note: `routegroup` is a dedicated Core block AST node using the same sparse authored
+span representation as `atomic`. Only the outermost nested group records a span; nesting and
+`structuralDepth` unwind through all control transfers. Active boundaries flush pending
+satin/reporter-running construction, while absent/`off` planning executes a byte-identical wrapper.
+Trace and partial-fill boundaries are rejected. Atomics may be placed inside a group, but a group
+cannot begin inside an atomic because that would split the indivisible owner.
+
+Compatibility is explicit: when no group executes, the existing whole-design nearest behavior is
+unchanged. Once any group executes, only group-tagged runs are eligible and all ungrouped records pass
+through in authored order. A group may contain color changes and `planbarrier`; finalization routes
+each color/segment intersection independently and aggregates its statistics. Atomic IDs inside those
+intersections still merge all internal trims/jumps into one forward-only route item.
+
+`routing.ts` now registers `nearest-2opt`. It starts from the stable spatial-bucket nearest result,
+keeps every chosen item direction, anchors the first item, and reverses only bounded order
+subsequences. The deterministic first strict improvement wins; equal-cost candidates retain original
+tie order. Each intersection searches a 32-item window, examines at most 4,096 exchanges, and accepts
+at most eight passes. Every distance comparison calls the existing planner budget hook. The ordinary
+`routesort` modes and ungrouped planner compatibility path continue to use plain `nearest`.
+
+`RunResult.plan.groups` and console diagnostics report each execution-order group ID and source line,
+eligible and moved runs, accepted 2-opt swaps, and travel before/after. Empty groups remain visible
+with zero counts, so statistics explain both movement and non-eligibility.
 
 ## 15. Phase 7: material, thread, and directional physics
 
