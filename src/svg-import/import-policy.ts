@@ -1,7 +1,7 @@
 // Quick import is a fixed preset over the canonical parser/model/emitter.
 
-import { emit } from '../lib/svg/emit.ts';
-import type { ImportField } from '../lib/svg/model.ts';
+import { emit } from '../lib/formats/svg-import/emit.ts';
+import type { ImportField } from '../lib/formats/svg-import/model.ts';
 import { parseSvgToModel } from './parse-svg-dom.ts';
 
 export interface QuickImportOptions {

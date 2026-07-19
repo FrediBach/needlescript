@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import * as Comlink from 'comlink';
 import type { CompilerWorkerApi } from '../compiler.worker.ts';
 import type { CompileResponse } from '../compiler.worker.types.ts';
-import type { MachineProfile } from '../lib/types.ts';
+import type { MachineProfile } from '../lib/core/types.ts';
 
 // Import the worker via Vite's native ?worker syntax so it gets bundled as a
 // separate chunk and never runs on the main thread.

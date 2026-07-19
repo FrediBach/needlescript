@@ -2,13 +2,13 @@ import type { DesignState, LineSegment, LineStitchBounds } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import type { MachinePreset } from '../data.ts';
 import type { WarningLocation } from '../lib/engine.ts';
-import type { PathParamDef, PointParamDef } from '../lib/parse-parameters.ts';
+import type { PathParamDef, PointParamDef } from '../lib/editor/parameters.ts';
 import StageCanvas from './StageCanvas.tsx';
 import PlaybackBar from './PlaybackBar.tsx';
 import StatsChips from './StatsChips.tsx';
 import styles from './StagePane.module.css';
-import { cn } from '@/lib/utils.ts';
-import { colorDist } from '../lib/colormath.ts';
+import { cn } from '@/utils.ts';
+import { colorDist } from '../lib/core/colormath.ts';
 import type { CSSProperties } from 'react';
 
 interface Props {

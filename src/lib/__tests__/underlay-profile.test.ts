@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FABRICS } from '../embroidery-registry.ts';
+import { FABRICS } from '../embroidery/embroidery-registry.ts';
 import {
   lowerFabricUnderlay,
   lowerLegacyFillUnderlay,
@@ -8,11 +8,11 @@ import {
   resolveFillUnderlayProfile,
   validateFillUnderlayProfile,
   validateSatinUnderlayProfile,
-} from '../underlay-profile.ts';
+} from '../embroidery/underlay-profile.ts';
 import type {
   ResolvedFillUnderlayProfile,
   ResolvedSatinUnderlayProfile,
-} from '../underlay-profile.ts';
+} from '../embroidery/underlay-profile.ts';
 
 describe('legacy satin underlay profile lowering', () => {
   it.each([

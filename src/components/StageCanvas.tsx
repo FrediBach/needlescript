@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { projectPoint } from '../lib/parse-parameters.ts';
-import type { PathParamDef, PointParamDef } from '../lib/parse-parameters.ts';
+import { projectPoint } from '../lib/editor/parameters.ts';
+import type { PathParamDef, PointParamDef } from '../lib/editor/parameters.ts';
 import { CanvasHud } from './stage-canvas/CanvasHud.tsx';
 import { computeAutoFitScale, draw } from './stage-canvas/CanvasRenderer.ts';
 import { formatPointLiteral } from './stage-canvas/sample-point.ts';

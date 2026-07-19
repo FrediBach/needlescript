@@ -1,5 +1,5 @@
 // Browser-side SVG DOM adapter. The normalized model it produces is fully
-// platform-neutral and lives in src/lib/svg.
+// platform-neutral and lives in src/lib/formats/svg-import/.
 
 import {
   matApply,
@@ -12,11 +12,21 @@ import {
   type Matrix,
   type Point,
   type SvgCurveSpec,
-} from '../lib/svg/svg-path.ts';
-import { computeHoleMap, isClosedRing, netFillArea, selfIntersects } from '../lib/svg/geometry.ts';
-import { autoSuggest } from '../lib/svg/strategies.ts';
-import { orderOperations } from '../lib/svg/ordering.ts';
-import { buildThreadMap, parseColorStr, rgbToHex, threadForColor } from '../lib/svg/thread-map.ts';
+} from '../lib/formats/svg-import/svg-path.ts';
+import {
+  computeHoleMap,
+  isClosedRing,
+  netFillArea,
+  selfIntersects,
+} from '../lib/formats/svg-import/geometry.ts';
+import { autoSuggest } from '../lib/formats/svg-import/strategies.ts';
+import { orderOperations } from '../lib/formats/svg-import/ordering.ts';
+import {
+  buildThreadMap,
+  parseColorStr,
+  rgbToHex,
+  threadForColor,
+} from '../lib/formats/svg-import/thread-map.ts';
 import {
   bboxOf,
   geometryOutsideField,
@@ -31,7 +41,7 @@ import {
   type SvgGradientStop,
   type SvgLinearGradient,
   type StagedDocument,
-} from '../lib/svg/model.ts';
+} from '../lib/formats/svg-import/model.ts';
 
 export interface ParseOptions {
   fitMM?: number;

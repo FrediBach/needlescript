@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CONSTRUCTION_PREFLIGHT_THRESHOLDS, run } from '../engine.ts';
-import { analyzeConstructionPreflight } from '../preflight-construction.ts';
+import { analyzeConstructionPreflight } from '../embroidery/preflight-construction.ts';
 import type {
   ConstructionRecord,
   FillConstructionRecord,
   SatinConstructionRecord,
-} from '../construction-metadata.ts';
+} from '../embroidery/construction-metadata.ts';
 import type { StitchEvent } from '../engine.ts';
 
 const stitch = (x: number, y: number, line = 1, underlay = false): StitchEvent => ({

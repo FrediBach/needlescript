@@ -10,7 +10,7 @@ import {
   toSVG,
 } from '../engine.ts';
 import type { RouteItem } from '../engine.ts';
-import type { StitchEvent } from '../types.ts';
+import type { StitchEvent } from '../core/types.ts';
 
 const printed = (source: string) => run(source).printed;
 

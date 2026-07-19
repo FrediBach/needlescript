@@ -2,9 +2,9 @@ import type { DesignState } from '../App.tsx';
 import { SEW_TIME_COLOR_CHANGE_PENALTY_SECONDS, SEW_TIME_TRIM_PENALTY_SECONDS } from '../data.ts';
 import type { MachinePreset } from '../data.ts';
 import { Badge } from '@/components/ui/badge.tsx';
-import { cn } from '@/lib/utils.ts';
+import { cn } from '@/utils.ts';
 import styles from './StatsChips.module.css';
-import { colorDist } from '../lib/colormath.ts';
+import { colorDist } from '../lib/core/colormath.ts';
 
 interface Props {
   design: DesignState;

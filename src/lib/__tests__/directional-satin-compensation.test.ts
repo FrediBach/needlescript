@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apply, mRotate } from '../affine.ts';
+import { apply, mRotate } from '../geometry/affine.ts';
 import { run } from '../engine.ts';
 import type { RunResult, StitchEvent } from '../engine.ts';
 

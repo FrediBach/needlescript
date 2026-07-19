@@ -1,4 +1,4 @@
-import type { NSItem } from '../../needlescript-monaco/catalog.ts';
+import type { NSItem } from '../../editor/monaco/catalog.ts';
 
 export interface CatalogCoverageGap {
   command: string;

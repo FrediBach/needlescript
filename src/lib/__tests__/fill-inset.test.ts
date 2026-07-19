@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { run } from '../interpreter.ts';
-import type { StitchEvent } from '../types.ts';
+import { run } from '../runtime/index.ts';
+import type { StitchEvent } from '../core/types.ts';
 
 const square = (size = 20) => `beginfill repeat 4 [ fd ${size} rt 90 ] endfill`;
 const stableSettings = "lock 0 autotrim 0 maxdensity 0 fillunderlay 'off' fillspacing 1 filllen 2 ";

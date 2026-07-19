@@ -4,17 +4,20 @@ import {
   extractUserSymbols,
   getImportCompletionContext,
   getSignatureContext,
-} from '../needlescript-monaco/symbols.ts';
-import { NS_ITEM_MAP } from '../needlescript-monaco/catalog.ts';
-import { registerNeedlescriptTokenizer } from '../needlescript-monaco/tokenizer.ts';
-import { STANDARD_LIBRARY_PROCEDURES } from '../standard-library/index.ts';
-import { CORE_COMMAND_NAMES } from '../commands.ts';
-import { EMBROIDERY_MODE_REGISTRIES } from '../embroidery-registry.ts';
-import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
-import { FILL_CONSTRUCTION_MODE_REGISTRIES } from '../fill-profile.ts';
-import { SATIN_CONSTRUCTION_MODE_REGISTRIES } from '../satin-profile.ts';
-import { PREFLIGHT_MODES } from '../preflight.ts';
-import { PLAN_MODES } from '../travel-planner.ts';
+} from '../editor/monaco/symbols.ts';
+import { NS_ITEM_MAP } from '../editor/monaco/catalog.ts';
+import { registerNeedlescriptTokenizer } from '../editor/monaco/tokenizer.ts';
+import { STANDARD_LIBRARY_PROCEDURES } from '../language/standard-library/index.ts';
+import { CORE_COMMAND_NAMES } from '../language/commands.ts';
+import { EMBROIDERY_MODE_REGISTRIES } from '../embroidery/embroidery-registry.ts';
+import {
+  FILL_UNDERLAY_PASS_KINDS,
+  SATIN_UNDERLAY_PASS_KINDS,
+} from '../embroidery/underlay-profile.ts';
+import { FILL_CONSTRUCTION_MODE_REGISTRIES } from '../embroidery/fill-profile.ts';
+import { SATIN_CONSTRUCTION_MODE_REGISTRIES } from '../embroidery/satin-profile.ts';
+import { PREFLIGHT_MODES } from '../embroidery/preflight.ts';
+import { PLAN_MODES } from '../embroidery/travel-planner.ts';
 import {
   catalogCoverageGaps,
   catalogExampleGaps,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toDST } from '../dst.ts';
+import { toDST } from '../formats/dst.ts';
 import { run } from '../engine.ts';
 import type { StitchEvent } from '../engine.ts';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { run } from '../interpreter.ts';
-import { Machine } from '../machine.ts';
+import { run } from '../runtime/index.ts';
+import { Machine } from '../embroidery/machine/index.ts';
 import { expectPositionalEvents } from './helpers/positional-events.ts';
 
 const underlayEvents = (source: string) =>

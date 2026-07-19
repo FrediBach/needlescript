@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { SYSTEM_PROMPT } from '../ai-prompt.ts';
-import { EMBROIDERY_MODE_REGISTRIES } from '../embroidery-registry.ts';
-import { FILL_CONSTRUCTION_MODE_REGISTRIES } from '../fill-profile.ts';
-import { SATIN_CONSTRUCTION_MODE_REGISTRIES } from '../satin-profile.ts';
-import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
-import { PLAN_MODES } from '../travel-planner.ts';
-import { PREFLIGHT_MODES } from '../preflight.ts';
+import { SYSTEM_PROMPT } from '../editor/ai-prompt.ts';
+import { EMBROIDERY_MODE_REGISTRIES } from '../embroidery/embroidery-registry.ts';
+import { FILL_CONSTRUCTION_MODE_REGISTRIES } from '../embroidery/fill-profile.ts';
+import { SATIN_CONSTRUCTION_MODE_REGISTRIES } from '../embroidery/satin-profile.ts';
+import {
+  FILL_UNDERLAY_PASS_KINDS,
+  SATIN_UNDERLAY_PASS_KINDS,
+} from '../embroidery/underlay-profile.ts';
+import { PLAN_MODES } from '../embroidery/travel-planner.ts';
+import { PREFLIGHT_MODES } from '../embroidery/preflight.ts';
 
 const EMBROIDERY_GUIDANCE_COMMANDS = [
   'stitchscope',

@@ -4,8 +4,8 @@ import {
   analyzeSpineColumn,
   legacyRailWidthIssue,
   legacySpineWidthIssue,
-} from '../column-analysis.ts';
-import type { Pt } from '../genmath.ts';
+} from '../geometry/column-analysis.ts';
+import type { Pt } from '../geometry/genmath.ts';
 
 describe('column analysis', () => {
   it('analyzes a straight open spine in physical arc-length order', () => {

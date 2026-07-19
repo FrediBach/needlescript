@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FABRICS, QWORD_BUILTINS, designStats, run, toDST, toEXP, toPES } from '../engine.ts';
-import type { RunResult, StitchEvent } from '../types.ts';
+import type { RunResult, StitchEvent } from '../core/types.ts';
 import { expectPositionalEvents } from './helpers/positional-events.ts';
 
 const RNG_SEED = 90210;

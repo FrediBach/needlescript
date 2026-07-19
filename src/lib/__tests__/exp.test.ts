@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toEXP } from '../exp.ts';
+import { toEXP } from '../formats/exp.ts';
 import { run } from '../engine.ts';
 import type { StitchEvent } from '../engine.ts';
 

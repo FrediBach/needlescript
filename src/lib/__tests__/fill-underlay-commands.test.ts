@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { run } from '../interpreter.ts';
-import { Machine } from '../machine.ts';
-import type { StitchEvent } from '../types.ts';
+import { run } from '../runtime/index.ts';
+import { Machine } from '../embroidery/machine/index.ts';
+import type { StitchEvent } from '../core/types.ts';
 
 const square = (size = 20) => `beginfill repeat 4 [ fd ${size} rt 90 ] endfill`;
 const underlayEvents = (source: string) =>

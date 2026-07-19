@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parse, run, tokenize } from '../engine.ts';
-import { Machine } from '../machine.ts';
+import { Machine } from '../embroidery/machine/index.ts';
 
 describe('stitchscope parsing', () => {
   it('produces a dedicated block AST node', () => {

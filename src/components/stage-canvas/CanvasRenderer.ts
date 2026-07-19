@@ -1,7 +1,7 @@
 import type { DesignState, LineStitchBounds } from '../../App.tsx';
 import type { HoopConfig } from '../../data.ts';
 import type { ChalkStroke, HoopInfo, WarningLocation } from '../../lib/engine.ts';
-import type { PointParamDef, XYRegion } from '../../lib/parse-parameters.ts';
+import type { PointParamDef, XYRegion } from '../../lib/editor/parameters.ts';
 import {
   canvasJumpThread,
   canvasNeedlePoint,
@@ -23,7 +23,7 @@ import {
   goldHi,
 } from '../../theme.ts';
 import type { CanvasOverlay, RenderTransform, Viewport } from './types.ts';
-import { colorDist, defaultSlotColor } from '../../lib/colormath.ts';
+import { colorDist, defaultSlotColor } from '../../lib/core/colormath.ts';
 
 // ── rendering ────────────────────────────────────────────────────────────────
 

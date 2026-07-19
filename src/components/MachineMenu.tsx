@@ -24,7 +24,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.tsx';
-import { cn } from '@/lib/utils.ts';
+import { cn } from '@/utils.ts';
 
 const MACHINE_CLASSES = ['home', 'multi-needle', 'commercial'] as const;
 

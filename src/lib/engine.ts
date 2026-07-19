@@ -6,19 +6,8 @@
 // Units: millimetres. Heading: degrees, 0 = up/north, clockwise.
 // ============================================================
 //
-// This file re-exports everything from the individual modules.
-// See the individual files for implementation details:
-//   types.ts        — shared types and interfaces
-//   errors.ts       — NeedlecriptError
-//   prng.ts         — makeRNG, makeNoise
-//   commands.ts     — ALIASES, BUILTIN_ARITY, QWORD_BUILTINS, FABRICS, FUNC_ARITY, ZERO_FUNCS, LIST_FUNCS, LIST_CMDS, RESERVED
-//   suggestions.ts  — suggest
-//   tokenizer.ts    — tokenize
-//   parser.ts       — parse
-//   list.ts         — NsList and the list value helpers (RFC-2)
-//   machine.ts      — LIMITS, Machine (internal stitch machine + fill engine)
-//   postprocess.ts  — applyLocks, applyAutoTrim, densityMap, designStats
-//   interpreter.ts  — run
+// This stable public barrel re-exports the platform-neutral modules grouped by
+// responsibility under core/, language/, geometry/, embroidery/, runtime/, and formats/.
 
 export type {
   TokenType,
@@ -62,9 +51,9 @@ export type {
   ResolvedDirectionalCompensation,
   DirectionalCompensationSample,
   DirectionalCompensationPreview,
-} from './types.ts';
-export { buildPreflightResult, PREFLIGHT_MODES } from './preflight.ts';
-export type { PreflightInput } from './preflight.ts';
+} from './core/types.ts';
+export { buildPreflightResult, PREFLIGHT_MODES } from './embroidery/preflight.ts';
+export type { PreflightInput } from './embroidery/preflight.ts';
 export {
   applyMachineCalibration,
   enforceMaximumMovement,
@@ -72,12 +61,12 @@ export {
   machineCalibrationMatrix,
   MACHINE_PROFILE_LIMITS,
   resolveMachineProfile,
-} from './machine-profile.ts';
+} from './embroidery/machine-profile.ts';
 export {
   analyzeEventStreamPreflight,
   EVENT_STREAM_PREFLIGHT_THRESHOLDS,
-} from './preflight-event-stream.ts';
-export { CONSTRUCTION_PREFLIGHT_THRESHOLDS } from './preflight-construction.ts';
+} from './embroidery/preflight-event-stream.ts';
+export { CONSTRUCTION_PREFLIGHT_THRESHOLDS } from './embroidery/preflight-construction.ts';
 export {
   COLOR_NAMES,
   DEFAULT_PALETTE,
@@ -91,9 +80,9 @@ export {
   unoklab,
   lerpColor,
   colorDist,
-} from './colormath.ts';
-export { NeedlescriptError } from './errors.ts';
-export { makeRNG, makeNoise, fork, gauss } from './prng.ts';
+} from './core/colormath.ts';
+export { NeedlescriptError } from './core/errors.ts';
+export { makeRNG, makeNoise, fork, gauss } from './core/prng.ts';
 export {
   ALIASES,
   BUILTIN_ARITY,
@@ -111,7 +100,7 @@ export {
   STRING_FUNCS,
   LIBRARY_FUNCS,
   RESERVED,
-} from './commands.ts';
+} from './language/commands.ts';
 export {
   DEFAULT_MATERIAL_INTENT,
   COMPENSATION_MODES,
@@ -128,7 +117,7 @@ export {
   THREAD_PROFILE_MODES,
   THREAD_PROFILES,
   TOPPING_PROFILES,
-} from './embroidery-registry.ts';
+} from './embroidery/embroidery-registry.ts';
 export type {
   CompensationMode,
   FabricMaterialDefaults,
@@ -142,21 +131,21 @@ export type {
   ThreadProfile,
   ThreadProfileMode,
   ToppingMode,
-} from './embroidery-registry.ts';
+} from './embroidery/embroidery-registry.ts';
 export {
   compensateOpenPathEnds,
   compensationForHeading,
   compensationTensor,
   directionalCompensationPreview,
   resolveDirectionalCompensation,
-} from './directional-compensation.ts';
-export { suggest } from './suggestions.ts';
-export { tokenize } from './tokenizer.ts';
-export { parse } from './parser/index.ts';
-export { linkStandardModules } from './module-linker.ts';
-export { NsList, isList, isString } from './list.ts';
-export type { Val } from './list.ts';
-export type { Pt } from './genmath.ts';
+} from './embroidery/directional-compensation.ts';
+export { suggest } from './core/suggestions.ts';
+export { tokenize } from './language/tokenizer.ts';
+export { parse } from './language/parser/index.ts';
+export { linkStandardModules } from './language/module-linker.ts';
+export { NsList, isList, isString } from './runtime/list.ts';
+export type { Val } from './runtime/list.ts';
+export type { Pt } from './geometry/genmath.ts';
 export {
   DEFAULT_SATIN_SHARP_TURN_DEG,
   DEFAULT_SATIN_UNSAFE_WIDTH_RATIO,
@@ -165,7 +154,7 @@ export {
   analyzeRailPairColumn,
   legacySpineWidthIssue,
   legacyRailWidthIssue,
-} from './column-analysis.ts';
+} from './geometry/column-analysis.ts';
 export type {
   ColumnSource,
   ColumnPointKind,
@@ -176,14 +165,14 @@ export type {
   AnalyzedColumnSample,
   AnalyzedColumnSegment,
   AnalyzedColumn,
-} from './column-analysis.ts';
+} from './geometry/column-analysis.ts';
 export {
   FILL_CONSTRUCTION_RANGES,
   FILL_STAGGER_MODES,
   FILL_CONSTRUCTION_MODE_REGISTRIES,
   fillStaggerOffset,
-} from './fill-profile.ts';
-export type { FillStaggerMode } from './fill-profile.ts';
+} from './embroidery/fill-profile.ts';
+export type { FillStaggerMode } from './embroidery/fill-profile.ts';
 export {
   SATIN_CAP_MODES,
   SATIN_JOIN_MODES,
@@ -196,13 +185,13 @@ export {
   satinCapUnderlayInset,
   satinSplitCount,
   satinSplitSeamFraction,
-} from './satin-profile.ts';
+} from './embroidery/satin-profile.ts';
 export type {
   SatinCapMode,
   SatinCapPolicy,
   SatinJoinMode,
   SatinWideMode,
-} from './satin-profile.ts';
+} from './embroidery/satin-profile.ts';
 export {
   SATIN_UNDERLAY_RANGES,
   SATIN_UNDERLAY_PASS_KINDS,
@@ -221,7 +210,7 @@ export {
   lowerFabricUnderlay,
   validateSatinUnderlayProfile,
   validateFillUnderlayProfile,
-} from './underlay-profile.ts';
+} from './embroidery/underlay-profile.ts';
 export type {
   NumericRange,
   SatinUnderlayPassKind,
@@ -252,9 +241,14 @@ export type {
   CustomResolvedFillUnderlayProfile,
   ResolvedFillUnderlayProfile,
   ProfileValidationIssue,
-} from './underlay-profile.ts';
-export { LIMITS, STOCK_LIMITS, OVERRIDE_CEILINGS, OVERRIDE_FLOORS } from './machine.ts';
-export type { BudgetKey } from './machine.ts';
+} from './embroidery/underlay-profile.ts';
+export {
+  LIMITS,
+  STOCK_LIMITS,
+  OVERRIDE_CEILINGS,
+  OVERRIDE_FLOORS,
+} from './embroidery/machine/index.ts';
+export type { BudgetKey } from './embroidery/machine/index.ts';
 export {
   DEFAULT_HOOP_INFO,
   HOOP_PRESET_NAMES,
@@ -266,9 +260,15 @@ export {
   inHoopOuter,
   fieldDescription,
   hoopDescription,
-} from './hoop-presets.ts';
-export { applyLocks, applyAutoTrim, densityMap, designStats, DensityGrid } from './postprocess.ts';
-export { applyTravelPlan, PLAN_MODES, PLAN_STRATEGIES } from './travel-planner.ts';
+} from './embroidery/hoop-presets.ts';
+export {
+  applyLocks,
+  applyAutoTrim,
+  densityMap,
+  designStats,
+  DensityGrid,
+} from './embroidery/postprocess.ts';
+export { applyTravelPlan, PLAN_MODES, PLAN_STRATEGIES } from './embroidery/travel-planner.ts';
 export type {
   PlanAtomicSpan,
   PlanMode,
@@ -276,8 +276,8 @@ export type {
   PlanStrategy,
   TravelPlanGroupResult,
   TravelPlanResult,
-} from './travel-planner.ts';
-export { routeItems, ROUTE_ALGORITHMS, ROUTESORT_MODES } from './routing.ts';
+} from './embroidery/travel-planner.ts';
+export { routeItems, ROUTE_ALGORITHMS, ROUTESORT_MODES } from './embroidery/routing.ts';
 export type {
   RouteAlgorithm,
   RouteItem,
@@ -285,13 +285,13 @@ export type {
   RoutePoint,
   RoutedItem,
   RouteSortMode,
-} from './routing.ts';
-export { run } from './interpreter.ts';
-export { PES_CATALOG } from './pes.ts';
-export { toSVG } from './svg.ts';
-export { toDST } from './dst.ts';
-export { toPES } from './pes.ts';
-export { toEXP } from './exp.ts';
+} from './embroidery/routing.ts';
+export { run } from './runtime/index.ts';
+export { PES_CATALOG } from './formats/pes.ts';
+export { toSVG } from './formats/svg.ts';
+export { toDST } from './formats/dst.ts';
+export { toPES } from './formats/pes.ts';
+export { toEXP } from './formats/exp.ts';
 export {
   BITMAP_HELPERS,
   EST_STITCHES_PER_MM2,
@@ -299,7 +299,7 @@ export {
   emitBitmapCode,
   processBitmap,
   uniqueBitmapPrefix,
-} from './bitmap-importer.ts';
+} from './formats/bitmap.ts';
 export type {
   BitmapCrop,
   BitmapPixels,
@@ -307,7 +307,7 @@ export type {
   BitmapSettings,
   EmitBitmapOptions,
   ProcessedBitmap,
-} from './bitmap-importer.ts';
+} from './formats/bitmap.ts';
 
 // SVG-import staging (pure modules; the DOM adapter lives in src/svg-import/).
 export type {
@@ -331,7 +331,7 @@ export type {
   SewOrderKey,
   BBox,
   ImportField,
-} from './svg/model.ts';
+} from './formats/svg-import/model.ts';
 export {
   defaultStrategy,
   bboxOf,
@@ -339,7 +339,7 @@ export {
   geometryOutsideField,
   pointInField,
   SEWABLE_RADIUS,
-} from './svg/model.ts';
+} from './formats/svg-import/model.ts';
 export {
   computeHoleMap,
   netFillArea,
@@ -350,7 +350,7 @@ export {
   pointInPolygon,
   isClosedRing,
   normalizedFillGroups,
-} from './svg/geometry.ts';
+} from './formats/svg-import/geometry.ts';
 export {
   STRATEGIES,
   STRATEGY_ORDER,
@@ -361,8 +361,13 @@ export {
   autoSuggest,
   type ParamControl,
   type StrategyDef,
-} from './svg/strategies.ts';
-export { emit, resampleRing, type EmitResult, type EmitOptions } from './svg/emit.ts';
+} from './formats/svg-import/strategies.ts';
+export {
+  emit,
+  resampleRing,
+  type EmitResult,
+  type EmitOptions,
+} from './formats/svg-import/emit.ts';
 export {
   emitAppend,
   inventoryProgram,
@@ -370,12 +375,17 @@ export {
   type AppendEmitResult,
   type ProgramImport,
   type ProgramInventory,
-} from './svg/merge.ts';
-export { orderOperations } from './svg/ordering.ts';
+} from './formats/svg-import/merge.ts';
+export { orderOperations } from './formats/svg-import/ordering.ts';
 export {
   canCreateMotifAlong,
   canCreateRailPair,
   createMotifAlong,
   createRailPair,
-} from './svg/relationships.ts';
-export { parseColorStr, nearestThread, threadForColor, buildThreadMap } from './svg/thread-map.ts';
+} from './formats/svg-import/relationships.ts';
+export {
+  parseColorStr,
+  nearestThread,
+  threadForColor,
+  buildThreadMap,
+} from './formats/svg-import/thread-map.ts';

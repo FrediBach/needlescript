@@ -4,19 +4,19 @@ import {
   EMBROIDERY_MODE_REGISTRIES,
   FILL_UNDERLAY_MODES,
   SATIN_UNDERLAY_MODES,
-} from '../embroidery-registry.ts';
-import { resolveMode, unknownModeMessage } from '../mode-registry.ts';
+} from '../embroidery/embroidery-registry.ts';
+import { resolveMode, unknownModeMessage } from '../core/mode-registry.ts';
 import {
   FILL_CONNECT_MODES,
   FILL_CONSTRUCTION_MODE_REGISTRIES,
   FILL_STAGGER_MODES,
-} from '../fill-profile.ts';
+} from '../embroidery/fill-profile.ts';
 import {
   SATIN_CAP_MODES,
   SATIN_CONSTRUCTION_MODE_REGISTRIES,
   SATIN_JOIN_MODES,
   SATIN_WIDE_MODES,
-} from '../satin-profile.ts';
+} from '../embroidery/satin-profile.ts';
 
 describe('shared mode registries', () => {
   it('resolves case-insensitively and retains the registry literal type', () => {

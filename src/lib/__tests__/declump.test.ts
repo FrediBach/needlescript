@@ -14,8 +14,11 @@
 import { describe, it, expect } from 'vitest';
 import { run } from '../engine.ts';
 import type { StitchEvent } from '../engine.ts';
-import { pointInsideCompoundRegion, segmentInsideCompoundRegion } from '../machine/fill.ts';
-import { FILL_DECLUMP_EDGE_MARGIN_MM } from '../fill-profile.ts';
+import {
+  pointInsideCompoundRegion,
+  segmentInsideCompoundRegion,
+} from '../embroidery/machine/fill.ts';
+import { FILL_DECLUMP_EDGE_MARGIN_MM } from '../embroidery/fill-profile.ts';
 
 const ev = (s: string) => run(s).events;
 const warnings = (s: string) => run(s).warnings;

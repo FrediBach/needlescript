@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mScale } from '../affine.ts';
-import { run } from '../interpreter.ts';
-import { Machine } from '../machine.ts';
+import { mScale } from '../geometry/affine.ts';
+import { run } from '../runtime/index.ts';
+import { Machine } from '../embroidery/machine/index.ts';
 import {
   generateFill,
   segmentInsideCompoundRegion,
   type GeneratedFillConnector,
-} from '../machine/fill.ts';
+} from '../embroidery/machine/fill.ts';
 
 const outer: [number, number][] = [
   [0, 0],

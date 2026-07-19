@@ -4,8 +4,8 @@ NeedleScript is a Logo-inspired language for generative embroidery. This documen
 describes the **stitch machine** — the component that turns turtle movements and
 embroidery directives into a concrete stream of stitch events. It is the side-effect
 target the interpreter drives (see `needlescript-interpreter-architecture.md`) and the
-source of the `StitchEvent[]` that the file exporters (`svg.ts`, `dst.ts`, `pes.ts`,
-`exp.ts`) consume.
+source of the `StitchEvent[]` that the file exporters (`formats/svg.ts`, `formats/dst.ts`,
+`formats/pes.ts`, `formats/exp.ts`) consume.
 
 Like the rest of `src/lib/`, the machine is platform-neutral: no DOM APIs, no UI. It is
 part of the publishable core.
@@ -36,10 +36,10 @@ physics and event accumulation_.
 
 ---
 
-## 2. Module layout (`machine/`)
+## 2. Module layout (`embroidery/machine/`)
 
 ```
-machine/
+embroidery/machine/
 ├── index.ts    barrel: re-exports LIMITS, STOCK_LIMITS, OVERRIDE_*, BudgetKey, Machine
 ├── limits.ts   engine limits + overridable per-run budgets
 ├── machine.ts  public Machine facade: color/trim commands over the subsystem hierarchy
@@ -49,40 +49,39 @@ machine/
 └── fill.ts     the standalone tatami scanline fill generator
 ```
 
-`machine.ts` (the file at `src/lib/machine.ts`) is a thin shim re-exporting from
-`machine/index.ts`, kept so existing import paths work unchanged
-(`machine.ts:1-10`).
+`embroidery/machine/index.ts` is the internal barrel for the machine subsystem. The stable
+package surface in `engine.ts` re-exports its limits and types without exposing the source layout.
 
 Tightly-coupled collaborators live one level up:
 
-- `affine.ts` — the 2×3 matrix math shared by the transform stack.
-- `underlay-profile.ts` — ordered satin/fill underlay pass types, centralized numeric ranges, pure
+- `geometry/affine.ts` — the 2×3 matrix math shared by the transform stack.
+- `embroidery/underlay-profile.ts` — ordered satin/fill underlay pass types, centralized numeric ranges, pure
   validation, and context-aware lowering of legacy modes and `fabric` presets.
-- `embroidery-registry.ts` — compatible legacy fabric construction settings plus typed fabric,
+- `embroidery/embroidery-registry.ts` — compatible legacy fabric construction settings plus typed fabric,
   thread, needle, stabilizer, and topping profiles/defaults.
-- `directional-compensation.ts` — pure grain-aligned compensation tensors, heading projections,
+- `embroidery/directional-compensation.ts` — pure grain-aligned compensation tensors, heading projections,
   open-path endpoint extension, material resolution, and preview diagnostics shared by opt-in
   satin/fill construction.
-- `fill-profile.ts` — fill inset/edge/stagger ranges, connector/stagger mode registries, internal
+- `embroidery/fill-profile.ts` — fill inset/edge/stagger ranges, connector/stagger mode registries, internal
   connector classification types, and pure drawless row-phase calculation including geometry
   hashing.
-- `satin-profile.ts` — cap/join/wide modes, physical ranges, cap helpers, and pure split-count/seam
+- `embroidery/satin-profile.ts` — cap/join/wide modes, physical ranges, cap helpers, and pure split-count/seam
   helpers.
-- `column-analysis.ts` — pure hoop-space spine/rail analysis for satin tips, tangents, curvature,
+- `geometry/column-analysis.ts` — pure hoop-space spine/rail analysis for satin tips, tangents, curvature,
   realized widths, corners, tapers, unsafe width/radius ratios, and emission-free segmentation.
-- `rail-pair.ts` — pure rail orientation, seam/checkpoint projection, arc-length pairing, and derived-spine interpolation shared by `satinbetween` and `railspine`.
-- `postprocess.ts` — `DensityGrid` (the live coverage index the machine feeds), plus
+- `geometry/rail-pair.ts` — pure rail orientation, seam/checkpoint projection, arc-length pairing, and derived-spine interpolation shared by `satinbetween` and `railspine`.
+- `embroidery/postprocess.ts` — `DensityGrid` (the live coverage index the machine feeds), plus
   the post-run `applyLocks`, `applyAutoTrim`, and `designStats` passes.
-- `routing.ts` / `travel-planner.ts` — shared route algorithms and the optional
+- `embroidery/routing.ts` / `embroidery/travel-planner.ts` — shared route algorithms and the optional
   event-level planner. They consume completed events and never mutate machine state.
-- `effects.ts`, `declump.ts`, `genmath.ts`, `hoop-presets.ts` — effect maps, declump
+- `embroidery/effects.ts`, `embroidery/declump.ts`, `geometry/genmath.ts`, `embroidery/hoop-presets.ts` — effect maps, declump
   state, geometry helpers, and hoop field definitions.
 
 ---
 
 ## 3. Output model: `StitchEvent`
 
-The machine's product is `events: StitchEvent[]` (`types.ts:20-28`):
+The machine's product is `events: StitchEvent[]` (`core/types.ts:20-28`):
 
 ```ts
 interface StitchEvent {
@@ -131,7 +130,7 @@ The public `Machine` class is a small facade over `FillMachine`, `SatinMachine`,
 | Trace           | `traceRecording`, `traceRuns`, `noEmit`                                                                                                                                                        | see §11                                                                |
 
 `effectiveLimits` starts as a mutable copy of `STOCK_LIMITS`
-(`machine/machine-core.ts`) so `override` can raise/lower budgets per run without
+(`embroidery/machine/machine-core.ts`) so `override` can raise/lower budgets per run without
 touching the shared constants.
 
 ### 4.1 Construction configuration snapshots
@@ -176,7 +175,7 @@ error raised while flushing an inner buffered reporter cannot strand its configu
 
 ### 4.2 Directional compensation preview
 
-`directional-compensation.ts` models compensation as a signed symmetric tensor in physical hoop
+`embroidery/directional-compensation.ts` models compensation as a signed symmetric tensor in physical hoop
 space. For grain heading `g`, its principal axes are the turtle-heading unit vectors at `g` and
 `g + 90°`. If their signed recommendations are `a` and `c`, the tensor is
 `T = R(g) diag(a, c) R(g)ᵀ`. `compensationForHeading` projects `T` onto any construction heading and
@@ -210,7 +209,7 @@ construction-specific rail widening, never a generic affine scale.
 
 ## 5. The stitching pipeline: `travel()`
 
-Almost all sewing funnels through `travel(nx, ny)` (`machine/machine-core.ts`), reached
+Almost all sewing funnels through `travel(nx, ny)` (`embroidery/machine/machine-core.ts`), reached
 via `setXY` (`643`), `forward` (`655`), and `arc` (`667`). `arc` decomposes a curve into
 half-turn / chord / half-turn steps so every stitch mode works on curves. `travel`
 dispatches, in order:
@@ -274,12 +273,12 @@ The machine maintains three separate stacks, all block-scoped by the interpreter
   (`pushDeclump`/`popDeclump`, `290-295`). Fill generation uses the same fold at commit time with
   additional compound-region and monotonic-order candidate guards.
 
-The affine math lives in `affine.ts`: `Mat` is a 2×3 matrix `[a,b,c,d,e,f]`; `compose`
+The affine math lives in `geometry/affine.ts`: `Mat` is a 2×3 matrix `[a,b,c,d,e,f]`; `compose`
 composes inside-out (OpenSCAD reading); `apply`/`linApply` map points/directions; and
 constructors (`mTranslate`, `mRotate`, `mScale`, `mMirror`, `mSkew`, `mRaw`) use turtle
 conventions. Because the transform _block commands_ and the pure _path functions_
 (`xlate`/`xrotate`/…) call the same matrices, a transform block and its `x*` companion
-produce bit-identical geometry — a property the test suite pins (`affine.ts:1-12`).
+produce bit-identical geometry — a property the test suite pins (`geometry/affine.ts:1-12`).
 
 The satin buffer and fill also snapshot the stack at the moment they begin
 (`satinCTM`/`satinLayers`, `fillCTM`/`fillLayers`) so a buffered column or region is
@@ -289,7 +288,7 @@ always mapped under one consistent transform, even if the block ends before the 
 
 ## 7. Satin columns and fills
 
-### 7.1 Satin (`flushSatin`, `machine/machine-satin.ts`)
+### 7.1 Satin (`flushSatin`, `embroidery/machine/machine-satin.ts`)
 
 A satin column is buffered as a local-space centerline while in satin mode, then sewn
 when the column ends (a pen move up, mode change, transform boundary, color change, or
@@ -390,7 +389,7 @@ perturbing a precise rail wrecks the column — with a one-time warning.
 
 `sewSatinBetween` is the immediate rail-pair sibling. It flushes a buffered spine column without changing the sticky mode, maps both rails and checkpoints through the active output stack first, then pairs them in physical hoop space. Its realized endpoints reuse satin underlay, pull compensation, short-stitch relief, tip merging, snag/ceiling checks, density accounting, and effect-skip conventions; history is committed before the call returns. Orientation, closed seams, checkpoints, and crossing diagnostics are deterministic and drawless.
 
-Before cap/join/wide policies select a construction, `column-analysis.ts` can lower either an
+Before cap/join/wide policies select a construction, `geometry/column-analysis.ts` can lower either an
 already mapped spine plus realized widths or the oriented samples from `prepareRailPair` into the
 same `AnalyzedColumn`. Cumulative arc length and all radii/widths are physical hoop millimetres.
 Samples retain incoming/outgoing and bisector tangents, signed curvature and turn, corner angle,
@@ -403,7 +402,7 @@ Cap policies consume physical length, endpoint/tip classification, and realized 
 policies consume sharp samples, tangents, arc positions, and realized widths; wide-column splitting
 uses the closed/sharp/cusp/unsafe classifications plus the same hoop-space rungs.
 
-### 7.2 Fills (`beginFill`/`endFill`, `machine/machine-fill.ts`)
+### 7.2 Fills (`beginFill`/`endFill`, `embroidery/machine/machine-fill.ts`)
 
 `beginFill` enters recording mode; `travel` then records the boundary rings.
 `endFill` closes the rings and generates stitches. Two engines exist:
@@ -526,7 +525,7 @@ the programmable generator so the per-row length function is honored (`2448`).
 ## 8. Coverage tracking (`DensityGrid`)
 
 The machine feeds every committed penetration to a live `DensityGrid`
-(`postprocess.ts`) in sewing order, via `_push`. The grid maintains:
+(`embroidery/postprocess.ts`) in sewing order, via `_push`. The grid maintains:
 
 - a 1 mm **cell grid** accumulating penetration counts and thread _length_ per cell
   (coverage in "layers" = length × thread width / cell area), with per-cell source-line
@@ -558,7 +557,7 @@ cell value and hotspot decision.
 
 ## 9. Hoop field and overflow
 
-The `hoop` directive sets `hoopInfo` (from `hoop-presets.ts`) defining the physical hoop
+The `hoop` directive sets `hoopInfo` (from `embroidery/hoop-presets.ts`) defining the physical hoop
 and the inset **sewable field**. During emission, `_push` checks each stitch against the
 field (`inHoopField`) and the physical hoop (`inHoopOuter`), collecting the first 50
 `fieldOverflows` classified `'field'` (outside sewable inset) or `'hoop'` (physically
@@ -573,7 +572,7 @@ field.
 
 ## 10. Budgets and limits (`limits.ts`)
 
-Two tables (`machine/limits.ts`):
+Two tables (`embroidery/machine/limits.ts`):
 
 - **`LIMITS`** — physics/format constants: `minStitch` (0.4 mm), `maxStitch` (12 mm),
   `maxListDepth`, `maxTraceVertices`, the sewable radius, etc. These are not overridable
@@ -623,12 +622,12 @@ list of `[x, y]` points (or a list of paths for `tracerings`).
 
 ---
 
-## 13. Post-run passes (`postprocess.ts`)
+## 13. Post-run passes (`embroidery/postprocess.ts`)
 
 After execution the interpreter runs the machine's `events` through pure passes in
-`postprocess.ts`:
+`embroidery/postprocess.ts`:
 
-- **`applyTravelPlan`** (`travel-planner.ts`) — partition color blocks into thread
+- **`applyTravelPlan`** (`embroidery/travel-planner.ts`) — partition color blocks into thread
   runs, split them into independent `planbarrier` segments, merge every tagged `atomic` span into one
   forward-only route item, and reorder private planner event
   wrappers through the generic strategy registry. The
@@ -652,9 +651,9 @@ After execution the interpreter runs the machine's `events` through pure passes 
 
 The interpreter orders these deliberately: planning runs before autotrim, density is
 analysed _before_ locks (so tie-offs don't read as hotspots), then locks are applied. The results populate the final
-`RunResult` (`types.ts:76-89`), which the exporters consume.
+`RunResult` (`core/types.ts:76-89`), which the exporters consume.
 
-When `RunOptions.machineProfile` supplies a non-identity correction, `machine-profile.ts` inserts a
+When `RunOptions.machineProfile` supplies a non-identity correction, `embroidery/machine-profile.ts` inserts a
 pure boundary between authored generation and final planning. It maps the completed event stream by
 the bounded affine `(scaleX, scaleY, skewX, skewY, offsetXMM, offsetYMM)`, maps construction regions,
 satin envelopes, connector endpoints, and diagnostic points through the same matrix, then remaps
@@ -668,7 +667,7 @@ recomputed from those events. Therefore corrected coordinates alone decide final
 identity correction the extra mapping/rebuild is bypassed and legacy event/warning/export bytes stay
 unchanged.
 
-After physical diagnostics are complete, `preflight.ts` purely adapts their internal
+After physical diagnostics are complete, `embroidery/preflight.ts` purely adapts their internal
 `WarningLocation` sidecars into `RunResult.preflight`. Stable codes currently cover density,
 same-hole penetration stacks, merged tiny movements, sewable-field and physical-hoop overflow, and
 satin snag risk. Realized rail-pair and programmable-satin snag sidecars retain the measured chord
@@ -681,7 +680,7 @@ manual operations are info-level worksheet reminders, unsupported operations are
 changes the event stream. The resolved speed class remains advisory metadata pending sew-out-backed
 thresholds.
 
-`preflight 'warn'` and `'strict'` additionally run `preflight-event-stream.ts` over the final
+`preflight 'warn'` and `'strict'` additionally run `embroidery/preflight-event-stream.ts` over the final
 planned/autotrimmed stream captured immediately before locks. Its bounded, fixed-order checks cover
 short-stitch runs, local reversals, moving-window
 near-hole penetrations, long sewn spans, untrimmed jump chains, profile-limited continuous stitch
@@ -693,7 +692,7 @@ Each check yields at most three issues with at most sixteen points. These are co
 engineering defaults and deliberately have no fabric/thread multiplier pending physical sew-out
 evidence; resolved thread width already influences the separate coverage metric.
 
-`construction-metadata.ts` is the internal identity layer for construction-aware analysis. Every
+`embroidery/construction-metadata.ts` is the internal identity layer for construction-aware analysis. Every
 generated fill and satin receives one globally unique ID plus its resolved hoop-space compound
 region or paired-rail topping envelope. Event object identities are tagged as underlay, edge run,
 topping, or travel; split satin also tags its lane, and fills retain their connector sidecars. These
@@ -701,7 +700,7 @@ objects remain private machine state and are never copied into `StitchEvent` or 
 planner reorders the same event objects, so finalization can compare planned positions with authored
 layer identities without guessing from stitch shape.
 
-`preflight-construction.ts` consumes only those explicit records. In fixed order it checks underlay
+`embroidery/preflight-construction.ts` consumes only those explicit records. In fixed order it checks underlay
 containment; 0.4–1.25 mm fill/border overlap; edge-run/satin stacking; cross-lane split hotspots of
 four penetrations within 0.3 mm; sewn connector containment; and underlay-before-topping order after
 planning. A satin border is associated only when its center samples lie within 0.75 mm of the
@@ -737,31 +736,30 @@ No preflight mode rewrites, reorders, inserts, or removes an event.
 
 ## 15. File reference
 
-| File                        | Responsibility                                                         |
-| --------------------------- | ---------------------------------------------------------------------- |
-| `machine.ts`                | re-export shim → `machine/index.ts`                                    |
-| `machine/index.ts`          | barrel: `LIMITS`, `STOCK_LIMITS`, `OVERRIDE_*`, `BudgetKey`, `Machine` |
-| `machine/limits.ts`         | physics constants + overridable per-run budgets                        |
-| `machine-profile.ts`        | local profile validation, affine correction, sidecar mapping, re-split |
-| `machine/machine.ts`        | public `Machine` facade and color/trim commands                        |
-| `machine/machine-core.ts`   | shared state, turtle motion, stacks, emission, trace, and `travel`     |
-| `machine/machine-satin.ts`  | satin columns and buffered running stitches                            |
-| `machine/machine-fill.ts`   | fill recording plus built-in and programmable fill generation          |
-| `machine/fill.ts`           | standalone tatami scanline fill generator                              |
-| `affine.ts`                 | 2×3 affine matrix math shared by the transform stack                   |
-| `satin-profile.ts`          | satin cap mode registry, ranges, and pure profile helpers              |
-| `rail-pair.ts`              | shared rail orientation, checkpoints, pairing, and derived spine       |
-| `postprocess.ts`            | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`         |
-| `preflight.ts`              | pure structured-issue adapter and resolved diagnostic profile          |
-| `preflight-event-stream.ts` | bounded pure checks over completed pre-lock events                     |
-| `construction-metadata.ts`  | internal fill/satin IDs, boundaries, layers, lanes, and connectors     |
-| `preflight-construction.ts` | pure checks over explicit construction records and final event order   |
-| `routing.ts`                | generic deterministic route algorithms and endpoint model              |
-| `travel-planner.ts`         | thread-run partitioning, plan modes, and connector reconstruction      |
-| `effects.ts`, `declump.ts`  | after-split effect maps and declump fold state                         |
-| `hoop-presets.ts`           | hoop presets and sewable-field geometry                                |
-| `embroidery-registry.ts`    | material profiles plus the compatible `FABRICS` construction view      |
-| `types.ts`                  | `StitchEvent`, `HoopInfo`, `RunResult`, `DesignStats`, density types   |
+| File                                             | Responsibility                                                         |
+| ------------------------------------------------ | ---------------------------------------------------------------------- |
+| `embroidery/machine/index.ts`                    | barrel: `LIMITS`, `STOCK_LIMITS`, `OVERRIDE_*`, `BudgetKey`, `Machine` |
+| `embroidery/machine/limits.ts`                   | physics constants + overridable per-run budgets                        |
+| `embroidery/machine-profile.ts`                  | local profile validation, affine correction, sidecar mapping, re-split |
+| `embroidery/machine/machine.ts`                  | public `Machine` facade and color/trim commands                        |
+| `embroidery/machine/machine-core.ts`             | shared state, turtle motion, stacks, emission, trace, and `travel`     |
+| `embroidery/machine/machine-satin.ts`            | satin columns and buffered running stitches                            |
+| `embroidery/machine/machine-fill.ts`             | fill recording plus built-in and programmable fill generation          |
+| `embroidery/machine/fill.ts`                     | standalone tatami scanline fill generator                              |
+| `geometry/affine.ts`                             | 2×3 affine matrix math shared by the transform stack                   |
+| `embroidery/satin-profile.ts`                    | satin cap mode registry, ranges, and pure profile helpers              |
+| `geometry/rail-pair.ts`                          | shared rail orientation, checkpoints, pairing, and derived spine       |
+| `embroidery/postprocess.ts`                      | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`         |
+| `embroidery/preflight.ts`                        | pure structured-issue adapter and resolved diagnostic profile          |
+| `embroidery/preflight-event-stream.ts`           | bounded pure checks over completed pre-lock events                     |
+| `embroidery/construction-metadata.ts`            | internal fill/satin IDs, boundaries, layers, lanes, and connectors     |
+| `embroidery/preflight-construction.ts`           | pure checks over explicit construction records and final event order   |
+| `embroidery/routing.ts`                          | generic deterministic route algorithms and endpoint model              |
+| `embroidery/travel-planner.ts`                   | thread-run partitioning, plan modes, and connector reconstruction      |
+| `embroidery/effects.ts`, `embroidery/declump.ts` | after-split effect maps and declump fold state                         |
+| `embroidery/hoop-presets.ts`                     | hoop presets and sewable-field geometry                                |
+| `embroidery/embroidery-registry.ts`              | material profiles plus the compatible `FABRICS` construction view      |
+| `core/types.ts`                                  | `StitchEvent`, `HoopInfo`, `RunResult`, `DesignStats`, density types   |
 
 Machine behavior is exercised by tests in `src/lib/__tests__/` — notably
 `engine.test.ts`, `satin-shape.test.ts`, `fill-shape.test.ts`, `transforms.test.ts`,

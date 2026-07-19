@@ -2,10 +2,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { run, makeRNG, LIMITS } from '../engine.ts';
-import { scatter, voronoiCells, triangulate, hull, relax } from '../generators.ts';
-import type { Domain } from '../generators.ts';
-import { signedArea, pointInRegion, vdist } from '../genmath.ts';
-import type { Pt } from '../genmath.ts';
+import { scatter, voronoiCells, triangulate, hull, relax } from '../geometry/generators.ts';
+import type { Domain } from '../geometry/generators.ts';
+import { signedArea, pointInRegion, vdist } from '../geometry/genmath.ts';
+import type { Pt } from '../geometry/genmath.ts';
 
 const disc: Domain = { kind: 'disc', r: LIMITS.sewableRadius };
 const square = (s: number): Pt[] => [

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { run } from '../engine.ts';
-import type { StitchEvent } from '../types.ts';
+import type { StitchEvent } from '../core/types.ts';
 
 const straight = (settings = '') =>
   run(`lock 0 underlay 'off' density 0.5 satin 4 ${settings} fd 12 satin 0`);

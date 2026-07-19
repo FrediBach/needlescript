@@ -5,9 +5,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { run } from '../engine.ts';
-import { offsetRegion, clipRegions } from '../geometry.ts';
-import { signedArea, pointInRegion } from '../genmath.ts';
-import type { Pt } from '../genmath.ts';
+import { offsetRegion, clipRegions } from '../geometry/geometry.ts';
+import { signedArea, pointInRegion } from '../geometry/genmath.ts';
+import type { Pt } from '../geometry/genmath.ts';
 
 const square = (s: number, cx = 0, cy = 0): Pt[] => [
   [cx - s, cy - s],

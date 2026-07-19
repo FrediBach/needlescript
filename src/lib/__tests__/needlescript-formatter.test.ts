@@ -3,8 +3,8 @@ import {
   formatNeedleScript,
   formatNeedleScriptSource,
   needleScriptPlugin,
-} from '../needlescript-formatter.ts';
-import { registerNeedlescriptFormattingProvider } from '../needlescript-monaco/formatting.ts';
+} from '../editor/formatter.ts';
+import { registerNeedlescriptFormattingProvider } from '../editor/monaco/formatting.ts';
 
 describe('NeedleScript Prettier formatter', () => {
   it('formats indentation, calls, commas, operators, and comments', async () => {

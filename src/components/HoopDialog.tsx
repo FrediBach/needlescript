@@ -3,7 +3,7 @@ import type { HoopConfig } from '../data.ts';
 import { HOOPS } from '../data.ts';
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog.tsx';
 import { buttonVariants } from '@/components/ui/button.tsx';
-import { cn } from '@/lib/utils.ts';
+import { cn } from '@/utils.ts';
 
 // Hoop shape icon — used in both the dialog and the header button
 export function HoopIcon({ hoop, size = 20 }: { hoop: HoopConfig; size?: number }) {

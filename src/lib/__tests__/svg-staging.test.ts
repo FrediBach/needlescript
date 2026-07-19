@@ -8,23 +8,32 @@ import {
   perimeterToAreaRatio,
   selfIntersects,
   normalizedFillGroups,
-} from '../svg/geometry.ts';
-import { STRATEGIES, eligibleStrategies, isClosedGeom, autoSuggest } from '../svg/strategies.ts';
-import { emit, resampleRing } from '../svg/emit.ts';
-import { emitAppend, inventoryProgram, mergeAppend } from '../svg/merge.ts';
-import { orderOperations } from '../svg/ordering.ts';
+} from '../formats/svg-import/geometry.ts';
+import {
+  STRATEGIES,
+  eligibleStrategies,
+  isClosedGeom,
+  autoSuggest,
+} from '../formats/svg-import/strategies.ts';
+import { emit, resampleRing } from '../formats/svg-import/emit.ts';
+import { emitAppend, inventoryProgram, mergeAppend } from '../formats/svg-import/merge.ts';
+import { orderOperations } from '../formats/svg-import/ordering.ts';
 import { parseSvgToModel } from '../../svg-import/parse-svg-dom.ts';
-import { pathToCurveSpecs } from '../svg/svg-path.ts';
-import { defaultStrategy, type StagedDocument, type ElementModel } from '../svg/model.ts';
-import { FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery-registry.ts';
-import { SATIN_CAP_MODES, SATIN_JOIN_MODES } from '../satin-profile.ts';
-import { run } from '../interpreter.ts';
+import { pathToCurveSpecs } from '../formats/svg-import/svg-path.ts';
+import {
+  defaultStrategy,
+  type StagedDocument,
+  type ElementModel,
+} from '../formats/svg-import/model.ts';
+import { FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery/embroidery-registry.ts';
+import { SATIN_CAP_MODES, SATIN_JOIN_MODES } from '../embroidery/satin-profile.ts';
+import { run } from '../runtime/index.ts';
 import {
   canCreateMotifAlong,
   canCreateRailPair,
   createMotifAlong,
   createRailPair,
-} from '../svg/relationships.ts';
+} from '../formats/svg-import/relationships.ts';
 import fillAndStrokeFixture from './fixtures/svg/fill-and-stroke.svg?raw';
 import compoundNonzeroFixture from './fixtures/svg/compound-nonzero.svg?raw';
 import nestedGroupsFixture from './fixtures/svg/nested-groups.svg?raw';

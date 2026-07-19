@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mTranslate } from '../affine.ts';
-import { Machine } from '../machine.ts';
+import { mTranslate } from '../geometry/affine.ts';
+import { Machine } from '../embroidery/machine/index.ts';
 
 describe('machine construction configuration snapshots', () => {
   it('restores the complete construction-state inventory', () => {

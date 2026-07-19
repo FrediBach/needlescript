@@ -1,7 +1,7 @@
 import * as Comlink from 'comlink';
 import { run, designStats, NeedlescriptError } from './lib/engine.ts';
-import type { MachineProfile, RunOptions } from './lib/types.ts';
-import type { RunTimings } from './lib/types.ts';
+import type { MachineProfile, RunOptions } from './lib/core/types.ts';
+import type { RunTimings } from './lib/core/types.ts';
 import type { CompileResponse } from './compiler.worker.types.ts';
 
 const compiler = {

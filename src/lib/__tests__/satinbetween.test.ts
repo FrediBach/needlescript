@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { run } from '../interpreter.ts';
+import { run } from '../runtime/index.ts';
 
 const events = (source: string) => run(`lock 0\n${source}`).events;
 

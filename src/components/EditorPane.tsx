@@ -11,16 +11,16 @@ import type {
   ReferenceDataVar,
   WarningLocation,
 } from '../lib/engine.ts';
-import type { ParamItem } from '../lib/parse-parameters.ts';
+import type { ParamItem } from '../lib/editor/parameters.ts';
 import type { AIModelInfo } from '../hooks/useAI.ts';
-import { registerNeedlescript, scheduleNeedlescriptProviders } from '../lib/needlescript-monaco.ts';
+import { registerNeedlescript, scheduleNeedlescriptProviders } from '../lib/editor/monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
 import {
   updateParameter,
   updatePointParameter,
   updatePaletteParameter,
   updateTextParameter,
-} from '../lib/parse-parameters.ts';
+} from '../lib/editor/parameters.ts';
 import type { ParamChange } from './ParametersPanel.tsx';
 import Splitter from './Splitter.tsx';
 import ParametersPanel from './ParametersPanel.tsx';

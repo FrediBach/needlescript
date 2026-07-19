@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { run, satinSplitCount, satinSplitSeamFraction } from '../engine.ts';
-import type { StitchEvent } from '../types.ts';
+import type { StitchEvent } from '../core/types.ts';
 
 const clean = (events: readonly StitchEvent[]) =>
   events.map(({ t, x, y, c, u }) => ({ t, x, y, c, u }));

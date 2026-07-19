@@ -1,4 +1,4 @@
-import type { StitchEvent } from '../../types.ts';
+import type { StitchEvent } from '../../core/types.ts';
 
 export interface PositionalEventOptions {
   tolerance?: number;

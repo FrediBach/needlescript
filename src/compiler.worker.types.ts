@@ -1,4 +1,4 @@
-import type { RunResult, DesignStats, MachineProfile, RunTimings } from './lib/types.ts';
+import type { RunResult, DesignStats, MachineProfile, RunTimings } from './lib/core/types.ts';
 
 interface CompileTimings extends RunTimings {
   statsMs: number;

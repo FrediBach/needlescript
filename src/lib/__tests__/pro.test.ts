@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { run, densityMap, applyAutoTrim, designStats, FABRICS, QWORD_BUILTINS } from '../engine.ts';
 import type { StitchEvent } from '../engine.ts';
-import { toDST } from '../dst.ts';
+import { toDST } from '../formats/dst.ts';
 import { EXAMPLES } from '../../data.ts';
 
 // ── helpers ────────────────────────────────────────────────────────────────

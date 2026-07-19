@@ -106,15 +106,15 @@ Import with options:
 
 ```text
 SVG text
-  -> src/lib/svg/parse.ts DOM walk
+  -> src/lib/formats/svg-import/parse.ts DOM walk
   -> StagedDocument / ElementModel
-  -> strategy selection in src/lib/svg/strategies.ts
-  -> src/lib/svg/emit.ts
+  -> strategy selection in src/lib/formats/svg-import/strategies.ts
+  -> src/lib/formats/svg-import/emit.ts
   -> compiler worker preview
   -> replace or append source
 ```
 
-The shared low-level SVG path and transform helpers live in `src/lib/svg/svg-path.ts`.
+The shared low-level SVG path and transform helpers live in `src/lib/formats/svg-import/svg-path.ts`.
 
 ### 4.2 Correctness and architecture issues to address first
 
@@ -211,7 +211,7 @@ implementation should disable commit.
 
 #### Duplicate importer pipelines will continue to drift
 
-`src/lib/svg-importer.ts` and `src/lib/svg/parse.ts` independently walk the DOM, resolve paint, and
+`src/lib/svg-importer.ts` and `src/lib/formats/svg-import/parse.ts` independently walk the DOM, resolve paint, and
 apply conversion policy.
 
 Required result: one parser and one model. Quick import is a preset consumer of that model.
@@ -368,7 +368,7 @@ src/svg-import/
   parse-svg-dom.ts              DOMParser adapter and SVG tree walk
   import-policy.ts              quick-import defaults
 
-src/lib/svg/
+src/lib/formats/svg-import/
   svg-path.ts                   existing pure path/transform helpers
   geometry.ts                   compound regions and metrics
   model.ts                      source geometry, operations, document model

@@ -10,8 +10,8 @@
 import { describe, it, expect } from 'vitest';
 import { run } from '../engine.ts';
 import type { StitchEvent } from '../engine.ts';
-import { apply, compose, mTranslate, mRotate, mRotateAbout, mMirror } from '../affine.ts';
-import type { Mat } from '../affine.ts';
+import { apply, compose, mTranslate, mRotate, mRotateAbout, mMirror } from '../geometry/affine.ts';
+import type { Mat } from '../geometry/affine.ts';
 
 const ev = (s: string) => run(s).events;
 const printed = (s: string) => run(s).printed;

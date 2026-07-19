@@ -7,7 +7,7 @@
  * prop surface: no drag-to-zoom, no warning overlay, no SVG staging overlays.
  */
 import { useMemo } from 'react';
-import type { StitchEvent, RunResult, DesignStats } from '../../lib/types.ts';
+import type { StitchEvent, RunResult, DesignStats } from '../../lib/core/types.ts';
 import type { DesignState, DebugMark } from '../../App.tsx';
 import StageCanvas from '../../components/StageCanvas.tsx';
 import { DEFAULT_HOOP } from '../../data.ts';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { run } from '../interpreter.ts';
+import { run } from '../runtime/index.ts';
 
 describe('standard-library modules', () => {
   it('imports an exported reporter under a local alias', () => {

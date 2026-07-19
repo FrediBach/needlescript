@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { run } from '../interpreter.ts';
+import { run } from '../runtime/index.ts';
 
 const printed = (source: string) => run(source).printed;
 

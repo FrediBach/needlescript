@@ -10,7 +10,7 @@
  *   </RunLocked>
  */
 import { useState, useCallback, useEffect, type ReactNode } from 'react';
-import type { RunResult, DesignStats } from '../../lib/types.ts';
+import type { RunResult, DesignStats } from '../../lib/core/types.ts';
 import { useCompiler } from '../../hooks/useCompiler.ts';
 import BookCanvas from './BookCanvas.tsx';
 import Run from './Run.tsx';

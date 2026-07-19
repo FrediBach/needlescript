@@ -8,7 +8,7 @@ import { Dialog, DialogClose, DialogContent } from '@/components/ui/dialog.tsx';
 import { Input } from '@/components/ui/input.tsx';
 import { ScrollArea } from '@/components/ui/scroll-area.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.tsx';
-import { cn } from '@/lib/utils.ts';
+import { cn } from '@/utils.ts';
 
 type TabId = 'reference' | 'glossary' | 'tutorial' | 'about';
 

@@ -5,8 +5,8 @@ import {
   emitBitmapCode,
   processBitmap,
   uniqueBitmapPrefix,
-} from '@/lib/bitmap-importer.ts';
-import type { BitmapPixels, BitmapSettings } from '@/lib/bitmap-importer.ts';
+} from '@/lib/formats/bitmap.ts';
+import type { BitmapPixels, BitmapSettings } from '@/lib/formats/bitmap.ts';
 import { THREADS } from '@/data.ts';
 import { Button } from '@/components/ui/button.tsx';
 import { Checkbox } from '@/components/ui/checkbox.tsx';
@@ -21,7 +21,7 @@ import {
 import { Label } from '@/components/ui/label.tsx';
 import { Slider } from '@/components/ui/slider.tsx';
 import { Switch } from '@/components/ui/switch.tsx';
-import { cn } from '@/lib/utils.ts';
+import { cn } from '@/utils.ts';
 
 export interface BitmapImportSource extends BitmapPixels {
   filename: string;

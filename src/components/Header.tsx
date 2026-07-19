@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/select.tsx';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip.tsx';
 import { MenuIcon, ChevronDownIcon, DownloadIcon, Share2Icon, UploadIcon } from 'lucide-react';
-import { cn } from '@/lib/utils.ts';
+import { cn } from '@/utils.ts';
 
 export type ExportFormat = 'dst' | 'pes' | 'exp' | 'svg';
 

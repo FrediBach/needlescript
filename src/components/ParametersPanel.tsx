@@ -12,7 +12,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import type { ChalkDataVar, ReferenceDataVar } from '../lib/engine.ts';
-import { parsePresets, snapValue, projectPoint, sampleRegion } from '../lib/parse-parameters.ts';
+import { parsePresets, snapValue, projectPoint, sampleRegion } from '../lib/editor/parameters.ts';
 import type {
   ParamItem,
   ParamDef,
@@ -21,13 +21,13 @@ import type {
   TextParamDef,
   ColorParamDef,
   PaletteParamDef,
-} from '../lib/parse-parameters.ts';
+} from '../lib/editor/parameters.ts';
 import { Slider } from '@/components/ui/slider.tsx';
 import { Switch } from '@/components/ui/switch.tsx';
 import { Input } from '@/components/ui/input.tsx';
-import { cn } from '@/lib/utils.ts';
+import { cn } from '@/utils.ts';
 import styles from './ParametersPanel.module.css';
-import { oklab, parseColor, unoklab } from '../lib/colormath.ts';
+import { oklab, parseColor, unoklab } from '../lib/core/colormath.ts';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

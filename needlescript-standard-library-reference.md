@@ -1,7 +1,7 @@
 # NeedleScript Standard Library Reference
 
 Companion to [NeedleScript Language Reference](./needlescript-language-reference.md). This
-document covers every exported procedure in `src/lib/standard-library/`. It describes the
+document covers every exported procedure in `src/lib/language/standard-library/`. It describes the
 bundled library as implemented; the main language reference remains authoritative for syntax,
 built-ins, the value model, geometry conventions, and machine behavior.
 

@@ -9,5 +9,5 @@
     "outDir": "./dist-lib"
   },
   "include": ["src/lib/engine.ts"],
-  "exclude": ["src/lib/__tests__", "src/lib/needlescript-monaco.ts"]
+  "exclude": ["src/lib/__tests__", "src/lib/editor/monaco.ts"]
 }

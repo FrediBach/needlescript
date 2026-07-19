@@ -7,14 +7,17 @@ The repo contains two build targets: a Vite-based playground app and a publishab
 
 The language pipeline in `src/lib/` is documented in detail. Read the relevant document before making non-trivial changes to these areas — each explains the module layout, data flow, and design rationale, with `file:line` references.
 
-| Document                                   | Covers                                                                                                  |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `needlescript-language-reference.md`       | Agent-oriented language reference                                                                       |
-| `needlescript-parser-architecture.md`      | Front-end: tokenizer, pre-scan, recursive-descent parser, AST (`tokenizer.ts`, `prescan.ts`, `parser/`) |
-| `needlescript-interpreter-architecture.md` | Evaluation: tree-walking interpreter, value model, budgets, reporters (`interpreter/`, `list.ts`)       |
-| `needlescript-machine-architecture.md`     | Stitch machine: turtle, transform stacks, satin/fill generation, coverage, output (`machine/`)          |
+| Document                                   | Covers                                                                                                                             |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `needlescript-language-reference.md`       | Agent-oriented language reference                                                                                                  |
+| `needlescript-parser-architecture.md`      | Front-end: tokenizer, pre-scan, recursive-descent parser, AST (`language/tokenizer.ts`, `language/prescan.ts`, `language/parser/`) |
+| `needlescript-interpreter-architecture.md` | Evaluation: tree-walking interpreter, value model, budgets, reporters (`runtime/`, `runtime/list.ts`)                              |
+| `needlescript-machine-architecture.md`     | Stitch machine: turtle, transform stacks, satin/fill generation, coverage, output (`embroidery/machine/`)                          |
 
 The end-to-end flow is: source → `tokenize` → `parse` → `run` (interpreter drives the `Machine`) → `RunResult` → exporters. Keep these docs updated when you change the corresponding modules.
+
+`src/lib/engine.ts` is the stable public barrel. Implementations are grouped by responsibility:
+`core/`, `language/`, `geometry/`, `embroidery/`, `runtime/`, `formats/`, and `editor/`.
 
 ## Dev environment
 
@@ -98,11 +101,11 @@ ESLint uses flat config (`eslint.config.js`) with TypeScript, React Hooks, React
 
 Before considering a user-visible command or mode complete:
 
-- Add its canonical name and arity to the appropriate table in `src/lib/commands.ts`. Add special
+- Add its canonical name and arity to the appropriate table in `src/lib/language/commands.ts`. Add special
   Core statement forms to `CORE_COMMAND_NAMES` as well.
 - Put embroidery construction modes and their numeric bounds in a focused registry; do not repeat
   literal choice lists in the parser, runtime, or Monaco snippets.
-- Resolve string modes with the shared case-insensitive helpers in `src/lib/mode-registry.ts` so
+- Resolve string modes with the shared case-insensitive helpers in `src/lib/core/mode-registry.ts` so
   unknown values get the standard choices and did-you-mean diagnostic.
 - Add a Monaco catalog item with completion text, hover documentation, and `params` signature
   metadata. Catalog coverage tests intentionally fail when any Core command omits one of these.

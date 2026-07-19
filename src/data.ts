@@ -1,6 +1,6 @@
 // Shared constants for the NeedleScript playground UI
 
-import { DEFAULT_PALETTE } from './lib/colormath.ts';
+import { DEFAULT_PALETTE } from './lib/core/colormath.ts';
 
 export const THREADS: string[] = [...DEFAULT_PALETTE];
 

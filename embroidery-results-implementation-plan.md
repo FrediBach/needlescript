@@ -132,22 +132,22 @@ performance.
 
 ## 5. Current architecture and likely touch points
 
-| Area                    | Existing owner                                            | Expected additions                                 |
-| ----------------------- | --------------------------------------------------------- | -------------------------------------------------- |
-| Command registry        | `src/lib/commands.ts`                                     | new commands, modes, profile registries            |
-| Parsing                 | `src/lib/parser/statements.ts`, `src/lib/parser/index.ts` | block commands and mode/value validation           |
-| Runtime dispatch        | `src/lib/interpreter/exec-cmd.ts`, `exec-stmt.ts`         | state updates, scoped unwinding, directives        |
-| Runtime context         | `src/lib/interpreter/context.ts`, `index.ts`              | planner constraints and run configuration          |
-| Core machine state      | `src/lib/machine/machine-core.ts`                         | style snapshots, material state, event tags        |
-| Satin generation        | `src/lib/machine/machine-satin.ts`, `rail-pair.ts`        | cap/join strategies, splitting, underlay profile   |
-| Fill generation         | `src/lib/machine/machine-fill.ts`, `machine/fill.ts`      | inset, staggering, connectors, edge policies       |
-| Post-processing         | `src/lib/postprocess.ts`, `travel-planner.ts`             | thread-aware coverage, preflight, constraints      |
-| Shared types            | `src/lib/types.ts`                                        | profiles, diagnostics, optional internal metadata  |
-| Standard library        | `src/lib/standard-library/stitchcraft.ns.ts`              | gradient and production recipes                    |
-| Public API              | `src/lib/engine.ts`                                       | registries, run options, diagnostic types          |
-| Editor language service | `src/lib/needlescript-monaco/`                            | completions, hovers, signatures, highlighting      |
-| Documentation           | root language/architecture/reference files                | semantics, examples, data flow, rationale          |
-| SVG staging             | `src/lib/svg/`                                            | expose only stable recipe settings after core work |
+| Area                    | Existing owner                                                              | Expected additions                                 |
+| ----------------------- | --------------------------------------------------------------------------- | -------------------------------------------------- |
+| Command registry        | `src/lib/language/commands.ts`                                              | new commands, modes, profile registries            |
+| Parsing                 | `src/lib/language/parser/statements.ts`, `src/lib/language/parser/index.ts` | block commands and mode/value validation           |
+| Runtime dispatch        | `src/lib/runtime/exec-cmd.ts`, `exec-stmt.ts`                               | state updates, scoped unwinding, directives        |
+| Runtime context         | `src/lib/runtime/context.ts`, `index.ts`                                    | planner constraints and run configuration          |
+| Core machine state      | `src/lib/embroidery/machine/machine-core.ts`                                | style snapshots, material state, event tags        |
+| Satin generation        | `src/lib/embroidery/machine/machine-satin.ts`, `rail-pair.ts`               | cap/join strategies, splitting, underlay profile   |
+| Fill generation         | `src/lib/embroidery/machine/machine-fill.ts`, `machine/fill.ts`             | inset, staggering, connectors, edge policies       |
+| Post-processing         | `src/lib/embroidery/postprocess.ts`, `travel-planner.ts`                    | thread-aware coverage, preflight, constraints      |
+| Shared types            | `src/lib/core/types.ts`                                                     | profiles, diagnostics, optional internal metadata  |
+| Standard library        | `src/lib/language/standard-library/stitchcraft.ns.ts`                       | gradient and production recipes                    |
+| Public API              | `src/lib/engine.ts`                                                         | registries, run options, diagnostic types          |
+| Editor language service | `src/lib/editor/monaco/`                                                    | completions, hovers, signatures, highlighting      |
+| Documentation           | root language/architecture/reference files                                  | semantics, examples, data flow, rationale          |
+| SVG staging             | `src/lib/formats/svg-import/`                                               | expose only stable recipe settings after core work |
 
 Avoid growing `exec-cmd.ts` and `machine-core.ts` into unstructured registries. Early in the roadmap,
 introduce focused configuration types in a new module such as `src/lib/embroidery-profile.ts` if
@@ -471,7 +471,7 @@ is normalized across the row-seeding axis.
 
 Tasks:
 
-- Implement in `src/lib/standard-library/stitchcraft.ns.ts`.
+- Implement in `src/lib/language/standard-library/stitchcraft.ns.ts`.
 - Decide how compound regions are represented; use a separate export if the current standard-library
   region convention only accepts a simple ring.
 - Add standard-library reference documentation and a concise example.
@@ -677,7 +677,7 @@ Acceptance criteria:
 - Resolving every legacy mode reproduces current events exactly.
 - Profile validation is pure and testable without running a program.
 
-Implementation note: `src/lib/underlay-profile.ts` owns the ordered satin/fill pass types,
+Implementation note: `src/lib/embroidery/underlay-profile.ts` owns the ordered satin/fill pass types,
 shared validation ranges, pure validators, and legacy/fabric lowering. Generator variants are
 explicit inputs because the historical doubled-center and directional-fill paths are not identical.
 Satin and fill emission consume the lowered pass order while retaining the legacy constants and
@@ -1831,7 +1831,7 @@ missing Phase 4/5 fill-edge and satin cap/join/wide commands are classified as s
 plan modes now participate in the same registry-driven catalog-mode coverage as construction and
 preflight modes.
 
-`ai-system-prompt.md` is the single prompt source imported verbatim by `src/lib/ai-prompt.ts`; there
+`ai-system-prompt.md` is the single prompt source imported verbatim by `src/lib/editor/ai-prompt.ts`; there
 is no generated duplicate to synchronize. It now covers fill inset and connector policy,
 parameterized satin/fill underlay, cap/corner/wide-column construction, barriers/atomic route
 groups, portable material intent, directional compensation, and preflight. Focused prompt tests pin

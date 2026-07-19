@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { run } from '../engine.ts';
-import type { StitchEvent } from '../types.ts';
+import type { StitchEvent } from '../core/types.ts';
 
 const MODES = ['continuous', 'fan', 'miter', 'split'] as const;
 const ANGLES = [45, 90, 135] as const;

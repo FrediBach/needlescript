@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emitBitmapCode, processBitmap, uniqueBitmapPrefix } from '../bitmap-importer.ts';
+import { emitBitmapCode, processBitmap, uniqueBitmapPrefix } from '../formats/bitmap.ts';
 import { run } from '../engine.ts';
 
 const pixels = new Uint8ClampedArray([

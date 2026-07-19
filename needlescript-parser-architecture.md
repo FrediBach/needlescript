@@ -20,25 +20,25 @@ pre-scan/parser stages before it reaches the interpreter:
 source string
      │
      ▼
-┌──────────────┐   Token[]
-│  tokenize()  ├──────────────┐
-│ tokenizer.ts │              │
-└──────────────┘              ▼
-                       ┌─────────────────┐   linked sources
-                       │  module linker  ├────────────┐
-                       │ module-linker.ts│            │
-                       └─────────────────┘            ▼
-                                             ┌─────────────────┐
-                                             │ closure lowering │
-                                             └────────┬────────┘
-                                                      ▼
-                                             ┌──────────────┐   ASTNode[]
-                                             │ prescan/parse├──────────────► interpreter
-                                             │ parser/*.ts  │
-                                             └──────────────┘
+┌─────────────────────────┐   Token[]
+│       tokenize()        ├──────────────┐
+│ language/tokenizer.ts   │              │
+└─────────────────────────┘              ▼
+                              ┌───────────────────────────┐   linked sources
+                              │       module linker       ├────────────┐
+                              │ language/module-linker.ts │            │
+                              └───────────────────────────┘            ▼
+                                                            ┌──────────────────┐
+                                                            │ closure lowering │
+                                                            └────────┬─────────┘
+                                                                     ▼
+                                                            ┌──────────────────────┐   ASTNode[]
+                                                            │    prescan/parse     ├────────────► runtime
+                                                            │ language/parser/*.ts │
+                                                            └──────────────────────┘
 ```
 
-The orchestration lives in `interpreter/index.ts:30` (`run()`):
+The orchestration lives in `runtime/index.ts:30` (`run()`):
 
 ```ts
 const tokens = tokenize(source); // 1. lexing
@@ -51,7 +51,7 @@ const program = linkStandardModules(tokens, parseNotes); // link, pre-scan, pars
 program execution inserts `linkStandardModules()` between tokenization and parsing;
 both lower-level surfaces are re-exported from the library barrel.
 
-Before pre-scan, `closure-lowering.ts` recognizes modern anonymous
+Before pre-scan, `language/closure-lowering.ts` recognizes modern anonymous
 `def(params) [ … ]` expressions. It builds lexical scope records, computes free
 variables, rejects writes/shadowing and the 16-capture limit, then lambda-lifts each
 body to a synthetic top-level procedure. The expression becomes an internal `$bind`
@@ -59,7 +59,7 @@ of that procedure to snapshot capture expressions. The internal spelling cannot 
 shadowed by a user procedure named `bind`; downstream stages otherwise see ordinary
 procedures and references.
 
-Key design principle stated in `parser/index.ts:1-5`: the parser accepts **both**
+Key design principle stated in `language/parser/index.ts:1-5`: the parser accepts **both**
 classic Logo syntax **and** a modern syntax (RFC-1). Every modern form _lowers_ to
 an existing AST node, so the interpreter, stitch machine, and file exporters never
 need to know which surface syntax produced a node. Legacy programs keep working
@@ -67,7 +67,7 @@ unchanged.
 
 ---
 
-## 2. The tokenizer (`tokenizer.ts`)
+## 2. The tokenizer (`language/tokenizer.ts`)
 
 `tokenize(src: string): Token[]` is a single-pass, character-by-character scanner.
 It tracks the current 1-based `line` for diagnostics and records `start`/`end`
@@ -75,7 +75,7 @@ character offsets on every token (used later for "glued token" disambiguation).
 
 ### 2.1 Token shape
 
-Defined in `types.ts:3-16`:
+Defined in `core/types.ts:3-16`:
 
 ```ts
 type TokenType =
@@ -101,7 +101,7 @@ expressions and block openers.
 
 | Kind     | Source form                     | Notes                                                                  |
 | -------- | ------------------------------- | ---------------------------------------------------------------------- |
-| `num`    | `42`, `3.14`, `.5`              | `true`/`false` fold to `1`/`0` (`tokenizer.ts:164`)                    |
+| `num`    | `42`, `3.14`, `.5`              | `true`/`false` fold to `1`/`0` (`language/tokenizer.ts:164`)           |
 | `string` | `'text'`                        | single-quoted, must close on the same line; escapes `\' \\ \n \t` only |
 | `var`    | `:name`                         | legacy Logo variable reference                                         |
 | `qword`  | `"word` or `"word"`             | quoted word; closing quote optional (modern style)                     |
@@ -112,29 +112,29 @@ expressions and block openers.
 
 ### 2.3 Notable lexing rules
 
-- **Comments**: `;`, `#`, and `//` all run to end of line (`tokenizer.ts:25`). A lone
+- **Comments**: `;`, `#`, and `//` all run to end of line (`language/tokenizer.ts:25`). A lone
   `/` remains division.
-- **`..`** is reserved for future syntax and errors immediately (`tokenizer.ts:44`).
+- **`..`** is reserved for future syntax and errors immediately (`language/tokenizer.ts:44`).
 - **Strings** are loud on failure: unterminated strings and unknown escape sequences
-  throw `NeedlescriptError` rather than silently recovering (`tokenizer.ts:50-86`).
+  throw `NeedlescriptError` rather than silently recovering (`language/tokenizer.ts:50-86`).
 - **Operators** use maximal munch: `<=`, `>=`, `!=`, `==` (normalized to `=`), and
   the compound-assignment ops `+= -= *= /=` are recognized as single tokens
-  (`tokenizer.ts:87-113`). Prefix `!` is emitted as the `word` token `not`.
+  (`language/tokenizer.ts:87-113`). Prefix `!` is emitted as the `word` token `not`.
 - **`spBefore`/`spAfter`** on operators encode the Logo convention that ` -5` (space
   before, glued after) is a negative literal, not subtraction — the parser consults
   these flags in `parseAdd` (`expressions.ts:163`).
-- **`qword` maximal munch** (`tokenizer.ts:142-159`): `"knit` and `"knit"` produce
+- **`qword` maximal munch** (`language/tokenizer.ts:142-159`): `"knit` and `"knit"` produce
   the same token; the optional closing quote is O(1) look-local so two qwords on one
   line still lex separately.
 - **`@name`** yields a `pref` token — one new token kind that stays out of the way of
   every existing program.
 
-`COMPOUND_ASSIGN_OPS` (`tokenizer.ts:7`) is exported for reuse by both the parser and
+`COMPOUND_ASSIGN_OPS` (`language/tokenizer.ts:7`) is exported for reuse by both the parser and
 the pre-scan.
 
 ---
 
-## 3. The pre-scan (`prescan.ts`)
+## 3. The pre-scan (`language/prescan.ts`)
 
 Recursive-descent needs to resolve bare identifiers _at parse time_ — is `leaf` a
 procedure call, a variable read, or unknown? Because NeedleScript allows a procedure
@@ -144,7 +144,7 @@ the token stream.
 
 ### 3.1 What it collects
 
-`PreScan` (`prescan.ts:21-30`):
+`PreScan` (`language/prescan.ts:21-30`):
 
 ```ts
 interface PreScan {
@@ -162,7 +162,7 @@ error).
 
 ### 3.2 The `walk` helper and passes
 
-`walk()` (`prescan.ts:41-90`) streams tokens while tracking procedure context: which
+`walk()` (`language/prescan.ts:41-90`) streams tokens while tracking procedure context: which
 procedure body a token sits in (`to … end` versus `def … ( … ) [ … ]`) and whether
 the cursor is inside the bound expressions of a keyword-`for` (where `to` is
 contextual, not a procedure header — `step` is also contextual here but is not
@@ -171,18 +171,18 @@ globally reserved, so no prescan guard is needed for it). It invokes a visitor
 
 `prescan()` runs several passes:
 
-1. **Pass 1 — signatures** (`prescan.ts:102`): collect procedure names and arity from
+1. **Pass 1 — signatures** (`language/prescan.ts:102`): collect procedure names and arity from
    both `to name :a :b` headers and `def name(a, b)` headers. Runs first so that
    assignment targets that are actually procedure names are skipped.
-2. **Pass 2a — explicit declarations** (`prescan.ts:152`): `make "x`, `local "x`,
+2. **Pass 2a — explicit declarations** (`language/prescan.ts:152`): `make "x`, `local "x`,
    `let x = …`, `let [x, y] = …` destructuring, and `for` counters (classic, modern
    `=`, and `for x in xs`).
-3. **Pass 2b — assignment targets** (`prescan.ts:200`): bare `x = …` / `x += …` in
+3. **Pass 2b — assignment targets** (`language/prescan.ts:200`): bare `x = …` / `x += …` in
    statement position. This heuristic may over-approximate (e.g. it also matches
    `if x = 1`), but over-approximation only ever _adds_ a candidate name — turning a
    would-be parse-time "unknown name" into at worst a runtime "never assigned". It can
    never cause a misparse, because reserved words and procedure names are excluded by
-   `register()` (`prescan.ts:145-149`). Zero-argument Library reporters are excluded
+   `register()` (`language/prescan.ts:145-149`). Zero-argument Library reporters are excluded
    from this heuristic because `if repcount = 3` is a common comparison; when one is
    actually assigned at statement position, the parser records the name immediately
    for subsequent reads.
@@ -191,7 +191,7 @@ The distinction between locals and globals is enforced here: a name registered i
 a procedure and either force-local (params, `let`, `local`, `for`) or already known
 local becomes a local; otherwise it is global.
 
-### 3.3 Compile-time source modules (`module-linker.ts`)
+### 3.3 Compile-time source modules (`language/module-linker.ts`)
 
 `linkStandardModules(rootTokens, notes)` recognizes top-level module directives before
 ordinary parsing:
@@ -203,7 +203,7 @@ export def radialdir(p) [ return vheading(p) ]
 
 An import specifier splits at its final dot: `std.textures` is the module ID and
 `radialdir` is the exported procedure. Bundled source is resolved from the pure registry
-in `standard-library/index.ts`; non-`std.*` IDs are rejected for now. The resolver
+in `language/standard-library/index.ts`; non-`std.*` IDs are rejected for now. The resolver
 boundary is deliberately separate from parsing so a future host resolver can supply user
 module source without adding filesystem or network APIs to `src/lib/`.
 
@@ -222,14 +222,14 @@ module scope while leaving room for exported values and host resolvers later.
 
 ---
 
-## 4. The parser (`parser/`)
+## 4. The parser (`language/parser/`)
 
 The parser is a recursive-descent parser split across four files plus a shared
 context object. The split exists to keep each file focused and to break the mutual
 import dependency between expression and statement parsing.
 
 ```
-parser/
+language/parser/
 ├── index.ts        entry point: parse(), ParseContext construction, parseProgram
 ├── context.ts      ParseContext interface (shared mutable state + helpers)
 ├── expressions.ts  precedence ladder, primaries, argument lists, postfix chains
@@ -386,9 +386,9 @@ Block and header helpers:
 - `parseHeaderBlock` / `parseLoopBlock` (`statements.ts:62-76`) — the latter bumps
   `loopDepth` so `break`/`continue` are legal inside.
 
-### 4.5 Command classification tables (`commands.ts`)
+### 4.5 Command classification tables (`language/commands.ts`)
 
-The parser is table-driven. `commands.ts` defines the name registries that the parser
+The parser is table-driven. `language/commands.ts` defines the name registries that the parser
 and pre-scan consult:
 
 | Table                      | Meaning                                                            |
@@ -410,19 +410,19 @@ and pre-scan consult:
 | `RESERVED`                 | "Core tier" words a user definition may **not** shadow             |
 
 Quoted embroidery modes use a focused layer rather than repeating arrays in this table.
-`embroidery-registry.ts` owns the fabric, thread, stabilizer, and topping profiles plus satin/fill
+`embroidery/embroidery-registry.ts` owns the fabric, thread, stabilizer, and topping profiles plus satin/fill
 underlay mode registries, while
-`fill-profile.ts` and `satin-profile.ts` own construction choices such as
+`embroidery/fill-profile.ts` and `embroidery/satin-profile.ts` own construction choices such as
 `satinwide 'warn'|'split'`;
-`QWORD_BUILTINS` is a compatibility view consumed by parser classification. `mode-registry.ts`
+`QWORD_BUILTINS` is a compatibility view consumed by parser classification. `core/mode-registry.ts`
 provides literal-preserving registry helpers, case-insensitive resolution, and the shared
 unknown-mode/did-you-mean diagnostic. Monaco snippets import the same registries, and catalog
 tests require every registered mode to remain documented.
 
 Two tiers govern name shadowing:
 
-- **Core tier** (`RESERVED`, `commands.ts:367`): hard error if redefined.
-- **Library tier** (`LIBRARY_FUNCS`, `commands.ts:357`): may be shadowed by a user
+- **Core tier** (`RESERVED`, `language/commands.ts:367`): hard error if redefined.
+- **Library tier** (`LIBRARY_FUNCS`, `language/commands.ts:357`): may be shadowed by a user
   procedure, emitting a one-time note via `noteLibraryShadow`.
 
 The Library-tier builtins use **soft reservation**: their names are _not_ in
@@ -463,14 +463,14 @@ which random seed is used.
 
 ## 5. Error handling and diagnostics
 
-All parse-time failures throw `NeedlescriptError` (`errors.ts:3`), which optionally
+All parse-time failures throw `NeedlescriptError` (`core/errors.ts:3`), which optionally
 carries a source `line` appended to the message as `(line N)` and exposed via
 `slLine`.
 
 The parser prioritizes actionable, human-readable diagnostics over terse ones:
 
-- **"Did you mean?"** suggestions come from `suggestions.ts`, a bounded (≤2 edits)
-  Levenshtein implementation. `didYouMeanKinded` (`suggestions.ts:45`) weaves the
+- **"Did you mean?"** suggestions come from `core/suggestions.ts`, a bounded (≤2 edits)
+  Levenshtein implementation. `didYouMeanKinded` (`core/suggestions.ts:45`) weaves the
   candidate's kind into the message ("did you mean the command `stitchlen`?"), using
   the `nameCandidates()` map from the context.
 - **Glued-bracket hints**: when a header index consumes the block-opening `[`, the
@@ -480,13 +480,13 @@ The parser prioritizes actionable, human-readable diagnostics over terse ones:
   a procedure, or `@` on a statement-only builtin each produce a specific message.
 - **Non-fatal notes** are collected into the optional `notes` array passed to
   `parse()` (used for library-shadow notices), surfaced to the user as warnings by the
-  interpreter (`interpreter/index.ts:35`).
+  interpreter (`runtime/index.ts:35`).
 
 ---
 
 ## 6. Output: the AST
 
-The parser emits `ASTNode[]`. The node union is defined in `types.ts:110-152`.
+The parser emits `ASTNode[]`. The node union is defined in `core/types.ts:110-152`.
 
 **Statement nodes** (`ASTNode`) include: `to`, `repeat`, `while`, `for`, `forin`,
 `if`, `transform`, `effect`, `make`, `local`, `letlist`, `setindex`, `output`,
@@ -496,14 +496,14 @@ The parser emits `ASTNode[]`. The node union is defined in `types.ts:110-152`.
 `listfunc`, `list`, `index`, `callval`, `callexpr`, `procref`, `trace`.
 
 Because both classic and modern syntaxes lower onto this same node set, the downstream
-consumers — the interpreter (`interpreter/`), the stitch machine (`machine/`), and the
+consumers — the interpreter (`runtime/`), the stitch machine (`embroidery/machine/`), and the
 exporters (`svg.ts`, `dst.ts`, `pes.ts`, `exp.ts`) — are agnostic to surface syntax.
 
 ---
 
-## 7. Related but separate: `parse-parameters.ts`
+## 7. Related but separate: `editor/parameters.ts`
 
-`parse-parameters.ts` is **not** part of the language parser. It is a lightweight,
+`editor/parameters.ts` is **not** part of the language parser. It is a lightweight,
 comment-annotation scanner that reads OpenSCAD-style `// [min:max]` annotations on
 `let`/`make` declarations to drive the playground's parameters-panel UI. It shares no
 code path with `tokenize`/`prescan`/`parse` and does not produce an AST. It is noted
@@ -518,24 +518,24 @@ need no color-specific token or node.
 
 ## 8. File reference
 
-| File                     | Responsibility                                                                    |
-| ------------------------ | --------------------------------------------------------------------------------- |
-| `tokenizer.ts`           | `tokenize()` — source → `Token[]`                                                 |
-| `closure-lowering.ts`    | anonymous-def scope analysis, capture checks, and lambda lifting                  |
-| `prescan.ts`             | `prescan()` — token stream → `PreScan` (names, arity, scopes)                     |
-| `module-linker.ts`       | import/export extraction, std resolution, qualification, AST linking              |
-| `standard-library/`      | bundled NeedleScript source modules and pure module registry                      |
-| `parser/index.ts`        | `parse()` entry, `ParseContext` construction, top-level loop, reporter-path check |
-| `parser/context.ts`      | `ParseContext` interface (shared state + helpers)                                 |
-| `parser/expressions.ts`  | precedence ladder, primaries, argument lists, postfix chains                      |
-| `parser/statements.ts`   | statement dispatcher, blocks, headers                                             |
-| `parser/analysis.ts`     | static control-flow analysis for reporter paths                                   |
-| `commands.ts`            | name/arity/reservation tables driving parser dispatch                             |
-| `embroidery-registry.ts` | fabric profiles and focused embroidery mode registries                            |
-| `mode-registry.ts`       | typed mode keys, case-insensitive resolution, standard diagnostics                |
-| `suggestions.ts`         | bounded edit-distance "did you mean?" helper                                      |
-| `errors.ts`              | `NeedlescriptError`                                                               |
-| `types.ts`               | `Token`, `TokenType`, `ASTNode`, `ExprNode` and related types                     |
+| File                                | Responsibility                                                                    |
+| ----------------------------------- | --------------------------------------------------------------------------------- |
+| `language/tokenizer.ts`             | `tokenize()` — source → `Token[]`                                                 |
+| `language/closure-lowering.ts`      | anonymous-def scope analysis, capture checks, and lambda lifting                  |
+| `language/prescan.ts`               | `prescan()` — token stream → `PreScan` (names, arity, scopes)                     |
+| `language/module-linker.ts`         | import/export extraction, std resolution, qualification, AST linking              |
+| `language/standard-library/`        | bundled NeedleScript source modules and pure module registry                      |
+| `language/parser/index.ts`          | `parse()` entry, `ParseContext` construction, top-level loop, reporter-path check |
+| `language/parser/context.ts`        | `ParseContext` interface (shared state + helpers)                                 |
+| `language/parser/expressions.ts`    | precedence ladder, primaries, argument lists, postfix chains                      |
+| `language/parser/statements.ts`     | statement dispatcher, blocks, headers                                             |
+| `language/parser/analysis.ts`       | static control-flow analysis for reporter paths                                   |
+| `language/commands.ts`              | name/arity/reservation tables driving parser dispatch                             |
+| `embroidery/embroidery-registry.ts` | fabric profiles and focused embroidery mode registries                            |
+| `core/mode-registry.ts`             | typed mode keys, case-insensitive resolution, standard diagnostics                |
+| `core/suggestions.ts`               | bounded edit-distance "did you mean?" helper                                      |
+| `core/errors.ts`                    | `NeedlescriptError`                                                               |
+| `core/types.ts`                     | `Token`, `TokenType`, `ASTNode`, `ExprNode` and related types                     |
 
 Tests covering the front-end live in `src/lib/__tests__/` — notably
 `tokenizer.test.ts`, `parser.test.ts`, `modern-syntax.test.ts`, and `language.test.ts`.

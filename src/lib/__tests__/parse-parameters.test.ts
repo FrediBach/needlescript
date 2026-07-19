@@ -15,8 +15,8 @@ import {
   snapValue,
   projectPoint,
   sampleRegion,
-} from '../parse-parameters.ts';
-import type { PathParamDef, PointParamDef, XYRegion } from '../parse-parameters.ts';
+} from '../editor/parameters.ts';
+import type { PathParamDef, PointParamDef, XYRegion } from '../editor/parameters.ts';
 
 // ── parseParameters ────────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ describe('parseParameters', () => {
     it('sets step to (max-min)/100', () => {
       const src = 'let x = 2.5 // [0.5:8]';
       const items = parseParameters(src);
-      const def = (items[0] as { kind: 'param'; def: import('../parse-parameters.ts').ParamDef })
+      const def = (items[0] as { kind: 'param'; def: import('../editor/parameters.ts').ParamDef })
         .def;
       expect(def.step).toBeCloseTo((8 - 0.5) / 100);
     });
@@ -125,7 +125,7 @@ describe('parseParameters', () => {
     it('recognises [switch:label0,label1]', () => {
       const src = 'let mode = 0 // [switch:hypo,epi]';
       const items = parseParameters(src);
-      const def = (items[0] as { kind: 'param'; def: import('../parse-parameters.ts').ParamDef })
+      const def = (items[0] as { kind: 'param'; def: import('../editor/parameters.ts').ParamDef })
         .def;
       expect(def.labels).toEqual(['hypo', 'epi']);
     });
@@ -202,7 +202,8 @@ describe('parseParameters', () => {
 
   it('clamps out-of-range source values', () => {
     const items = parseParameters('let n = 100 // [1:10]');
-    const def = (items[0] as { kind: 'param'; def: import('../parse-parameters.ts').ParamDef }).def;
+    const def = (items[0] as { kind: 'param'; def: import('../editor/parameters.ts').ParamDef })
+      .def;
     expect(def.value).toBe(10);
   });
 

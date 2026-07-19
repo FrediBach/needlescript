@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { fillStaggerOffset } from '../fill-profile.ts';
-import { run } from '../interpreter.ts';
-import { generateFill } from '../machine/fill.ts';
-import type { StitchEvent } from '../types.ts';
+import { fillStaggerOffset } from '../embroidery/fill-profile.ts';
+import { run } from '../runtime/index.ts';
+import { generateFill } from '../embroidery/machine/fill.ts';
+import type { StitchEvent } from '../core/types.ts';
 import { expectPositionalEvents } from './helpers/positional-events.ts';
 
 const square = (size = 16) => `beginfill repeat 4 [ fd ${size} rt 90 ] endfill`;

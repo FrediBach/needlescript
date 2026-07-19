@@ -9,7 +9,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select.tsx';
-import { cn } from '@/lib/utils.ts';
+import { cn } from '@/utils.ts';
 
 const SPEEDS = [
   { value: 0.125, label: '⅛×' },

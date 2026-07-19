@@ -25,10 +25,10 @@ import type {
   ResolvedMachineProfile,
 } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
-import { toDST } from './lib/dst.ts';
-import { toPES } from './lib/pes.ts';
-import { toEXP } from './lib/exp.ts';
-import { toSVG } from './lib/svg.ts';
+import { toDST } from './lib/formats/dst.ts';
+import { toPES } from './lib/formats/pes.ts';
+import { toEXP } from './lib/formats/exp.ts';
+import { toSVG } from './lib/formats/svg.ts';
 import { EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, MACHINES } from './data.ts';
 import type { HoopConfig, MachineHoop, MachinePreset } from './data.ts';
 import { getFallbackHoopFitWarning } from './hoop-fit-warning.ts';
@@ -44,8 +44,8 @@ import {
   updatePathParameterPoint,
   updatePathParameterValue,
   updatePointParameter,
-} from './lib/parse-parameters.ts';
-import type { ParamItem, PathParamDef, PointParamDef } from './lib/parse-parameters.ts';
+} from './lib/editor/parameters.ts';
+import type { ParamItem, PathParamDef, PointParamDef } from './lib/editor/parameters.ts';
 import { usePanelSplit } from './hooks/usePanelSplit.ts';
 import { useSvgImport } from './hooks/useSvgImport.ts';
 import { useBitmapImport } from './hooks/useBitmapImport.ts';

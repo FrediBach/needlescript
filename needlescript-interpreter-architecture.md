@@ -19,13 +19,12 @@ concerns. It is part of the publishable core.
 source ──tokenize──► Token[] ──link/parse──► ASTNode[] ──run()──► RunResult
                                                     │
                                        ┌────────────┴────────────┐
-                                       │   interpreter/  +  Machine │
+                                       │   runtime/  +  Machine │
                                        └───────────────────────────┘
 ```
 
-The public entry point is `run(source, opts)` in `interpreter/index.ts:30`. The thin
-re-export `interpreter.ts:2` forwards to `interpreter/index.ts`. `run` is also
-surfaced from the library barrel `engine.ts:81`.
+The implementation entry point is `run(source, opts)` in `runtime/index.ts:30`; the
+stable public surface re-exports it from `engine.ts`.
 
 `run` performs the full pipeline in one call:
 
@@ -54,7 +53,7 @@ unchanged. The playground worker adds statistics, worker-total, and message
 round-trip timings in `CompileResponse.timings`.
 
 `RunOptions.machineProfile` is the other non-source input. It is a serializable local machine
-profile resolved and validated by `machine-profile.ts`; it never enters the AST, globals, share URL,
+profile resolved and validated by `embroidery/machine-profile.ts`; it never enters the AST, globals, share URL,
 or source text. The resolved identity/default or caller profile is returned in
 `RunResult.machineProfile` and reused by structured preflight.
 
@@ -68,13 +67,13 @@ reaches the worker.
 
 ---
 
-## 2. Module layout (`interpreter/`)
+## 2. Module layout (`runtime/`)
 
 The interpreter is split into focused modules that all share one mutable `RunContext`
 object:
 
 ```
-interpreter/
+runtime/
 ├── index.ts        run() — orchestration, context construction, module wiring, finalize
 ├── context.ts      RunContext interface: all mutable state + function slots
 ├── signals.ts      ReturnSignal, LoopSignal (non-error control-flow unwinding)
@@ -91,12 +90,12 @@ interpreter/
 └── string-func.ts  string library: str, num, split, joinstr, upper, …
 ```
 
-The value model those modules operate on lives one level up in `list.ts`.
+The value model those modules operate on lives alongside them in `runtime/list.ts`.
 
-Travel routing deliberately lives outside the evaluator modules. `routing.ts` owns the
+Travel routing deliberately lives outside the evaluator modules. `embroidery/routing.ts` owns the
 generic deterministic algorithm registry, spatial-bucket nearest implementation, and bounded
 nearest-plus-2-opt improvement;
-`travel-planner.ts` adapts final `StitchEvent` runs to that interface. `gen-func.ts`
+`embroidery/travel-planner.ts` adapts final `StitchEvent` runs to that interface. `gen-func.ts`
 adapts NeedleScript point/path values to the same interface for `routesort`. This
 keeps future algorithms additive: implement one `RouteAlgorithm`, register it, then
 map a language mode to it without duplicating spatial search or tie semantics.
@@ -176,19 +175,19 @@ evaluator function.
 
 ---
 
-## 4. The value model (`list.ts`)
+## 4. The value model (`runtime/list.ts`)
 
 Runtime values are the union `Val = number | string | NsList | FuncRef`
-(`list.ts:17`):
+(`runtime/list.ts:17`):
 
 - **`number`** — the only scalar; booleans do not exist (`true`/`false` lex to `1`/`0`,
   comparisons return `1`/`0`).
 - **`string`** — immutable value type; copy is identity, index assignment is always an
   error (`exec-stmt.ts:107`).
-- **`NsList`** (`list.ts:19-27`) — a class wrapping `items: Val[]`. `instanceof` is the
+- **`NsList`** (`runtime/list.ts:19-27`) — a class wrapping `items: Val[]`. `instanceof` is the
   type tag; identity is reference identity (Python-like: mutable, reference semantics,
   explicit `copy()`).
-- **`FuncRef`** (`list.ts`) — a reference to a procedure or builtin produced by
+- **`FuncRef`** (`runtime/list.ts`) — a reference to a procedure or builtin produced by
   `@name`, carrying a declared arity range plus an immutable tuple of leading bound
   values. Plain references have an empty tuple; `bind` and lambda-lifted closures
   populate it. `ComposedRef` extends it for `compose(@f, @g, …)` pipelines.
@@ -198,18 +197,18 @@ reference is deliberately an error. Formatting exposes the effective arity and b
 slot count; final top-level references are also serialized into `referenceVars` for
 the playground Data inspector.
 
-`list.ts` also provides the shared value utilities the interpreter leans on
+`runtime/list.ts` also provides the shared value utilities the interpreter leans on
 everywhere:
 
-| Helper                              | Role                                                                    |
-| ----------------------------------- | ----------------------------------------------------------------------- |
-| `num(v, what, line, side)`          | guard: value must be a number, else a named type error (`list.ts:115`)  |
-| `isList` / `isFuncRef` / `isString` | type predicates                                                         |
-| `describeVal`                       | human phrasing for error messages ("a list (length 3)")                 |
-| `formatNum` / `formatVal`           | canonical display for `print` and list rendering                        |
-| `deepEqual`                         | structural equality with a `1e-9` numeric tolerance (`list.ts:141`)     |
-| `deepCopy`                          | deep clone with a per-cell callback for budget charging (`list.ts:173`) |
-| `valDepth` / `cellCount`            | depth/size measures, all capped at `LIMITS.maxListDepth`                |
+| Helper                              | Role                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------- |
+| `num(v, what, line, side)`          | guard: value must be a number, else a named type error (`runtime/list.ts:115`)  |
+| `isList` / `isFuncRef` / `isString` | type predicates                                                                 |
+| `describeVal`                       | human phrasing for error messages ("a list (length 3)")                         |
+| `formatNum` / `formatVal`           | canonical display for `print` and list rendering                                |
+| `deepEqual`                         | structural equality with a `1e-9` numeric tolerance (`runtime/list.ts:141`)     |
+| `deepCopy`                          | deep clone with a per-cell callback for budget charging (`runtime/list.ts:173`) |
+| `valDepth` / `cellCount`            | depth/size measures, all capped at `LIMITS.maxListDepth`                        |
 
 Every deep walk is depth-capped so a cycle created through mutation becomes a loud
 error rather than a hang — the project's "loud beats convenient" rule.
@@ -255,7 +254,7 @@ The quoted `underlay` and `fillunderlay` commands retain legacy selectors until 
 generator knows the physical width or region area, then lower to ordered typed profiles.
 `fabric` presets explicitly provide satin mode, fill mode, and doubled-pass policy rather than
 relying on implicit dispatcher defaults. Lowering and validation are pure functions in
-`underlay-profile.ts`; they require neither interpreter context nor program execution.
+`embroidery/underlay-profile.ts`; they require neither interpreter context nor program execution.
 
 `underlaypasses` validates a list of up to 16 case-insensitive pass names before touching machine
 state. The numeric `underlaylen`, `underlayinset`, and `underlayspacing` commands use the centralized
@@ -441,7 +440,7 @@ every unbounded operation is metered.
 
 `initBudget` installs the metering primitives, all reading limits from
 `ctx.m.effectiveLimits` (a mutable copy of `STOCK_LIMITS` that `override` can raise or
-lower, `machine/machine.ts:206`):
+lower, `embroidery/machine/machine.ts:206`):
 
 | Function                 | Charges                                                      |
 | ------------------------ | ------------------------------------------------------------ |
@@ -455,7 +454,7 @@ lower, `machine/machine.ts:206`):
 `overlongMsg` (`budget.ts:15`) tailors the "ran too long" message — noting if the op
 limit was raised by `override`, and if stitch-history queries were used (a likely
 non-terminating feedback loop). The relevant budget keys are defined in
-`machine/limits.ts` (`STOCK_LIMITS`, `OVERRIDE_CEILINGS`, `OVERRIDE_FLOORS`), and stitch
+`embroidery/machine/limits.ts` (`STOCK_LIMITS`, `OVERRIDE_CEILINGS`, `OVERRIDE_FLOORS`), and stitch
 count itself is enforced inside the `Machine`.
 
 ### 9.2 Value guards (`guards.ts`)
@@ -469,9 +468,9 @@ count itself is enforced inside the `Machine`.
 - **`list(v, …)`** / **`funcRef(v, …)`** — assert list / procedure-reference types.
 - **`checkDepth(v, line)`** — reject nesting a value past `LIMITS.maxListDepth`.
 
-String-valued construction modes are resolved separately through `mode-registry.ts`.
-`exec-cmd.ts` reads the focused registries from `embroidery-registry.ts`, `fill-profile.ts`, and
-`satin-profile.ts`, matches values
+String-valued construction modes are resolved separately through `core/mode-registry.ts`.
+`exec-cmd.ts` reads the focused registries from `embroidery/embroidery-registry.ts`, `embroidery/fill-profile.ts`, and
+`embroidery/satin-profile.ts`, matches values
 case-insensitively while retaining their literal TypeScript union, and uses one standard
 unknown-mode message with choices and did-you-mean text. Travel planning exposes `PLAN_MODES`
 from its strategy registry for the same validation path. These registries are also consumed by
@@ -483,7 +482,7 @@ Monaco metadata, so runtime and editor choices cannot drift independently.
 
 Four modules install one dispatcher each; `evalExpr`'s `listfunc` branch and
 `callRef` route to them by name-table membership (`LIST_FUNCS`, `GEN_FUNCS`,
-`QUERY_FUNCS`, `STRING_FUNCS` from `commands.ts`):
+`QUERY_FUNCS`, `STRING_FUNCS` from `language/commands.ts`):
 
 - **`list-func.ts`** — RFC-2 list library: `range`, `filled`, `len`, `first`/`last`,
   `concat`, `slice`, `sort`, `map`/`filter`/`reduce`, `compose`, `pick`/`shuffle`
@@ -492,10 +491,10 @@ Four modules install one dispatcher each; `evalExpr`'s `listfunc` branch and
   `smoothstep`), simplex noise, vector/segment ops, path/curve ops (`resample`,
   `chaikin`, `bezier`), generators (`scatter`, `voronoi`, `triangulate`, `hull`,
   `relax`), geometry ops (`offsetpath`, `clippaths`), and the pure path transforms. It
-  bridges to `affine.ts`, `genmath.ts`, `geometry.ts`, `generators.ts`, and
-  `hoop-presets.ts`. When a generator uses the implicit hoop field it sets
+  bridges to `geometry/affine.ts`, `geometry/genmath.ts`, `geometry/geometry.ts`, `geometry/generators.ts`, and
+  `embroidery/hoop-presets.ts`. When a generator uses the implicit hoop field it sets
   `ctx.m.fieldLocked` so a later `hoop` directive errors clearly.
-- **Rail-pair surface** — `satinbetween` runs from the `listcmd` branch because its operands are runtime lists. The interpreter validates paths, checkpoints, reporter contracts, and the geometry-input budget before one atomic machine call. `railinset`, `railrake`, and `railspine` live in `gen-func.ts`; `railspine` shares the pure builder in `rail-pair.ts`.
+- **Rail-pair surface** — `satinbetween` runs from the `listcmd` branch because its operands are runtime lists. The interpreter validates paths, checkpoints, reporter contracts, and the geometry-input budget before one atomic machine call. `railinset`, `railrake`, and `railspine` live in `gen-func.ts`; `railspine` shares the pure builder in `geometry/rail-pair.ts`.
 - **`query-func.ts`** — closed-loop stitch-history reporters (`coverat`, `countat`,
   `nearestsewn`, `sewnwithin`, `stitchedpoints`). They set `ctx.m.usedQuery`, map local
   points through the CTM to hoop space, and read the machine's coverage grid. Costs are
@@ -535,7 +534,7 @@ stitch pair or a fill row.
 ## 12. The Machine boundary
 
 The interpreter never emits stitches directly. It computes values and control flow,
-then calls methods on `ctx.m` (the `Machine` from `machine/`) — `forward`, `arc`,
+then calls methods on `ctx.m` (the `Machine` from `embroidery/machine/`) — `forward`, `arc`,
 `setXY`, `beginFill`/`endFill`, `pushTransform`/`popOut`, `flushSatin`, `markHere`,
 `colorChange`, `snapshotConstructionConfig`/`restoreConstructionConfig`, etc. The `Machine` owns:
 
@@ -583,7 +582,7 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    (`index.ts:206-241`).
 7. **Finalize preview data**: translate each chalk command's raw event-stream offset
    to the stitch/jump playback index, and classify/snapshot chalkable final globals.
-8. **Assemble structured preflight** (`preflight.ts`): the pure adapter sorts locatable diagnostic
+8. **Assemble structured preflight** (`embroidery/preflight.ts`): the pure adapter sorts locatable diagnostic
    sidecars by their legacy warning index, maps them to stable codes/severities/suggestions, copies
    deterministic hoop-space points and source lines, then, when `preflight 'warn'` or `'strict'` is
    active, appends the fixed-order results from the pure event-stream and construction analyzers and
@@ -619,7 +618,7 @@ With local calibration, the live density grid and history reporters likewise ret
 authored coordinates during execution, while final density is rebuilt from the corrected pre-lock
 stream. This prevents a user's private correction from feeding back into NeedleScript control flow.
 
-The `RunResult` shape is defined in `types.ts`; downstream, the exporters
+The `RunResult` shape is defined in `core/types.ts`; downstream, the exporters
 (`svg.ts`, `dst.ts`, `pes.ts`, `exp.ts`) consume `events` to produce files.
 Because chalk never enters `events`, machine-export inertness is structural rather
 than an exporter filtering rule.
@@ -660,30 +659,29 @@ show-info toggle filters only rendered findings and never recompiles or changes 
 
 ## 15. File reference
 
-| File                         | Responsibility                                                   |
-| ---------------------------- | ---------------------------------------------------------------- |
-| `interpreter.ts`             | re-export shim → `interpreter/index.ts`                          |
-| `interpreter/index.ts`       | `run()`: pipeline, context construction, module wiring, finalize |
-| `interpreter/context.ts`     | `RunContext` interface (state + function slots)                  |
-| `interpreter/signals.ts`     | `ReturnSignal`, `LoopSignal`                                     |
-| `interpreter/budget.ts`      | op/cell/string budget metering, trace notes                      |
-| `interpreter/guards.ts`      | `truthy`, `toIndex`, `list`, `funcRef`, `checkDepth`             |
-| `interpreter/eval-expr.ts`   | expression evaluator + trace sandbox                             |
-| `interpreter/exec-stmt.ts`   | statement/block/loop executor                                    |
-| `interpreter/exec-cmd.ts`    | `cmd` dispatcher (turtle + directives)                           |
-| `interpreter/proc-call.ts`   | `callProc`, `callProcVals`, `scalarBuiltin`, `callRef`           |
-| `interpreter/reporters.ts`   | `@name` reporter contracts + effect clamps                       |
-| `interpreter/list-func.ts`   | list library dispatcher                                          |
-| `interpreter/gen-func.ts`    | generative-math dispatcher                                       |
-| `routing.ts`                 | generic route strategy registry + spatial nearest search         |
-| `travel-planner.ts`          | color/run partitioning and event-level plan strategy registry    |
-| `interpreter/query-func.ts`  | stitch-history query dispatcher                                  |
-| `interpreter/string-func.ts` | string library dispatcher                                        |
-| `list.ts`                    | value model (`Val`, `NsList`, `FuncRef`) + value utilities       |
-| `colormath.ts`               | CSS colors, normalization, HSL/RGB, OKLab math and defaults      |
-| `embroidery-registry.ts`     | material profiles and accepted embroidery construction modes     |
-| `mode-registry.ts`           | typed mode resolution and standard unknown-mode diagnostics      |
-| `machine/`                   | the stitch machine (side-effect target, budgets, events)         |
+| File                                | Responsibility                                                   |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| `runtime/index.ts`                  | `run()`: pipeline, context construction, module wiring, finalize |
+| `runtime/context.ts`                | `RunContext` interface (state + function slots)                  |
+| `runtime/signals.ts`                | `ReturnSignal`, `LoopSignal`                                     |
+| `runtime/budget.ts`                 | op/cell/string budget metering, trace notes                      |
+| `runtime/guards.ts`                 | `truthy`, `toIndex`, `list`, `funcRef`, `checkDepth`             |
+| `runtime/eval-expr.ts`              | expression evaluator + trace sandbox                             |
+| `runtime/exec-stmt.ts`              | statement/block/loop executor                                    |
+| `runtime/exec-cmd.ts`               | `cmd` dispatcher (turtle + directives)                           |
+| `runtime/proc-call.ts`              | `callProc`, `callProcVals`, `scalarBuiltin`, `callRef`           |
+| `runtime/reporters.ts`              | `@name` reporter contracts + effect clamps                       |
+| `runtime/list-func.ts`              | list library dispatcher                                          |
+| `runtime/gen-func.ts`               | generative-math dispatcher                                       |
+| `embroidery/routing.ts`             | generic route strategy registry + spatial nearest search         |
+| `embroidery/travel-planner.ts`      | color/run partitioning and event-level plan strategy registry    |
+| `runtime/query-func.ts`             | stitch-history query dispatcher                                  |
+| `runtime/string-func.ts`            | string library dispatcher                                        |
+| `runtime/list.ts`                   | value model (`Val`, `NsList`, `FuncRef`) + value utilities       |
+| `core/colormath.ts`                 | CSS colors, normalization, HSL/RGB, OKLab math and defaults      |
+| `embroidery/embroidery-registry.ts` | material profiles and accepted embroidery construction modes     |
+| `core/mode-registry.ts`             | typed mode resolution and standard unknown-mode diagnostics      |
+| `embroidery/machine/`               | the stitch machine (side-effect target, budgets, events)         |
 
 Interpreter behavior is exercised by tests in `src/lib/__tests__/` — notably
 `engine.test.ts`, `language.test.ts`, `loop-control.test.ts`, `lists.test.ts`,

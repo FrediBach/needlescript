@@ -17,15 +17,15 @@ import {
   netFillArea,
   strategySupportsAtomic,
 } from '@/lib/engine';
-import { simplifyRDP } from '@/lib/svg/svg-path';
-import { orderOperations } from '@/lib/svg/ordering';
+import { simplifyRDP } from '@/lib/formats/svg-import/svg-path';
+import { orderOperations } from '@/lib/formats/svg-import/ordering';
 
 export {
   canCreateMotifAlong,
   canCreateRailPair,
   createMotifAlong,
   createRailPair,
-} from '@/lib/svg/relationships';
+} from '@/lib/formats/svg-import/relationships';
 
 function mapOperations(
   doc: StagedDocument,

@@ -11,7 +11,7 @@ import {
   AI_HELP_TEXT,
   type AiCommandType,
   type ChatMessage,
-} from '../lib/ai-prompt.ts';
+} from '../lib/editor/ai-prompt.ts';
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 

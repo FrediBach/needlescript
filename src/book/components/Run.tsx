@@ -13,12 +13,9 @@ import { useState, useCallback, useEffect, useLayoutEffect, useRef, type ReactNo
 import Editor from '@monaco-editor/react';
 import type { BeforeMount, OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
-import type { RunResult, DesignStats } from '../../lib/types.ts';
+import type { RunResult, DesignStats } from '../../lib/core/types.ts';
 import { useCompiler } from '../../hooks/useCompiler.ts';
-import {
-  registerNeedlescript,
-  scheduleNeedlescriptProviders,
-} from '../../lib/needlescript-monaco.ts';
+import { registerNeedlescript, scheduleNeedlescriptProviders } from '../../lib/editor/monaco.ts';
 import BookCanvas from './BookCanvas.tsx';
 import { useBookTheme } from '../lib/useBookTheme.ts';
 

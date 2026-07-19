@@ -3,7 +3,7 @@ import {
   compensateOpenPathEnds,
   compensationForHeading,
   compensationTensor,
-} from '../directional-compensation.ts';
+} from '../embroidery/directional-compensation.ts';
 import { run } from '../engine.ts';
 import type { RunResult, StitchEvent } from '../engine.ts';
 

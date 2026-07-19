@@ -1,7 +1,7 @@
 import type { DesignState, LineStitchBounds } from '../../App.tsx';
 import type { HoopConfig } from '../../data.ts';
 import type { HoopInfo, WarningLocation } from '../../lib/engine.ts';
-import type { PathParamDef, PointParamDef, XYRegion } from '../../lib/parse-parameters.ts';
+import type { PathParamDef, PointParamDef, XYRegion } from '../../lib/editor/parameters.ts';
 
 export interface StageCanvasProps {
   design: DesignState;
