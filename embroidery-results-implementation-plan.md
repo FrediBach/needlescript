@@ -1513,6 +1513,8 @@ step is a completed W01 setup record and post-release measurement table.
 
 ### Session 8.1 — Structured preflight result
 
+Status: complete (2026-07-19)
+
 Purpose: make diagnostics useful beyond warning strings.
 
 Proposed types:
@@ -1547,6 +1549,20 @@ Acceptance criteria:
 
 - Existing warning consumers continue to work.
 - Every structured issue has stable ordering and deterministic coordinates.
+
+Implementation note: every successful run now includes the optional public `RunResult.preflight`
+field with structured issues, the resolved built-in diagnostic envelope, and severity counts. The
+pure `buildPreflightResult` adapter consumes completed warning metadata without mutating the stitch
+stream or the legacy `warnings` array. Stable codes cover density hotspots, same-hole stacks,
+sub-reliable movements, sewable-field overflow, physically unreachable hoop points, and satin snag
+risk. Physical hoop overflow is classified as an error; the other migrated diagnostics remain
+warnings. Existing warning text and indices remain intact.
+
+Realized rail-pair and programmable-satin snag warnings now retain the two physical chord endpoints
+and source line. Width-only satin/E-stitch advisories retain their source line and an empty point
+list because no construction geometry exists at the setting command. Tests pin the default resolved
+profile, summary counts, codes, severities, messages, source lines, deterministic coordinates and
+ordering, and the distinction between the inset field and the physical hoop.
 
 ### Session 8.2 — New event-stream checks
 

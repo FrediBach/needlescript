@@ -1335,9 +1335,21 @@ export class SatinMachine extends MachineCore {
     for (const point of topping) {
       const d = previous ? Math.hypot(point.x - previous.x, point.y - previous.y) : 0;
       if (d > 8 && !snagWarned) {
+        const index = this.warnings.length;
         this.warnings.push(
           `satinbetween: a realized stitch spans ${d.toFixed(1)} mm — stitches over ~8 mm tend to snag`,
         );
+        this.constructionWarningLocations.push({
+          index,
+          points: previous
+            ? [
+                { x: previous.x, y: previous.y },
+                { x: point.x, y: point.y },
+              ]
+            : [{ x: point.x, y: point.y }],
+          lines: this.currentLine === undefined ? [] : [this.currentLine],
+          kind: 'satin',
+        });
         snagWarned = true;
       }
       if (d > 12.1 && previous) {
@@ -1992,6 +2004,7 @@ export class SatinMachine extends MachineCore {
     let topping: Pen[] = [];
     let maxFullW = 0;
     let maxChord = 0;
+    let maxChordPoints: [{ x: number; y: number }, { x: number; y: number }] | undefined;
     let side = this.satinSide; // local copy of the alternating rail flag
     let cursor = 0; // arc-length consumed (pair base)
     let pair = 0; // 0-based pair index → reporter's `i`
@@ -2056,7 +2069,13 @@ export class SatinMachine extends MachineCore {
         ).scale;
         if (prev) {
           const d = Math.hypot(hx - prev.x, hy - prev.y);
-          if (d > maxChord) maxChord = d;
+          if (d > maxChord) {
+            maxChord = d;
+            maxChordPoints = [
+              { x: prev.x, y: prev.y },
+              { x: hx, y: hy },
+            ];
+          }
           if (d < LIMITS.minStitch * 0.5) {
             this._dropTiny(hx, hy);
             continue;
@@ -2172,26 +2191,38 @@ export class SatinMachine extends MachineCore {
         }
       }
       maxChord = 0;
-      for (let index = 1; index < topping.length; index++)
-        maxChord = Math.max(
-          maxChord,
-          Math.hypot(
-            topping[index].x - topping[index - 1].x,
-            topping[index].y - topping[index - 1].y,
-          ),
+      maxChordPoints = undefined;
+      for (let index = 1; index < topping.length; index++) {
+        const chord = Math.hypot(
+          topping[index].x - topping[index - 1].x,
+          topping[index].y - topping[index - 1].y,
         );
+        if (chord > maxChord) {
+          maxChord = chord;
+          maxChordPoints = [
+            { x: topping[index - 1].x, y: topping[index - 1].y },
+            { x: topping[index].x, y: topping[index].y },
+          ];
+        }
+      }
     }
     if (this.satinJoin !== 'legacy') {
       topping = this._applySatinCornerStrategy(topping, mappedAnalysis, 'programmable satin');
       maxChord = 0;
-      for (let index = 1; index < topping.length; index++)
-        maxChord = Math.max(
-          maxChord,
-          Math.hypot(
-            topping[index].x - topping[index - 1].x,
-            topping[index].y - topping[index - 1].y,
-          ),
+      maxChordPoints = undefined;
+      for (let index = 1; index < topping.length; index++) {
+        const chord = Math.hypot(
+          topping[index].x - topping[index - 1].x,
+          topping[index].y - topping[index - 1].y,
         );
+        if (chord > maxChord) {
+          maxChord = chord;
+          maxChordPoints = [
+            { x: topping[index - 1].x, y: topping[index - 1].y },
+            { x: topping[index].x, y: topping[index].y },
+          ];
+        }
+      }
     }
     this.satinSide = side;
 
@@ -2203,10 +2234,18 @@ export class SatinMachine extends MachineCore {
 
     // Snag: keys off the realized chord, which for a raked stitch is the
     // hypotenuse across width and longitudinal span — not leftw + rightw (§5.2).
-    if (maxChord > 8)
+    if (maxChord > 8) {
+      const index = this.warnings.length;
       this.warnings.push(
         `satin @fn: a realized stitch spans ${maxChord.toFixed(1)} mm — stitches over ~8 mm tend to snag; reduce the rake or width`,
       );
+      this.constructionWarningLocations.push({
+        index,
+        points: maxChordPoints ?? [],
+        lines: this.currentLine === undefined ? [] : [this.currentLine],
+        kind: 'satin',
+      });
+    }
 
     // Emit order: anchor, then underlay (chosen from the max realized width),
     // then the buffered topping — matching the built-in flush.

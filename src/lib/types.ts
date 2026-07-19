@@ -39,7 +39,43 @@ export interface WarningLocation {
   index: number; // index into RunResult.warnings
   points: { x: number; y: number }[]; // hoop-space coordinates (mm)
   lines: number[]; // source lines that contributed to the hotspot
-  kind: 'density' | 'stack' | 'tiny' | 'overflow' | 'fill';
+  kind: 'density' | 'stack' | 'tiny' | 'overflow' | 'fill' | 'satin';
+}
+
+export type PreflightSeverity = 'info' | 'warning' | 'error';
+
+/** A stable, machine-readable counterpart to an existing sewability warning. */
+export interface PreflightIssue {
+  severity: PreflightSeverity;
+  code: string;
+  message: string;
+  /** Deterministic hoop-space coordinates in diagnostic order. */
+  points: { x: number; y: number }[];
+  /** De-duplicated source lines in diagnostic order. */
+  lines: number[];
+  constructionIds?: number[];
+  suggestion?: string;
+}
+
+/**
+ * The effective diagnostic envelope used by preflight.
+ *
+ * Session 8.5 can extend this shape with local machine capabilities and
+ * calibration while the default profile continues to describe today's rules.
+ */
+export interface ResolvedMachineProfile {
+  name: string;
+  minimumReliableMovementMM: number;
+  maximumStitchMM: number;
+  maximumPreferredSatinStitchMM: number;
+  maximumDensityLayers: number;
+  sameHolePenetrationLimit: number;
+}
+
+export interface PreflightResult {
+  issues: PreflightIssue[];
+  profile: ResolvedMachineProfile;
+  summary: Record<string, number>;
 }
 
 /** Physical hoop and derived sewable field, as configured by the `hoop` command. */
@@ -189,6 +225,8 @@ export interface RunResult {
   events: StitchEvent[];
   warnings: string[];
   warningLocations?: WarningLocation[];
+  /** Structured counterparts for locatable physical-sewability warnings. */
+  preflight?: PreflightResult;
   printed: string[];
   locks: number;
   density: DensityResult;

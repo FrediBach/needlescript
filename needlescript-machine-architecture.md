@@ -654,6 +654,14 @@ The interpreter orders these deliberately: planning runs before autotrim, densit
 analysed _before_ locks (so tie-offs don't read as hotspots), then locks are applied. The results populate the final
 `RunResult` (`types.ts:76-89`), which the exporters consume.
 
+After physical diagnostics are complete, `preflight.ts` purely adapts their internal
+`WarningLocation` sidecars into `RunResult.preflight`. Stable codes currently cover density,
+same-hole penetration stacks, merged tiny movements, sewable-field and physical-hoop overflow, and
+satin snag risk. Realized rail-pair and programmable-satin snag sidecars retain the measured chord
+endpoints; width-only satin/E-stitch advisories have source attribution but no invented coordinate.
+Issues follow legacy warning-index order, so ordering and copied hoop-space coordinates are
+deterministic. Exporters still consume only `events`, and preflight never rewrites them.
+
 ---
 
 ## 14. Design themes
@@ -690,6 +698,7 @@ analysed _before_ locks (so tie-offs don't read as hotspots), then locks are app
 | `satin-profile.ts`         | satin cap mode registry, ranges, and pure profile helpers              |
 | `rail-pair.ts`             | shared rail orientation, checkpoints, pairing, and derived spine       |
 | `postprocess.ts`           | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`         |
+| `preflight.ts`             | pure structured-issue adapter and resolved diagnostic profile          |
 | `routing.ts`               | generic deterministic route algorithms and endpoint model              |
 | `travel-planner.ts`        | thread-run partitioning, plan modes, and connector reconstruction      |
 | `effects.ts`, `declump.ts` | after-split effect maps and declump fold state                         |

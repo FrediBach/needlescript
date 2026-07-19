@@ -1337,7 +1337,7 @@ Contract: zero RNG draws, zero emission — branching on them keeps determinism.
 | `assert cond`                  | stop with a line-numbered error if false                                                 |
 | `assert(cond, message)`        | with a message string, evaluated only on failure                                         |
 
-Parse-time checks and diagnostics: reporter-path check (a `@name` / expression-position procedure that may miss `return` is rejected at parse time, naming the procedure), did-you-mean suggestions across all namespaces, glued-bracket hints, kind-aware rejections. Non-fatal issues (clamps, merged tiny stitches, unclosed fills, hoop overflow, density) surface as warnings.
+Parse-time checks and diagnostics: reporter-path check (a `@name` / expression-position procedure that may miss `return` is rejected at parse time, naming the procedure), did-you-mean suggestions across all namespaces, glued-bracket hints, kind-aware rejections. Non-fatal issues (clamps, merged tiny stitches, unclosed fills, hoop overflow, density) surface as warnings. `RunResult.preflight` additionally exposes structured, deterministic issues for density hotspots, same-hole stacks, tiny merged movements, field/hoop overflow, and satin snag risk. Each issue has a stable code, severity, message, hoop-space points, source lines, and optional suggestion. The original `RunResult.warnings` strings remain unchanged for compatibility; preflight does not alter stitches or exports.
 
 `chalk` accepts a point `[x, y]`, an ordered path, or a mixed list of points and paths.
 The optional styles are `'auto'` (line plus vertices), `'dots'`, and `'line'`.

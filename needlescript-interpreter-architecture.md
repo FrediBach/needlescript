@@ -571,8 +571,14 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    (`index.ts:206-241`).
 7. **Finalize preview data**: translate each chalk command's raw event-stream offset
    to the stitch/jump playback index, and classify/snapshot chalkable final globals.
-8. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
-   `warningLocations`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `activeHoop`, `activeOverrides`,
+8. **Assemble structured preflight** (`preflight.ts`): the pure adapter sorts locatable diagnostic
+   sidecars by their legacy warning index, maps them to stable codes/severities/suggestions, copies
+   deterministic hoop-space points and source lines, and counts severities. It does not mutate the
+   completed events or the legacy warning array. Density hotspots, same-hole stacks, merged tiny
+   movements, field/physical-hoop overflow, and satin snag advisories participate; unrelated fill
+   construction warnings remain string-only until construction-aware preflight.
+9. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
+   `warningLocations`, optional `preflight`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional
    `plan` statistics. Explicit groups add per-group line, eligibility/movement, accepted-improvement,
    and before/after-travel records.
@@ -588,6 +594,10 @@ The `RunResult` shape is defined in `types.ts`; downstream, the exporters
 (`svg.ts`, `dst.ts`, `pes.ts`, `exp.ts`) consume `events` to produce files.
 Because chalk never enters `events`, machine-export inertness is structural rather
 than an exporter filtering rule.
+
+`RunResult.preflight.profile` currently records the built-in movement, stitch, satin, density, and
+same-hole thresholds. It is intentionally a resolved value object so a later local machine profile
+can extend the result without embedding machine-specific correction in NeedleScript source.
 
 ---
 

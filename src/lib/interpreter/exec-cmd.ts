@@ -931,10 +931,18 @@ export function initExecCmdHandler(
         ctx.m.flushSatin();
         ctx.m.satinReporter = null;
         const v = Math.max(0, a[0]);
-        if (v > 10 && ctx.m.satinWide !== 'split')
+        if (v > 10 && ctx.m.satinWide !== 'split') {
+          const index = ctx.m.warnings.length;
           ctx.m.warnings.push(
             `satin ${v} mm is very wide — columns over ~8 mm tend to snag; consider splitting`,
           );
+          ctx.m.constructionWarningLocations.push({
+            index,
+            points: [],
+            lines: ctx.m.currentLine === undefined ? [] : [ctx.m.currentLine],
+            kind: 'satin',
+          });
+        }
         ctx.m.satinWidth = v;
         ctx.m.mode = v > 0.05 ? 'satin' : 'run';
         return;
@@ -1004,8 +1012,16 @@ export function initExecCmdHandler(
         ctx.m.flushSatin();
         ctx.m.satinReporter = null;
         const v = Math.max(0, a[0]);
-        if (v > 10)
+        if (v > 10) {
+          const index = ctx.m.warnings.length;
           ctx.m.warnings.push(`estitch ${v} mm is very wide — prongs over ~8 mm tend to snag`);
+          ctx.m.constructionWarningLocations.push({
+            index,
+            points: [],
+            lines: ctx.m.currentLine === undefined ? [] : [ctx.m.currentLine],
+            kind: 'satin',
+          });
+        }
         ctx.m.eWidth = v;
         ctx.m.mode = v > 0.05 ? 'estitch' : 'run';
         return;

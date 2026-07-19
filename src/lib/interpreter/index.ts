@@ -34,6 +34,7 @@ import { inspectChalkValue } from '../chalk.ts';
 import { DEFAULT_BACKGROUND, defaultSlotColor } from '../colormath.ts';
 import type { ColorTableEntry } from '../types.ts';
 import { directionalCompensationPreview } from '../directional-compensation.ts';
+import { buildPreflightResult } from '../preflight.ts';
 
 export function run(source: string, opts: RunOptions = {}): RunResult {
   const startedAt = performance.now();
@@ -405,6 +406,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     events: m.events,
     warnings: m.warnings,
     warningLocations,
+    preflight: buildPreflightResult({
+      warnings: m.warnings,
+      warningLocations,
+      hoop: m.hoopInfo,
+      maximumDensityLayers: m.maxDensity,
+    }),
     printed: ctx.printed,
     locks,
     density,

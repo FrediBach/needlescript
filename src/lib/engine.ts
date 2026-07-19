@@ -27,6 +27,10 @@ export type {
   StitchEvent,
   RunResult,
   WarningLocation,
+  PreflightSeverity,
+  PreflightIssue,
+  PreflightResult,
+  ResolvedMachineProfile,
   DesignStats,
   ASTNode,
   ExprNode,
@@ -52,6 +56,8 @@ export type {
   DirectionalCompensationSample,
   DirectionalCompensationPreview,
 } from './types.ts';
+export { buildPreflightResult, resolveMachineProfile } from './preflight.ts';
+export type { PreflightInput } from './preflight.ts';
 export {
   COLOR_NAMES,
   DEFAULT_PALETTE,
