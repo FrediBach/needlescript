@@ -111,6 +111,28 @@ The public `Machine` class is a small facade over `FillMachine`, `SatinMachine`,
 (`machine/machine-core.ts`) so `override` can raise/lower budgets per run without
 touching the shared constants.
 
+### 4.1 Construction configuration snapshots
+
+`Machine.snapshotConstructionConfig()` captures the settings that determine how future movement is
+constructed, and `restoreConstructionConfig(snapshot)` restores only those settings. The typed
+`ConstructionConfigSnapshot` includes running-stitch numeric/list/reporter forms and list progress;
+bean and E-stitch modes; satin width/reporter, spacing, and alternating side; fill angle, spacing,
+length forms, and an unused one-shot fill arm; and the lock, pull-compensation, underlay,
+short-stitch, auto-trim, and density settings. Current `fabric` presets resolve into these same
+physics fields, so their construction effects are scoped without treating warning notes as state.
+
+Snapshots deliberately exclude turtle and push/pop state, output and coverage history, warning
+history, color, transforms/effects, hoop and field state, budgets/overrides, and trace state. Reporter
+functions retain reference identity. Mutable stitch/fill length patterns and static armed-fill paths
+are copied when taking and restoring a snapshot, so later mutation of live configuration cannot
+alter the saved value.
+
+An active `beginfill` recording cannot cross either boundary. A pending satin column or
+reporter-driven running stretch is flushed before the snapshot or restore; otherwise the methods are
+event-free and leave list-cycle progress untouched. An unused fill arm may cross the boundary and is
+restored with the other construction settings. Replacing such an outer arm still uses the existing
+single note emitted by `fillarm`; merely crossing the boundary adds no warning.
+
 ---
 
 ## 5. The stitching pipeline: `travel()`

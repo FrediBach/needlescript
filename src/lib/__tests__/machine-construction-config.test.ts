@@ -1,0 +1,307 @@
+import { describe, expect, it } from 'vitest';
+import { mTranslate } from '../affine.ts';
+import { Machine } from '../machine.ts';
+
+describe('machine construction configuration snapshots', () => {
+  it('restores the complete construction-state inventory', () => {
+    const machine = new Machine();
+    const stitchReporter = () => 1.5;
+    const satinReporter = (): [number, number, number, number, number] => [2, 0.4, 0, 1, 0];
+    const fillLenReporter = () => 2.25;
+    const fillDirReporter = () => 30;
+    const fillShapeReporter = (): [number, number, number] => [0.5, 2.5, 0.25];
+    const fillPathsReporter = (rings: [number, number][][]) => rings;
+
+    machine.stitchLen = 1.5;
+    machine.stitchLenList = [1.25, 2.75];
+    machine.stitchLenListPhase = 1;
+    machine.stitchLenStretchIndex = 7;
+    machine.stitchLenStretchStart = false;
+    machine.stitchLenReporter = stitchReporter;
+    machine.mode = 'satin';
+    machine.beanRepeats = 5;
+    machine.eWidth = 2.5;
+    machine.satinWidth = 4.5;
+    machine.satinSpacing = 0.55;
+    machine.satinSide = -1;
+    machine.satinReporter = satinReporter;
+    machine.fillAngle = 37;
+    machine.fillSpacing = 0.65;
+    machine.fillLen = 3;
+    machine.fillLenList = [2, 3.5];
+    machine.fillLenListPhase = 1;
+    machine.fillLenReporter = fillLenReporter;
+    machine.lockLen = 0.9;
+    machine.pullComp = 0.45;
+    machine.underlayMode = 'edge';
+    machine.fillUnderlayMode = 'tatami';
+    machine.doubleUnderlay = true;
+    machine.shortStitch = false;
+    machine.autoTrim = 12;
+    machine.maxDensity = 2.75;
+    machine.fillArmed = true;
+    machine.fillDirReporter = fillDirReporter;
+    machine.fillShapeReporter = fillShapeReporter;
+    machine.fillPathsReporter = fillPathsReporter;
+    machine.fillPathsStatic = [
+      [
+        [0, 0],
+        [4, 0],
+      ],
+    ];
+    machine.fillArmLine = 42;
+    machine.fillPathsName = '@rows';
+
+    const snapshot = machine.snapshotConstructionConfig();
+
+    machine.stitchLen = 6;
+    machine.stitchLenList = null;
+    machine.stitchLenListPhase = 0;
+    machine.stitchLenStretchIndex = 0;
+    machine.stitchLenStretchStart = true;
+    machine.stitchLenReporter = null;
+    machine.mode = 'run';
+    machine.beanRepeats = 1;
+    machine.eWidth = 0;
+    machine.satinWidth = 0;
+    machine.satinSpacing = 1;
+    machine.satinSide = 1;
+    machine.satinReporter = null;
+    machine.fillAngle = 0;
+    machine.fillSpacing = 1;
+    machine.fillLen = null;
+    machine.fillLenList = null;
+    machine.fillLenListPhase = 0;
+    machine.fillLenReporter = null;
+    machine.lockLen = 0;
+    machine.pullComp = 0;
+    machine.underlayMode = 'off';
+    machine.fillUnderlayMode = 'off';
+    machine.doubleUnderlay = false;
+    machine.shortStitch = true;
+    machine.autoTrim = 0;
+    machine.maxDensity = 0;
+    machine.fillArmed = false;
+    machine.fillDirReporter = null;
+    machine.fillShapeReporter = null;
+    machine.fillPathsReporter = null;
+    machine.fillPathsStatic = null;
+    machine.fillArmLine = undefined;
+    machine.fillPathsName = null;
+
+    machine.restoreConstructionConfig(snapshot);
+
+    expect(machine).toMatchObject({
+      stitchLen: 1.5,
+      stitchLenList: [1.25, 2.75],
+      stitchLenListPhase: 1,
+      stitchLenStretchIndex: 7,
+      stitchLenStretchStart: false,
+      mode: 'satin',
+      beanRepeats: 5,
+      eWidth: 2.5,
+      satinWidth: 4.5,
+      satinSpacing: 0.55,
+      satinSide: -1,
+      fillAngle: 37,
+      fillSpacing: 0.65,
+      fillLen: 3,
+      fillLenList: [2, 3.5],
+      fillLenListPhase: 1,
+      lockLen: 0.9,
+      pullComp: 0.45,
+      underlayMode: 'edge',
+      fillUnderlayMode: 'tatami',
+      doubleUnderlay: true,
+      shortStitch: false,
+      autoTrim: 12,
+      maxDensity: 2.75,
+      fillArmed: true,
+      fillPathsStatic: [
+        [
+          [0, 0],
+          [4, 0],
+        ],
+      ],
+      fillArmLine: 42,
+      fillPathsName: '@rows',
+    });
+    expect(machine.stitchLenReporter).toBe(stitchReporter);
+    expect(machine.satinReporter).toBe(satinReporter);
+    expect(machine.fillLenReporter).toBe(fillLenReporter);
+    expect(machine.fillDirReporter).toBe(fillDirReporter);
+    expect(machine.fillShapeReporter).toBe(fillShapeReporter);
+    expect(machine.fillPathsReporter).toBe(fillPathsReporter);
+  });
+
+  it('copies mutable length patterns and static fill paths in both directions', () => {
+    const machine = new Machine();
+    const stitchPattern = [1, 2];
+    const fillPattern = [3, 4];
+    const staticPaths: [number, number][][] = [
+      [
+        [0, 0],
+        [5, 0],
+      ],
+    ];
+    machine.stitchLenList = stitchPattern;
+    machine.fillLenList = fillPattern;
+    machine.fillPathsStatic = staticPaths;
+
+    const snapshot = machine.snapshotConstructionConfig();
+    expect(snapshot.stitchLenList).not.toBe(stitchPattern);
+    expect(snapshot.fillLenList).not.toBe(fillPattern);
+    expect(snapshot.fillPathsStatic).not.toBe(staticPaths);
+    expect(snapshot.fillPathsStatic?.[0]).not.toBe(staticPaths[0]);
+    expect(snapshot.fillPathsStatic?.[0][0]).not.toBe(staticPaths[0][0]);
+
+    stitchPattern[0] = 8;
+    fillPattern[0] = 9;
+    staticPaths[0][0][0] = 10;
+    machine.restoreConstructionConfig(snapshot);
+    expect(machine.stitchLenList).toEqual([1, 2]);
+    expect(machine.fillLenList).toEqual([3, 4]);
+    expect(machine.fillPathsStatic).toEqual([
+      [
+        [0, 0],
+        [5, 0],
+      ],
+    ]);
+
+    machine.stitchLenList![0] = 6;
+    machine.fillLenList![0] = 7;
+    machine.fillPathsStatic![0][0][0] = 11;
+    machine.restoreConstructionConfig(snapshot);
+    expect(machine.stitchLenList).toEqual([1, 2]);
+    expect(machine.fillLenList).toEqual([3, 4]);
+    expect(machine.fillPathsStatic![0][0]).toEqual([0, 0]);
+  });
+
+  it('does not restore turtle, output, warning, color, transform, or directive state', () => {
+    const machine = new Machine();
+    const snapshot = machine.snapshotConstructionConfig();
+    const density = machine.density;
+
+    machine.x = 12;
+    machine.y = 8;
+    machine.heading = 135;
+    machine.penDown = false;
+    machine.stateStack.push({ x: 1, y: 2, heading: 3, penDown: true });
+    machine.events.push({ t: 'mark', x: 12, y: 8, c: 3, label: 'kept' });
+    machine.warnings.push('kept warning');
+    machine.colorIdx = 3;
+    machine.started = true;
+    machine.lastEmit = { x: 12, y: 8 };
+    machine.satinDensityNoted = true;
+    machine.pushTransform(mTranslate(5, 6));
+    machine.hoopSet = true;
+    machine.effectiveLimits.maxStitches = 1234;
+
+    machine.restoreConstructionConfig(snapshot);
+
+    expect(machine).toMatchObject({
+      x: 12,
+      y: 8,
+      heading: 135,
+      penDown: false,
+      colorIdx: 3,
+      started: true,
+      lastEmit: { x: 12, y: 8 },
+      satinDensityNoted: true,
+      hoopSet: true,
+    });
+    expect(machine.stateStack).toHaveLength(1);
+    expect(machine.events).toEqual([{ t: 'mark', x: 12, y: 8, c: 3, label: 'kept' }]);
+    expect(machine.warnings).toEqual(['kept warning']);
+    expect(machine.density).toBe(density);
+    expect(machine.ctm).toEqual(mTranslate(5, 6));
+    expect(machine.effectiveLimits.maxStitches).toBe(1234);
+  });
+
+  it('does not emit or reset list phase when no buffered construction exists', () => {
+    const machine = new Machine();
+    machine.stitchLenList = [1, 2, 3];
+    machine.stitchLenStretchIndex = 4;
+    machine.stitchLenStretchStart = false;
+
+    const snapshot = machine.snapshotConstructionConfig();
+    expect(machine.events).toEqual([]);
+    expect(snapshot.stitchLenStretchIndex).toBe(4);
+    expect(snapshot.stitchLenStretchStart).toBe(false);
+
+    machine.stitchLenStretchIndex = 9;
+    machine.restoreConstructionConfig(snapshot);
+    expect(machine.events).toEqual([]);
+    expect(machine.stitchLenStretchIndex).toBe(4);
+    expect(machine.stitchLenStretchStart).toBe(false);
+  });
+
+  it('flushes buffered running and satin construction at snapshot boundaries', () => {
+    const running = new Machine();
+    running.stitchLenReporter = () => 1;
+    running.forward(5);
+    const runningEventsBefore = running.events.length;
+    expect(running.runBuffer).not.toBeNull();
+
+    running.snapshotConstructionConfig();
+    expect(running.runBuffer).toBeNull();
+    expect(running.events.length).toBeGreaterThan(runningEventsBefore);
+
+    const satin = new Machine();
+    satin.mode = 'satin';
+    satin.satinWidth = 3;
+    satin.forward(5);
+    expect(satin.events).toEqual([]);
+    expect(satin.satinPath).not.toBeNull();
+
+    satin.snapshotConstructionConfig();
+    expect(satin.satinPath).toBeNull();
+    expect(satin.events.length).toBeGreaterThan(0);
+  });
+
+  it('flushes inner buffered construction before restoring outer settings', () => {
+    const machine = new Machine();
+    const outer = machine.snapshotConstructionConfig();
+    machine.stitchLenReporter = () => 1;
+    machine.forward(5);
+    const beforeRestore = machine.events.length;
+
+    machine.restoreConstructionConfig(outer);
+
+    expect(machine.events.length).toBeGreaterThan(beforeRestore);
+    expect(machine.stitchLenReporter).toBeNull();
+    expect(machine.x).toBe(0);
+    expect(machine.y).toBe(5);
+  });
+
+  it('rejects snapshot and restore boundaries during active fill recording', () => {
+    const snapshotMachine = new Machine();
+    snapshotMachine.beginFill();
+    expect(() => snapshotMachine.snapshotConstructionConfig()).toThrow(/active fill/);
+    expect(snapshotMachine.recording).toBe(true);
+
+    const restoreMachine = new Machine();
+    const snapshot = restoreMachine.snapshotConstructionConfig();
+    restoreMachine.beginFill();
+    expect(() => restoreMachine.restoreConstructionConfig(snapshot)).toThrow(/active fill/);
+    expect(restoreMachine.recording).toBe(true);
+  });
+
+  it('preserves an unused armed fill without adding warnings', () => {
+    const machine = new Machine();
+    const outerDirection = () => 45;
+    machine.fillArmed = true;
+    machine.fillDirReporter = outerDirection;
+    machine.fillArmLine = 12;
+    const snapshot = machine.snapshotConstructionConfig();
+
+    machine.fillDirReporter = () => 90;
+    machine.fillArmLine = 20;
+    machine.restoreConstructionConfig(snapshot);
+
+    expect(machine.fillArmed).toBe(true);
+    expect(machine.fillDirReporter).toBe(outerDirection);
+    expect(machine.fillArmLine).toBe(12);
+    expect(machine.warnings).toEqual([]);
+  });
+});

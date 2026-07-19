@@ -20,6 +20,66 @@ import { DEFAULT_HOOP_INFO, inHoopField, inHoopOuter } from '../hoop-presets.ts'
 type OutLayer =
   { kind: 'aff'; m: Mat } | { kind: 'warp'; fn: (x: number, y: number) => [number, number] };
 
+type StitchLengthReporter = (t: number, s: number, i: number, p: [number, number]) => number;
+type SatinReporter = (
+  t: number,
+  s: number,
+  i: number,
+  u: number,
+) => [number, number, number, number, number];
+type FillLengthReporter = StitchLengthReporter;
+type FillDirectionReporter = (px: number, py: number) => number;
+type FillShapeReporter = (
+  px: number,
+  py: number,
+  row: number,
+  v: number,
+) => [number, number, number];
+type FillPathsReporter = (rings: [number, number][][]) => [number, number][][];
+
+/**
+ * Construction settings saved by `snapshotConstructionConfig()`.
+ *
+ * Reporter functions intentionally retain identity. Mutable length patterns and
+ * static fill paths are copied both into and out of the snapshot.
+ */
+export interface ConstructionConfigSnapshot {
+  readonly stitchLen: number;
+  readonly stitchLenList: readonly number[] | null;
+  readonly stitchLenListPhase: number;
+  readonly stitchLenStretchIndex: number;
+  readonly stitchLenStretchStart: boolean;
+  readonly stitchLenReporter: StitchLengthReporter | null;
+  readonly mode: 'run' | 'satin' | 'estitch';
+  readonly beanRepeats: number;
+  readonly eWidth: number;
+  readonly satinWidth: number;
+  readonly satinSpacing: number;
+  readonly satinSide: number;
+  readonly satinReporter: SatinReporter | null;
+  readonly fillAngle: number;
+  readonly fillSpacing: number;
+  readonly fillLen: number | null;
+  readonly fillLenList: readonly number[] | null;
+  readonly fillLenListPhase: number;
+  readonly fillLenReporter: FillLengthReporter | null;
+  readonly lockLen: number;
+  readonly pullComp: number;
+  readonly underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
+  readonly fillUnderlayMode: 'off' | 'auto' | 'tatami' | 'edge';
+  readonly doubleUnderlay: boolean;
+  readonly shortStitch: boolean;
+  readonly autoTrim: number;
+  readonly maxDensity: number;
+  readonly fillArmed: boolean;
+  readonly fillDirReporter: FillDirectionReporter | null;
+  readonly fillShapeReporter: FillShapeReporter | null;
+  readonly fillPathsReporter: FillPathsReporter | null;
+  readonly fillPathsStatic: readonly (readonly (readonly [number, number])[])[] | null;
+  readonly fillArmLine: number | undefined;
+  readonly fillPathsName: string | null;
+}
+
 /** Snapshot of all sandboxed machine state for trace (RFC-trace §4.1). */
 interface MachineSnapshot {
   x: number;
@@ -32,7 +92,7 @@ interface MachineSnapshot {
   stitchLenListPhase: number;
   stitchLenStretchIndex: number;
   stitchLenStretchStart: boolean;
-  stitchLenReporter: ((t: number, s: number, i: number, p: [number, number]) => number) | null;
+  stitchLenReporter: StitchLengthReporter | null;
   // Running-stitch buffer (reporter buffered mode)
   runBuffer: { x: number; y: number }[] | null;
   runBufferCTM: Mat;
@@ -50,7 +110,7 @@ interface MachineSnapshot {
   // Extended filllen forms (list / reporter)
   fillLenList: number[] | null;
   fillLenListPhase: number;
-  fillLenReporter: ((t: number, s: number, i: number, p: [number, number]) => number) | null;
+  fillLenReporter: FillLengthReporter | null;
   lockLen: number;
   pullComp: number;
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
@@ -64,9 +124,7 @@ interface MachineSnapshot {
   lastEmit: { x: number; y: number } | null;
   started: boolean;
   satinPath: { x: number; y: number }[] | null;
-  satinReporter:
-    | ((t: number, s: number, i: number, u: number) => [number, number, number, number, number])
-    | null;
+  satinReporter: SatinReporter | null;
   satinDensityNoted: boolean;
   satinCTM: Mat;
   satinLayers: OutLayer[];
@@ -75,10 +133,9 @@ interface MachineSnapshot {
   rings: [number, number][][];
   curRing: [number, number][] | null;
   fillArmed: boolean;
-  fillDirReporter: ((px: number, py: number) => number) | null;
-  fillShapeReporter:
-    ((px: number, py: number, row: number, v: number) => [number, number, number]) | null;
-  fillPathsReporter: ((rings: [number, number][][]) => [number, number][][]) | null;
+  fillDirReporter: FillDirectionReporter | null;
+  fillShapeReporter: FillShapeReporter | null;
+  fillPathsReporter: FillPathsReporter | null;
   fillPathsStatic: [number, number][][] | null;
   fillArmLine: number | undefined;
   fillPathsName: string | null;
@@ -119,8 +176,7 @@ export abstract class MachineCore {
   stitchLenListPhase: number = 0; // start index offset for the list form
   stitchLenStretchIndex: number = 0; // cycling index within current stretch (list form)
   stitchLenStretchStart: boolean = true; // true = reset index on next pen-down move
-  stitchLenReporter: ((t: number, s: number, i: number, p: [number, number]) => number) | null =
-    null; // per-stitch reporter; null = numeric/list form
+  stitchLenReporter: StitchLengthReporter | null = null; // per-stitch reporter; null = numeric/list form
   // Running-stitch buffer for the reporter form. When non-null, travel() appends
   // spine points here and defers splitting until flushRunningStitch() is called.
   runBuffer: { x: number; y: number }[] | null = null;
@@ -139,7 +195,7 @@ export abstract class MachineCore {
   // Extended filllen forms (list / reporter). Exactly one active at a time.
   fillLenList: number[] | null = null; // cycling length pattern for fill rows
   fillLenListPhase: number = 0; // start index offset for the list form
-  fillLenReporter: ((t: number, s: number, i: number, p: [number, number]) => number) | null = null; // per-stitch reporter for fill rows
+  fillLenReporter: FillLengthReporter | null = null; // per-stitch reporter for fill rows
   lockLen = 0.7;
   pullComp = 0; // pull compensation in mm
   underlayMode: 'off' | 'auto' | 'center' | 'edge' | 'zigzag' = 'off';
@@ -152,9 +208,7 @@ export abstract class MachineCore {
   // Programmable satin (`satin @fn`): a user shape reporter that supersedes the
   // built-in generator, queried once per stitch pair at flush time. null = the
   // built-in numeric generator. Set/cleared by the `satin`/`estitch` commands.
-  satinReporter:
-    | ((t: number, s: number, i: number, u: number) => [number, number, number, number, number])
-    | null = null;
+  satinReporter: SatinReporter | null = null;
   satinDensityNoted = false; // one-time "density ignored under satin @fn" note
   // Programmable fill (`fill dir @d shape @s`): user reporters that supersede the
   // built-in tatami generator for the next beginfill…endfill (§2/§3). null = the
@@ -163,10 +217,9 @@ export abstract class MachineCore {
   // queried at endfill, inside _generateProgrammableFill — the generator itself
   // is drawless (§10), so determinism rides on the reporters' own sampling.
   fillArmed = false;
-  fillDirReporter: ((px: number, py: number) => number) | null = null;
-  fillShapeReporter:
-    ((px: number, py: number, row: number, v: number) => [number, number, number]) | null = null;
-  fillPathsReporter: ((rings: [number, number][][]) => [number, number][][]) | null = null;
+  fillDirReporter: FillDirectionReporter | null = null;
+  fillShapeReporter: FillShapeReporter | null = null;
+  fillPathsReporter: FillPathsReporter | null = null;
   fillPathsStatic: [number, number][][] | null = null;
   fillArmLine: number | undefined = undefined;
   fillPathsName: string | null = null;
@@ -259,6 +312,103 @@ export abstract class MachineCore {
 
   /** Flush buffered satin or reporter-mode running stitches at motion boundaries. */
   abstract flushSatin(): void;
+
+  /**
+   * Snapshot only stitch-construction configuration for a future scoped restore.
+   * Active fill recording cannot cross a configuration boundary. A buffered
+   * satin column or reporter-driven running stretch is committed first so it is
+   * generated wholly under the configuration that created it.
+   */
+  snapshotConstructionConfig(): ConstructionConfigSnapshot {
+    if (this.recording)
+      throw new NeedlescriptError(
+        'cannot snapshot construction configuration during an active fill — close it with endfill first',
+      );
+    if (this.runBuffer !== null || this.satinPath !== null) this.flushSatin();
+
+    return {
+      stitchLen: this.stitchLen,
+      stitchLenList: this.stitchLenList?.slice() ?? null,
+      stitchLenListPhase: this.stitchLenListPhase,
+      stitchLenStretchIndex: this.stitchLenStretchIndex,
+      stitchLenStretchStart: this.stitchLenStretchStart,
+      stitchLenReporter: this.stitchLenReporter,
+      mode: this.mode,
+      beanRepeats: this.beanRepeats,
+      eWidth: this.eWidth,
+      satinWidth: this.satinWidth,
+      satinSpacing: this.satinSpacing,
+      satinSide: this.satinSide,
+      satinReporter: this.satinReporter,
+      fillAngle: this.fillAngle,
+      fillSpacing: this.fillSpacing,
+      fillLen: this.fillLen,
+      fillLenList: this.fillLenList?.slice() ?? null,
+      fillLenListPhase: this.fillLenListPhase,
+      fillLenReporter: this.fillLenReporter,
+      lockLen: this.lockLen,
+      pullComp: this.pullComp,
+      underlayMode: this.underlayMode,
+      fillUnderlayMode: this.fillUnderlayMode,
+      doubleUnderlay: this.doubleUnderlay,
+      shortStitch: this.shortStitch,
+      autoTrim: this.autoTrim,
+      maxDensity: this.maxDensity,
+      fillArmed: this.fillArmed,
+      fillDirReporter: this.fillDirReporter,
+      fillShapeReporter: this.fillShapeReporter,
+      fillPathsReporter: this.fillPathsReporter,
+      fillPathsStatic:
+        this.fillPathsStatic?.map((path) => path.map((point) => [point[0], point[1]])) ?? null,
+      fillArmLine: this.fillArmLine,
+      fillPathsName: this.fillPathsName,
+    };
+  }
+
+  /** Restore a construction snapshot without rewinding turtle or output state. */
+  restoreConstructionConfig(snapshot: ConstructionConfigSnapshot): void {
+    if (this.recording)
+      throw new NeedlescriptError(
+        'cannot restore construction configuration during an active fill — close it with endfill first',
+      );
+    if (this.runBuffer !== null || this.satinPath !== null) this.flushSatin();
+
+    this.stitchLen = snapshot.stitchLen;
+    this.stitchLenList = snapshot.stitchLenList?.slice() ?? null;
+    this.stitchLenListPhase = snapshot.stitchLenListPhase;
+    this.stitchLenStretchIndex = snapshot.stitchLenStretchIndex;
+    this.stitchLenStretchStart = snapshot.stitchLenStretchStart;
+    this.stitchLenReporter = snapshot.stitchLenReporter;
+    this.mode = snapshot.mode;
+    this.beanRepeats = snapshot.beanRepeats;
+    this.eWidth = snapshot.eWidth;
+    this.satinWidth = snapshot.satinWidth;
+    this.satinSpacing = snapshot.satinSpacing;
+    this.satinSide = snapshot.satinSide;
+    this.satinReporter = snapshot.satinReporter;
+    this.fillAngle = snapshot.fillAngle;
+    this.fillSpacing = snapshot.fillSpacing;
+    this.fillLen = snapshot.fillLen;
+    this.fillLenList = snapshot.fillLenList?.slice() ?? null;
+    this.fillLenListPhase = snapshot.fillLenListPhase;
+    this.fillLenReporter = snapshot.fillLenReporter;
+    this.lockLen = snapshot.lockLen;
+    this.pullComp = snapshot.pullComp;
+    this.underlayMode = snapshot.underlayMode;
+    this.fillUnderlayMode = snapshot.fillUnderlayMode;
+    this.doubleUnderlay = snapshot.doubleUnderlay;
+    this.shortStitch = snapshot.shortStitch;
+    this.autoTrim = snapshot.autoTrim;
+    this.maxDensity = snapshot.maxDensity;
+    this.fillArmed = snapshot.fillArmed;
+    this.fillDirReporter = snapshot.fillDirReporter;
+    this.fillShapeReporter = snapshot.fillShapeReporter;
+    this.fillPathsReporter = snapshot.fillPathsReporter;
+    this.fillPathsStatic =
+      snapshot.fillPathsStatic?.map((path) => path.map((point) => [point[0], point[1]])) ?? null;
+    this.fillArmLine = snapshot.fillArmLine;
+    this.fillPathsName = snapshot.fillPathsName;
+  }
 
   /** Push an affine transform delta (translate/rotate/scale/…) onto the stack. */
   pushTransform(delta: Mat) {

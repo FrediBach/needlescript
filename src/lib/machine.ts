@@ -7,4 +7,4 @@ export {
   OVERRIDE_FLOORS,
   Machine,
 } from './machine/index.ts';
-export type { BudgetKey } from './machine/index.ts';
+export type { BudgetKey, ConstructionConfigSnapshot } from './machine/index.ts';
