@@ -118,6 +118,7 @@ export type {
   ToppingMode,
 } from './embroidery-registry.ts';
 export {
+  compensateOpenPathEnds,
   compensationForHeading,
   compensationTensor,
   directionalCompensationPreview,

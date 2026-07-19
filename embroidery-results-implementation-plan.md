@@ -1426,6 +1426,8 @@ their compensated thresholds.
 
 ### Session 7.5 — Opt-in directional fill and border compensation
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Extend open fill row ends according to row direction and material tensor.
@@ -1439,6 +1441,28 @@ Acceptance criteria:
 - Compensation does not cross holes or field boundaries without warnings.
 - Directional fills use endpoint tangents consistently.
 - Legacy `pullcomp` behavior remains available.
+
+Implementation note: `compensation 'directional'` now extends every open topping row by the pull
+tensor's projection along its physical row heading. Fixed tatami resolves its single hoop-space row
+heading before generation. Direction-field streamlines and custom paths resolve the start and end
+amount independently from their final hoop-space endpoint tangents, after affine/warp mapping, so
+curved paths may receive different compensation at their two ends. Push remains unapplied and zero
+pending the versioned sew-out measurements in Session 7.6. Closed custom contours retain their
+authored seam and geometry and emit the existing limitation warning with directional terminology.
+
+The recorded pre-inset compound region is retained as the authored containment envelope for the
+construction. If a compensated endpoint segment crosses an outer boundary or enters a hole, the
+machine emits one source-attributed spatial warning per fill recommending `fillinset`, reduced
+`pullcomp`, or legacy compensation. A sufficient physical `fillinset` reserves the overlap inside
+the authored region and suppresses that warning. This integrates the existing explicit border
+reservation and final `filledgerun`/border coverage diagnostic without inventing an automatic border
+width or silently clipping authored compensation.
+
+The source-ordered `fabric`/`pullcomp` override rule is identical to directional satin. The default
+and explicit `'legacy'` paths retain the scalar generator, transform behavior, warnings, connector
+routing, events, and RNG draw count exactly. Directional fill is also drawless. Tests pin anisotropic
+fixed rows, independent curved endpoint tangents, physical compensation after non-uniform transforms,
+closed-contour stability, hole/boundary warnings, inset reservation, and legacy compatibility.
 
 ### Session 7.6 — Physical sew-out validation
 

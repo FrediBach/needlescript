@@ -30,6 +30,7 @@ import {
 } from '../fill-profile.ts';
 import type { FillConnectorAction } from '../fill-profile.ts';
 import { DECLUMP_STITCH_FLOOR, declumpFoldPoint, declumpResetRun } from '../declump.ts';
+import { compensateOpenPathEnds, compensationForHeading } from '../directional-compensation.ts';
 
 export class FillMachine extends SatinMachine {
   private _fillStaggerShortWarned = false;
@@ -37,6 +38,8 @@ export class FillMachine extends SatinMachine {
   private _fillEdgeRunEmitted = false;
   private _fillEdgeRunSamples: { x: number; y: number; line?: number }[] = [];
   private _fillEdgeRunOverlapWarned = false;
+  private _directionalFillBoundaryWarned = false;
+  private _directionalFillAuthoredRings: [number, number][][] = [];
   private _activeFillConnectorId = 0;
 
   beginFill() {
@@ -46,6 +49,8 @@ export class FillMachine extends SatinMachine {
       );
     this.flushSatin();
     this.recording = true;
+    this._directionalFillBoundaryWarned = false;
+    this._directionalFillAuthoredRings = [];
     this.rings = [];
     this.curRing = [this.mapOut(this.x, this.y)];
     if (this.fillArmed) {
@@ -269,6 +274,55 @@ export class FillMachine extends SatinMachine {
       lines: this.currentLine === undefined ? [] : [this.currentLine],
       kind: 'fill',
     });
+  }
+
+  _noteDirectionalFillBoundaryCrossing(from: [number, number], to: [number, number]) {
+    if (
+      this._directionalFillBoundaryWarned ||
+      !this._directionalFillAuthoredRings.length ||
+      segmentInsideCompoundRegion(this._directionalFillAuthoredRings, from, to, 0)
+    )
+      return;
+    this._directionalFillBoundaryWarned = true;
+    const extension = Math.hypot(to[0] - from[0], to[1] - from[1]);
+    const lineSuffix = this.currentLine === undefined ? '' : ` (line ${this.currentLine})`;
+    const index = this.warnings.length;
+    this.warnings.push(
+      `directional fill compensation extends ${extension.toFixed(2)} mm beyond the authored fill boundary near (${to[0].toFixed(1)}, ${to[1].toFixed(1)}) — reserve border overlap with fillinset, reduce pullcomp, or use compensation 'legacy'${lineSuffix}`,
+    );
+    this.constructionWarningLocations.push({
+      index,
+      points: [{ x: to[0], y: to[1] }],
+      lines: this.currentLine === undefined ? [] : [this.currentLine],
+      kind: 'fill',
+    });
+  }
+
+  _directionalFillCompForAngle(angleDegrees: number): number {
+    const tensor = this._directionalPullTensor();
+    if (!tensor) return this.pullComp;
+    const radians = (angleDegrees * Math.PI) / 180;
+    const heading = vheading([Math.cos(radians), Math.sin(radians)]);
+    return Math.max(0, compensationForHeading(tensor, heading).alongStitchMM);
+  }
+
+  _extendDirectionalFillPath(poly: [number, number][], noteBoundary = true): [number, number][] {
+    const tensor = this._directionalPullTensor();
+    if (!tensor || poly.length < 2) return poly;
+    const extended = compensateOpenPathEnds(poly, tensor);
+    if (noteBoundary) {
+      this._noteDirectionalFillBoundaryCrossing(poly[0], extended[0]);
+      this._noteDirectionalFillBoundaryCrossing(
+        poly[poly.length - 1],
+        extended[extended.length - 1],
+      );
+    }
+    return extended;
+  }
+
+  _noteDirectionalFillPathBoundary(poly: [number, number][], extended: [number, number][]) {
+    this._noteDirectionalFillBoundaryCrossing(poly[0], extended[0]);
+    this._noteDirectionalFillBoundaryCrossing(poly[poly.length - 1], extended[extended.length - 1]);
   }
 
   _noteFillEdgeRun(message: string, point: [number, number]) {
@@ -1029,13 +1083,23 @@ export class FillMachine extends SatinMachine {
       let poly = rows[r];
       // Boustrophedon: alternate row direction in placement order (§8/§14).
       if (r % 2 === 1) poly = poly.slice().reverse();
+      const directionalTopping = !opts.underlay && this.compensationMode === 'directional';
       poly =
         opts.underlay && opts.insetMM !== undefined
           ? this._insetStreamline(poly, opts.insetMM)
-          : this._extendForPullComp(poly);
+          : directionalTopping
+            ? poly
+            : this._extendForPullComp(poly);
       if (poly.length < 2) continue;
+      const directionalFinalPath = directionalTopping
+        ? this._extendDirectionalFillPath(
+            poly.map(([x, y]) => toFinal(x, y)),
+            false,
+          )
+        : null;
       if (!opts.underlay && this.fillEdgeShort > 0) {
-        const finalPoly = this.fillHasWarp ? poly.map(([x, y]) => toFinal(x, y)) : poly;
+        const finalPoly =
+          directionalFinalPath ?? (this.fillHasWarp ? poly.map(([x, y]) => toFinal(x, y)) : poly);
         if (pathlen(finalPoly) < this.fillEdgeShort) {
           this._noteFillEdgeShort(finalPoly[0][0], finalPoly[0][1]);
           continue;
@@ -1074,10 +1138,22 @@ export class FillMachine extends SatinMachine {
       const [sx, sy] = localOf(poly[0][0], poly[0][1]);
       cumPhase += phaseFn(sx, sy, r, v);
       if (!pen.length) continue;
-      const fillPts: FillPoint[] = pen.map((p) => {
+      let fillPts: FillPoint[] = pen.map((p) => {
         const [fx, fy] = toFinal(p[0], p[1]);
         return { x: fx, y: fy, jump: false };
       });
+      if (directionalFinalPath && fillPts.length >= 2) {
+        const finalPath = poly.map(([x, y]) => toFinal(x, y));
+        this._noteDirectionalFillPathBoundary(finalPath, directionalFinalPath);
+        fillPts = fillPts.slice();
+        fillPts[0] = {
+          x: directionalFinalPath[0][0],
+          y: directionalFinalPath[0][1],
+          jump: false,
+        };
+        const last = directionalFinalPath[directionalFinalPath.length - 1];
+        fillPts[fillPts.length - 1] = { x: last[0], y: last[1], jump: false };
+      }
       const connectorAction =
         !opts.underlay && this.fillConnect !== 'legacy' && emittedToppingRow
           ? this._emitPolicyFillConnector([fillPts[0].x, fillPts[0].y], hoopRings)
@@ -1292,6 +1368,9 @@ export class FillMachine extends SatinMachine {
     // Rings are recorded in hoop space, so the "end near" hint must be too.
     const [hx, hy] = this.mapOut(this.x, this.y);
     const endNear = { x: hx, y: hy };
+    this._directionalFillAuthoredRings = rings.map((ring) =>
+      ring.map(([x, y]) => [x, y] as [number, number]),
+    );
     rings = this._applyFillInset(rings);
     if (!rings.length) {
       if (this.fillArmed) {
@@ -1427,7 +1506,11 @@ export class FillMachine extends SatinMachine {
           spacing: this.fillSpacing,
           stitchLen,
           endNear,
-          comp: this.pullComp,
+          comp: this._directionalFillCompForAngle(this.fillAngle),
+          onCompensatedEnd:
+            this.compensationMode === 'directional'
+              ? (from, to) => this._noteDirectionalFillBoundaryCrossing(from, to)
+              : undefined,
           minRowLengthMM: this.fillEdgeShort,
           onShortRow: (x, y) => this._noteFillEdgeShort(x, y),
           safeConnect: this.fillInset > 0,
@@ -1472,7 +1555,11 @@ export class FillMachine extends SatinMachine {
         return;
       }
       if (this.pullComp > 0 && clipped.some((p) => p.closed))
-        this.warnings.push('pullcomp does not widen closed contour rings — open row ends only');
+        this.warnings.push(
+          this.compensationMode === 'directional'
+            ? 'directional compensation does not widen closed contour rings — open row ends only'
+            : 'pullcomp does not widen closed contour rings — open row ends only',
+        );
 
       // Underlay is always generated from the recorded compound region, never
       // from the decorative paths returned by the custom generator.
@@ -1517,14 +1604,20 @@ export class FillMachine extends SatinMachine {
       };
       let emittedCustomPath = false;
       for (let row = 0; row < clipped.length; row++) {
-        const local = clipped[row].closed
-          ? clipped[row].path
-          : this._extendForPullComp(clipped[row].path);
-        const hoop = local.map((p) => this._mapFill(p[0], p[1]));
+        const local =
+          clipped[row].closed || this.compensationMode === 'directional'
+            ? clipped[row].path
+            : this._extendForPullComp(clipped[row].path);
+        let hoop = local.map((p) => this._mapFill(p[0], p[1]));
+        const uncompensatedHoop = hoop;
+        if (!clipped[row].closed && this.compensationMode === 'directional')
+          hoop = this._extendDirectionalFillPath(hoop, false);
         if (!clipped[row].closed && this.fillEdgeShort > 0 && pathlen(hoop) < this.fillEdgeShort) {
           this._noteFillEdgeShort(hoop[0][0], hoop[0][1]);
           continue;
         }
+        if (!clipped[row].closed && this.compensationMode === 'directional')
+          this._noteDirectionalFillPathBoundary(uncompensatedHoop, hoop);
         const subdivided = this._walkStreamline(
           hoop,
           row,
@@ -1773,7 +1866,11 @@ export class FillMachine extends SatinMachine {
       spacing: useSpacing,
       stitchLen: useLen,
       endNear,
-      comp: this.pullComp, // rows run along the stitch axis: extend against pull
+      comp: this._directionalFillCompForAngle(useAngle),
+      onCompensatedEnd:
+        this.compensationMode === 'directional'
+          ? (from, to) => this._noteDirectionalFillBoundaryCrossing(from, to)
+          : undefined,
       minRowLengthMM: this.fillEdgeShort,
       onShortRow: (x, y) => this._noteFillEdgeShort(x, y),
       safeConnect: this.fillInset > 0,

@@ -67,12 +67,16 @@ interface WideSatinLaneSample {
 export class SatinMachine extends MachineCore {
   // ---- Satin column: underlay + zigzag, sewn when the column ends ----
 
-  _directionalSatinPullTensor(): CompensationTensor | null {
+  _directionalPullTensor(): CompensationTensor | null {
     if (this.compensationMode !== 'directional') return null;
     return resolveDirectionalCompensation(
       this.materialIntent,
       this.pullCompExplicit ? this.pullComp : undefined,
     ).pullTensor;
+  }
+
+  _directionalSatinPullTensor(): CompensationTensor | null {
+    return this._directionalPullTensor();
   }
 
   _satinPullForHeading(heading: number, tensor: CompensationTensor | null): number {

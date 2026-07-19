@@ -969,9 +969,9 @@ export const NS_ITEMS: NSItem[] = [
   {
     label: 'compensation',
     kindName: 'function',
-    detail: 'satin compensation mode',
+    detail: 'satin and fill compensation mode',
     documentation:
-      "Choose compensation semantics. `'legacy'` (default) preserves scalar `pullcomp` for satin and fill. `'directional'` applies the grain-aligned material tensor to satin rail endpoints in physical hoop space; fill remains scalar until its separate directional phase. `fabric` supplies the mean pull magnitude. A later explicit `pullcomp` replaces that mean while retaining the `fabricstretch` anisotropy; a later `fabric` restores its profile magnitude and neutral stretch defaults. Sticky, `stitchscope`-aware, and drawless.",
+      "Choose compensation semantics. `'legacy'` (default) preserves scalar `pullcomp` for satin and fill. `'directional'` applies the grain-aligned tensor across satin columns and along open fill-row endpoint tangents in final physical hoop space. Curved rows resolve each end independently; closed fill contours stay unchanged. Endpoint crossings of an authored outer boundary or hole warn spatially—use `fillinset` to reserve border overlap. `fabric` supplies the mean pull magnitude; a later explicit `pullcomp` replaces it while retaining `fabricstretch` anisotropy, and a later `fabric` restores profile defaults. Push remains unapplied pending sew-out evidence. Sticky, `stitchscope`-aware, and drawless.",
     insertText: modeCommandSnippet('compensation', COMPENSATION_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
@@ -981,7 +981,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'pull compensation (mm)',
     documentation:
-      "Pull compensation 0–1.5 mm: widens satin columns and extends fill rows so shapes sew out at their digitized size. Under `compensation 'directional'`, it replaces the material tensor's mean pull magnitude while retaining declared stretch anisotropy; fill continues to use this scalar value.",
+      "Pull compensation 0–1.5 mm: widens satin columns and extends open fill rows so shapes sew out at their digitized size. Under `compensation 'directional'`, it replaces the material tensor's mean pull magnitude while retaining declared stretch anisotropy; satin projects it across columns and fills project it along physical endpoint tangents. Reserve border overlap with `fillinset`.",
     insertText: 'pullcomp ${1:mm}',
     isSnippet: true,
     params: [['mm']],
@@ -1091,7 +1091,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'fabric grain heading (degrees)',
     documentation:
-      "Record the fabric grain heading as turtle degrees: 0 points up and positive angles turn clockwise. Values wrap to 0–360. It feeds preview diagnostics and opt-in `compensation 'directional'` satin geometry.",
+      "Record the fabric grain heading as turtle degrees: 0 points up and positive angles turn clockwise. Values wrap to 0–360. It feeds preview diagnostics and opt-in `compensation 'directional'` satin/fill geometry.",
     insertText: 'fabricgrain ${1:0}',
     isSnippet: true,
     params: [['degrees']],
@@ -1100,7 +1100,7 @@ export const NS_ITEMS: NSItem[] = [
     label: 'fabricstretch',
     kindName: 'function',
     detail: 'declared along/across fabric stretch',
-    documentation: `Record fractional stretch along and across the grain, each from ${MATERIAL_RANGES.stretch.min} to ${MATERIAL_RANGES.stretch.max}. The values redistribute directional preview and opt-in satin pull while preserving its mean magnitude. A later \`fabric\` command restores that profile's neutral stretch defaults.`,
+    documentation: `Record fractional stretch along and across the grain, each from ${MATERIAL_RANGES.stretch.min} to ${MATERIAL_RANGES.stretch.max}. The values redistribute directional preview and opt-in satin/fill pull while preserving its mean magnitude. A later \`fabric\` command restores that profile's neutral stretch defaults.`,
     insertText: 'fabricstretch ${1:along} ${2:across}',
     isSnippet: true,
     params: [['along', 'across']],

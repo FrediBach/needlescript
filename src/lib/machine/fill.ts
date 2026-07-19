@@ -24,6 +24,8 @@ export interface FillOpts {
   endNear?: { x: number; y: number };
   /** Extend (+) or inset (−) each row end along the stitch axis, in mm. */
   comp?: number;
+  /** Observe a compensated row end in final hoop space. */
+  onCompensatedEnd?: (from: [number, number], to: [number, number]) => void;
   /** Omit topping row fragments shorter than this physical length. */
   minRowLengthMM?: number;
   /** Called once per row fragment omitted by `minRowLengthMM`. */
@@ -286,9 +288,13 @@ export function generateFill(rings: [number, number][][], opt: FillOpts): FillPo
     for (let i = 0; i + 1 < xs.length; i += 2) {
       const a0 = xs[i] - comp,
         a1 = xs[i + 1] + comp;
-      if (a1 - a0 >= Math.max(0.5, opt.minRowLengthMM ?? 0))
+      if (a1 - a0 >= Math.max(0.5, opt.minRowLengthMM ?? 0)) {
+        if (comp > 0 && opt.onCompensatedEnd) {
+          opt.onCompensatedEnd(unrot([xs[i], y]), unrot([a0, y]));
+          opt.onCompensatedEnd(unrot([xs[i + 1], y]), unrot([a1, y]));
+        }
         segs.push({ x0: a0, x1: a1, y, row: rowIdx });
-      else if ((opt.minRowLengthMM ?? 0) > 0 && a1 - a0 >= 0.5) {
+      } else if ((opt.minRowLengthMM ?? 0) > 0 && a1 - a0 >= 0.5) {
         const [x, yy] = unrot([(a0 + a1) / 2, y]);
         opt.onShortRow?.(x, yy);
       }

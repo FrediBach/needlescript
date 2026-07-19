@@ -61,7 +61,8 @@ Tightly-coupled collaborators live one level up:
 - `embroidery-registry.ts` — compatible legacy fabric construction settings plus typed fabric,
   thread, needle, stabilizer, and topping profiles/defaults.
 - `directional-compensation.ts` — pure grain-aligned compensation tensors, heading projections,
-  material resolution, and preview diagnostics shared by opt-in satin construction.
+  open-path endpoint extension, material resolution, and preview diagnostics shared by opt-in
+  satin/fill construction.
 - `fill-profile.ts` — fill inset/edge/stagger ranges, connector/stagger mode registries, internal
   connector classification types, and pure drawless row-phase calculation including geometry
   hashing.
@@ -196,7 +197,9 @@ Finalization calls `directionalCompensationPreview` once and exposes the result 
 `RunResult.compensation`: the current scalar, its source, the resolved signed tensors, and
 projections at the grain and cross-grain headings. With the default `compensationMode = 'legacy'`,
 this remains comparison-only. The opt-in `'directional'` mode uses the same pure resolver for satin
-geometry. Fill, borders, and running stitches still do not read the tensor.
+and open fill-row geometry. The existing satin-oriented `appliedMode` value remains stable for API
+compatibility; additive `fillEndpointMode` reports the fill policy. Borders and running stitches do
+not read the tensor.
 
 Directional satin replaces the preset tensor's mean magnitude when `pullCompExplicit` is true; it
 does not replace the stretch-derived axis ratio. `fabric` restores its profile scalar and clears the
@@ -407,7 +410,8 @@ uses the closed/sharp/cusp/unsafe classifications plus the same hoop-space rungs
 
 - **Built-in tatami** — `generateFill` in `fill.ts` (a standalone, pure function):
   rotates the region to the fill angle, scans horizontal rows at `spacing`, computes
-  span crossings with even-odd inside testing, applies pull compensation (`comp`),
+  span crossings with even-odd inside testing, applies scalar or pre-resolved directional pull
+  compensation (`comp`),
   orders rows/segments greedily by nearest endpoint, subdivides to stitch length with a
   per-row phase offset (`row % 3`) to avoid tramline artifacts, and unrotates. The default
   `fillStagger = 'legacy'` takes this exact path. Opt-in brick/progressive/random policies replace
@@ -451,6 +455,22 @@ uses the closed/sharp/cusp/unsafe classifications plus the same hoop-space rungs
   Region underlay is deliberately independent of those returned paths: it is generated from the
   recorded compound region before decorative path emission, preserving holes and disconnected
   components.
+
+`compensation 'directional'` changes only open topping-row endpoints. Fixed tatami projects the
+resolved pull tensor along its physical scan-row heading. General direction-field streamlines and
+custom paths map their geometry to final hoop space first, then independently extend the start and
+end along their local endpoint tangents with `compensateOpenPathEnds`; curved paths therefore need
+not receive the same amount at both ends. Closed custom contours are explicit and remain unchanged.
+Push is not applied because the material registry still resolves it to zero pending sew-out data.
+Underlay retains its established construction.
+
+Before `fillInset` is applied, `endFill` retains a copy of the authored compound even-odd region.
+Each directional endpoint extension is checked as a segment against that envelope. Crossing an
+outer boundary or entering a hole emits one source-attributed spatial warning per fill; sufficient
+physical inset keeps the endpoint inside and suppresses it. The warning recommends reserving border
+overlap with `fillinset`, reducing `pullcomp`, or returning to legacy mode. Compensation is not
+silently clipped, and no automatic border width is inferred. Existing `filledgerun` samples still
+perform the final density-aware check against later satin border coverage.
 
 `fillConnect` defaults to `legacy`, which preserves the historical fixed, programmable, and custom
 path event streams. Opt-in `inside` uses `segmentInsideCompoundRegion`: in final hoop space it

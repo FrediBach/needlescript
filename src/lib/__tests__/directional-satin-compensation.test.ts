@@ -119,13 +119,7 @@ describe('opt-in directional satin compensation', () => {
     );
   });
 
-  it('keeps fill on scalar compensation and scopes the mode', () => {
-    const fillSource =
-      'pullcomp 0.4 fillspacing 2 stitchlen 2 beginfill repeat 4 [ fd 8 rt 90 ] endfill';
-    expect(run(`compensation 'directional' ${fillSource}`).events).toEqual(
-      run(`compensation 'legacy' ${fillSource}`).events,
-    );
-
+  it('scopes the mode and diagnoses unknown values', () => {
     const scoped = run("stitchscope [ compensation 'directional' ]");
     expect(scoped.compensation.appliedMode).toBe('legacy-scalar');
     expect(() => run("compensation 'directionl'")).toThrow(

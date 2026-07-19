@@ -118,8 +118,8 @@ export interface ReferenceDataVar {
 
 /**
  * Resolved source-level material choices for a run. These values describe the
- * author's intent. Grain/stretch also feed preview-only directional physics;
- * only legacy `fabric` construction settings affect stitch geometry.
+ * author's intent. Grain/stretch also feed opt-in directional satin/fill
+ * construction; legacy `fabric` settings retain their scalar geometry.
  */
 export interface MaterialIntent {
   fabricPreset: string;
@@ -177,6 +177,8 @@ export interface DirectionalCompensationSample {
 /** Resolved comparison plus the compensation mode active at the end of the run. */
 export interface DirectionalCompensationPreview {
   appliedMode: 'legacy-scalar' | 'directional-satin';
+  /** Fill endpoint policy active at the end of the run. */
+  fillEndpointMode: 'legacy-scalar' | 'directional-open-path';
   currentScalarPullMM: number;
   pullMagnitudeSource: 'fabric-profile' | 'explicit-pullcomp' | 'none';
   resolved: ResolvedDirectionalCompensation;
@@ -192,7 +194,7 @@ export interface RunResult {
   density: DensityResult;
   /** Resolved material/thread intent after all source-order overrides. */
   material: MaterialIntent;
-  /** Directional recommendation and active-mode diagnostic used by opt-in satin construction. */
+  /** Directional recommendation and active-mode diagnostic used by opt-in satin/fill construction. */
   compensation: DirectionalCompensationPreview;
   /** The hoop configured by the `hoop` directive, if any. */
   activeHoop?: HoopInfo;

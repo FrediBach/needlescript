@@ -66,6 +66,52 @@ export function compensationForHeading(
 }
 
 /**
+ * Extend both ends of an open physical path by the tensor projection along
+ * each endpoint tangent. The path is expected to be in final hoop space;
+ * closed paths must be filtered by the caller because endpoint extension does
+ * not widen a contour.
+ */
+export function compensateOpenPathEnds(
+  path: readonly [number, number][],
+  pullTensor: CompensationTensor,
+): [number, number][] {
+  if (path.length < 2) return path.map(([x, y]) => [x, y]);
+
+  const extend = (
+    endpoint: readonly [number, number],
+    neighbor: readonly [number, number],
+  ): [number, number] => {
+    const dx = endpoint[0] - neighbor[0];
+    const dy = endpoint[1] - neighbor[1];
+    const length = Math.hypot(dx, dy);
+    if (!(length > EPSILON)) return [endpoint[0], endpoint[1]];
+    const heading = normalizeHeading((Math.atan2(dx, dy) * 180) / Math.PI);
+    const extension = Math.max(0, compensationForHeading(pullTensor, heading).alongStitchMM);
+    return [endpoint[0] + (dx / length) * extension, endpoint[1] + (dy / length) * extension];
+  };
+
+  const last = path.length - 1;
+  let startNeighbor = 1;
+  while (
+    startNeighbor < path.length &&
+    Math.hypot(path[startNeighbor][0] - path[0][0], path[startNeighbor][1] - path[0][1]) <= EPSILON
+  )
+    startNeighbor++;
+  let endNeighbor = last - 1;
+  while (
+    endNeighbor >= 0 &&
+    Math.hypot(path[endNeighbor][0] - path[last][0], path[endNeighbor][1] - path[last][1]) <=
+      EPSILON
+  )
+    endNeighbor--;
+  if (startNeighbor >= path.length || endNeighbor < 0) return path.map(([x, y]) => [x, y]);
+
+  const start = extend(path[0], path[startNeighbor]);
+  const end = extend(path[last], path[endNeighbor]);
+  return [start, ...path.slice(1, -1).map(([x, y]) => [x, y] as [number, number]), end];
+}
+
+/**
  * Resolve material intent into a directional recommendation. The fabric
  * preset supplies the existing scalar magnitude. Declared stretch distributes
  * that magnitude between grain axes while preserving their arithmetic mean.
@@ -134,6 +180,7 @@ export function directionalCompensationPreview(
   ];
   return {
     appliedMode: options.mode === 'directional' ? 'directional-satin' : 'legacy-scalar',
+    fillEndpointMode: options.mode === 'directional' ? 'directional-open-path' : 'legacy-scalar',
     currentScalarPullMM,
     pullMagnitudeSource: applyExplicitToTensor
       ? 'explicit-pullcomp'
