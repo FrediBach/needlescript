@@ -1,8 +1,10 @@
 # Embroidery Results: Multi-Session Implementation Plan
 
-Status: proposed implementation roadmap  
+Status: software implementation complete; physical sew-out validation remains in progress (Session 7.6)
+
 Scope: NeedleScript language, stitch machine, standard library, diagnostics, documentation, and
-playground integration  
+playground integration
+
 Primary objective: improve physical sew-out quality while preserving NeedleScript's deterministic,
 readable, generative programming model
 
@@ -152,10 +154,10 @@ introduce focused configuration types in a new module such as `src/lib/embroider
 material and underlay state would otherwise be duplicated across command, machine, preflight, and
 UI code.
 
-## 6. Proposed language surface
+## 6. Implemented language surface
 
-The names below are the working API for planning and tests. Each implementation session should
-validate spelling and composition against the parser before treating it as final.
+The names below are the implemented API. Their spelling, modes, composition, editor coverage, and
+documentation are pinned by the command, registry, Monaco, AI-prompt, and integration tests.
 
 ### 6.1 Scoped settings
 
@@ -232,8 +234,9 @@ atomic [
 planbarrier
 ```
 
-`atomic` is useful without `plan`: it is inert in stitch generation but records intent for later
-planning and diagnostics. `planbarrier` prevents reordering across its event boundary.
+With planning absent or `plan 'off'`, `atomic`, `routegroup`, and `planbarrier` are byte-identical
+no-ops around their ordinary body/output and record no planner spans. With an active plan,
+`planbarrier` prevents reordering across its authored event boundary.
 
 ### 6.6 Portable material intent
 
@@ -241,10 +244,10 @@ planning and diagnostics. `planbarrier` prevents reordering across its event bou
 fabric 'knit'
 fabricgrain 90
 fabricstretch 0.15 0.5
-threadprofile 'poly-40'
+threadprofile 'polyester-40wt'
 threadwidth 0.4
 needle 75
-stabilizer 'cutaway-medium'
+stabilizer 'cutaway'
 topping 1
 ```
 
@@ -259,13 +262,14 @@ validation.
 preflight 'warn'    // off, warn, strict
 ```
 
-`warn` appends diagnostics without changing events. `strict` should initially fail only on existing
-hard physical/format violations, not subjective recommendations. Expanding strict failures requires
-a separately reviewed policy change.
+`warn` adds structured diagnostics without changing events or legacy warning strings. `strict`
+fails only on issues already classified as errors: physical hoop unreachability, explicit
+construction layer-order violations, and operations rejected by an explicitly selected local
+machine profile. Expanding strict failures requires a separately reviewed policy change.
 
 ### 6.8 Standard-library recipes
 
-Working exports:
+Implemented exports:
 
 ```needlescript
 import std.stitchcraft.gradientrows as gradientrows
@@ -274,8 +278,8 @@ import std.stitchcraft.fillandborder as fillandborder
 import std.stitchcraft.appliquewith as appliquewith
 ```
 
-The final APIs should favor explicit arguments and pure returned geometry when the caller needs
-color control. Existing `appliquesteps`, `gradientbands`, and `threadblend` remain unchanged.
+The APIs favor explicit arguments and pure returned geometry when the caller needs color control.
+Existing `appliquesteps`, `gradientbands`, and `threadblend` remain unchanged.
 
 ## 7. Cross-cutting data model
 
@@ -373,6 +377,8 @@ later subphase gated by fixtures and sew-out evidence.
 
 ### Session 0.1 — Characterization fixtures
 
+Status: complete (2026-07-19)
+
 Purpose: lock down current output before changing generators.
 
 Tasks:
@@ -401,7 +407,15 @@ Acceptance criteria:
 - No production behavior changes.
 - Full test, format, lint, app build, and library validation pass.
 
+Implementation note: `embroidery-baseline.test.ts` pins compact running, satin, rail-pair, fill,
+underlay, and planner fixtures as exact event/warning/density/statistics snapshots with an appended
+RNG probe. It also freezes every legacy fabric preset and representative DST/PES/EXP bytes.
+`helpers/positional-events.ts` reports the first positional mismatch with neighboring context. The
+session added characterization only and did not alter production output.
+
 ### Session 0.2 — Shared registries and documentation hooks
+
+Status: complete (2026-07-19)
 
 Purpose: avoid duplicating mode lists and bounds across parser, runtime, Monaco, and docs.
 
@@ -418,12 +432,20 @@ Acceptance criteria:
 - One source of truth exists for every new mode registry introduced later.
 - The session does not add user-visible commands unless they are fully documented.
 
+Implementation note: focused registries now own embroidery, underlay, fill, satin, plan, and
+preflight choices and use shared case-insensitive resolution/did-you-mean helpers from
+`mode-registry.ts`. Monaco coverage helpers fail on missing completion, hover, signature, example,
+or registered-mode documentation. The contributor checklist in `AGENTS.md` requires command,
+registry, editor, documentation, compatibility, and RNG coverage for later language additions.
+
 ## 9. Phase 1: standard-library quick wins
 
 This phase deliberately uses existing language features. It should produce useful results early
 without changing machine semantics.
 
 ### Session 1.1 — Density-neutral two-color gradient rows
+
+Status: complete (2026-07-19)
 
 Purpose: turn the technique in `examples/advanced/gradientfill.ns` into a reusable primitive.
 
@@ -438,7 +460,7 @@ Design requirements:
 - Empty groups are valid.
 - The helper consumes zero RNG draws.
 
-Proposed initial signature:
+Implemented signature:
 
 ```needlescript
 gradientrows(region, angle, pitch, @amount)
@@ -464,7 +486,16 @@ Acceptance criteria:
 - Same source and seed produce identical geometry; seed changes do not affect this drawless helper.
 - Existing `gradientbands` and `threadblend` behavior is unchanged.
 
+Implementation note: `std.stitchcraft.gradientrows` clips one constant-pitch candidate field to a
+simple or compound even-odd region and assigns every row exactly once using deterministic error
+diffusion. The reporter receives normalized seeding-axis position, empty groups remain valid, and
+the helper draws no RNG values. Standard-library fixtures pin 50/50 interleaving, endpoints,
+concave/holed clipping, determinism, validation, and aggregate row-count invariance; the advanced
+two-color example uses the export directly.
+
 ### Session 1.2 — N-color gradients and routing
+
+Status: complete (2026-07-19)
 
 Purpose: generalize only after the two-color contract is stable.
 
@@ -475,7 +506,7 @@ Design requirements:
 - Multichannel error is diffused deterministically while assigning each candidate exactly once.
 - Each color group's rows can be routed serpentine and optionally reversed by the caller.
 
-Proposed export:
+Implemented export:
 
 ```needlescript
 gradientrowsn(region, angle, pitch, @weights)
@@ -489,7 +520,16 @@ Acceptance criteria:
 - Quantization error remains bounded over the row sequence.
 - Malformed weights name the reporter and row.
 
+Implementation note: `std.stitchcraft.gradientrowsn` generalizes the same drawless candidate field
+to two through eight fixed channels using normalized multichannel error diffusion. It rejects
+non-lists, changing lengths, non-numeric/negative/all-zero weights with row-attributed diagnostics.
+`serpentinerows` provides caller-controlled routing and reversal without changing assignment. Tests
+pin distribution bounds, density invariance, compound clipping, malformed rows, and zero RNG draws;
+the advanced three-color example demonstrates the routed result.
+
 ### Session 1.3 — Knockdown and fill-with-border recipes
+
+Status: complete (2026-07-19)
 
 Purpose: cover common production constructions using readable library code.
 
@@ -512,9 +552,17 @@ Acceptance criteria:
 - Bordered fills overlap predictably on convex, concave, and holed regions.
 - Every stage remains visible in the emitted event sequence.
 
+Implementation note: `std.stitchcraft` now exports sparse running-stitch `knockdown`, pure
+`fillbordergeometry`, default and explicit-overlap `fillandborder`/`fillandborderwith`, and additive
+`appliquewith` while preserving `appliquesteps`. Fixtures pin region validation, convex/concave/hole
+insets, stage/color order, overlap, stops, and compatibility. The 4 × 4 fleece example combines a
+sparse foundation with a smaller topping-aware patch and stays below the configured density limit.
+
 ## 10. Phase 2: scoped stitch configuration
 
 ### Session 2.1 — State inventory and machine snapshot
+
+Status: complete (2026-07-19)
 
 Purpose: define exactly what a stitch configuration scope owns.
 
@@ -551,7 +599,17 @@ Acceptance criteria:
 - Mutable lists used by stitch/fill length modes cannot mutate a saved snapshot accidentally.
 - Existing machine state tests remain unchanged.
 
+Implementation note: `Machine.snapshotConstructionConfig()` and
+`restoreConstructionConfig()` own running/list/reporter modes, satin/fill arms and policies,
+underlay, material/coverage intent, compensation, locks, auto-trim, and density configuration while
+excluding turtle, output, color, RNG, transforms/effects, coverage history, directives, and
+budgets. Snapshots copy mutable lists, preserve reporter identity, flush only pending buffered
+construction where required, and reject entry/restoration during active fill recording. Focused
+machine tests pin owned and deliberately unowned state plus buffer and unused-fill-arm behavior.
+
 ### Session 2.2 — `stitchscope` parser and runtime
+
+Status: complete (2026-07-19)
 
 Tasks:
 
@@ -570,6 +628,13 @@ Acceptance criteria:
 - Color changes remain changed after the scope.
 - Turtle state remains where the body leaves it.
 - A program rewritten from manual reset commands to `stitchscope` produces identical stitches.
+
+Implementation note: `stitchscope` is a dedicated Core block AST form whose interpreter execution
+snapshots configuration and restores it in `finally`. Nested scopes restore LIFO through ordinary
+completion, `return`, `break`, `continue`, reporter failures, and runtime errors. Color, turtle,
+transform, RNG, output, and coverage effects remain outside the scope; trace remains non-emitting;
+active/partial fill boundaries are rejected. Parser/runtime tests and the Monaco catalog pin syntax,
+reserved-name behavior, folding/completion, restoration, and manual-reset equivalence.
 
 ## 11. Phase 3: parameterized underlay
 
@@ -857,8 +922,9 @@ and segments without 0.1 mm edge clearance outside their endpoint ramps. `jump` 
 non-sewing connector; `trim` also emits a cut when the physical distance reaches active `autotrim`,
 or the existing 7 mm default while general auto-trimming is disabled. Custom paths keep their
 returned/clipped order. An internal per-fill sidecar records policy, action, containment, endpoints,
-distance, margin, and line for future preflight without changing the public event schema. Underlay
-keeps legacy routing, and only actually sewn connectors feed density/history.
+distance, margin, and line without changing the public event schema; Session 8.3 subsequently
+consumes it for connector-containment preflight. Underlay keeps legacy routing, and only actually
+sewn connectors feed density/history.
 
 ### Session 4.4 — Edge run and edge-shortening policies
 
@@ -1117,10 +1183,10 @@ The alternatives were exercised against the existing reorder/reversal and finali
   metadata at every exit and would make exporter isolation conventional rather than structural.
 - A dense event-index sidecar was rejected as the planner's working form. Its indices have to be
   remapped whenever planning drops connector jumps, inserts new ones, or reverses runs. A **sparse
-  authored-boundary sidecar** remains the intended low-impact recording mechanism for the future
-  zero-emission `planbarrier`, `routegroup`, and `atomic` syntax: the machine can record boundary/span
-  offsets while the authored stream is append-only, and finalization can compile those offsets into
-  wrapper tags once, before any reorder.
+  authored-boundary sidecar** was selected for the subsequently implemented zero-emission
+  `planbarrier`, `routegroup`, and `atomic` syntax: the machine records boundary/span offsets while
+  the authored stream is append-only, and finalization compiles those offsets into wrapper tags
+  once, before any reorder.
 - Internal wrappers were selected because metadata moves with an event through reorder/reversal,
   planner-created events receive tags deliberately, and unwrapping creates one auditable boundary.
   The wrapper refactor also leaves planning-off output untouched.
@@ -1377,12 +1443,13 @@ reports the applied legacy scalar, the resolved pull/push tensors, and grain/cro
 comparison. This result is additive diagnostics only: no generator reads it and no stitch, warning,
 coverage value, export, or RNG draw changes.
 
-Construction semantics remain deliberately separate. A future directional satin mode may use
-positive across-column pull to widen rail endpoints and evidence-backed negative along-column push.
-Open tatami rows may use their positive along-row component to extend endpoints; push remains
-deferred. Borders require explicit inset/overlap behavior rather than a generic affine scale, and
-running stitches receive no automatic correction. Synthetic tests pin heading rotation invariance,
-grain-axis swapping, signed projections, material resolution, and unchanged event geometry.
+At the end of Session 7.3, construction semantics remained deliberately separate and this session
+changed no geometry. Sessions 7.4–7.5 subsequently consumed positive across-column pull for satin
+rail widening and positive along-row pull for open fill endpoints. Evidence-backed negative
+along-column/row push remains deferred. Borders still require explicit inset/overlap behavior rather
+than a generic affine scale, and running stitches receive no automatic correction. Synthetic tests
+pin heading rotation invariance, grain-axis swapping, signed projections, material resolution, and
+the Session 7.3 unchanged-event boundary.
 
 ### Session 7.4 — Opt-in directional satin compensation
 
@@ -1517,7 +1584,7 @@ Status: complete (2026-07-19)
 
 Purpose: make diagnostics useful beyond warning strings.
 
-Proposed types:
+Initial type sketch (the final result also records the selected mode):
 
 ```ts
 interface PreflightIssue {
@@ -1996,30 +2063,41 @@ directional auto compensation waits for sew-out validation.
 - promoted directional compensation modes;
 - finalized SVG staging controls and production examples.
 
-## 23. Open decisions to resolve before implementation
+## 23. Decision log and remaining evidence gate
 
-1. Should construction and planner metadata live on events, in sidecars, or in an internal event
-   wrapper?
-2. Should `underlaypasses` accept a list, or should a block/profile form provide better future
-   extensibility?
-3. Should fill edge-run order be underlay → edge → topping or underlay → topping → edge?
-4. How should reporter-supplied fill phase combine with named stagger policies?
-5. Should satin start/end caps be independently configurable in the first public API?
-6. Resolved in Session 5.4: use a constant-count hoop-space rung partition with alternating shared
-   seam ownership; refuse closed, sharp, crossed, radius-unsafe, and reporter-defined topology.
-7. Does `atomic` permit internal color changes, or should that require a separate multi-color group?
-8. Which preflight checks are objective enough for `strict` mode?
-9. Which thread widths and material coefficients have sufficient evidence to ship as recommendations?
+1. Resolved in Sessions 6.1 and 8.3: planner metadata uses private event wrappers compiled from
+   sparse authored-boundary sidecars; construction diagnostics use separate internal records keyed
+   to stable event identities. Neither representation leaks into public events or exporters.
+2. Resolved in Session 3.2: `underlaypasses` and `fillunderlaypasses` accept ordered lists. A future
+   programmable path form remains separately deferred by the Session 3.4 spike.
+3. Resolved in Session 4.4: fill construction order is underlay → edge run → topping.
+4. Resolved in Session 4.2: reporter-supplied cumulative fill phase remains the base; a named
+   stagger policy adds and wraps its deterministic per-row offset.
+5. Resolved in Session 5.2: the engine retains independent start/end cap fields, while the first
+   public `satincap` command deliberately sets both.
+6. Resolved in Session 5.4: wide satin uses a constant-count hoop-space rung partition with
+   alternating shared-seam ownership; closed, sharp, crossed, radius-unsafe, and reporter-defined
+   topology warns and remains unsplit.
+7. Resolved in Session 6.3: an active `atomic` cannot contain a color change because the planner
+   routes independent color blocks. Authors use one atomic per color; planning-off execution remains
+   byte-identical and permits ordinary color changes.
+8. Resolved in Sessions 8.4–8.5: `strict` fails only existing error-severity issues—physical hoop
+   unreachability, explicit underlay/topping layer-order violations, and operations rejected by an
+   explicitly selected local machine profile. Recommendations remain non-fatal.
+9. Open evidence gate: generic rayon/polyester 40 wt and 60 wt planning widths remain advisory, and
+   fabric directional defaults and push stay neutral. Session 7.6 physical measurements are required
+   before any value is promoted as an automatic material recommendation.
 10. Resolved in Session 8.5: final hoop overflow is checked only after local correction; authored
     coordinates remain visible to source-time reporters but do not produce duplicate final warnings.
-11. Resolved in Session 8.5 for local profiles: retain the resolved profile in `RunResult`; SVG stores
-    the complete JSON record and DST stores its name when exporter metadata is supplied. PES/EXP
-    retain corrected coordinates only because the current encoders have no safe metadata slot.
-12. Resolved in Session 8.5: `material`/source commands remain portable design intent;
+11. Resolved in Session 8.5 for local profiles: retain the resolved profile in `RunResult`; SVG
+    stores the complete JSON record and DST stores its name when exporter metadata is supplied.
+    PES/EXP retain corrected coordinates only because the current encoders have no safe metadata
+    slot.
+12. Resolved in Session 8.5: material/source commands remain portable design intent;
     `machineProfile` is caller-local `RunOptions` configuration and never source syntax.
 
-Resolve these in the first session that depends on them. Record the result in the relevant
-architecture document and update this plan rather than leaving decisions only in issue or chat
+Any new unresolved choice should be recorded here and resolved in the first dependent session, with
+the result also captured in the relevant architecture document rather than only in issue or chat
 history.
 
 ## 24. Overall definition of done
@@ -2037,3 +2115,9 @@ This roadmap is complete when:
 - Monaco, AI generation guidance, SVG staging, examples, and public library exports agree;
 - automated checks pass and physical sew-out evidence supports every promoted automatic profile;
 - lettering remains clearly deferred to its own font-design and digitizing roadmap.
+
+Current audit (2026-07-19): all software sessions and automated criteria above are complete. The
+roadmap remains open only for the physical measurements in Session 7.6. Directional compensation is
+therefore still explicit and experimental, fabric directional defaults and push remain neutral, and
+no automatic profile claims sew-out backing. Programmable underlay, lettering, and the playground
+machine-profile editor are documented follow-ups outside the completed software scope.
