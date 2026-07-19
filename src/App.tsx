@@ -31,6 +31,7 @@ import { toEXP } from './lib/exp.ts';
 import { toSVG } from './lib/svg.ts';
 import { EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, MACHINES } from './data.ts';
 import type { HoopConfig, MachineHoop, MachinePreset } from './data.ts';
+import { getFallbackHoopFitWarning } from './hoop-fit-warning.ts';
 import type { ExportFormat } from './components/Header.tsx';
 import {
   deletePathParameterVertex,
@@ -757,15 +758,14 @@ export default function App() {
   });
 
   // Hoop-fit warning computed reactively so it updates when the hoop changes
-  // without requring a re-run.
+  // without requiring a re-run.
   const displayDesign = useMemo((): DesignState => {
-    if (!design.stats) return design;
-    const safeR = Math.min(selectedHoop.widthMM, selectedHoop.heightMM) / 2 - 3;
-    if (design.stats.maxRadius > safeR) {
-      const warning = `design reaches ${(design.stats.maxRadius * 2).toFixed(0)} mm — outside the ${selectedHoop.label}`;
-      return { ...design, warnings: [...design.warnings, warning] };
-    }
-    return design;
+    const warning = getFallbackHoopFitWarning(
+      design.stats?.maxRadius ?? null,
+      selectedHoop,
+      design.activeHoop !== undefined,
+    );
+    return warning ? { ...design, warnings: [...design.warnings, warning] } : design;
   }, [design, selectedHoop]);
 
   // Push the hoop-fit warning into the console whenever it appears or changes
