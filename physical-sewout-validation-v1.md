@@ -108,6 +108,42 @@ warnings. Existing artifacts are not replaced unless `--force` is explicit. Arch
 with the physical specimen record and copy its machine-file checksum into the setup record below.
 Checksums and successful software exports establish provenance only; they are not physical evidence.
 
+### Expected warning ledger
+
+A clean full-matrix generation must remain inside the 130 × 180 mm sewable field. The following
+construction advisories are expected and are pinned by the fixture test:
+
+| Specimen | Expected warning                                      | Rationale for retaining the target                                                                                                    |
+| -------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| K01      | Two fill-boundary extension warnings at 0.50 mm pull  | The isolated F01/F03 targets deliberately expose row-end behavior beyond their 0.4 mm inset; they have no neighboring region or hole. |
+| X01      | Four fill-boundary extension warnings at 0.60 mm pull | F01–F04 deliberately expose every required fill-row heading beyond the 0.4 mm inset; the extension remains isolated.                  |
+| P01      | Fleece topping advisory                               | P01 already specifies topping; retain the general fabric advisory in the manifest as an operator check.                               |
+
+These messages are not exporter failures and must remain in `manifest.json`. Any additional warning,
+any hoop overflow, or a changed warning count requires review before sewing that artifact. Do not
+silence the K01/X01 warnings by changing the v1 geometry: their purpose is to make the candidate
+endpoint behavior measurable. Create v2 if the protocol changes.
+
+### First physical run order
+
+1. Start with W01 only and choose the machine's native format from its generated DST, PES, or EXP
+   file. Confirm the machine or transfer software reports a 130 × 180 mm design field and three
+   thread colors without applying scaling, rotation, centering offsets, or stitch optimization.
+2. Match the selected file's SHA-256 value in `manifest.json`, then copy the checksum, machine,
+   firmware, format, hoop, thread, needle, stabilizer, and intended speed into a new specimen setup
+   record below.
+3. Align the identified fabric grain with hoop-space 0° (vertical), hoop and stabilize consistently,
+   and sew W01 at the recorded speed. Stop and record the event if thread breaks, the needle deflects,
+   the hoop slips, or the machine modifies/rejects the file; do not silently restart under the same
+   specimen ID.
+4. Remove the specimen, let it rest flat for at least 30 minutes, complete every W01 measurement and
+   observation, and retain the physical sample with its manifest.
+5. Review W01 before proceeding in order through K01, X01, D01, optional D02/P01, and W02. A changed
+   machine, speed, material lot, stabilizer setup, thread, or needle creates a new specimen record.
+
+The repository cannot advance this section past W01 without the physical setup record and measured
+values. Generated files, previews, and checksums are not substitutes for that handoff.
+
 ## Specimen setup record
 
 Duplicate this section for every completed specimen. Do not collapse records that used different

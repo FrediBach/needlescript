@@ -89,6 +89,14 @@ const SPECIMENS = [
   },
 ] as const;
 
+const BOUNDARY_WARNING_COUNTS: Partial<Record<(typeof SPECIMENS)[number]['id'], number>> = {
+  K01: 2,
+  X01: 4,
+};
+
+const FLEECE_TOPPING_NOTE =
+  'fleece: consider a water-soluble topping so stitches don’t sink into the pile';
+
 function sourceForSpecimen(specimen: (typeof SPECIMENS)[number]): string {
   return source
     .replace("let sheet_fabric = 'woven'", `let sheet_fabric = '${specimen.fabric}'`)
@@ -160,5 +168,14 @@ describe('physical sew-out validation v1', () => {
       toPES(result.events, `${specimen.id}-SEWOUT-V1`, result.colorTable).byteLength,
     ).toBeGreaterThan(512);
     expect(toEXP(result.events, `${specimen.id}-SEWOUT-V1`).byteLength).toBeGreaterThan(0);
+
+    const boundaryWarnings = result.warnings.filter((warning) =>
+      warning.includes('beyond the authored fill boundary'),
+    );
+    const otherWarnings = result.warnings.filter(
+      (warning) => !warning.includes('beyond the authored fill boundary'),
+    );
+    expect(boundaryWarnings).toHaveLength(BOUNDARY_WARNING_COUNTS[specimen.id] ?? 0);
+    expect(otherWarnings).toEqual(specimen.id === 'P01' ? [FLEECE_TOPPING_NOTE] : []);
   });
 });

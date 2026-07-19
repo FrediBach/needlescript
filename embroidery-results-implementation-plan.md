@@ -1503,6 +1503,12 @@ SHA-256 checksums, setup metadata, stitch/event counts, and warnings; output is 
 replacement requires explicit `--force`. Export tests cover every format for every specimen. These
 artifacts improve physical-test provenance but do not count as sew-out evidence.
 
+The v1 runbook starts with W01 and pins the generated-warning ledger before physical execution. K01
+and X01 intentionally retain isolated fill-boundary extension diagnostics at their profile pull
+values so row-end behavior remains measurable; P01 retains the fleece topping advisory. Any other
+warning or hoop overflow blocks that artifact from sewing pending review. The next evidence-bearing
+step is a completed W01 setup record and post-release measurement table.
+
 ## 16. Phase 8: preflight and machine calibration
 
 ### Session 8.1 — Structured preflight result
