@@ -1087,6 +1087,8 @@ proven rather than inferred. The construction is deterministic and consumes no R
 
 ### Session 6.1 — Planner metadata spike
 
+Status: complete (2026-07-19)
+
 Purpose: choose the least invasive representation for barriers and groups.
 
 Tasks:
@@ -1099,6 +1101,39 @@ Tasks:
   program-order history, but diagnostics must state the mismatch when it matters.
 
 Deliverable: a short decision record in this document or the travel-planner architecture section.
+
+Decision record: the planner's authoritative working representation is an internal event wrapper,
+`{ event: StitchEvent, tags: PlanTags }`. `travel-planner.ts` now lowers the authored public stream
+to wrappers before partitioning/routing and unwraps it before returning. `PlanTags` begins with a
+segment ID and reserves optional group and atomic IDs. Planner-created connector jumps inherit the
+destination record's tags. The wrapper and its tags are private to the module: `StitchEvent`,
+`RunResult.events`, all later post-process passes, and all four exporters continue to receive only
+the public event shape.
+
+The alternatives were exercised against the existing reorder/reversal and finalization paths:
+
+- Optional fields directly on `StitchEvent` were rejected. Object spreads in reversal and later
+  post-process passes preserve unknown fields, so safe use would depend on remembering to strip
+  metadata at every exit and would make exporter isolation conventional rather than structural.
+- A dense event-index sidecar was rejected as the planner's working form. Its indices have to be
+  remapped whenever planning drops connector jumps, inserts new ones, or reverses runs. A **sparse
+  authored-boundary sidecar** remains the intended low-impact recording mechanism for the future
+  zero-emission `planbarrier`, `routegroup`, and `atomic` syntax: the machine can record boundary/span
+  offsets while the authored stream is append-only, and finalization can compile those offsets into
+  wrapper tags once, before any reorder.
+- Internal wrappers were selected because metadata moves with an event through reorder/reversal,
+  planner-created events receive tags deliberately, and unwrapping creates one auditable boundary.
+  The wrapper refactor also leaves planning-off output untouched.
+
+The fixed finalization contract is `authored events/history → planner wrappers → plan → unwrap →
+autotrim → density finalize → locks → RunResult/exporters`. Source `line` and underlay `u` remain
+properties of the wrapped event and survive reordering; reversal remains forbidden for mixed
+underlay/topping runs. Density and stitch-history reporters retain the committed **authored/program
+order** grid: coverage totals are order-independent, and rebuilding it would retroactively change
+values on which the program may already have branched. When a run both uses a history reporter and
+is materially reordered, the plan diagnostic now states that the query observed authored order
+before the final sew-order plan. Locks deliberately remain outside planner records and are derived
+only after final route and auto-trim boundaries are known.
 
 ### Session 6.2 — `planbarrier`
 

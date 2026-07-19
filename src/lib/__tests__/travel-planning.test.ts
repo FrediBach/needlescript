@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyTravelPlan, designStats, run } from '../engine.ts';
+import { applyTravelPlan, designStats, run, toDST, toEXP, toPES, toSVG } from '../engine.ts';
 import type { StitchEvent } from '../types.ts';
 
 const printed = (source: string) => run(source).printed;
@@ -223,6 +223,34 @@ describe('plan directive', () => {
     const planned = run(threeRuns("plan 'nearest'"));
     const plain = run(threeRuns(''));
     expect(planned.density).toEqual(plain.density);
+  });
+
+  it('states when history queries saw authored order before a material reorder', () => {
+    const result = run(`${threeRuns("plan 'nearest'")} print countat([0, 0])`);
+    expect(result.printed.at(-1)).toMatch(
+      /history queries used authored order, before this final sew-order plan/,
+    );
+  });
+
+  it('does not report a history-order mismatch when eligible runs keep authored order', () => {
+    const result = run(`
+      plan 'nearest' lock 0 autotrim 0 stitchlen 12
+      down fd 1 trim up setxy 5 0 down fd 1
+      print countat([0, 0])
+    `);
+    expect(result.printed.at(-1)).toBe("plan 'nearest': nothing to reorder");
+  });
+
+  it('lowers planner-only records before RunResult and every exporter boundary', () => {
+    const result = run(threeRuns("plan 'nearest'"));
+    const publicKeys = new Set(['t', 'x', 'y', 'c', 'line', 'u', 'label']);
+    expect(
+      result.events.every((event) => Object.keys(event).every((key) => publicKeys.has(key))),
+    ).toBe(true);
+    expect(() => toDST(result.events, 'planner-metadata')).not.toThrow();
+    expect(() => toEXP(result.events, 'planner-metadata')).not.toThrow();
+    expect(() => toPES(result.events, 'planner-metadata', result.colorTable)).not.toThrow();
+    expect(() => toSVG(result.events, 'planner-metadata', result.colorTable)).not.toThrow();
   });
 
   it('does not split long jumps when autotrim is disabled', () => {

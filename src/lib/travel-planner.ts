@@ -13,7 +13,7 @@ export interface TravelPlanResult {
 }
 
 interface ThreadRun {
-  events: StitchEvent[];
+  records: PlannerEventRecord[];
   entry: readonly [number, number];
   exit: readonly [number, number];
   index: number;
@@ -21,8 +21,25 @@ interface ThreadRun {
 }
 
 interface ColorBlock {
-  prefix: StitchEvent[];
+  prefix: PlannerEventRecord[];
   runs: ThreadRun[];
+}
+
+/**
+ * Planner-only metadata travels beside an event, never on the public event.
+ * Future barrier/group/atomic commands can populate these tags when the raw
+ * stream is lowered into planner records. The records are unwrapped before
+ * any later post-process or RunResult/export boundary.
+ */
+interface PlannerTags {
+  segment: number;
+  group?: number;
+  atomic?: number;
+}
+
+interface PlannerEventRecord {
+  event: StitchEvent;
+  tags: PlannerTags;
 }
 
 export interface PlanStrategy {
@@ -56,24 +73,24 @@ function travelLength(events: StitchEvent[]): number {
   return total;
 }
 
-function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
-  const prefix: StitchEvent[] = [];
+function splitColorBlock(records: PlannerEventRecord[], autoTrim: number): ColorBlock {
+  const prefix: PlannerEventRecord[] = [];
   const runs: ThreadRun[] = [];
-  let current: StitchEvent[] = [];
+  let current: PlannerEventRecord[] = [];
   let currentEntry: StitchEvent | null = null;
-  let gap: StitchEvent[] = [];
+  let gap: PlannerEventRecord[] = [];
   let lastPosition: StitchEvent | null = null;
   let cutPending = false;
 
   const finish = () => {
-    const positional = current.filter((event) => event.t === 'stitch' || event.t === 'jump');
+    const positional = current.filter(({ event }) => event.t === 'stitch' || event.t === 'jump');
     if (positional.length === 0) {
       prefix.push(...current);
     } else {
-      const first = currentEntry ?? positional[0];
-      const last = positional[positional.length - 1];
+      const first = currentEntry ?? positional[0].event;
+      const last = positional[positional.length - 1].event;
       runs.push({
-        events: current,
+        records: current,
         entry: [first.x, first.y],
         exit: [last.x, last.y],
         index: runs.length,
@@ -88,7 +105,7 @@ function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
     if (gap.length === 0) return;
     let distance = 0;
     let point = lastPosition;
-    for (const event of gap) {
+    for (const { event } of gap) {
       if (event.t !== 'jump') continue;
       if (point) distance += Math.hypot(event.x - point.x, event.y - point.y);
       point = event;
@@ -97,7 +114,7 @@ function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
     if (cutPending || longCut) {
       // Boundary marks annotate the run just sewn. Connector jumps are rebuilt
       // after ordering and are therefore intentionally not retained.
-      current.push(...gap.filter((event) => event.t === 'mark'));
+      current.push(...gap.filter(({ event }) => event.t === 'mark'));
       if (current.length > 0) finish();
       // The last jump is the physical approach point for the next run. Keep it
       // out of the atomic run, but retain its coordinates for routing and for
@@ -111,18 +128,19 @@ function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
     gap = [];
   };
 
-  for (const event of events) {
+  for (const record of records) {
+    const { event } = record;
     if (event.t === 'jump' || event.t === 'mark') {
-      gap.push(event);
+      gap.push(record);
       continue;
     }
     flushGap(event.t === 'stitch');
     if (event.t === 'trim') {
-      current.push(event);
+      current.push(record);
       cutPending = true;
       continue;
     }
-    current.push(event);
+    current.push(record);
     if (event.t === 'stitch') lastPosition = event;
   }
   flushGap(false);
@@ -130,40 +148,47 @@ function splitColorBlock(events: StitchEvent[], autoTrim: number): ColorBlock {
   return { prefix, runs };
 }
 
-function isReversible(events: StitchEvent[]): boolean {
-  const positional = events.filter((event) => event.t === 'stitch' || event.t === 'jump');
-  if (positional.length === 0 || positional.some((event) => event.t !== 'stitch')) return false;
+function isReversible(records: PlannerEventRecord[]): boolean {
+  const positional = records.filter(({ event }) => event.t === 'stitch' || event.t === 'jump');
+  if (positional.length === 0 || positional.some(({ event }) => event.t !== 'stitch')) return false;
 
   // Reversing mixed underlay/top-stitch output would sew the decorative layer
   // before its foundation. Runs containing only one of those layers are safe.
-  const hasUnderlay = positional.some((event) => event.u === 1);
-  const hasTopStitch = positional.some((event) => event.u !== 1);
+  const hasUnderlay = positional.some(({ event }) => event.u === 1);
+  const hasTopStitch = positional.some(({ event }) => event.u !== 1);
   if (hasUnderlay && hasTopStitch) return false;
 
   // Marks may occur between stitches and describe authored sequence points.
   // A trailing trim/mark suffix, on the other hand, remains meaningful at the
   // end of the reversed run.
-  const lastPositional = events.findLastIndex(
-    (event) => event.t === 'stitch' || event.t === 'jump',
+  const lastPositional = records.findLastIndex(
+    ({ event }) => event.t === 'stitch' || event.t === 'jump',
   );
-  return events.slice(0, lastPositional).every((event) => event.t === 'stitch');
+  return records.slice(0, lastPositional).every(({ event }) => event.t === 'stitch');
 }
 
-function reverseRun(run: ThreadRun): StitchEvent[] {
-  const stitches = run.events.filter((event) => event.t === 'stitch');
-  const suffix = run.events.slice(stitches.length);
+function reverseRun(run: ThreadRun): PlannerEventRecord[] {
+  const stitches = run.records.filter(({ event }) => event.t === 'stitch');
+  const suffix = run.records.slice(stitches.length);
   const points: (readonly [number, number])[] = [run.entry];
-  for (const stitch of stitches) points.push([stitch.x, stitch.y]);
+  for (const { event } of stitches) points.push([event.x, event.y]);
 
-  const reversed = stitches.toReversed().map((stitch, index) => ({
-    ...stitch,
-    x: points[points.length - 2 - index][0],
-    y: points[points.length - 2 - index][1],
+  const reversed = stitches.toReversed().map((record, index) => ({
+    ...record,
+    event: {
+      ...record.event,
+      x: points[points.length - 2 - index][0],
+      y: points[points.length - 2 - index][1],
+    },
   }));
   const end = run.entry;
   return [
     ...reversed,
-    ...suffix.map((event) => (event.t === 'trim' ? { ...event, x: end[0], y: end[1] } : event)),
+    ...suffix.map((record) =>
+      record.event.t === 'trim'
+        ? { ...record, event: { ...record.event, x: end[0], y: end[1] } }
+        : record,
+    ),
   ];
 }
 
@@ -171,8 +196,8 @@ function planBlock(
   block: ColorBlock,
   strategy: PlanStrategy,
   examine?: (count: number) => void,
-): StitchEvent[] {
-  if (block.runs.length <= 1) return [...block.prefix, ...block.runs.flatMap((run) => run.events)];
+): PlannerEventRecord[] {
+  if (block.runs.length <= 1) return [...block.prefix, ...block.runs.flatMap((run) => run.records)];
   const ordered = routeItems(
     strategy.algorithm,
     block.runs.map((run) => ({
@@ -189,20 +214,23 @@ function planBlock(
   let previous: ThreadRun | null = null;
   for (const routed of ordered) {
     const run = routed.item.value;
-    const runEvents = routed.reversed ? reverseRun(run) : run.events;
+    const runRecords = routed.reversed ? reverseRun(run) : run.records;
     const entry = routed.reversed ? run.exit : run.entry;
     if (previous) {
-      const first = runEvents.find((event) => event.t === 'stitch' || event.t === 'jump');
+      const first = runRecords.find(({ event }) => event.t === 'stitch' || event.t === 'jump');
       if (first)
         out.push({
-          t: 'jump',
-          x: entry[0],
-          y: entry[1],
-          c: first.c,
-          line: first.line,
+          event: {
+            t: 'jump',
+            x: entry[0],
+            y: entry[1],
+            c: first.event.c,
+            line: first.event.line,
+          },
+          tags: first.tags,
         });
     }
-    out.push(...runEvents);
+    out.push(...runRecords);
     previous = run;
   }
   return out;
@@ -215,36 +243,46 @@ export function applyTravelPlan(
   examine?: (count: number) => void,
 ): TravelPlanResult {
   const strategy = PLAN_STRATEGIES[mode];
-  const output: StitchEvent[] = [];
-  let segment: StitchEvent[] = [];
+  const records: PlannerEventRecord[] = events.map((event) => ({
+    event,
+    tags: { segment: 0 },
+  }));
+  const output: PlannerEventRecord[] = [];
+  let segment: PlannerEventRecord[] = [];
   let runs = 0;
   let colors = 0;
-  let reordered = false;
 
   const flush = () => {
     const block = splitColorBlock(segment, autoTrim);
     runs += block.runs.length;
     if (block.runs.length > 0) colors++;
-    if (block.runs.length > 1) reordered = true;
     output.push(...planBlock(block, strategy, examine));
     segment = [];
   };
 
-  for (const event of events) {
+  for (const record of records) {
+    const { event } = record;
     if (event.t === 'color') {
       flush();
-      output.push(event);
+      output.push(record);
     } else {
-      segment.push(event);
+      segment.push(record);
     }
   }
   flush();
 
+  const outputEvents = output.map(({ event }) => event);
+  const authoredStitches = records.filter(({ event }) => event.t === 'stitch');
+  const plannedStitches = output.filter(({ event }) => event.t === 'stitch');
+  const reordered =
+    authoredStitches.length !== plannedStitches.length ||
+    authoredStitches.some((record, index) => record !== plannedStitches[index]);
+
   return {
-    events: output,
+    events: outputEvents,
     mode,
     travelBeforeMm: travelLength(events),
-    travelAfterMm: travelLength(output),
+    travelAfterMm: travelLength(outputEvents),
     runs,
     colors,
     reordered,

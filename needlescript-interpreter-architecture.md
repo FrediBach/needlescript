@@ -511,7 +511,8 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
 1. **Flush and close**: `m.flushSatin()`; if a fill was left open, close it with a
    warning (`index.ts:90-95`).
 2. **Tiny-stitch merge warnings**, then optional **travel planning**. Planning sees
-   the closed raw event stream and runs before every order-sensitive pass.
+   the closed raw event stream, lowers it to private event-plus-tag wrappers, and runs before every
+   order-sensitive pass. It unwraps to plain `StitchEvent[]` before returning.
 3. **Auto-trim**, then **density analysis** before locks (so tie-offs don't read as false hotspots), then
    density/stack hotspot warnings with `WarningLocation` spatial data
    (`index.ts:121-153`).
@@ -530,7 +531,9 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
 The load-bearing finalize order is `flush → plan → autotrim → density → locks`.
 Planning therefore prevents unnecessary automatic cuts, while locks see only final
 run boundaries. The live density grid and history queries intentionally remain in
-program order; density accumulation is order-independent.
+program order; density accumulation is order-independent. If a history reporter ran and planning
+materially reorders the stream, the planner diagnostic explicitly notes that the reporter observed
+authored order rather than final sew order.
 
 The `RunResult` shape is defined in `types.ts`; downstream, the exporters
 (`svg.ts`, `dst.ts`, `pes.ts`, `exp.ts`) consume `events` to produce files.

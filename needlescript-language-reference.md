@@ -968,7 +968,7 @@ Hoop-agnostic margin idiom: `let margin = first(offsetpath(fieldpath(), -6))`.
 
 After execution, planning partitions every color block into atomic thread runs at explicit trims and at jumps that active autotrim would cut. Each color's first run stays first and keeps its authored direction; remaining runs are chained by nearest entry point, with deterministic original-index ties. `nearest` never reverses runs. `reversing-nearest` may reverse stitch-only runs without internal jumps, mixed underlay/top-stitch ordering, or mid-run marks; this includes ordinary straight running-stitch lines and preserves their stitch geometry. Explicit trims remain, and color boundaries are never crossed. Connector jumps are rebuilt for the new adjacency and direction so the later lock pass retains a valid tie-in direction. The pass runs before autotrim, density finalization, and locks, so automatic trims and locks see the shortened route.
 
-Planning can change which overlapping same-color run lies on top. History queries still see program order because they execute before this final pass; density is unchanged. Active planning prints before/after travel and autotrim counts and exposes `planMode`, `travelBeforeMm`, and `travelAfterMm` through result statistics.
+Planning can change which overlapping same-color run lies on top. History queries still see program order because they execute before this final pass; density is unchanged. If a history query ran and planning materially reordered the design, the plan diagnostic states this authored-order/final-order mismatch. Active planning prints before/after travel and autotrim counts and exposes `planMode`, `travelBeforeMm`, and `travelAfterMm` through result statistics.
 
 ### 16.3 Custom fill-path helpers
 

@@ -95,6 +95,14 @@ Every event is in **hoop space** — the machine maps local turtle coordinates t
 the transform/warp stack _before_ pushing. `line` carries the source line (or the
 caller's line, when inside a procedure) so previews can highlight the responsible code.
 
+Planner constraints do not extend this public shape. During finalization the travel planner wraps
+each authored event in a private `{ event, tags }` record, performs routing on those records, and
+unwraps them before auto-trim, locks, `RunResult`, or an exporter can observe the stream. Future
+zero-emission barriers and group/atomic spans will be recorded as sparse authored event-boundary
+offsets while the machine stream is append-only, then compiled into wrapper tags at that one
+lowering boundary. See the Session 6.1 decision record in
+`embroidery-results-implementation-plan.md`.
+
 ---
 
 ## 4. Machine state
@@ -531,10 +539,11 @@ After execution the interpreter runs the machine's `events` through pure passes 
 `postprocess.ts`:
 
 - **`applyTravelPlan`** (`travel-planner.ts`) — partition color blocks into atomic
-  runs and reorder them through the generic strategy registry. The
+  runs and reorder private planner event wrappers through the generic strategy registry. The
   `reversing-nearest` strategy also considers both endpoints of eligible stitch-only
   runs. Connector jumps are rebuilt for the chosen entry direction so the later lock
-  pass retains its tie-in direction; stitch geometry and explicit trims are retained.
+  pass retains its tie-in direction; stitch geometry and explicit trims are retained. The wrappers
+  are lowered back to plain `StitchEvent[]` before this pass returns.
 - **`applyLocks`** (`17`) — insert tie-in/tie-off "lock" stitches at the start/end of
   each stitch run that borders a cut (color/trim) or a jump gap ≥ 4 mm, securing the
   thread. Returns the augmented events and a lock count.

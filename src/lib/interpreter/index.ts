@@ -173,9 +173,13 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       runs: planned.runs,
       colors: planned.colors,
     };
+    const historyNote =
+      planned.reordered && m.usedQuery
+        ? '; history queries used authored order, before this final sew-order plan'
+        : '';
     ctx.printed.push(
       planned.reordered
-        ? `plan '${planned.mode}': travel ${planned.travelBeforeMm.toFixed(1)} mm → ${planned.travelAfterMm.toFixed(1)} mm, autotrims ${beforeAutotrims} → ${afterAutotrims} (runs: ${planned.runs}, colors: ${planned.colors})`
+        ? `plan '${planned.mode}': travel ${planned.travelBeforeMm.toFixed(1)} mm → ${planned.travelAfterMm.toFixed(1)} mm, autotrims ${beforeAutotrims} → ${afterAutotrims} (runs: ${planned.runs}, colors: ${planned.colors}${historyNote})`
         : `plan '${planned.mode}': nothing to reorder`,
     );
   }
