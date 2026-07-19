@@ -296,6 +296,46 @@ export function initExecStmt(ctx: RunContext): void {
         }
         return;
       }
+      case 'atomic': {
+        if (ctx.insideTrace > 0)
+          throw new NeedlescriptError(
+            'atomic is not allowed inside trace — apply it where the captured path is sewn',
+            st.line,
+          );
+        const planning = ctx.planMode !== null && ctx.planMode !== 'off';
+        const ownsSpan = planning && ctx.atomicDepth === 0;
+        if (ownsSpan && ctx.m.recording)
+          throw new NeedlescriptError(
+            'atomic cannot start inside a beginfill…endfill recording — wrap the complete fill instead',
+            st.line,
+          );
+        if (ownsSpan) ctx.m.flushSatin();
+        const start = ctx.m.events.length;
+        ctx.atomicDepth++;
+        ctx.structuralDepth++;
+        let bodyError: unknown;
+        let bodyThrew = false;
+        try {
+          ctx.execBlock(st.body, env, repcount, depth, contextLine);
+        } catch (error) {
+          bodyError = error;
+          bodyThrew = true;
+        } finally {
+          ctx.structuralDepth--;
+          ctx.atomicDepth--;
+        }
+        if (ownsSpan) {
+          if (ctx.m.recording)
+            throw new NeedlescriptError(
+              'atomic cannot end inside a beginfill…endfill recording — close the fill inside the atomic block',
+              st.line,
+            );
+          ctx.m.flushSatin();
+          ctx.planAtomicSpans.push({ start, end: ctx.m.events.length, line: st.line });
+        }
+        if (bodyThrew) throw bodyError;
+        return;
+      }
       case 'transform': {
         // Build the delta matrix from the args, compose it onto the CTM for
         // the duration of the block, then restore. flushSatin on both edges

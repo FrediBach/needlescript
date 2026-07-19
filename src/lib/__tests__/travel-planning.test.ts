@@ -400,3 +400,107 @@ describe('planbarrier', () => {
     );
   });
 });
+
+describe('atomic', () => {
+  const stitchXs = (source: string) =>
+    run(source)
+      .events.filter((event) => event.t === 'stitch')
+      .map((event) => event.x);
+
+  const fixture = (open: string, close: string) => `
+    plan 'nearest' lock 0 autotrim 0 stitchlen 20
+    down fd 1 trim
+    ${open}
+      up setxy 20 0 down fd 1 trim
+      up setxy 2 0 down fd 1 trim
+    ${close}
+    up setxy 5 0 down fd 1
+  `;
+
+  it('moves the complete forward-only span as one route item', () => {
+    expect(stitchXs(fixture('', ''))).toEqual([0, 0, 2, 5, 20]);
+    expect(stitchXs(fixture('atomic [', ']'))).toEqual([0, 0, 5, 20, 2]);
+    expect(
+      stitchXs(
+        fixture('atomic [ atomic [', '] ]').replace("plan 'nearest'", "plan 'reversing-nearest'"),
+      ),
+    ).toEqual([0, 0, 5, 20, 2]);
+  });
+
+  it('preserves every internal event and underlay/topping order', () => {
+    const events: StitchEvent[] = [
+      { t: 'stitch', x: 0, y: 0, c: 0 },
+      { t: 'trim', x: 0, y: 0, c: 0 },
+      { t: 'jump', x: 20, y: 0, c: 0 },
+      { t: 'stitch', x: 20, y: 1, c: 0, u: 1 },
+      { t: 'trim', x: 20, y: 1, c: 0 },
+      { t: 'mark', x: 20, y: 1, c: 0, label: 'between' },
+      { t: 'jump', x: 2, y: 0, c: 0 },
+      { t: 'stitch', x: 2, y: 1, c: 0 },
+      { t: 'trim', x: 2, y: 1, c: 0 },
+      { t: 'jump', x: 5, y: 0, c: 0 },
+      { t: 'stitch', x: 5, y: 1, c: 0 },
+    ];
+    const planned = applyTravelPlan(
+      events,
+      'reversing-nearest',
+      0,
+      undefined,
+      [],
+      [{ start: 2, end: 9, line: 7 }],
+    ).events;
+    const atomicRecords = planned.slice(-7);
+    expect(atomicRecords).toEqual(events.slice(2, 9));
+    expect(planned.filter((event) => event.t === 'stitch').map((event) => event.x)).toEqual([
+      0, 5, 20, 2,
+    ]);
+  });
+
+  it('restores nesting after non-local procedure return', () => {
+    const result = run(`
+      plan 'nearest' lock 0 autotrim 0 stitchlen 20
+      def stage(x) [
+        atomic [
+          up setxy x 0 down fd 1 trim
+          return
+        ]
+      ]
+      down fd 1 trim
+      stage(20)
+      stage(2)
+      up setxy 5 0 down fd 1
+    `);
+    expect(result.events.filter((event) => event.t === 'stitch').map((event) => event.x)).toEqual([
+      0, 0, 2, 5, 20,
+    ]);
+  });
+
+  it('is byte-identical and does not flush buffered construction when planning is off', () => {
+    const plain = "lock 0 autotrim 0 underlay 'off' density 1 satin 4 fd 3 fd 3 satin 0";
+    const grouped =
+      "lock 0 autotrim 0 underlay 'off' density 1 satin 4 fd 3 atomic [ fd 3 ] satin 0";
+    expect(run(grouped).events).toEqual(run(plain).events);
+    expect(run(`plan 'off' ${grouped}`).events).toEqual(run(plain).events);
+
+    const colorPlain = 'lock 0 fd 1 color 2 fd 1';
+    expect(run('lock 0 atomic [ fd 1 color 2 fd 1 ]').events).toEqual(run(colorPlain).events);
+  });
+
+  it('rejects constraints the color-block planner cannot preserve', () => {
+    expect(() => run("plan 'nearest' atomic [ fd 1 color 2 fd 1 ]")).toThrow(
+      /atomic cannot contain a color change/i,
+    );
+    expect(() => run("plan 'nearest' atomic [ fd 1 planbarrier fd 1 ]")).toThrow(
+      /planbarrier cannot appear inside atomic/i,
+    );
+    expect(() => run('atomic [ let p = trace [ atomic [ fd 1 ] ] ]')).toThrow(
+      /atomic is not allowed inside trace/i,
+    );
+    expect(() => run("plan 'nearest' beginfill atomic [ fd 5 ] endfill")).toThrow(
+      /cannot start inside a beginfill/i,
+    );
+    expect(() => run("plan 'nearest' atomic [ beginfill fd 5 ] endfill")).toThrow(
+      /cannot end inside a beginfill/i,
+    );
+  });
+});

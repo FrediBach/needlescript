@@ -548,6 +548,11 @@ export function initExecCmdHandler(
       // A disabled or absent planner must be a true construction no-op. In
       // particular, do not flush buffered satin/reporter-running output.
       if (ctx.planMode === null || ctx.planMode === 'off') return;
+      if (ctx.atomicDepth > 0)
+        throw new NeedlescriptError(
+          'planbarrier cannot appear inside atomic — an atomic span must stay within one planner segment',
+          st.line,
+        );
       if (ctx.m.recording)
         throw new NeedlescriptError(
           'planbarrier cannot split a beginfill…endfill recording — place it before beginfill or after endfill',

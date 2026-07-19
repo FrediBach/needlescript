@@ -35,7 +35,7 @@ The most common code-generation errors, in order of frequency:
 
 ### 2.1 Blocks use `[ ]`, never `{ }`
 
-Every block — loop bodies, `if`/`else`, `def` bodies, `stitchscope`, and transform/effect blocks — is delimited by square brackets. The characters `{` and `}` must appear **nowhere**.
+Every block — loop bodies, `if`/`else`, `def` bodies, `stitchscope`, `atomic`, and transform/effect blocks — is delimited by square brackets. The characters `{` and `}` must appear **nowhere**.
 
 ```text
 repeat 6 [ fd 10 rt 60 ]        // correct
@@ -60,7 +60,7 @@ break continue return exit output true false and or not
 | `shape` | `fill … shape @proc` — immediately after `fill` | ordinary name                       |
 | `paths` | `fill paths @proc                               | expr`— immediately after`fill`      | ordinary name |
 
-**Core tier** (hard error if redefined): all movement, stitching, thread, fill, control-flow, transform and effect commands, `@name` references, and the zero-arg reporters — e.g. `fd`, `rt`, `circle`, `color`, `satin`, `satinbetween`, `stitchscope`, `scale`, `rotate`, `translate`, `transform`, `warp`, `humanize`, `snaptogrid`, `declump`, `pos`, `heading`, `xcor`, `ycor`, `repcount`, `random`, `trace`, `tracerings`. Cannot be used as variable, parameter, or procedure names.
+**Core tier** (hard error if redefined): all movement, stitching, thread, fill, control-flow, transform and effect commands, `@name` references, and the zero-arg reporters — e.g. `fd`, `rt`, `circle`, `color`, `satin`, `satinbetween`, `stitchscope`, `atomic`, `scale`, `rotate`, `translate`, `transform`, `warp`, `humanize`, `snaptogrid`, `declump`, `pos`, `heading`, `xcor`, `ycor`, `repcount`, `random`, `trace`, `tracerings`. Cannot be used as variable, parameter, or procedure names.
 
 **Library tier** (soft reservation): every list, string, generative-math, and stitch-history function (`len`, `clamp`, `scatter`, `str`, `upper`, `coverat`, `satinpair`, `tatamirow`, …). Variables and parameters **may** reuse these names (builtins resolve only at glued-call position); a user `def` of the same name shadows the builtin for the whole program with a one-time console note. **Best practice for generated code: avoid reusing any builtin name.** Safe alternatives:
 
@@ -215,6 +215,7 @@ Reads: plain names (`fd x`) or classic (`fd :x`) resolve identically. Plain `x =
 | `break`                                   | end innermost enclosing loop                                                            |
 | `continue`                                | next iteration of innermost loop                                                        |
 | `stitchscope [ … ]`                       | temporarily override stitch-construction settings; always restore them on exit          |
+| `atomic [ … ]`                            | keep the block's planned output contiguous and in authored order                        |
 
 - `to` and `step` end the bound expressions naturally: `for i = 1 to n * 2 [ … ]` needs no parens.
 - The loop variable doesn't leak.
@@ -984,6 +985,36 @@ always rejected inside `trace`, since trace output is sandboxed data rather than
 With planning active it is also rejected inside an open `beginfill…endfill`, because the complete
 buffered fill is committed only at `endfill`. Put the barrier before `beginfill` or after `endfill`
 instead.
+
+#### `atomic`
+
+`atomic [ … ]` makes every routable run emitted by the block one indivisible, forward-only planner
+item. Its stitches, jumps, trims, marks, underlay, and topping retain authored order, while the
+complete item may move within its color and `planbarrier` segment. This is intended for compound
+constructions whose foundation and decorative pass must remain adjacent:
+
+```text
+atomic [
+  underlay 'edge'
+  satin 4
+  fd 20
+  trim
+]
+```
+
+Nested atomics do not create competing spans: the outermost executing block owns all nested output.
+Entry and exit are exception-safe, so `return`, `break`, and `continue` close the span before control
+continues. The form consumes no RNG draws.
+
+With planning absent or explicitly `off`, `atomic` executes only its body. It records no span and
+does not flush buffered satin or reporter-driven running construction, so output is byte-identical
+to the unwrapped body. With active planning, the outer boundary flushes pending construction at both
+edges so a whole satin or running construction cannot leak into or out of the span.
+
+An active atomic cannot contain a color change because the current planner routes independent color
+blocks; use one atomic per color. It also cannot contain `planbarrier`, run inside `trace`, start
+inside an open `beginfill…endfill`, or leave a fill open when it ends. A complete fill may be wrapped
+as `atomic [ beginfill … endfill ]`.
 
 ### 16.3 Custom fill-path helpers
 

@@ -1038,6 +1038,16 @@ export const NS_ITEMS: NSItem[] = [
     params: [[]],
   },
   {
+    label: 'atomic',
+    kindName: 'function',
+    detail: 'keep a construction contiguous during travel planning',
+    documentation:
+      "Treat every routable run emitted by the block as one indivisible, forward-only travel-planner item. Internal stitches, jumps, trims, marks, underlay, and topping retain their authored order while the complete item may move within its color and `planbarrier` segment. Nested `atomic` blocks belong to the outermost span. With planning absent or `plan 'off'`, the block is byte-identical to its body and does not flush buffered construction. Active atomics cannot cross a color change or `planbarrier`, start/end inside an open `beginfill…endfill`, or run inside `trace`.\n\n```\natomic [\n  // foundation and decorative pass stay together\n  underlay 'edge'\n  satin 4\n  fd 20\n  trim\n]\n```",
+    insertText: 'atomic [\n\t$0\n]',
+    isSnippet: true,
+    params: [[]],
+  },
+  {
     label: 'fabric',
     kindName: 'function',
     detail: 'fabric preset',

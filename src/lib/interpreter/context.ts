@@ -1,5 +1,6 @@
 import type { ASTNode, ChalkEvent, ExprNode, ColorTableEntry } from '../types.ts';
 import type { PlanMode } from '../travel-planner.ts';
+import type { PlanAtomicSpan } from '../travel-planner.ts';
 import type { Machine } from '../machine.ts';
 import type { Val, NsList, FuncRef, ComposedRef, RefSignature } from '../list.ts';
 import type { Pt } from '../genmath.ts';
@@ -39,6 +40,9 @@ export interface RunContext {
   planLine?: number;
   /** Sparse authored event offsets at which a new planner segment begins. */
   planBarrierOffsets: number[];
+  /** Outermost authored atomic spans; nested atomic blocks share their owner's span. */
+  planAtomicSpans: PlanAtomicSpan[];
+  atomicDepth: number;
   palette: ColorTableEntry[];
   paletteSetLine?: number;
   background: string;

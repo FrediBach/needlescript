@@ -1172,6 +1172,8 @@ produce empty segments and have no effect. The command is drawless.
 
 ### Session 6.3 — `atomic` blocks
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Add parser/runtime block support with exception-safe nesting.
@@ -1186,6 +1188,25 @@ Acceptance criteria:
 - Underlay/topping constructions remain contiguous.
 - Atomic blocks can move as a unit within one allowed planner segment.
 - With plan off, stitches are byte-identical.
+
+Implementation note: `atomic` is a dedicated Core block AST node. During active planning, only the
+outermost executing atomic flushes pending satin/reporter-running construction at entry and exit and
+records one sparse `[start,end)` authored event span; nested atomics share that owner. Both nesting
+and `structuralDepth` unwind in `finally`, including through `return`, `break`, `continue`, and errors.
+With planning absent or `off`, the wrapper executes its body without flushing or recording, retaining
+byte-identical buffered construction.
+
+Finalization lowers spans to private wrapper `atomic` IDs. Explicit trims and autotrim-sized jumps
+inside one ID no longer split it into separate route items, all internal events retain authored
+order, and no reverse endpoints are offered even under `reversing-nearest`. Leading atomic jumps
+travel with the item instead of being discarded as rebuildable connectors. Atomics stay inside one
+planner segment: an active `planbarrier` inside the block is rejected. Trace and partial-fill
+boundaries are likewise rejected; a complete `atomic [ beginfill … endfill ]` is valid.
+
+The current planner independently routes color blocks and therefore cannot move a multi-color item
+without weakening either the atomic or color-order contract. Active atomics containing a color event
+are rejected with the atomic source line and a suggestion to use one atomic per color. Planning-off
+execution remains unaffected, including internal color changes.
 
 ### Session 6.4 — `routegroup` and improved algorithms
 

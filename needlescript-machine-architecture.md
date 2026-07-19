@@ -97,10 +97,10 @@ caller's line, when inside a procedure) so previews can highlight the responsibl
 
 Planner constraints do not extend this public shape. During finalization the travel planner wraps
 each authored event in a private `{ event, tags }` record, performs routing on those records, and
-unwraps them before auto-trim, locks, `RunResult`, or an exporter can observe the stream. Future
-group/atomic spans can follow `planbarrier`, which records sparse authored event-boundary offsets
-while the machine stream is append-only; finalization compiles the offsets into wrapper segment tags
-at that one lowering boundary. See the Session 6.1 decision record in
+unwraps them before auto-trim, locks, `RunResult`, or an exporter can observe the stream. `planbarrier`
+records sparse authored event-boundary offsets and `atomic` records sparse outermost event spans while
+the machine stream is append-only; finalization compiles those into wrapper segment/atomic tags at
+that one lowering boundary. See the Session 6.1 decision record in
 `embroidery-results-implementation-plan.md`.
 
 ---
@@ -538,13 +538,16 @@ list of `[x, y]` points (or a list of paths for `tracerings`).
 After execution the interpreter runs the machine's `events` through pure passes in
 `postprocess.ts`:
 
-- **`applyTravelPlan`** (`travel-planner.ts`) — partition color blocks into atomic
-  runs, split them into independent `planbarrier` segments, and reorder private planner event
+- **`applyTravelPlan`** (`travel-planner.ts`) — partition color blocks into thread
+  runs, split them into independent `planbarrier` segments, merge every tagged `atomic` span into one
+  forward-only route item, and reorder private planner event
   wrappers through the generic strategy registry. The
   `reversing-nearest` strategy also considers both endpoints of eligible stitch-only
   runs. Connector jumps are rebuilt for the chosen entry direction so the later lock
-  pass retains its tie-in direction; stitch geometry and explicit trims are retained. The wrappers
-  are lowered back to plain `StitchEvent[]` before this pass returns.
+  pass retains its tie-in direction; stitch geometry and explicit trims are retained. Internal
+  atomic jumps/trims/marks remain in authored order. Cross-color atomics are rejected because colors
+  are independently routed. The wrappers are lowered back to plain `StitchEvent[]` before this pass
+  returns.
 - **`applyLocks`** (`17`) — insert tie-in/tie-off "lock" stitches at the start/end of
   each stitch run that borders a cut (color/trim) or a jump gap ≥ 4 mm, securing the
   thread. Returns the augmented events and a lock count.

@@ -10,6 +10,7 @@ import { tokenize } from '../tokenizer.ts';
 import { linkStandardModules } from '../module-linker.ts';
 import { applyAutoTrim, applyLocks } from '../postprocess.ts';
 import { applyTravelPlan } from '../travel-planner.ts';
+import type { PlanAtomicSpan } from '../travel-planner.ts';
 import type { TravelPlanStats } from '../types.ts';
 import { formatVal, isFuncRef } from '../list.ts';
 import type { Val } from '../list.ts';
@@ -71,12 +72,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     insideTrace: 0,
     insideFillGenerator: 0,
     traceNoted: new Set<string>(),
-    // Structural block depth: incremented inside repeat/for/while/forin/if/transform/effect
+    // Structural block depth: incremented inside repeat/for/while/forin/if/atomic/transform/effect
     // so that the `hoop` and `override` placement guards can detect nested placement.
     structuralDepth: 0,
     planMode: null,
     planLine: undefined,
     planBarrierOffsets: [] as number[],
+    planAtomicSpans: [] as PlanAtomicSpan[],
+    atomicDepth: 0,
     palette: [] as ColorTableEntry[],
     paletteSetLine: undefined,
     background: DEFAULT_BACKGROUND,
@@ -168,6 +171,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       m.autoTrim,
       (n) => ctx.tickN(n, ctx.planLine),
       ctx.planBarrierOffsets,
+      ctx.planAtomicSpans,
     );
     const afterAutotrims = m.autoTrim > 0 ? applyAutoTrim(planned.events, m.autoTrim).trims : 0;
     m.events = planned.events;

@@ -50,7 +50,9 @@ describe('NeedleScript Monaco symbol analysis', () => {
     } as never);
 
     expect(tokenizer?.sewingKwCmds).toContain('stitchscope');
+    expect(tokenizer?.sewingKwCmds).toContain('atomic');
     expect(NS_ITEM_MAP.get('stitchscope')?.insertText).toContain('[\n');
+    expect(NS_ITEM_MAP.get('atomic')?.insertText).toContain('[\n');
   });
 
   it('highlights planner directives as stitch commands', () => {

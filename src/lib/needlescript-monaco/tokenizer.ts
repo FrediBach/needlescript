@@ -46,6 +46,8 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
     sewingKwCmds: [
       // Construction configuration scope.
       'stitchscope',
+      // Travel-planner indivisible span.
+      'atomic',
       // Transform block commands (CTM stack) — mutate the stitch transform.
       'translate',
       'rotate',
