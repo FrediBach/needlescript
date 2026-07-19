@@ -19,15 +19,29 @@ import {
   analyzeSpineColumn,
   legacyRailWidthIssue,
 } from '../column-analysis.ts';
-import type { AnalyzedColumn } from '../column-analysis.ts';
-import { satinCapUnderlayInset, satinCapWidthFactor } from '../satin-profile.ts';
-import type { SatinCapMode } from '../satin-profile.ts';
+import type { AnalyzedColumn, AnalyzedColumnSample } from '../column-analysis.ts';
+import {
+  SATIN_CORNER_LIMITS,
+  satinCapUnderlayInset,
+  satinCapWidthFactor,
+} from '../satin-profile.ts';
+import type { SatinCapMode, SatinJoinMode } from '../satin-profile.ts';
 
 interface ResolvedSatinCaps {
   readonly start: SatinCapMode;
   readonly end: SatinCapMode;
   readonly startLengthMM: number;
   readonly endLengthMM: number;
+}
+
+interface SatinToppingPoint {
+  x: number;
+  y: number;
+  centerX: number;
+  centerY: number;
+  side: number;
+  arc: number;
+  widthMM: number;
 }
 
 export class SatinMachine extends MachineCore {
@@ -83,6 +97,302 @@ export class SatinMachine extends MachineCore {
       LIMITS.minStitch,
     );
     return Math.min(start, end);
+  }
+
+  _cornerFallbackWarning(label: string, mode: SatinJoinMode, corner: AnalyzedColumnSample) {
+    const lineSuffix = this.currentLine === undefined ? '' : ` (line ${this.currentLine})`;
+    this.warnings.push(
+      `${label}: ${mode} join cannot be constructed safely near (${corner.point[0].toFixed(1)}, ${corner.point[1].toFixed(1)}) — using continuous${lineSuffix}`,
+    );
+  }
+
+  _relieveContinuousCorner<T extends SatinToppingPoint>(
+    points: readonly T[],
+    corner: AnalyzedColumnSample,
+    windowMM: number,
+  ): T[] {
+    const out = points.map((point) => ({ ...point }));
+    if (!this.shortStitch) return out;
+    const innerSide = corner.signedTurnDeg > 0 ? 1 : -1;
+    const candidates = out
+      .map((point, index) => ({ point, index }))
+      .filter(
+        ({ point }) =>
+          point.side === innerSide && Math.abs(point.arc - corner.arcLengthMM) <= windowMM + 1e-9,
+      )
+      .sort(
+        (a, b) =>
+          Math.abs(a.point.arc - corner.arcLengthMM) - Math.abs(b.point.arc - corner.arcLengthMM),
+      );
+    for (let rank = 0; rank < candidates.length; rank += 2) {
+      const point = out[candidates[rank].index];
+      point.x = point.centerX + (point.x - point.centerX) * 0.6;
+      point.y = point.centerY + (point.y - point.centerY) * 0.6;
+    }
+    return out;
+  }
+
+  _cornerSupport(analysis: AnalyzedColumn, corner: AnalyzedColumnSample) {
+    const position = analysis.sharpCornerIndices.indexOf(corner.index);
+    if (position < 0) return null;
+    const previousIndex = analysis.sharpCornerIndices[position - 1];
+    const nextIndex = analysis.sharpCornerIndices[position + 1];
+    const previousArc =
+      previousIndex === undefined
+        ? analysis.closed
+          ? analysis.samples[analysis.sharpCornerIndices.at(-1)!].arcLengthMM - analysis.lengthMM
+          : 0
+        : analysis.samples[previousIndex].arcLengthMM;
+    const nextArc =
+      nextIndex === undefined
+        ? analysis.closed
+          ? analysis.samples[analysis.sharpCornerIndices[0]].arcLengthMM + analysis.lengthMM
+          : analysis.lengthMM
+        : analysis.samples[nextIndex].arcLengthMM;
+    const incoming = corner.arcLengthMM - previousArc;
+    const outgoing = nextArc - corner.arcLengthMM;
+    if (!(incoming > 1e-9) || !(outgoing > 1e-9)) return null;
+    const available = Math.min(incoming, outgoing) * 0.45;
+    const desired = Math.max(corner.realizedWidthMM * 0.75, this.satinSpacing * 2);
+    return {
+      incoming,
+      outgoing,
+      windowMM: Math.min(available, desired),
+    };
+  }
+
+  _fanCorner<T extends SatinToppingPoint>(
+    points: readonly T[],
+    corner: AnalyzedColumnSample,
+    windowMM: number,
+  ): T[] | null {
+    const incoming = corner.incomingTangent;
+    const outgoing = corner.outgoingTangent;
+    if (!incoming || !outgoing || corner.turnAngleDeg >= 150) return null;
+    const innerSide = corner.signedTurnDeg > 0 ? 1 : -1;
+    const outerSide = -innerSide;
+    const near = points
+      .map((point, index) => ({ point, index }))
+      .filter(({ point }) => Math.abs(point.arc - corner.arcLengthMM) <= windowMM + 1e-9);
+    const inner = near.filter(({ point }) => point.side === innerSide);
+    const outer = near.filter(({ point }) => point.side === outerSide);
+    if (inner.length < 2 || outer.length < 2) return null;
+
+    const keepInner = new Set(
+      inner
+        .slice()
+        .sort(
+          (a, b) =>
+            Math.abs(a.point.arc - corner.arcLengthMM) - Math.abs(b.point.arc - corner.arcLengthMM),
+        )
+        .slice(0, SATIN_CORNER_LIMITS.maxInnerPenetrations)
+        .map(({ index }) => index),
+    );
+    const keepOuter = new Set<number>();
+    const outerLimit = SATIN_CORNER_LIMITS.maxOuterPenetrations;
+    if (outer.length <= outerLimit) {
+      for (const { index } of outer) keepOuter.add(index);
+    } else {
+      for (let i = 0; i < outerLimit; i++) {
+        const selected = Math.round((i * (outer.length - 1)) / (outerLimit - 1));
+        keepOuter.add(outer[selected].index);
+      }
+    }
+
+    const incomingNormal: Pt = [-incoming[1] * outerSide, incoming[0] * outerSide];
+    const outgoingNormal: Pt = [-outgoing[1] * outerSide, outgoing[0] * outerSide];
+    const out: T[] = [];
+    for (let index = 0; index < points.length; index++) {
+      const source = points[index];
+      const isNear = Math.abs(source.arc - corner.arcLengthMM) <= windowMM + 1e-9;
+      if (!isNear) {
+        out.push({ ...source });
+        continue;
+      }
+      if (source.side === innerSide && !keepInner.has(index)) continue;
+      if (source.side === outerSide && !keepOuter.has(index)) continue;
+      const point = { ...source };
+      if (source.side === innerSide) {
+        point.x = point.centerX + (point.x - point.centerX) * 0.6;
+        point.y = point.centerY + (point.y - point.centerY) * 0.6;
+      } else {
+        const progress = Math.min(
+          Math.max((source.arc - corner.arcLengthMM + windowMM) / (windowMM * 2), 0),
+          1,
+        );
+        let dx = incomingNormal[0] + (outgoingNormal[0] - incomingNormal[0]) * progress;
+        let dy = incomingNormal[1] + (outgoingNormal[1] - incomingNormal[1]) * progress;
+        const length = Math.hypot(dx, dy);
+        if (!(length > 1e-6)) return null;
+        dx /= length;
+        dy /= length;
+        const radius = Math.max(source.widthMM / 2, LIMITS.minStitch);
+        point.x = corner.point[0] + dx * radius;
+        point.y = corner.point[1] + dy * radius;
+        point.centerX = corner.point[0];
+        point.centerY = corner.point[1];
+      }
+      out.push(point);
+    }
+    return out;
+  }
+
+  _lineIntersection(a: Pt, ad: Pt, b: Pt, bd: Pt): Pt | null {
+    const denominator = ad[0] * bd[1] - ad[1] * bd[0];
+    if (Math.abs(denominator) < 1e-6) return null;
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const t = (dx * bd[1] - dy * bd[0]) / denominator;
+    return [a[0] + ad[0] * t, a[1] + ad[1] * t];
+  }
+
+  _splitCorner<T extends SatinToppingPoint>(
+    points: readonly T[],
+    corner: AnalyzedColumnSample,
+    windowMM: number,
+    miter: boolean,
+  ): T[] | null {
+    const incoming = corner.incomingTangent;
+    const outgoing = corner.outgoingTangent;
+    if (!incoming || !outgoing || corner.turnAngleDeg >= 150) return null;
+    const replacementWindow = Math.min(
+      windowMM,
+      Math.max(this.satinSpacing * 1.5, SATIN_CORNER_LIMITS.overlapMM * 2),
+    );
+    const first = points.findIndex(
+      (point) => Math.abs(point.arc - corner.arcLengthMM) <= replacementWindow + 1e-9,
+    );
+    if (first < 0) return null;
+    let last = first;
+    while (
+      last + 1 < points.length &&
+      Math.abs(points[last + 1].arc - corner.arcLengthMM) <= replacementWindow + 1e-9
+    )
+      last++;
+    if (last - first + 1 < 4) return null;
+
+    const halfWidth = corner.realizedWidthMM / 2;
+    const overlap = Math.min(
+      SATIN_CORNER_LIMITS.overlapMM,
+      windowMM / 2,
+      Math.max(halfWidth / 2, LIMITS.minStitch),
+    );
+    if (overlap < LIMITS.minStitch / 2) return null;
+    const normalIn: Pt = [-incoming[1], incoming[0]];
+    const normalOut: Pt = [-outgoing[1], outgoing[0]];
+    const intersections = new Map<number, Pt>();
+    if (miter) {
+      for (const side of [-1, 1]) {
+        const a: Pt = [
+          corner.point[0] + normalIn[0] * halfWidth * side,
+          corner.point[1] + normalIn[1] * halfWidth * side,
+        ];
+        const b: Pt = [
+          corner.point[0] + normalOut[0] * halfWidth * side,
+          corner.point[1] + normalOut[1] * halfWidth * side,
+        ];
+        const intersection = this._lineIntersection(a, incoming, b, outgoing);
+        if (
+          !intersection ||
+          Math.hypot(intersection[0] - corner.point[0], intersection[1] - corner.point[1]) >
+            Math.max(corner.realizedWidthMM * SATIN_CORNER_LIMITS.miterLimit, windowMM * 2)
+        )
+          return null;
+        intersections.set(side, intersection);
+      }
+    }
+
+    const beforeSide = first > 0 ? points[first - 1].side : -points[first].side;
+    const firstSide = -beforeSide;
+    const sides = [firstSide, -firstSide] as const;
+    const base = points[first];
+    const makePoint = (leg: 'incoming' | 'outgoing', side: number, order: number): T => {
+      const tangent = leg === 'incoming' ? incoming : outgoing;
+      const normal = leg === 'incoming' ? normalIn : normalOut;
+      let center: Pt;
+      let point: Pt;
+      if (miter) {
+        const intersection = intersections.get(side)!;
+        const direction = leg === 'incoming' ? -1 : 1;
+        point = [
+          intersection[0] + tangent[0] * overlap * direction,
+          intersection[1] + tangent[1] * overlap * direction,
+        ];
+        center = [point[0] - normal[0] * halfWidth * side, point[1] - normal[1] * halfWidth * side];
+      } else {
+        const direction = leg === 'incoming' ? 1 : -1;
+        center = [
+          corner.point[0] + tangent[0] * overlap * direction,
+          corner.point[1] + tangent[1] * overlap * direction,
+        ];
+        point = [
+          center[0] + normal[0] * halfWidth * side,
+          center[1] + normal[1] * halfWidth * side,
+        ];
+      }
+      return {
+        ...base,
+        x: point[0],
+        y: point[1],
+        centerX: center[0],
+        centerY: center[1],
+        side,
+        arc: corner.arcLengthMM + (order - 1.5) * 1e-6,
+        widthMM: corner.realizedWidthMM,
+      };
+    };
+    const replacement = [
+      makePoint('incoming', sides[0], 0),
+      makePoint('incoming', sides[1], 1),
+      makePoint('outgoing', sides[0], 2),
+      makePoint('outgoing', sides[1], 3),
+    ];
+    return [
+      ...points.slice(0, first).map((point) => ({ ...point })),
+      ...replacement,
+      ...points.slice(last + 1).map((point) => ({ ...point })),
+    ];
+  }
+
+  _applySatinCornerStrategy<T extends SatinToppingPoint>(
+    points: readonly T[],
+    analysis: AnalyzedColumn,
+    label: string,
+  ): T[] {
+    if (this.satinJoin === 'legacy' || !analysis.sharpCornerIndices.length) return points.slice();
+    if (analysis.closed && this.satinJoin !== 'continuous') {
+      const corner = analysis.samples[analysis.sharpCornerIndices[0]];
+      this._cornerFallbackWarning(label, this.satinJoin, corner);
+      return analysis.sharpCornerIndices.reduce((current, index) => {
+        const sample = analysis.samples[index];
+        const support = this._cornerSupport(analysis, sample);
+        return support ? this._relieveContinuousCorner(current, sample, support.windowMM) : current;
+      }, points.slice());
+    }
+
+    let out = points.slice();
+    for (const index of analysis.sharpCornerIndices) {
+      const corner = analysis.samples[index];
+      const support = this._cornerSupport(analysis, corner);
+      if (!support || support.windowMM < this.satinSpacing) {
+        this._cornerFallbackWarning(label, this.satinJoin, corner);
+        continue;
+      }
+      if (this.satinJoin === 'continuous') {
+        out = this._relieveContinuousCorner(out, corner, support.windowMM);
+        continue;
+      }
+      const constructed =
+        this.satinJoin === 'fan'
+          ? this._fanCorner(out, corner, support.windowMM)
+          : this._splitCorner(out, corner, support.windowMM, this.satinJoin === 'miter');
+      if (constructed) out = constructed;
+      else {
+        this._cornerFallbackWarning(label, this.satinJoin, corner);
+        out = this._relieveContinuousCorner(out, corner, support.windowMM);
+      }
+    }
+    return out;
   }
 
   _pushCappedTopping(x: number, y: number) {
@@ -217,6 +527,7 @@ export class SatinMachine extends MachineCore {
     const analysis = analyzeSpineColumn(
       path.map((point) => [point.x, point.y]),
       width,
+      { sharpTurnThresholdDeg: this.satinCornerAngle },
     );
     const analyzedByInput = new Map(analysis.samples.map((sample) => [sample.inputIndex, sample]));
     const cumulative = [0];
@@ -231,6 +542,8 @@ export class SatinMachine extends MachineCore {
       prevUy = 0;
     let innerCounter = 0;
     let warnedTight = false;
+    const topping: SatinToppingPoint[] = [];
+    const planCorners = !u && this.satinJoin !== 'legacy';
     for (let i = 1; i < path.length; i++) {
       const ox = path[i - 1].x,
         oy = path[i - 1].y;
@@ -286,11 +599,27 @@ export class SatinMachine extends MachineCore {
         if (caps) h *= this._satinCapFactor(caps, cumulative[i - 1] + len * t, totalLength, width);
         const x = cx + px * h * this.satinSide;
         const y = cy + py * h * this.satinSide;
-        if (caps) this._pushCappedTopping(x, y);
+        if (planCorners)
+          topping.push({
+            x,
+            y,
+            centerX: cx,
+            centerY: cy,
+            side: this.satinSide,
+            arc: cumulative[i - 1] + len * t,
+            widthMM: h * 2,
+          });
+        else if (caps) this._pushCappedTopping(x, y);
         else this._push('stitch', x, y, u);
       }
       prevUx = ux;
       prevUy = uy;
+    }
+    if (planCorners) {
+      for (const point of this._applySatinCornerStrategy(topping, analysis, 'satin')) {
+        if (caps) this._pushCappedTopping(point.x, point.y);
+        else this._push('stitch', point.x, point.y, false);
+      }
     }
   }
 
@@ -330,7 +659,9 @@ export class SatinMachine extends MachineCore {
       b: this.mapOut(cp.b[0], cp.b[1]),
     }));
     const geometry = prepareRailPair(railA, railB, checkpoints, this.currentLine, chargeOps);
-    const analysis = analyzeRailPairColumn(geometry.samples);
+    const analysis = analyzeRailPairColumn(geometry.samples, {
+      sharpTurnThresholdDeg: this.satinCornerAngle,
+    });
     const caps = this._resolveSatinCaps(
       geometry.spineLength,
       this._railWidth(geometry.samples[0]) + this.pullComp,
@@ -359,6 +690,9 @@ export class SatinMachine extends MachineCore {
       side: number;
       sample: RailPairSample;
       arc: number;
+      centerX: number;
+      centerY: number;
+      widthMM: number;
     }[] = [];
     let side = this.satinSide;
     let insetWarned = false;
@@ -448,6 +782,9 @@ export class SatinMachine extends MachineCore {
             side,
             sample,
             arc: Math.min(arc, geometry.spineLength),
+            centerX: sample.mid[0],
+            centerY: sample.mid[1],
+            widthMM: (this._railWidth(sample) + this.pullComp) * factor,
           });
         }
         cursor += advance * 2;
@@ -476,6 +813,9 @@ export class SatinMachine extends MachineCore {
           side,
           sample,
           arc,
+          centerX: sample.mid[0],
+          centerY: sample.mid[1],
+          widthMM: (this._railWidth(sample) + this.pullComp) * factor,
         });
       }
     }
@@ -490,15 +830,19 @@ export class SatinMachine extends MachineCore {
           side,
           sample,
           arc: geometry.spineLength,
+          centerX: sample.mid[0],
+          centerY: sample.mid[1],
+          widthMM: 0,
         });
       }
     }
     this.satinSide = side;
 
     this._shortenRailPairCrowding(topping);
+    const joinedTopping = this._applySatinCornerStrategy(topping, analysis, 'satinbetween');
     this._warnRailPairCrossings(geometry, chargeOps);
     this._warnRailPairCurvature(analysis);
-    this._emitRailPairColumn(geometry, topping, caps);
+    this._emitRailPairColumn(geometry, joinedTopping, caps);
 
     // The turtle remains in local space. Keep heading/pen/mode untouched and
     // place it at the authored endpoint corresponding to the final rail side.
@@ -862,6 +1206,7 @@ export class SatinMachine extends MachineCore {
     const analysis = analyzeSpineColumn(
       hoop.map((point) => [point.x, point.y]),
       realizedWidths,
+      { sharpTurnThresholdDeg: this.satinCornerAngle },
     );
     const analyzedByInput = new Map(analysis.samples.map((sample) => [sample.inputIndex, sample]));
     const cumulative = [0];
@@ -876,6 +1221,8 @@ export class SatinMachine extends MachineCore {
       prevUy = 0;
     let innerCounter = 0;
     let warnedTight = false;
+    const topping: SatinToppingPoint[] = [];
+    const planCorners = !u && this.satinJoin !== 'legacy';
     for (let i = 1; i < hoop.length; i++) {
       const ox = hoop[i - 1].x,
         oy = hoop[i - 1].y;
@@ -937,11 +1284,27 @@ export class SatinMachine extends MachineCore {
           h *= this._satinCapFactor(caps, cumulative[i - 1] + len * t, totalLength, halfBase * 2);
         const x = cx + dirx * h * this.satinSide;
         const y = cy + diry * h * this.satinSide;
-        if (caps) this._pushCappedTopping(x, y);
+        if (planCorners)
+          topping.push({
+            x,
+            y,
+            centerX: cx,
+            centerY: cy,
+            side: this.satinSide,
+            arc: cumulative[i - 1] + len * t,
+            widthMM: h * 2,
+          });
+        else if (caps) this._pushCappedTopping(x, y);
         else this._push('stitch', x, y, u);
       }
       prevUx = ux;
       prevUy = uy;
+    }
+    if (planCorners) {
+      for (const point of this._applySatinCornerStrategy(topping, analysis, 'transformed satin')) {
+        if (caps) this._pushCappedTopping(point.x, point.y);
+        else this._push('stitch', point.x, point.y, false);
+      }
     }
   }
 
@@ -1116,8 +1479,10 @@ export class SatinMachine extends MachineCore {
       arc: number;
       capArc: number;
       realizedWidth: number;
+      widthMM: number;
+      side: number;
     }
-    const topping: Pen[] = [];
+    let topping: Pen[] = [];
     let maxFullW = 0;
     let maxChord = 0;
     let side = this.satinSide; // local copy of the alternating rail flag
@@ -1194,9 +1559,11 @@ export class SatinMachine extends MachineCore {
           y: hy,
           centerX,
           centerY,
-          arc: stepPos,
+          arc: capArc,
           capArc,
           realizedWidth: (lw + rw) * widthScale + this.pullComp,
+          widthMM: (lw + rw) * widthScale + this.pullComp,
+          side,
         };
         topping.push(pen);
         prev = pen;
@@ -1220,7 +1587,9 @@ export class SatinMachine extends MachineCore {
     ).scale;
     const startWidth = maxFullW * startScale + this.pullComp;
     const endWidth = maxFullW * endScale + this.pullComp;
-    const mappedAnalysis = analyzeSpineColumn(capSpine, maxFullW + this.pullComp);
+    const mappedAnalysis = analyzeSpineColumn(capSpine, maxFullW + this.pullComp, {
+      sharpTurnThresholdDeg: this.satinCornerAngle,
+    });
     const caps = this._resolveSatinCaps(
       capLength,
       startWidth,
@@ -1246,12 +1615,26 @@ export class SatinMachine extends MachineCore {
             y,
             centerX: x,
             centerY: y,
-            arc: L,
+            arc: capLength,
             capArc: capLength,
             realizedWidth: endWidth,
+            widthMM: endWidth,
+            side,
           });
         }
       }
+      maxChord = 0;
+      for (let index = 1; index < topping.length; index++)
+        maxChord = Math.max(
+          maxChord,
+          Math.hypot(
+            topping[index].x - topping[index - 1].x,
+            topping[index].y - topping[index - 1].y,
+          ),
+        );
+    }
+    if (this.satinJoin !== 'legacy') {
+      topping = this._applySatinCornerStrategy(topping, mappedAnalysis, 'programmable satin');
       maxChord = 0;
       for (let index = 1; index < topping.length; index++)
         maxChord = Math.max(

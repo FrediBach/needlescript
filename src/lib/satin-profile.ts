@@ -5,13 +5,26 @@ import { defineModes } from './mode-registry.ts';
 export const SATIN_CAP_MODES = defineModes(['legacy', 'butt', 'taper', 'point', 'round']);
 export type SatinCapMode = (typeof SATIN_CAP_MODES)[number];
 
+export const SATIN_JOIN_MODES = defineModes(['legacy', 'continuous', 'fan', 'miter', 'split']);
+export type SatinJoinMode = (typeof SATIN_JOIN_MODES)[number];
+
 /** Central physical bounds for satin cap construction controls. */
 export const SATIN_CONSTRUCTION_RANGES = Object.freeze({
   capLengthMM: Object.freeze({ min: 0.4, max: 20, default: 2 }),
+  cornerAngleDeg: Object.freeze({ min: 5, max: 175, default: 60 }),
+});
+
+/** Fixed physical safeguards used by automatic sharp-corner construction. */
+export const SATIN_CORNER_LIMITS = Object.freeze({
+  overlapMM: 0.5,
+  maxOuterPenetrations: 8,
+  maxInnerPenetrations: 2,
+  miterLimit: 2.5,
 });
 
 export const SATIN_CONSTRUCTION_MODE_REGISTRIES = {
   satincap: SATIN_CAP_MODES,
+  satinjoin: SATIN_JOIN_MODES,
 } as const;
 
 export interface SatinCapPolicy {

@@ -62,6 +62,8 @@ export const BUILTIN_ARITY: Record<string, number> = {
   satin: 1,
   satincap: 1,
   satincaplen: 1,
+  satinjoin: 1,
+  satincorner: 1,
   density: 1,
   bean: 1,
   estitch: 1,

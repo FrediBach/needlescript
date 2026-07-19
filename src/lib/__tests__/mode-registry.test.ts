@@ -10,7 +10,11 @@ import {
   FILL_CONSTRUCTION_MODE_REGISTRIES,
   FILL_STAGGER_MODES,
 } from '../fill-profile.ts';
-import { SATIN_CAP_MODES, SATIN_CONSTRUCTION_MODE_REGISTRIES } from '../satin-profile.ts';
+import {
+  SATIN_CAP_MODES,
+  SATIN_CONSTRUCTION_MODE_REGISTRIES,
+  SATIN_JOIN_MODES,
+} from '../satin-profile.ts';
 
 describe('shared mode registries', () => {
   it('resolves case-insensitively and retains the registry literal type', () => {
@@ -35,6 +39,9 @@ describe('shared mode registries', () => {
       fillstagger: FILL_STAGGER_MODES,
       fillconnect: FILL_CONNECT_MODES,
     });
-    expect(SATIN_CONSTRUCTION_MODE_REGISTRIES).toEqual({ satincap: SATIN_CAP_MODES });
+    expect(SATIN_CONSTRUCTION_MODE_REGISTRIES).toEqual({
+      satincap: SATIN_CAP_MODES,
+      satinjoin: SATIN_JOIN_MODES,
+    });
   });
 });

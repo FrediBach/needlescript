@@ -1003,6 +1003,8 @@ post-run lock pass remains unchanged and outside the cap generator. The policy i
 
 ### Session 5.3 — Corner strategies
 
+Status: complete (2026-07-19)
+
 Implement:
 
 - `continuous`: current behavior plus short-stitch relief;
@@ -1023,6 +1025,24 @@ Acceptance criteria:
 - Acute, right-angle, and obtuse fixtures each have stable expected event patterns.
 - Corner coverage stays below configured limits under recommended defaults.
 - No automatic split changes color or inserts a trim unless explicitly specified by policy.
+
+Implementation note: `satinjoin 'legacy'|'continuous'|'fan'|'miter'|'split'` is a sticky,
+`stitchscope`-aware policy selected at physical hoop-space turns meeting `satincorner` (5–175
+degrees, default 60). The default `legacy` branch retains the previous direct-emission path exactly.
+Continuous retains the existing zigzag and adds alternating 60%-width inner relief when
+`shortstitch` is enabled. Fan interpolates the outer normal around the turn, keeps at most eight
+outer penetrations and two shortened inner bites per corner window, and therefore bounds both
+outer repeats and inner stacks. Miter computes bounded offset-rail intersections for two straight
+legs; split extends/restarts the legs across the vertex. Both use a maximum 0.5 mm physical overlap.
+
+Underlay remains a single continuous construction over the authored spine or checkpoint-anchored
+rail correspondence for every policy. Miter and split replace topping points and connect them with
+ordinary stitches, so they add no jump, trim, color, or lock boundary. Insufficient leg support,
+near-reversals, excessive miters, and unsupported closed joins emit a source warning and fall back
+locally to continuous. Plain, transformed, programmable, and rail-pair satin share the same
+analysis and policy pass; all decisions are deterministic and consume no RNG draws. Acute,
+right-angle, obtuse, density-limit, fallback, underlay-continuity, checkpoint, and no-boundary event
+fixtures live in `satin-corners.test.ts`.
 
 ### Session 5.4 — Wide-column splitting
 

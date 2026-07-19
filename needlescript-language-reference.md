@@ -366,6 +366,8 @@ Modes are sticky: they apply to every move until changed.
 | `satinbetween(railA, railB, …)` | immediate satin column between authored path rails; optional checkpoints/reporter — §16.2. Call syntax only                                                                                                     |
 | `satincap 'mode'`               | open-column cap at both ends: `'legacy'`, `'butt'`, `'taper'`, `'point'`, or `'round'`; default `'legacy'`                                                                                                      |
 | `satincaplen mm`                | physical taper/point/round transition length, 0.4–20 mm (default **2**)                                                                                                                                         |
+| `satinjoin 'mode'`              | sharp-corner construction: `'legacy'`, `'continuous'`, `'fan'`, `'miter'`, or `'split'`; default `'legacy'`                                                                                                     |
+| `satincorner degrees`           | absolute travel-direction change that selects a sharp join, 5–175° (default **60**)                                                                                                                             |
 | `density mm`                    | satin penetration spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                          |
 | `bean n`                        | each stitch sewn n times (forced odd, max 9); `bean 1` off                                                                                                                                                      |
 | `estitch mm`                    | blanket stitch: prongs of this length on the left of travel, spaced by `stitchlen`; `estitch 0` off                                                                                                             |
@@ -738,6 +740,32 @@ applies to `satin @fn` and `satinbetween`. Narrowing caps shorten every underlay
 physical transition span so it stays beneath the topping. Caps do not add trims, colors, or locks;
 ordinary locks are still applied later at thread-run boundaries. All cap construction is
 deterministic and consumes zero RNG draws. Both commands are sticky and restored by `stitchscope`.
+
+### Satin corners — `satinjoin` / `satincorner`
+
+`satinjoin` is an opt-in construction policy for turns whose absolute change in travel direction
+is at least `satincorner`. The threshold accepts 5–175 degrees, defaults to 60, and is evaluated in
+physical hoop space after transforms and warps. Lower values classify gentler bends as corners.
+
+| Mode           | Output semantics                                                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `'legacy'`     | byte-identical compatibility path (default); `satincorner` has no effect                                                            |
+| `'continuous'` | retain one continuous zigzag and, when `shortstitch` is enabled, pull alternating inner-corner bites to 60% width                   |
+| `'fan'`        | distribute outer penetrations around the turn; retain at most eight outer points and two shortened inner bites in the corner window |
+| `'miter'`      | end and restart straight topping legs at bounded intersections of their offset rails, with 0.5 mm physical overlap                  |
+| `'split'`      | end the incoming topping leg past the vertex and start the outgoing leg before it, with 0.5 mm physical overlap                     |
+
+Every underlay pass remains one continuous path through the authored spine or paired rails; only
+the topping construction changes. Miter and split use ordinary stitch connectors, never implicit
+jumps, trims, color changes, or locks. The fan penetration caps and miter limit bound repeated
+outer holes and inner-corner stacks. If a selected construction lacks enough straight support, is
+near a reversal, exceeds the miter limit, or requires unsupported closed-seam handling, the engine
+emits a source warning and uses `continuous` at that corner.
+
+The same policy applies to plain, transformed, programmable, and rail-pair satin. Rail-pair
+construction retains the checkpoint-anchored correspondence prepared before corner selection.
+Join construction is deterministic and drawless. Both settings are sticky and restored by
+`stitchscope`.
 
 ### 16.1 Programmable satin — `satin @fn`
 

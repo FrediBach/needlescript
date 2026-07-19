@@ -25,6 +25,8 @@ describe('machine construction configuration snapshots', () => {
     machine.satinSpacing = 0.55;
     machine.satinSide = -1;
     machine.satinReporter = satinReporter;
+    machine.satinJoin = 'fan';
+    machine.satinCornerAngle = 35;
     machine.fillAngle = 37;
     machine.fillSpacing = 0.65;
     machine.fillInset = 0.75;
@@ -86,6 +88,8 @@ describe('machine construction configuration snapshots', () => {
     machine.satinSpacing = 1;
     machine.satinSide = 1;
     machine.satinReporter = null;
+    machine.satinJoin = 'legacy';
+    machine.satinCornerAngle = 60;
     machine.fillAngle = 0;
     machine.fillSpacing = 1;
     machine.fillInset = 0;
@@ -130,6 +134,8 @@ describe('machine construction configuration snapshots', () => {
       satinWidth: 4.5,
       satinSpacing: 0.55,
       satinSide: -1,
+      satinJoin: 'fan',
+      satinCornerAngle: 35,
       fillAngle: 37,
       fillSpacing: 0.65,
       fillInset: 0.75,

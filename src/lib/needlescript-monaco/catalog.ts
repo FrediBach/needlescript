@@ -8,7 +8,7 @@ import {
   FILL_CONSTRUCTION_RANGES,
   FILL_STAGGER_MODES,
 } from '../fill-profile.ts';
-import { SATIN_CAP_MODES, SATIN_CONSTRUCTION_RANGES } from '../satin-profile.ts';
+import { SATIN_CAP_MODES, SATIN_CONSTRUCTION_RANGES, SATIN_JOIN_MODES } from '../satin-profile.ts';
 
 export type NSItemKind = 'keyword' | 'function' | 'variable' | 'constant';
 
@@ -708,6 +708,25 @@ export const NS_ITEMS: NSItem[] = [
     insertText: `satincaplen \${1:${SATIN_CONSTRUCTION_RANGES.capLengthMM.default}}`,
     isSnippet: true,
     params: [['mm']],
+  },
+  {
+    label: 'satinjoin',
+    kindName: 'function',
+    detail: 'choose sharp satin-corner construction',
+    documentation:
+      "Choose how sharp corners at or above `satincorner` are constructed. `'legacy'` preserves the previous event stream; `'continuous'` keeps one continuous zigzag with short-stitch relief; `'fan'` distributes at most eight outer-rail penetrations around the turn and keeps at most two shortened inner bites; `'miter'` overlaps straight legs at their bounded rail intersections; `'split'` ends and restarts the topping legs with a 0.5 mm overlap. Underlay remains continuous through every join. Miter and split connectors are stitches: they never add a trim or color change. Unsupported or closed geometry warns and falls back to continuous. The policy is sticky, `stitchscope`-aware, and drawless.",
+    insertText: modeCommandSnippet('satinjoin', SATIN_JOIN_MODES, "'"),
+    isSnippet: true,
+    params: [['mode']],
+  },
+  {
+    label: 'satincorner',
+    kindName: 'function',
+    detail: 'sharp satin turn threshold (degrees)',
+    documentation: `Set the minimum absolute change in travel direction that selects a non-legacy satin join. Range ${SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.min}–${SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.max} degrees; default ${SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.default}. Lower values classify gentler bends as corners. Measured after the authored output transform in physical hoop space.`,
+    insertText: `satincorner \${1:${SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.default}}`,
+    isSnippet: true,
+    params: [['degrees']],
   },
   {
     label: 'density',

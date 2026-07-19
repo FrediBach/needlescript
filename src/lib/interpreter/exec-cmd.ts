@@ -434,6 +434,22 @@ export function initExecCmdHandler(
       ctx.m.satinCapEnd = mode;
       return;
     }
+    if (st.name === 'satinjoin') {
+      ctx.traceNote('satinjoin', 'note: satinjoin inside trace has no effect on the captured path');
+      const modeVal = vals[0];
+      if (typeof modeVal !== 'string')
+        throw new NeedlescriptError(
+          `satinjoin expects a string mode, got ${describeVal(modeVal)} — e.g. satinjoin 'fan'`,
+          st.line,
+        );
+      const allowed = SATIN_CONSTRUCTION_MODE_REGISTRIES.satinjoin;
+      const mode = resolveMode(modeVal, allowed);
+      if (mode === undefined)
+        throw new NeedlescriptError(unknownModeMessage('satinjoin', modeVal, allowed), st.line);
+      ctx.m.flushSatin();
+      ctx.m.satinJoin = mode;
+      return;
+    }
     // String-argument mode commands — handled before the bulk num() conversion.
     if (st.name === 'fabric' || st.name === 'underlay' || st.name === 'fillunderlay') {
       ctx.traceNote(st.name, `note: ${st.name} inside trace has no effect on the captured path`);
@@ -827,6 +843,21 @@ export function initExecCmdHandler(
           );
         ctx.m.flushSatin();
         ctx.m.satinCapLength = a[0];
+        return;
+      }
+      case 'satincorner': {
+        ctx.traceNote(
+          'satincorner',
+          'note: satincorner inside trace has no effect on the captured path',
+        );
+        const range = SATIN_CONSTRUCTION_RANGES.cornerAngleDeg;
+        if (!Number.isFinite(a[0]) || a[0] < range.min || a[0] > range.max)
+          throw new NeedlescriptError(
+            `satincorner must be between ${range.min} and ${range.max} degrees`,
+            st.line,
+          );
+        ctx.m.flushSatin();
+        ctx.m.satinCornerAngle = a[0];
         return;
       }
       case 'estitch': {

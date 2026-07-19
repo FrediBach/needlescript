@@ -17,7 +17,7 @@ import type { FillUnderlayCustomization, SatinUnderlayCustomization } from '../u
 import { FILL_CONSTRUCTION_RANGES } from '../fill-profile.ts';
 import type { FillConnectMode, FillConnectorRecord, FillStaggerMode } from '../fill-profile.ts';
 import { SATIN_CONSTRUCTION_RANGES } from '../satin-profile.ts';
-import type { SatinCapMode } from '../satin-profile.ts';
+import type { SatinCapMode, SatinJoinMode } from '../satin-profile.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -69,6 +69,8 @@ export interface ConstructionConfigSnapshot {
   readonly satinCapStart: SatinCapMode;
   readonly satinCapEnd: SatinCapMode;
   readonly satinCapLength: number;
+  readonly satinJoin: SatinJoinMode;
+  readonly satinCornerAngle: number;
   readonly fillAngle: number;
   readonly fillSpacing: number;
   readonly fillInset: number;
@@ -125,6 +127,8 @@ interface MachineSnapshot {
   satinCapStart: SatinCapMode;
   satinCapEnd: SatinCapMode;
   satinCapLength: number;
+  satinJoin: SatinJoinMode;
+  satinCornerAngle: number;
   eWidth: number;
   beanRepeats: number;
   fillAngle: number;
@@ -220,6 +224,8 @@ export abstract class MachineCore {
   satinCapStart: SatinCapMode = 'legacy';
   satinCapEnd: SatinCapMode = 'legacy';
   satinCapLength: number = SATIN_CONSTRUCTION_RANGES.capLengthMM.default;
+  satinJoin: SatinJoinMode = 'legacy';
+  satinCornerAngle: number = SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.default;
   eWidth = 0;
   beanRepeats = 1;
   fillAngle = 0;
@@ -384,6 +390,8 @@ export abstract class MachineCore {
       satinCapStart: this.satinCapStart,
       satinCapEnd: this.satinCapEnd,
       satinCapLength: this.satinCapLength,
+      satinJoin: this.satinJoin,
+      satinCornerAngle: this.satinCornerAngle,
       fillAngle: this.fillAngle,
       fillSpacing: this.fillSpacing,
       fillInset: this.fillInset,
@@ -442,6 +450,8 @@ export abstract class MachineCore {
       this.satinCapStart = snapshot.satinCapStart;
       this.satinCapEnd = snapshot.satinCapEnd;
       this.satinCapLength = snapshot.satinCapLength;
+      this.satinJoin = snapshot.satinJoin;
+      this.satinCornerAngle = snapshot.satinCornerAngle;
       this.fillAngle = snapshot.fillAngle;
       this.fillSpacing = snapshot.fillSpacing;
       this.fillInset = snapshot.fillInset;
@@ -556,6 +566,8 @@ export abstract class MachineCore {
       satinCapStart: this.satinCapStart,
       satinCapEnd: this.satinCapEnd,
       satinCapLength: this.satinCapLength,
+      satinJoin: this.satinJoin,
+      satinCornerAngle: this.satinCornerAngle,
       eWidth: this.eWidth,
       beanRepeats: this.beanRepeats,
       fillAngle: this.fillAngle,
@@ -685,6 +697,8 @@ export abstract class MachineCore {
     this.satinCapStart = snap.satinCapStart;
     this.satinCapEnd = snap.satinCapEnd;
     this.satinCapLength = snap.satinCapLength;
+    this.satinJoin = snap.satinJoin;
+    this.satinCornerAngle = snap.satinCornerAngle;
     this.eWidth = snap.eWidth;
     this.beanRepeats = snap.beanRepeats;
     this.fillAngle = snap.fillAngle;
