@@ -114,6 +114,14 @@ export {
 } from './fill-profile.ts';
 export type { FillStaggerMode } from './fill-profile.ts';
 export {
+  SATIN_CAP_MODES,
+  SATIN_CONSTRUCTION_RANGES,
+  SATIN_CONSTRUCTION_MODE_REGISTRIES,
+  satinCapWidthFactor,
+  satinCapUnderlayInset,
+} from './satin-profile.ts';
+export type { SatinCapMode, SatinCapPolicy } from './satin-profile.ts';
+export {
   SATIN_UNDERLAY_RANGES,
   SATIN_UNDERLAY_PASS_KINDS,
   SATIN_UNDERLAY_MAX_PASSES,

@@ -61,6 +61,7 @@ Tightly-coupled collaborators live one level up:
 - `fill-profile.ts` — fill inset/edge/stagger ranges, connector/stagger mode registries, internal
   connector classification types, and pure drawless row-phase calculation including geometry
   hashing.
+- `satin-profile.ts` — cap modes/range registry plus pure width-factor and underlay-inset helpers.
 - `column-analysis.ts` — pure hoop-space spine/rail analysis for satin tips, tangents, curvature,
   realized widths, corners, tapers, unsafe width/radius ratios, and emission-free segmentation.
 - `rail-pair.ts` — pure rail orientation, seam/checkpoint projection, arc-length pairing, and derived-spine interpolation shared by `satinbetween` and `railspine`.
@@ -104,7 +105,7 @@ The public `Machine` class is a small facade over `FillMachine`, `SatinMachine`,
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | Turtle          | `x`, `y`, `heading`, `penDown`                                                                                                                                                                 | always in **local** space                                             |
 | Stitch config   | `stitchLen`, `stitchLenList`/`Reporter`, `mode`, `beanRepeats`                                                                                                                                 | one of numeric / list / reporter stitch-length forms active at a time |
-| Satin           | `satinWidth`, `satinSpacing`, `satinSide`, `eWidth`, `satinReporter`, `satinPath`                                                                                                              | buffered column                                                       |
+| Satin           | `satinWidth`, `satinSpacing`, `satinSide`, `satinCapStart`/`End`/`Length`, `eWidth`, `satinReporter`, `satinPath`                                                                              | buffered column                                                       |
 | Fill            | `fillAngle`, `fillSpacing`, `fillInset`, `fillEdgeRun`, `fillEdgeShort`, `fillStagger`/`Amount`, `fillConnect`, `fillLen`(+list/reporter), `fillArmed`, `fillDirReporter`, `fillShapeReporter` | tatami + programmable                                                 |
 | Physics         | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity`                                                                           | selectors lower to typed profiles at generation time                  |
 | Output          | `events`, `warnings`, `colorIdx`, `lastEmit`, `started`                                                                                                                                        | accumulation                                                          |
@@ -123,7 +124,8 @@ touching the shared constants.
 `Machine.snapshotConstructionConfig()` captures the settings that determine how future movement is
 constructed, and `restoreConstructionConfig(snapshot)` restores only those settings. The typed
 `ConstructionConfigSnapshot` includes running-stitch numeric/list/reporter forms and list progress;
-bean and E-stitch modes; satin width/reporter, spacing, alternating side, and optional custom
+bean and E-stitch modes; satin width/reporter, spacing, alternating side, independent cap modes,
+cap transition length, and optional custom
 underlay pass/length/inset/spacing overrides; fill angle, spacing, construction inset, edge-run
 inset, minimum useful row-fragment length, stagger mode and amount, connector policy,
 fill-underlay pass/length/inset/spacing/relative-angle overrides,
@@ -259,6 +261,19 @@ programmable satin, and rail-pair satin consume the same pass objects. A request
 that reaches the center of a narrow column is clamped there and warns once per column. Every pass
 emits through the existing underlay paths with `u: 1`.
 
+For an open column with a non-legacy `satincap`, the shared analyzed physical length and realized
+endpoint widths resolve independent start/end cap constructions before topping emission. `butt`
+retains full width; `taper` uses a smooth ramp to a safe terminal bite; `point` converges to the
+spine tip; and `round` applies the circle equation to half-width over a radius equal to half the
+realized endpoint width. A round end that cannot fit within `satincaplen` or half the column warns
+and resolves to point. Width factors are applied to buffered plain/transformed, programmable, and
+rail-pair topping in hoop space. Point/round endpoints are pinned at the analyzed tip. Exact
+coincidences merge silently, while nonzero sub-half-minimum moves use the existing recorded tiny
+merge. Narrowing modes trim each underlay path by its resolved physical cap span before pass
+construction, keeping the underlay inside the final topping envelope. Closed columns resolve both
+ends to `legacy` and retain their seam. The default `legacy` branch avoids cap interpolation
+entirely, preserving exact events.
+
 After-split effects (humanize/snaptogrid/declump) deliberately **skip** satin rails —
 perturbing a precise rail wrecks the column — with a one-time warning.
 
@@ -271,10 +286,10 @@ Samples retain incoming/outgoing and bisector tangents, signed curvature and tur
 width slope, taper/tip state, continuous-versus-sharp classification, and width-to-limiting-radius
 ratio. Rail inputs additionally retain each rail's curvature. Declared indices or detected turns
 split the model into corner-sharing open segments; a closed column without corners remains one
-closed segment. This pass copies input geometry, emits no events, and reads no RNG. The current
-plain/transformed buffered satin and rail-pair curvature guards consume its compatibility metrics,
-but stitch generation stays on the byte-compatible legacy paths until a later non-legacy policy is
-selected.
+closed segment. This pass copies input geometry, emits no events, and reads no RNG. The
+plain/transformed buffered satin and rail-pair curvature guards consume its compatibility metrics.
+Cap policies also consume physical length, endpoint/tip classification, and realized widths; later
+corner and wide-column policies can reuse the remaining segmentation data.
 
 ### 7.2 Fills (`beginFill`/`endFill`, `machine/machine-fill.ts`)
 
@@ -524,6 +539,7 @@ analysed _before_ locks (so tie-offs don't read as hotspots), then locks are app
 | `machine/machine-fill.ts`  | fill recording plus built-in and programmable fill generation          |
 | `machine/fill.ts`          | standalone tatami scanline fill generator                              |
 | `affine.ts`                | 2×3 affine matrix math shared by the transform stack                   |
+| `satin-profile.ts`         | satin cap mode registry, ranges, and pure profile helpers              |
 | `rail-pair.ts`             | shared rail orientation, checkpoints, pairing, and derived spine       |
 | `postprocess.ts`           | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`         |
 | `routing.ts`               | generic deterministic route algorithms and endpoint model              |

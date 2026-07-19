@@ -961,6 +961,8 @@ platform-neutral library utility for the cap, corner, and wide-column sessions.
 
 ### Session 5.2 — Cap strategies
 
+Status: complete (2026-07-19)
+
 Implement opt-in cap policies:
 
 - `butt`: finish at full width with no taper;
@@ -981,6 +983,23 @@ Acceptance criteria:
 - Caps work for spine and rail-pair satin.
 - No cap emits repeated zero-length stitches.
 - Underlay remains hidden beneath topping.
+
+Implementation note: `satincap 'legacy'|'butt'|'taper'|'point'|'round'` is a sticky,
+`stitchscope`-aware policy for open buffered-spine, programmable-spine, and rail-pair satin;
+`satincaplen` is a physical 0.4–20 mm transition length with a 2 mm default. The public selector
+sets both ends, while `Machine` retains independent start/end modes for a future asymmetric surface.
+Butt caps keep full realized width. Tapers use a smooth width ramp with a machine-safe terminal
+bite. Point caps converge to the analyzed spine tip, and round caps use a circular half-width
+profile whose longitudinal radius is half the realized endpoint width; when that semicircle exceeds
+the configured length or half the column, it warns and falls back to point. Closed columns retain
+their existing seam and ignore caps without changing events.
+
+Cap distances and realized widths are evaluated in hoop space after the authored output map.
+Narrowing caps reserve their physical transition span from every underlay pass; connector motion to
+the shortened pass remains within the topping envelope. Exact coincident tips merge silently;
+nonzero sub-half-minimum decorative penetrations use the existing tiny-stitch merge path. The
+post-run lock pass remains unchanged and outside the cap generator. The policy is drawless.
+`legacy` bypasses all cap geometry and preserves the prior event stream exactly.
 
 ### Session 5.3 — Corner strategies
 

@@ -29,6 +29,7 @@ import {
   SATIN_UNDERLAY_RANGES,
 } from '../underlay-profile.ts';
 import { FILL_CONSTRUCTION_RANGES, FILL_CONSTRUCTION_MODE_REGISTRIES } from '../fill-profile.ts';
+import { SATIN_CONSTRUCTION_MODE_REGISTRIES, SATIN_CONSTRUCTION_RANGES } from '../satin-profile.ts';
 
 /**
  * Handler for the `'cmd'` statement branch of execStmt. Returns a function
@@ -416,6 +417,23 @@ export function initExecCmdHandler(
       ctx.m.fillConnect = mode;
       return;
     }
+    if (st.name === 'satincap') {
+      ctx.traceNote('satincap', 'note: satincap inside trace has no effect on the captured path');
+      const modeVal = vals[0];
+      if (typeof modeVal !== 'string')
+        throw new NeedlescriptError(
+          `satincap expects a string mode, got ${describeVal(modeVal)} — e.g. satincap 'taper'`,
+          st.line,
+        );
+      const allowed = SATIN_CONSTRUCTION_MODE_REGISTRIES.satincap;
+      const mode = resolveMode(modeVal, allowed);
+      if (mode === undefined)
+        throw new NeedlescriptError(unknownModeMessage('satincap', modeVal, allowed), st.line);
+      ctx.m.flushSatin();
+      ctx.m.satinCapStart = mode;
+      ctx.m.satinCapEnd = mode;
+      return;
+    }
     // String-argument mode commands — handled before the bulk num() conversion.
     if (st.name === 'fabric' || st.name === 'underlay' || st.name === 'fillunderlay') {
       ctx.traceNote(st.name, `note: ${st.name} inside trace has no effect on the captured path`);
@@ -794,6 +812,21 @@ export function initExecCmdHandler(
           );
         ctx.m.satinWidth = v;
         ctx.m.mode = v > 0.05 ? 'satin' : 'run';
+        return;
+      }
+      case 'satincaplen': {
+        ctx.traceNote(
+          'satincaplen',
+          'note: satincaplen inside trace has no effect on the captured path',
+        );
+        const range = SATIN_CONSTRUCTION_RANGES.capLengthMM;
+        if (!Number.isFinite(a[0]) || a[0] < range.min || a[0] > range.max)
+          throw new NeedlescriptError(
+            `satincaplen must be between ${range.min} and ${range.max} mm`,
+            st.line,
+          );
+        ctx.m.flushSatin();
+        ctx.m.satinCapLength = a[0];
         return;
       }
       case 'estitch': {

@@ -20,9 +20,118 @@ import {
   legacyRailWidthIssue,
 } from '../column-analysis.ts';
 import type { AnalyzedColumn } from '../column-analysis.ts';
+import { satinCapUnderlayInset, satinCapWidthFactor } from '../satin-profile.ts';
+import type { SatinCapMode } from '../satin-profile.ts';
+
+interface ResolvedSatinCaps {
+  readonly start: SatinCapMode;
+  readonly end: SatinCapMode;
+  readonly startLengthMM: number;
+  readonly endLengthMM: number;
+}
 
 export class SatinMachine extends MachineCore {
   // ---- Satin column: underlay + zigzag, sewn when the column ends ----
+
+  _resolveSatinCaps(
+    lengthMM: number,
+    startWidthMM: number,
+    endWidthMM: number,
+    closed: boolean,
+    label: string,
+  ): ResolvedSatinCaps {
+    if (closed) return { start: 'legacy', end: 'legacy', startLengthMM: 0, endLengthMM: 0 };
+
+    const resolveEnd = (mode: SatinCapMode, widthMM: number, end: 'start' | 'end') => {
+      if (mode === 'legacy' || mode === 'butt') return { mode, lengthMM: 0 };
+      const bounded = Math.min(this.satinCapLength, lengthMM / 2);
+      if (mode !== 'round') return { mode, lengthMM: bounded };
+      const radius = widthMM / 2;
+      if (!(radius > 0) || radius > this.satinCapLength + 1e-9 || radius > lengthMM / 2 + 1e-9) {
+        const lineSuffix = this.currentLine === undefined ? '' : ` (line ${this.currentLine})`;
+        this.warnings.push(
+          `${label}: round ${end} cap needs ${radius.toFixed(1)} mm of spine for a ${widthMM.toFixed(1)} mm semicircle — using point${lineSuffix}`,
+        );
+        return { mode: 'point' as const, lengthMM: bounded };
+      }
+      return { mode, lengthMM: radius };
+    };
+
+    const start = resolveEnd(this.satinCapStart, startWidthMM, 'start');
+    const end = resolveEnd(this.satinCapEnd, endWidthMM, 'end');
+    return {
+      start: start.mode,
+      end: end.mode,
+      startLengthMM: start.lengthMM,
+      endLengthMM: end.lengthMM,
+    };
+  }
+
+  _satinCapFactor(caps: ResolvedSatinCaps, arcMM: number, lengthMM: number, widthMM: number) {
+    const start = satinCapWidthFactor(
+      caps.start,
+      arcMM,
+      caps.startLengthMM,
+      widthMM,
+      LIMITS.minStitch,
+    );
+    const end = satinCapWidthFactor(
+      caps.end,
+      lengthMM - arcMM,
+      caps.endLengthMM,
+      widthMM,
+      LIMITS.minStitch,
+    );
+    return Math.min(start, end);
+  }
+
+  _pushCappedTopping(x: number, y: number) {
+    const previous = this.lastEmit;
+    const distance = previous ? Math.hypot(x - previous.x, y - previous.y) : Infinity;
+    // Exact tip coincidences are an intentional merge, not a malformed tiny move.
+    if (distance < 1e-9) return false;
+    if (distance < LIMITS.minStitch * 0.5) {
+      this._dropTiny(x, y);
+      return false;
+    }
+    this._push('stitch', x, y);
+    return true;
+  }
+
+  _trimLocalPathForCaps(
+    local: { x: number; y: number }[],
+    caps: ResolvedSatinCaps,
+  ): { x: number; y: number }[] {
+    if (local.length < 2) return local.slice();
+    const hoop = this._toHoop(local);
+    const cumulative = [0];
+    for (let i = 1; i < hoop.length; i++)
+      cumulative.push(
+        cumulative[i - 1] + Math.hypot(hoop[i].x - hoop[i - 1].x, hoop[i].y - hoop[i - 1].y),
+      );
+    const total = cumulative[cumulative.length - 1];
+    const start = satinCapUnderlayInset(caps.start, caps.startLengthMM);
+    const end = total - satinCapUnderlayInset(caps.end, caps.endLengthMM);
+    if (start === 0 && end === total) return local.slice();
+    if (end - start < LIMITS.minStitch) return [];
+
+    const atArc = (arc: number) => {
+      let segment = 1;
+      while (segment < cumulative.length - 1 && cumulative[segment] < arc) segment++;
+      const span = cumulative[segment] - cumulative[segment - 1] || 1;
+      const t = (arc - cumulative[segment - 1]) / span;
+      return {
+        x: local[segment - 1].x + (local[segment].x - local[segment - 1].x) * t,
+        y: local[segment - 1].y + (local[segment].y - local[segment - 1].y) * t,
+      };
+    };
+
+    const out = [atArc(start)];
+    for (let i = 1; i < local.length - 1; i++)
+      if (cumulative[i] > start + 1e-9 && cumulative[i] < end - 1e-9) out.push(local[i]);
+    out.push(atArc(end));
+    return out;
+  }
 
   _resolveSatinUnderlay(
     columnWidthMM: number,
@@ -101,13 +210,23 @@ export class SatinMachine extends MachineCore {
     spacing: number,
     u: boolean,
     shortStitch: boolean,
+    caps?: ResolvedSatinCaps,
   ) {
+    if (path.length < 2) return;
     const half = width / 2;
     const analysis = analyzeSpineColumn(
       path.map((point) => [point.x, point.y]),
       width,
     );
     const analyzedByInput = new Map(analysis.samples.map((sample) => [sample.inputIndex, sample]));
+    const cumulative = [0];
+    for (let i = 1; i < path.length; i++)
+      cumulative.push(
+        cumulative[i - 1] + Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y),
+      );
+    const totalLength = cumulative[cumulative.length - 1];
+    if (caps && (caps.start === 'point' || caps.start === 'round'))
+      this._pushCappedTopping(path[0].x, path[0].y);
     let prevUx: number | null = null,
       prevUy = 0;
     let innerCounter = 0;
@@ -164,7 +283,11 @@ export class SatinMachine extends MachineCore {
           innerCounter++;
           if (innerCounter % 2 === 1) h = half * 0.6;
         }
-        this._push('stitch', cx + px * h * this.satinSide, cy + py * h * this.satinSide, u);
+        if (caps) h *= this._satinCapFactor(caps, cumulative[i - 1] + len * t, totalLength, width);
+        const x = cx + px * h * this.satinSide;
+        const y = cy + py * h * this.satinSide;
+        if (caps) this._pushCappedTopping(x, y);
+        else this._push('stitch', x, y, u);
       }
       prevUx = ux;
       prevUy = uy;
@@ -208,6 +331,14 @@ export class SatinMachine extends MachineCore {
     }));
     const geometry = prepareRailPair(railA, railB, checkpoints, this.currentLine, chargeOps);
     const analysis = analyzeRailPairColumn(geometry.samples);
+    const caps = this._resolveSatinCaps(
+      geometry.spineLength,
+      this._railWidth(geometry.samples[0]) + this.pullComp,
+      this._railWidth(geometry.samples[geometry.samples.length - 1]) + this.pullComp,
+      geometry.closed,
+      'satinbetween',
+    );
+    const hasCapPolicy = caps.start !== 'legacy' || caps.end !== 'legacy';
     if (geometry.railBReversed)
       this.warnings.push(
         geometry.closed
@@ -222,7 +353,13 @@ export class SatinMachine extends MachineCore {
         this.currentLine,
       );
 
-    const topping: { x: number; y: number; side: number; sample: RailPairSample }[] = [];
+    const topping: {
+      x: number;
+      y: number;
+      side: number;
+      sample: RailPairSample;
+      arc: number;
+    }[] = [];
     let side = this.satinSide;
     let insetWarned = false;
     let advanceWarned = false;
@@ -297,7 +434,21 @@ export class SatinMachine extends MachineCore {
             side > 0 ? ret[3] : ret[4],
             arc,
           );
-          topping.push({ ...point, side, sample });
+          const factor = hasCapPolicy
+            ? this._satinCapFactor(
+                caps,
+                Math.min(arc, geometry.spineLength),
+                geometry.spineLength,
+                this._railWidth(sample) + this.pullComp,
+              )
+            : 1;
+          topping.push({
+            x: hasCapPolicy ? sample.mid[0] + (point.x - sample.mid[0]) * factor : point.x,
+            y: hasCapPolicy ? sample.mid[1] + (point.y - sample.mid[1]) * factor : point.y,
+            side,
+            sample,
+            arc: Math.min(arc, geometry.spineLength),
+          });
         }
         cursor += advance * 2;
         pair++;
@@ -311,7 +462,35 @@ export class SatinMachine extends MachineCore {
           ? geometry.atProgress(step / steps)
           : geometry.atArc(arc);
         const point = place(sample, side, 0, 0, arc);
-        topping.push({ ...point, side, sample });
+        const factor = hasCapPolicy
+          ? this._satinCapFactor(
+              caps,
+              arc,
+              geometry.spineLength,
+              this._railWidth(sample) + this.pullComp,
+            )
+          : 1;
+        topping.push({
+          x: hasCapPolicy ? sample.mid[0] + (point.x - sample.mid[0]) * factor : point.x,
+          y: hasCapPolicy ? sample.mid[1] + (point.y - sample.mid[1]) * factor : point.y,
+          side,
+          sample,
+          arc,
+        });
+      }
+    }
+    if (hasCapPolicy && (caps.end === 'point' || caps.end === 'round')) {
+      const sample = geometry.samples[geometry.samples.length - 1];
+      const last = topping[topping.length - 1];
+      if (!last || Math.hypot(last.x - sample.mid[0], last.y - sample.mid[1]) >= 1e-9) {
+        side = -side;
+        topping.push({
+          x: sample.mid[0],
+          y: sample.mid[1],
+          side,
+          sample,
+          arc: geometry.spineLength,
+        });
       }
     }
     this.satinSide = side;
@@ -319,7 +498,7 @@ export class SatinMachine extends MachineCore {
     this._shortenRailPairCrowding(topping);
     this._warnRailPairCrossings(geometry, chargeOps);
     this._warnRailPairCurvature(analysis);
-    this._emitRailPairColumn(geometry, topping);
+    this._emitRailPairColumn(geometry, topping, caps);
 
     // The turtle remains in local space. Keep heading/pen/mode untouched and
     // place it at the authored endpoint corresponding to the final rail side.
@@ -334,7 +513,7 @@ export class SatinMachine extends MachineCore {
   }
 
   _shortenRailPairCrowding(
-    topping: { x: number; y: number; side: number; sample: RailPairSample }[],
+    topping: { x: number; y: number; side: number; sample: RailPairSample; arc: number }[],
   ) {
     if (!this.shortStitch) return;
     let shortened = 0;
@@ -391,7 +570,8 @@ export class SatinMachine extends MachineCore {
 
   _emitRailPairColumn(
     geometry: RailPairGeometry,
-    topping: { x: number; y: number; side: number; sample: RailPairSample }[],
+    topping: { x: number; y: number; side: number; sample: RailPairSample; arc: number }[],
+    caps: ResolvedSatinCaps,
   ) {
     const start = geometry.samples[0].mid;
     const from = this.lastEmit ?? { x: 0, y: 0 };
@@ -401,7 +581,10 @@ export class SatinMachine extends MachineCore {
       this.started = true;
       this._push('stitch', start[0], start[1]);
     }
-    this._railPairUnderlay(geometry);
+    this._railPairUnderlay(geometry, caps);
+
+    if (caps.start === 'point' || caps.start === 'round')
+      this._pushCappedTopping(start[0], start[1]);
 
     let previous = this.lastEmit;
     let tipNoted = false;
@@ -437,12 +620,14 @@ export class SatinMachine extends MachineCore {
         }
         continue;
       }
-      this._push('stitch', point.x, point.y);
-      previous = point;
+      if (caps.start === 'legacy' && caps.end === 'legacy') {
+        this._push('stitch', point.x, point.y);
+        previous = point;
+      } else if (this._pushCappedTopping(point.x, point.y)) previous = point;
     }
   }
 
-  _railPairUnderlay(geometry: RailPairGeometry) {
+  _railPairUnderlay(geometry: RailPairGeometry, caps: ResolvedSatinCaps) {
     const width = geometry.meanWidth + this.pullComp;
     const profile = this._resolveSatinUnderlay(width, 'rail-pair');
     if (!profile.passes.length) return;
@@ -459,10 +644,14 @@ export class SatinMachine extends MachineCore {
         : [pass.runningStitchLengthMM],
     );
     const uLen = runningLengths.length ? Math.min(...runningLengths) : 2.5;
-    const underlaySteps = Math.max(1, Math.ceil(geometry.spineLength / uLen));
+    const startArc = satinCapUnderlayInset(caps.start, caps.startLengthMM);
+    const endArc = geometry.spineLength - satinCapUnderlayInset(caps.end, caps.endLengthMM);
+    if (endArc - startArc < LIMITS.minStitch) return;
+    const underlayLength = endArc - startArc;
+    const underlaySteps = Math.max(1, Math.ceil(underlayLength / uLen));
     const underlaySamples: RailPairSample[] = [];
     for (let i = 0; i <= underlaySteps; i++)
-      underlaySamples.push(geometry.atArc((geometry.spineLength * i) / underlaySteps));
+      underlaySamples.push(geometry.atArc(startArc + (underlayLength * i) / underlaySteps));
     const spine = underlaySamples.map(({ mid }) => ({ x: mid[0], y: mid[1] }));
     const reverseSpine = spine.slice().reverse();
     const runCenter = () => {
@@ -510,10 +699,10 @@ export class SatinMachine extends MachineCore {
         this._runAlong(left, pass.runningStitchLengthMM, true);
         this._runAlong(right.reverse(), pass.runningStitchLengthMM, true);
       } else {
-        const steps = Math.max(1, Math.ceil(geometry.spineLength / pass.spacingMM));
+        const steps = Math.max(1, Math.ceil(underlayLength / pass.spacingMM));
         const zigzag: { x: number; y: number }[] = [];
         for (let i = 0; i <= steps; i++) {
-          const sample = geometry.atArc((geometry.spineLength * i) / steps);
+          const sample = geometry.atArc(startArc + (underlayLength * i) / steps);
           const edge = i % 2 === 0 ? sample.a : sample.b;
           const railWidth = this._railWidth(sample);
           const widthRatio =
@@ -564,29 +753,43 @@ export class SatinMachine extends MachineCore {
 
   _flushSatinPlain(path: { x: number; y: number }[]) {
     const w = this.satinWidth + this.pullComp;
+    const analysis = analyzeSpineColumn(
+      path.map((point) => [point.x, point.y]),
+      w,
+    );
+    const caps = this._resolveSatinCaps(analysis.lengthMM, w, w, analysis.closed, 'satin');
+    const hasCapPolicy = caps.start !== 'legacy' || caps.end !== 'legacy';
+    const underlayPath = hasCapPolicy ? this._trimLocalPathForCaps(path, caps) : path;
     const profile = this._resolveSatinUnderlay(w, 'spine');
     this._warnCollapsedEdgeInset(profile, w, 'the satin column');
     if (!this.started) {
       this.started = true;
       this._push('stitch', path[0].x, path[0].y);
     }
-    const rev = path.slice().reverse();
+    const rev = underlayPath.slice().reverse();
     for (const pass of profile.passes) {
       if (pass.kind === 'center') {
-        this._runAlong(path, pass.runningStitchLengthMM, true);
+        this._runAlong(underlayPath, pass.runningStitchLengthMM, true);
         this._runAlong(rev, pass.runningStitchLengthMM, true);
       } else if (pass.kind === 'edge') {
         const off = this._edgeCenterOffset(w, pass.inset);
-        this._runAlong(this._offsetPath(path, off), pass.runningStitchLengthMM, true);
+        this._runAlong(this._offsetPath(underlayPath, off), pass.runningStitchLengthMM, true);
         this._runAlong(this._offsetPath(rev, off), pass.runningStitchLengthMM, true);
       } else {
-        this._zigzagAlong(path, w * pass.widthRatio, pass.spacingMM, true, false);
+        this._zigzagAlong(underlayPath, w * pass.widthRatio, pass.spacingMM, true, false);
         if (pass.returnRun === 'reverse-center')
           this._runAlong(rev, pass.returnRunStitchLengthMM, true);
       }
     }
     // The topping
-    this._zigzagAlong(path, w, this.satinSpacing, false, this.shortStitch);
+    this._zigzagAlong(
+      path,
+      w,
+      this.satinSpacing,
+      false,
+      this.shortStitch,
+      hasCapPolicy ? caps : undefined,
+    );
   }
 
   // ---- Transform-aware satin (CTM active) ----
@@ -643,7 +846,9 @@ export class SatinMachine extends MachineCore {
     spacing: number,
     u: boolean,
     shortStitch: boolean,
+    caps?: ResolvedSatinCaps,
   ) {
+    if (local.length < 2) return;
     const hoop = this._toHoop(local);
     const halfDesign = designWidth / 2;
     const realizedWidths = local.map((point, index) => {
@@ -659,6 +864,14 @@ export class SatinMachine extends MachineCore {
       realizedWidths,
     );
     const analyzedByInput = new Map(analysis.samples.map((sample) => [sample.inputIndex, sample]));
+    const cumulative = [0];
+    for (let i = 1; i < hoop.length; i++)
+      cumulative.push(
+        cumulative[i - 1] + Math.hypot(hoop[i].x - hoop[i - 1].x, hoop[i].y - hoop[i - 1].y),
+      );
+    const totalLength = cumulative[cumulative.length - 1];
+    if (caps && (caps.start === 'point' || caps.start === 'round'))
+      this._pushCappedTopping(hoop[0].x, hoop[0].y);
     let prevUx: number | null = null,
       prevUy = 0;
     let innerCounter = 0;
@@ -720,7 +933,12 @@ export class SatinMachine extends MachineCore {
           innerCounter++;
           if (innerCounter % 2 === 1) h = halfBase * 0.6;
         }
-        this._push('stitch', cx + dirx * h * this.satinSide, cy + diry * h * this.satinSide, u);
+        if (caps)
+          h *= this._satinCapFactor(caps, cumulative[i - 1] + len * t, totalLength, halfBase * 2);
+        const x = cx + dirx * h * this.satinSide;
+        const y = cy + diry * h * this.satinSide;
+        if (caps) this._pushCappedTopping(x, y);
+        else this._push('stitch', x, y, u);
       }
       prevUx = ux;
       prevUy = uy;
@@ -743,10 +961,31 @@ export class SatinMachine extends MachineCore {
     }
     const avgScale = scaleN ? scaleSum / scaleN : 1;
     const w = this.satinWidth * avgScale + this.pullComp;
+    const hoopFull = this._toHoop(local);
+    const realizedWidths = local.map((point, index) => {
+      const previous = local[Math.max(0, index - 1)];
+      const next = local[Math.min(local.length - 1, index + 1)];
+      const a = index < local.length - 1 ? point : previous;
+      const b = index < local.length - 1 ? next : point;
+      return this.satinWidth * this._perpVec(ctm, a.x, a.y, b.x, b.y).scale + this.pullComp;
+    });
+    const analysis = analyzeSpineColumn(
+      hoopFull.map((point) => [point.x, point.y]),
+      realizedWidths,
+    );
+    const caps = this._resolveSatinCaps(
+      analysis.lengthMM,
+      realizedWidths[0],
+      realizedWidths[realizedWidths.length - 1],
+      analysis.closed,
+      'transformed satin',
+    );
+    const hasCapPolicy = caps.start !== 'legacy' || caps.end !== 'legacy';
+    const underlayLocal = hasCapPolicy ? this._trimLocalPathForCaps(local, caps) : local;
     const profile = this._resolveSatinUnderlay(w, 'spine');
     this._warnCollapsedEdgeInset(profile, w, 'the transformed satin column');
-    const hoop = this._toHoop(local);
-    const revLocal = local.slice().reverse();
+    const hoop = this._toHoop(underlayLocal);
+    const revLocal = underlayLocal.slice().reverse();
     const revHoop = hoop.slice().reverse();
     for (const pass of profile.passes) {
       if (pass.kind === 'center') {
@@ -754,11 +993,15 @@ export class SatinMachine extends MachineCore {
         this._runAlong(revHoop, pass.runningStitchLengthMM, true);
       } else if (pass.kind === 'edge') {
         const off = this._edgeCenterOffset(w, pass.inset);
-        this._runAlong(this._offsetPathT(local, ctm, off), pass.runningStitchLengthMM, true);
+        this._runAlong(
+          this._offsetPathT(underlayLocal, ctm, off),
+          pass.runningStitchLengthMM,
+          true,
+        );
         this._runAlong(this._offsetPathT(revLocal, ctm, off), pass.runningStitchLengthMM, true);
       } else {
         this._zigzagAlongT(
-          local,
+          underlayLocal,
           this.satinWidth * pass.widthRatio,
           this.pullComp * pass.widthRatio,
           pass.spacingMM,
@@ -777,6 +1020,7 @@ export class SatinMachine extends MachineCore {
       this.satinSpacing,
       false,
       this.shortStitch,
+      hasCapPolicy ? caps : undefined,
     );
   }
 
@@ -842,6 +1086,7 @@ export class SatinMachine extends MachineCore {
       return {
         x: p0.x + dx * f,
         y: p0.y + dy * f,
+        segment: seg,
         nx: -uy,
         ny: ux, // left normal (local)
         heading: ((Math.atan2(ux, uy) * 180) / Math.PI + 360) % 360,
@@ -866,6 +1111,11 @@ export class SatinMachine extends MachineCore {
     interface Pen {
       x: number;
       y: number;
+      centerX: number;
+      centerY: number;
+      arc: number;
+      capArc: number;
+      realizedWidth: number;
     }
     const topping: Pen[] = [];
     let maxFullW = 0;
@@ -877,6 +1127,17 @@ export class SatinMachine extends MachineCore {
     let prev: Pen | null = null;
     let guard = 0;
     const guardMax = this.effectiveLimits.maxStitches + 10;
+    const capSpine = local.map((point) => this._mapSatin(point.x, point.y));
+    const capCumulative = [0];
+    for (let index = 1; index < capSpine.length; index++)
+      capCumulative.push(
+        capCumulative[index - 1] +
+          Math.hypot(
+            capSpine[index][0] - capSpine[index - 1][0],
+            capSpine[index][1] - capSpine[index - 1][1],
+          ),
+      );
+    const capLength = capCumulative[capCumulative.length - 1];
 
     while (cursor < L - 1e-9 && guard++ < guardMax) {
       const ret = reporter(cursor, cursor / L, pair, resolve(cursor).heading);
@@ -903,6 +1164,23 @@ export class SatinMachine extends MachineCore {
         side = -side;
         const left = side > 0; // side=+1 → left rail (lw/ll); −1 → right (rw/rl)
         const [hx, hy] = place(stepPos + (left ? ll : rl), left ? lw : rw, side);
+        const center = resolve(stepPos);
+        const [centerX, centerY] = this._mapSatin(center.x, center.y);
+        const capArc =
+          capCumulative[center.segment - 1] +
+          Math.hypot(
+            centerX - capSpine[center.segment - 1][0],
+            centerY - capSpine[center.segment - 1][1],
+          );
+        const segmentStart = local[center.segment - 1];
+        const segmentEnd = local[center.segment];
+        const widthScale = this._perpVec(
+          this.satinCTM,
+          segmentStart.x,
+          segmentStart.y,
+          segmentEnd.x,
+          segmentEnd.y,
+        ).scale;
         if (prev) {
           const d = Math.hypot(hx - prev.x, hy - prev.y);
           if (d > maxChord) maxChord = d;
@@ -911,12 +1189,78 @@ export class SatinMachine extends MachineCore {
             continue;
           }
         }
-        const pen = { x: hx, y: hy };
+        const pen = {
+          x: hx,
+          y: hy,
+          centerX,
+          centerY,
+          arc: stepPos,
+          capArc,
+          realizedWidth: (lw + rw) * widthScale + this.pullComp,
+        };
         topping.push(pen);
         prev = pen;
       }
       cursor += adv * 2;
       pair++;
+    }
+    const startScale = this._perpVec(
+      this.satinCTM,
+      local[0].x,
+      local[0].y,
+      local[1].x,
+      local[1].y,
+    ).scale;
+    const endScale = this._perpVec(
+      this.satinCTM,
+      local[n - 2].x,
+      local[n - 2].y,
+      local[n - 1].x,
+      local[n - 1].y,
+    ).scale;
+    const startWidth = maxFullW * startScale + this.pullComp;
+    const endWidth = maxFullW * endScale + this.pullComp;
+    const mappedAnalysis = analyzeSpineColumn(capSpine, maxFullW + this.pullComp);
+    const caps = this._resolveSatinCaps(
+      capLength,
+      startWidth,
+      endWidth,
+      mappedAnalysis.closed,
+      'programmable satin',
+    );
+    const hasCapPolicy = caps.start !== 'legacy' || caps.end !== 'legacy';
+    if (hasCapPolicy) {
+      for (const pen of topping) {
+        const factor = this._satinCapFactor(caps, pen.capArc, capLength, pen.realizedWidth);
+        pen.x = pen.centerX + (pen.x - pen.centerX) * factor;
+        pen.y = pen.centerY + (pen.y - pen.centerY) * factor;
+      }
+      if (caps.end === 'point' || caps.end === 'round') {
+        const endpoint = resolve(L);
+        const [x, y] = this._mapSatin(endpoint.x, endpoint.y);
+        const last = topping[topping.length - 1];
+        if (!last || Math.hypot(last.x - x, last.y - y) >= 1e-9) {
+          side = -side;
+          topping.push({
+            x,
+            y,
+            centerX: x,
+            centerY: y,
+            arc: L,
+            capArc: capLength,
+            realizedWidth: endWidth,
+          });
+        }
+      }
+      maxChord = 0;
+      for (let index = 1; index < topping.length; index++)
+        maxChord = Math.max(
+          maxChord,
+          Math.hypot(
+            topping[index].x - topping[index - 1].x,
+            topping[index].y - topping[index - 1].y,
+          ),
+        );
     }
     this.satinSide = side;
 
@@ -939,8 +1283,16 @@ export class SatinMachine extends MachineCore {
       const [hx, hy] = this._mapSatin(local[0].x, local[0].y);
       this._push('stitch', hx, hy);
     }
-    this._programmableUnderlay(local, maxFullW + this.pullComp);
-    for (const p of topping) this._push('stitch', p.x, p.y, false);
+    this._programmableUnderlay(local, maxFullW + this.pullComp, hasCapPolicy ? caps : undefined);
+    if (hasCapPolicy && (caps.start === 'point' || caps.start === 'round')) {
+      const start = resolve(0);
+      const [x, y] = this._mapSatin(start.x, start.y);
+      this._pushCappedTopping(x, y);
+    }
+    for (const p of topping) {
+      if (hasCapPolicy) this._pushCappedTopping(p.x, p.y);
+      else this._push('stitch', p.x, p.y, false);
+    }
   }
 
   /** One-time "wider than the curve it follows" warning on the realized width. */
@@ -969,13 +1321,14 @@ export class SatinMachine extends MachineCore {
   }
 
   /** Underlay for a programmable column, sized by the max realized width (§9). */
-  _programmableUnderlay(local: { x: number; y: number }[], w: number) {
+  _programmableUnderlay(local: { x: number; y: number }[], w: number, caps?: ResolvedSatinCaps) {
     const profile = this._resolveSatinUnderlay(w, 'programmable');
     if (!profile.passes.length) return;
     this._warnCollapsedEdgeInset(profile, w, 'the programmable satin column');
-    const hoop = this._toHoop(local);
+    const underlayLocal = caps ? this._trimLocalPathForCaps(local, caps) : local;
+    const hoop = this._toHoop(underlayLocal);
     const revHoop = hoop.slice().reverse();
-    const revLocal = local.slice().reverse();
+    const revLocal = underlayLocal.slice().reverse();
     for (const pass of profile.passes) {
       if (pass.kind === 'center') {
         this._runAlong(hoop, pass.runningStitchLengthMM, true);
@@ -983,7 +1336,7 @@ export class SatinMachine extends MachineCore {
       } else if (pass.kind === 'edge') {
         const off = this._edgeCenterOffset(w, pass.inset);
         this._runAlong(
-          this._offsetPathT(local, this.satinCTM, off),
+          this._offsetPathT(underlayLocal, this.satinCTM, off),
           pass.runningStitchLengthMM,
           true,
         );
@@ -995,7 +1348,7 @@ export class SatinMachine extends MachineCore {
       } else {
         const designWidth = profile.source === 'custom' ? Math.max(0, w - this.pullComp) : w;
         this._zigzagAlongT(
-          local,
+          underlayLocal,
           designWidth * pass.widthRatio,
           this.pullComp * pass.widthRatio,
           pass.spacingMM,

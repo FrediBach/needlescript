@@ -8,6 +8,7 @@ import {
   FILL_CONSTRUCTION_RANGES,
   FILL_STAGGER_MODES,
 } from '../fill-profile.ts';
+import { SATIN_CAP_MODES, SATIN_CONSTRUCTION_RANGES } from '../satin-profile.ts';
 
 export type NSItemKind = 'keyword' | 'function' | 'variable' | 'constant';
 
@@ -688,6 +689,25 @@ export const NS_ITEMS: NSItem[] = [
       ['railA', 'railB', '@shape'],
       ['railA', 'railB', 'checkpoints', '@shape'],
     ],
+  },
+  {
+    label: 'satincap',
+    kindName: 'function',
+    detail: 'choose open satin-column cap construction',
+    documentation:
+      "Choose the construction at both ends of an open spine or rail-pair satin column. `'legacy'` preserves existing output; `'butt'` finishes at full width; `'taper'` narrows over `satincaplen` while retaining a safe terminal bite; `'point'` converges both rails with coincident tip penetrations merged; `'round'` fans through a semicircular profile when the column is long enough. Closed columns have no caps and retain their seam. Underlay is shortened beneath narrowing caps. The policy is sticky, `stitchscope`-aware, and drawless.",
+    insertText: modeCommandSnippet('satincap', SATIN_CAP_MODES, "'"),
+    isSnippet: true,
+    params: [['mode']],
+  },
+  {
+    label: 'satincaplen',
+    kindName: 'function',
+    detail: 'satin cap transition length (mm)',
+    documentation: `Set the physical transition length used by taper, point, and round caps. Range ${SATIN_CONSTRUCTION_RANGES.capLengthMM.min}–${SATIN_CONSTRUCTION_RANGES.capLengthMM.max} mm; default ${SATIN_CONSTRUCTION_RANGES.capLengthMM.default}. On a short column each end is bounded to half the available spine length. Round caps fall back to point when a true semicircle cannot fit.`,
+    insertText: `satincaplen \${1:${SATIN_CONSTRUCTION_RANGES.capLengthMM.default}}`,
+    isSnippet: true,
+    params: [['mm']],
   },
   {
     label: 'density',

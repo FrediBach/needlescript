@@ -364,6 +364,8 @@ Modes are sticky: they apply to every move until changed.
 | `stitchlen mm` (`stitchlength`) | running-stitch length, clamped 0.4–12 mm (default **2.5**). Three forms: `stitchlen 2.5` (uniform) · `stitchlen [4, 1.5]` (cycling pattern, optional phase arg) · `stitchlen @fn` (per-stitch reporter) — §16.3 |
 | `satin mm`                      | zigzag column of this width; spacing set by `density`. `satin 0` returns to running stitch. Recommended 2–8 mm; >~8 mm warns (snag risk). `satin @fn` = programmable column — §16.1                             |
 | `satinbetween(railA, railB, …)` | immediate satin column between authored path rails; optional checkpoints/reporter — §16.2. Call syntax only                                                                                                     |
+| `satincap 'mode'`               | open-column cap at both ends: `'legacy'`, `'butt'`, `'taper'`, `'point'`, or `'round'`; default `'legacy'`                                                                                                      |
+| `satincaplen mm`                | physical taper/point/round transition length, 0.4–20 mm (default **2**)                                                                                                                                         |
 | `density mm`                    | satin penetration spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                          |
 | `bean n`                        | each stitch sewn n times (forced odd, max 9); `bean 1` off                                                                                                                                                      |
 | `estitch mm`                    | blanket stitch: prongs of this length on the left of travel, spaced by `stitchlen`; `estitch 0` off                                                                                                             |
@@ -391,7 +393,8 @@ stitchscope [
 ```
 
 The scope snapshots and restores running-stitch numeric/list/reporter forms and list progress; bean
-and E-stitch modes; satin width/reporter, density, and alternating side; fill angle, spacing,
+and E-stitch modes; satin width/reporter, density, alternating side, cap modes, and cap length;
+fill angle, spacing,
 construction/edge-run insets, minimum useful edge-fragment length, connector/stagger policies,
 length forms, and pending programmable/custom fill arm; plus lock, pull compensation, satin/fill
 underlay, double underlay, short-stitch, auto-trim, and max-density settings.
@@ -708,6 +711,33 @@ After-split effects (`humanize`, `snaptogrid`, `declump`) deliberately **skip sa
 ---
 
 ## 16. Programmable stitching
+
+### Satin caps — `satincap` / `satincaplen`
+
+Caps are opt-in construction policies for both ends of an **open** satin column:
+
+| Mode       | Output semantics                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| `'legacy'` | byte-identical compatibility path (default)                                                      |
+| `'butt'`   | retain full realized width through the start and finish                                          |
+| `'taper'`  | smoothly narrow over `satincaplen`, retaining a machine-safe nonzero terminal bite               |
+| `'point'`  | converge both rails at the spine tip; coincident/sub-0.2 mm penetrations merge                   |
+| `'round'`  | fan along a circular half-width profile, producing a semicircular end where the geometry permits |
+
+`satincaplen` accepts 0.4–20 mm and defaults to 2 mm. It bounds taper and point transitions. A
+round cap needs longitudinal space equal to half its realized endpoint width and must fit within
+both `satincaplen` and half the column; otherwise a source warning names the affected end and the
+generator falls back to point. On very short taper/point columns, each end is bounded to half the
+available spine length. Closed columns have no tips, so they keep their deterministic seam and
+legacy output even when a cap policy is active.
+
+The engine keeps start and end modes independently, although the current command sets both.
+Distances, endpoint widths, and fallback decisions are made in final physical hoop space after
+affine transforms or warps; pull compensation is included in the realized width. The policy also
+applies to `satin @fn` and `satinbetween`. Narrowing caps shorten every underlay pass by the same
+physical transition span so it stays beneath the topping. Caps do not add trims, colors, or locks;
+ordinary locks are still applied later at thread-run boundaries. All cap construction is
+deterministic and consumes zero RNG draws. Both commands are sticky and restored by `stitchscope`.
 
 ### 16.1 Programmable satin — `satin @fn`
 

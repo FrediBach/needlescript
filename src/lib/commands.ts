@@ -2,6 +2,7 @@
 
 import { EMBROIDERY_MODE_REGISTRIES } from './embroidery-registry.ts';
 import { FILL_CONSTRUCTION_MODE_REGISTRIES } from './fill-profile.ts';
+import { SATIN_CONSTRUCTION_MODE_REGISTRIES } from './satin-profile.ts';
 
 export { FABRICS } from './embroidery-registry.ts';
 
@@ -59,6 +60,8 @@ export const BUILTIN_ARITY: Record<string, number> = {
   pop: 0,
   stitchlen: 1,
   satin: 1,
+  satincap: 1,
+  satincaplen: 1,
   density: 1,
   bean: 1,
   estitch: 1,
@@ -147,6 +150,7 @@ export const EFFECT_ARITY: Record<string, { min: number; max: number }> = {
 export const QWORD_BUILTINS: Readonly<Record<string, readonly string[]>> = {
   ...EMBROIDERY_MODE_REGISTRIES,
   ...FILL_CONSTRUCTION_MODE_REGISTRIES,
+  ...SATIN_CONSTRUCTION_MODE_REGISTRIES,
 };
 
 export const FUNC_ARITY: Record<string, number> = {
