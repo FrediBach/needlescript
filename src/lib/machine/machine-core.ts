@@ -14,6 +14,8 @@ import {
   cloneSatinUnderlayCustomization,
 } from '../underlay-profile.ts';
 import type { FillUnderlayCustomization, SatinUnderlayCustomization } from '../underlay-profile.ts';
+import { FILL_CONSTRUCTION_RANGES } from '../fill-profile.ts';
+import type { FillStaggerMode } from '../fill-profile.ts';
 
 /**
  * One entry of the pre-split output stack: either an affine transform delta
@@ -65,6 +67,8 @@ export interface ConstructionConfigSnapshot {
   readonly fillAngle: number;
   readonly fillSpacing: number;
   readonly fillInset: number;
+  readonly fillStagger: FillStaggerMode;
+  readonly fillStaggerAmount: number;
   readonly fillLen: number | null;
   readonly fillLenList: readonly number[] | null;
   readonly fillLenListPhase: number;
@@ -115,6 +119,8 @@ interface MachineSnapshot {
   fillAngle: number;
   fillSpacing: number;
   fillInset: number;
+  fillStagger: FillStaggerMode;
+  fillStaggerAmount: number;
   fillLen: number | null;
   // Extended filllen forms (list / reporter)
   fillLenList: number[] | null;
@@ -203,6 +209,8 @@ export abstract class MachineCore {
   fillAngle = 0;
   fillSpacing = 0.4;
   fillInset = 0;
+  fillStagger: FillStaggerMode = 'legacy';
+  fillStaggerAmount: number = FILL_CONSTRUCTION_RANGES.staggerAmount.default;
   fillLen: number | null = null;
   // Extended filllen forms (list / reporter). Exactly one active at a time.
   fillLenList: number[] | null = null; // cycling length pattern for fill rows
@@ -358,6 +366,8 @@ export abstract class MachineCore {
       fillAngle: this.fillAngle,
       fillSpacing: this.fillSpacing,
       fillInset: this.fillInset,
+      fillStagger: this.fillStagger,
+      fillStaggerAmount: this.fillStaggerAmount,
       fillLen: this.fillLen,
       fillLenList: this.fillLenList?.slice() ?? null,
       fillLenListPhase: this.fillLenListPhase,
@@ -408,6 +418,8 @@ export abstract class MachineCore {
       this.fillAngle = snapshot.fillAngle;
       this.fillSpacing = snapshot.fillSpacing;
       this.fillInset = snapshot.fillInset;
+      this.fillStagger = snapshot.fillStagger;
+      this.fillStaggerAmount = snapshot.fillStaggerAmount;
       this.fillLen = snapshot.fillLen;
       this.fillLenList = snapshot.fillLenList?.slice() ?? null;
       this.fillLenListPhase = snapshot.fillLenListPhase;
@@ -516,6 +528,8 @@ export abstract class MachineCore {
       fillAngle: this.fillAngle,
       fillSpacing: this.fillSpacing,
       fillInset: this.fillInset,
+      fillStagger: this.fillStagger,
+      fillStaggerAmount: this.fillStaggerAmount,
       fillLen: this.fillLen,
       fillLenList: this.fillLenList ? this.fillLenList.slice() : null,
       fillLenListPhase: this.fillLenListPhase,
@@ -638,6 +652,8 @@ export abstract class MachineCore {
     this.fillAngle = snap.fillAngle;
     this.fillSpacing = snap.fillSpacing;
     this.fillInset = snap.fillInset;
+    this.fillStagger = snap.fillStagger;
+    this.fillStaggerAmount = snap.fillStaggerAmount;
     this.fillLen = snap.fillLen;
     this.fillLenList = snap.fillLenList ? snap.fillLenList.slice() : null;
     this.fillLenListPhase = snap.fillLenListPhase;

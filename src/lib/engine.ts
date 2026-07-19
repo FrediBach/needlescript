@@ -86,7 +86,13 @@ export { linkStandardModules } from './module-linker.ts';
 export { NsList, isList, isString } from './list.ts';
 export type { Val } from './list.ts';
 export type { Pt } from './genmath.ts';
-export { FILL_CONSTRUCTION_RANGES } from './fill-profile.ts';
+export {
+  FILL_CONSTRUCTION_RANGES,
+  FILL_STAGGER_MODES,
+  FILL_CONSTRUCTION_MODE_REGISTRIES,
+  fillStaggerOffset,
+} from './fill-profile.ts';
+export type { FillStaggerMode } from './fill-profile.ts';
 export {
   SATIN_UNDERLAY_RANGES,
   SATIN_UNDERLAY_PASS_KINDS,

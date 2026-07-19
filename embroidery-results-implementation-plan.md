@@ -786,6 +786,8 @@ hoop-space warning location. The command is deterministic and honors the active 
 
 ### Session 4.2 — Stagger policies
 
+Status: complete (2026-07-19)
+
 Purpose: prevent repeated row-aligned penetration patterns and visible tramlines.
 
 Policies:
@@ -808,6 +810,17 @@ Acceptance criteria:
 - `legacy` reproduces current events.
 - Hashed random phase is stable when unrelated earlier fills are edited.
 - No policy creates sub-minimum stitches without a merge/warning.
+
+Implementation note: `fillstagger` selects the centralized `legacy`/`brick`/`progressive`/`random`
+registry and `fillstaggeramount` supplies a sticky 0–1 phase fraction (default 0.65); both are
+included in `stitchscope`. Legacy preserves the fixed generator's three-row cycle and the
+programmable generator's cumulative reporter phase exactly. Non-legacy policies add a wrapped
+offset to that reporter base. Fixed lengths multiply the fraction directly; list/reporter forms use
+the first effective row length before continuing their authored sequence. Progressive repeats
+`0, amount, 3×amount, 2×amount`; random hashes row geometry quantized to micrometres and consumes no
+main-stream draws. Open custom fill paths participate, closed seams and fill underlay do not.
+Policy-created sub-0.4 mm edge fragments merge into a neighbour and produce one spatial,
+source-attributed warning.
 
 ### Session 4.3 — Connector policies
 

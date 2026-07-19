@@ -1,5 +1,9 @@
 // ---------- Tatami fill ----------
 
+import { FILL_CONSTRUCTION_RANGES, fillStaggerOffset } from '../fill-profile.ts';
+import type { FillStaggerMode } from '../fill-profile.ts';
+import { LIMITS } from './limits.ts';
+
 export interface FillOpts {
   angle: number;
   spacing: number;
@@ -9,6 +13,11 @@ export interface FillOpts {
   comp?: number;
   /** Require every sewn row connector to remain inside the compound region. */
   safeConnect?: boolean;
+  /** Opt-in topping phase policy. Omitted/legacy preserves the historical path. */
+  stagger?: FillStaggerMode;
+  staggerAmount?: number;
+  /** Called when a policy-created sub-minimum edge fragment is merged away. */
+  onShortEdge?: (x: number, y: number) => void;
 }
 
 export interface FillPoint {
@@ -226,11 +235,25 @@ export function generateFill(rings: [number, number][][], opt: FillOpts): FillPo
     const to = reverse ? seg.x0 : seg.x1;
     if (cur === null) push(from, seg.y, false);
     else connect([from, seg.y]);
-    const phase = (seg.row % 3) * (slen / 3);
+    const policyActive = opt.stagger !== undefined && opt.stagger !== 'legacy';
+    const phase = policyActive
+      ? fillStaggerOffset(
+          opt.stagger!,
+          seg.row,
+          opt.staggerAmount ?? FILL_CONSTRUCTION_RANGES.staggerAmount.default,
+          0,
+          seg.y,
+        ) * slen
+      : (seg.row % 3) * (slen / 3);
     const lo = Math.min(from, to) + 0.3,
       hi = Math.max(from, to) - 0.3;
     const grid: number[] = [];
-    for (let g = Math.ceil((lo - phase) / slen) * slen + phase; g < hi; g += slen) grid.push(g);
+    for (let g = Math.ceil((lo - phase) / slen) * slen + phase; g < hi; g += slen) {
+      if (policyActive && Math.min(Math.abs(g - from), Math.abs(to - g)) < LIMITS.minStitch) {
+        const [x, y] = unrot([g, seg.y]);
+        opt.onShortEdge?.(x, y);
+      } else grid.push(g);
+    }
     if (reverse) grid.reverse();
     for (const g of grid) sewLine([g, seg.y]);
     sewLine([to, seg.y]);

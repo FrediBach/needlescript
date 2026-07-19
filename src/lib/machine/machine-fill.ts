@@ -14,8 +14,11 @@ import type {
   FillUnderlayProfile,
   LegacyFillGenerator,
 } from '../underlay-profile.ts';
+import { fillStaggerOffset } from '../fill-profile.ts';
 
 export class FillMachine extends SatinMachine {
+  private _fillStaggerShortWarned = false;
+
   beginFill() {
     if (this.recording)
       throw new NeedlescriptError(
@@ -89,6 +92,22 @@ export class FillMachine extends SatinMachine {
         return false;
     }
     return true;
+  }
+
+  _noteFillStaggerShort(x: number, y: number) {
+    if (this._fillStaggerShortWarned) return;
+    this._fillStaggerShortWarned = true;
+    const lineSuffix = this.currentLine === undefined ? '' : ` (line ${this.currentLine})`;
+    const index = this.warnings.length;
+    this.warnings.push(
+      `fillstagger '${this.fillStagger}' merged a sub-${LIMITS.minStitch} mm edge fragment near (${x.toFixed(1)}, ${y.toFixed(1)})${lineSuffix}`,
+    );
+    this.constructionWarningLocations.push({
+      index,
+      points: [{ x, y }],
+      lines: this.currentLine === undefined ? [] : [this.currentLine],
+      kind: 'fill',
+    });
   }
 
   /** Inset a ring towards the interior of the shape by `d` mm (approximate). */
@@ -707,7 +726,34 @@ export class FillMachine extends SatinMachine {
           : this._extendForPullComp(poly);
       if (poly.length < 2) continue;
       const v = vOf(r);
-      const pen = this._walkStreamline(poly, r, v, cumPhase, lenFn, localOf);
+      const policyActive = !opts.underlay && this.fillStagger !== 'legacy';
+      const rowPhase = policyActive
+        ? (((cumPhase +
+            fillStaggerOffset(
+              this.fillStagger,
+              r,
+              this.fillStaggerAmount,
+              poly[0][0],
+              poly[0][1],
+            )) %
+            1) +
+            1) %
+          1
+        : cumPhase;
+      const pen = this._walkStreamline(
+        poly,
+        r,
+        v,
+        rowPhase,
+        lenFn,
+        localOf,
+        policyActive
+          ? (p) => {
+              const [x, y] = toFinal(p[0], p[1]);
+              this._noteFillStaggerShort(x, y);
+            }
+          : undefined,
+      );
       // Advance the cumulative brick phase by this row's phase (§8).
       const [sx, sy] = localOf(poly[0][0], poly[0][1]);
       cumPhase += phaseFn(sx, sy, r, v);
@@ -754,6 +800,7 @@ export class FillMachine extends SatinMachine {
     cumPhase: number,
     lenFn: (x: number, y: number, row: number, v: number, si: number) => number,
     localOf: (x: number, y: number) => [number, number],
+    onShortEdge?: (point: [number, number]) => void,
   ): [number, number][] {
     const out: [number, number][] = [];
     if (poly.length < 2) return poly.slice();
@@ -763,6 +810,10 @@ export class FillMachine extends SatinMachine {
       cum.push(cum[i - 1] + Math.hypot(poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]));
     const total = cum[cum.length - 1];
     if (!(total > 0)) return [poly[0].slice() as [number, number]];
+    if (onShortEdge && total < LIMITS.minStitch) {
+      onShortEdge(poly[0]);
+      return [];
+    }
 
     const at = (s: number): [number, number] => {
       const a = Math.min(Math.max(s, 0), total);
@@ -782,6 +833,10 @@ export class FillMachine extends SatinMachine {
     const [l0x, l0y] = localOf(poly[0][0], poly[0][1]);
     const firstLen = Math.min(Math.max(lenFn(l0x, l0y, row, v, 0), 1), 7);
     let s = frac > 1e-6 ? frac * firstLen : firstLen;
+    if (onShortEdge && s < LIMITS.minStitch && s < total) {
+      onShortEdge(at(s));
+      s += firstLen;
+    }
     let guard = 0;
     let si = 1; // stitch index within this row (0 = the first, above; si tracks subsequent)
     const guardMax = Math.ceil(total / 0.5) + 16;
@@ -793,7 +848,17 @@ export class FillMachine extends SatinMachine {
       s += len;
       si++;
     }
-    out.push([poly[poly.length - 1][0], poly[poly.length - 1][1]]);
+    const endpoint = poly[poly.length - 1];
+    if (
+      onShortEdge &&
+      out.length > 1 &&
+      Math.hypot(endpoint[0] - out[out.length - 1][0], endpoint[1] - out[out.length - 1][1]) <
+        LIMITS.minStitch
+    ) {
+      onShortEdge(out[out.length - 1]);
+      out.pop();
+    }
+    out.push([endpoint[0], endpoint[1]]);
     return out;
   }
 
@@ -880,6 +945,7 @@ export class FillMachine extends SatinMachine {
     if (!this.recording) throw new NeedlescriptError('endfill without a matching beginfill');
     this._closeRing();
     this.recording = false;
+    this._fillStaggerShortWarned = false;
     if (!this.rings.length) {
       this.warnings.push('fill skipped — the boundary needs at least 3 pen-down points');
       if (this.fillArmed) {
@@ -1032,6 +1098,9 @@ export class FillMachine extends SatinMachine {
           endNear,
           comp: this.pullComp,
           safeConnect: this.fillInset > 0,
+          stagger: this.fillStagger,
+          staggerAmount: this.fillStaggerAmount,
+          onShortEdge: (x, y) => this._noteFillStaggerShort(x, y),
         });
         this._emitFillPts(points, false, this.fillInset > 0 ? rings : undefined);
         const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
@@ -1118,9 +1187,20 @@ export class FillMachine extends SatinMachine {
           hoop,
           row,
           0,
-          0,
+          !clipped[row].closed && this.fillStagger !== 'legacy'
+            ? fillStaggerOffset(
+                this.fillStagger,
+                row,
+                this.fillStaggerAmount,
+                hoop[0][0],
+                hoop[0][1],
+              )
+            : 0,
           (_x, _y, _r, _v, si) => lengthAt(si, local[Math.min(si, local.length - 1)]),
           (x, y) => apply(inv, x, y),
+          !clipped[row].closed && this.fillStagger !== 'legacy'
+            ? (p) => this._noteFillStaggerShort(p[0], p[1])
+            : undefined,
         );
         const sewConnector = previousLocal ? connectorInside(previousLocal, local[0]) : true;
         for (let i = 0; i < subdivided.length; i++)
@@ -1259,6 +1339,7 @@ export class FillMachine extends SatinMachine {
               Math.abs(p[1] - ln0) < 1e-9 &&
               Math.abs(p[2] - ph0) < 1e-9,
           );
+        if (this.fillStagger !== 'legacy') constShape = false;
         scSpacing = sp0;
         scLen = Math.min(Math.max(ln0, 1), 7);
       }
@@ -1331,6 +1412,9 @@ export class FillMachine extends SatinMachine {
       endNear,
       comp: this.pullComp, // rows run along the stitch axis: extend against pull
       safeConnect: this.fillInset > 0,
+      stagger: this.fillStagger,
+      staggerAmount: this.fillStaggerAmount,
+      onShortEdge: (x, y) => this._noteFillStaggerShort(x, y),
     });
     if (!pts.length) {
       this.warnings.push('fill skipped — the area is too small to fill at this spacing');

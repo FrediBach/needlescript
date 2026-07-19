@@ -28,7 +28,7 @@ import {
   SATIN_UNDERLAY_PASS_KINDS,
   SATIN_UNDERLAY_RANGES,
 } from '../underlay-profile.ts';
-import { FILL_CONSTRUCTION_RANGES } from '../fill-profile.ts';
+import { FILL_CONSTRUCTION_RANGES, FILL_CONSTRUCTION_MODE_REGISTRIES } from '../fill-profile.ts';
 
 /**
  * Handler for the `'cmd'` statement branch of execStmt. Returns a function
@@ -378,6 +378,24 @@ export function initExecCmdHandler(
         ...ctx.m.fillUnderlayCustomization,
         passKinds,
       };
+      return;
+    }
+    if (st.name === 'fillstagger') {
+      ctx.traceNote(
+        'fillstagger',
+        'note: fillstagger inside trace has no effect on the captured path',
+      );
+      const modeVal = vals[0];
+      if (typeof modeVal !== 'string')
+        throw new NeedlescriptError(
+          `fillstagger expects a string mode, got ${describeVal(modeVal)} — e.g. fillstagger 'progressive'`,
+          st.line,
+        );
+      const allowed = FILL_CONSTRUCTION_MODE_REGISTRIES.fillstagger;
+      const mode = resolveMode(modeVal, allowed);
+      if (mode === undefined)
+        throw new NeedlescriptError(unknownModeMessage('fillstagger', modeVal, allowed), st.line);
+      ctx.m.fillStagger = mode;
       return;
     }
     // String-argument mode commands — handled before the bulk num() conversion.
@@ -843,6 +861,20 @@ export function initExecCmdHandler(
         if (!Number.isFinite(a[0]) || a[0] < min || a[0] > max)
           throw new NeedlescriptError(`fillinset must be between ${min} and ${max} mm`, st.line);
         ctx.m.fillInset = a[0];
+        return;
+      }
+      case 'fillstaggeramount': {
+        ctx.traceNote(
+          'fillstaggeramount',
+          'note: fillstaggeramount inside trace has no effect on the captured path',
+        );
+        const { min, max } = FILL_CONSTRUCTION_RANGES.staggerAmount;
+        if (!Number.isFinite(a[0]) || a[0] < min || a[0] > max)
+          throw new NeedlescriptError(
+            `fillstaggeramount must be between ${min} and ${max}`,
+            st.line,
+          );
+        ctx.m.fillStaggerAmount = a[0];
         return;
       }
       case 'filllen': {

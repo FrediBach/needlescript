@@ -451,6 +451,8 @@ endfill
 | `fillangle deg`                           | direction of fill rows (default 0). Thread is shiny — the angle is a visible design choice                                                                                                                                                                                                                        |
 | `fillspacing mm`                          | row spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                                                                                                                                          |
 | `fillinset mm`                            | inset the complete compound fill region by 0–10 physical mm (default **0**) to reserve border overlap. Outer boundaries shrink, holes expand, and split components are joined only by jumps. Topping and fill underlay use the inset region; collapsed/split results warn with a source line and preview location |
+| `fillstagger 'mode'`                      | topping penetration phase: `'legacy'` (existing output), `'brick'` (alternating), `'progressive'` (four-row cycle), or `'random'` (stable geometry hash; zero RNG draws). See §16.3                                                                                                                               |
+| `fillstaggeramount fraction`              | wrapped 0–1 phase amount for non-legacy staggering (default **0.65**). With fixed fill length this is a fraction of that length; list/reporter forms use each row's first effective length                                                                                                                        |
 | `filllen mm`                              | fill stitch length, 1–7 mm; default follows `stitchlen`; `filllen 0` = follow again. Rows are brick-offset. Same three forms as `stitchlen`: numeric · `[list]` rhythm per row · `@fn` reporter (t/s/i reset per row). `filllen 0` propagates whichever form `stitchlen` uses                                     |
 | `fill dir @field` / `fill shape @texture` | arms a **programmable fill** for the next `beginfill…endfill` — §16.2                                                                                                                                                                                                                                             |
 
@@ -766,6 +768,26 @@ Shaper inputs: `p` local penetration position (usable with `coverat(p)`), `row` 
 
 Helper: `tatamirow(spacing, len[, phase])` → `[spacing, len, phase-or-0.5]`.
 
+`fillstagger` controls topping penetrations without moving row spines. The policies are:
+
+- `'legacy'`: the fixed tatami generator retains its historical three-row `0, 1/3, 2/3` cycle;
+  programmable fills retain their historical cumulative shape-reporter phase. This is the default
+  and is byte-identical.
+- `'brick'`: add `0, amount` on alternating rows.
+- `'progressive'`: repeat the wrapped four-row offsets `0, amount, 3×amount, 2×amount`.
+- `'random'`: hash the row index and micrometre-quantized row geometry, then scale the result by
+  `amount`. It consumes no seeded-stream draws, so editing an unrelated earlier fill cannot
+  reshuffle later phases.
+
+For `fill shape @texture`, the reporter's existing cumulative phase is the base; the policy offset
+is added and wrapped into 0…1. With `filllen [list]`, `filllen @fn`, or inherited `stitchlen` forms,
+that fraction is converted to millimetres using the first effective length of the row; later
+penetrations continue using the authored list/reporter. Non-legacy policies also phase open custom
+fill paths, while closed contours retain their authored seam. Fill underlay is unaffected. If a
+chosen phase would leave an edge fragment below 0.4 mm, the fragment is merged into its neighbour
+and one spatial, `endfill`-line warning identifies the fill. `fillstaggeramount 0` disables the
+added offset; because phases wrap, 1 is equivalent to 0 for the alternating brick offset.
+
 ### 16.4 Programmable stitch splitting — `stitchlen @fn` / `stitchlen [list]`
 
 Replaces the running-stitch splitter. Sticky mode command; the numeric form disengages.
@@ -794,15 +816,15 @@ All randomness is seeded and deterministic; default seed 42. `seed n` reseeds (t
 
 Draw accounting (the **fork convention** — edits stay local):
 
-| Call                                                                                                       | Main-stream draws                            |
-| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `random(n)`                                                                                                | 1                                            |
-| `pick(xs)`                                                                                                 | 1                                            |
-| `gauss(mu, sigma)`                                                                                         | 2                                            |
-| `scatter(…)`, `shuffle(xs)`, `humanize` block / `humanizepath`                                             | 1 each (forks a child RNG for internal work) |
-| `snoise2/3`, `fbm2`, `noise`, `noise2`                                                                     | 0 (seeded fields, no stream consumption)     |
-| `voronoi`, `relax`, `snaptogrid`, `declump`, `trace`, `satinbetween`, `railspine`, field/history reporters | 0                                            |
-| `@name`, `bind`, `compose`, anonymous `def` creation                                                       | 0                                            |
+| Call                                                                                                                               | Main-stream draws                            |
+| ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `random(n)`                                                                                                                        | 1                                            |
+| `pick(xs)`                                                                                                                         | 1                                            |
+| `gauss(mu, sigma)`                                                                                                                 | 2                                            |
+| `scatter(…)`, `shuffle(xs)`, `humanize` block / `humanizepath`                                                                     | 1 each (forks a child RNG for internal work) |
+| `snoise2/3`, `fbm2`, `noise`, `noise2`                                                                                             | 0 (seeded fields, no stream consumption)     |
+| `voronoi`, `relax`, `snaptogrid`, `declump`, `trace`, `satinbetween`, `railspine`, `fillstagger 'random'`, field/history reporters | 0                                            |
+| `@name`, `bind`, `compose`, anonymous `def` creation                                                                               | 0                                            |
 
 Inserting a `scatter(6)` shifts a later `random 10` by exactly one draw.
 
@@ -940,6 +962,8 @@ Applies pull comp, underlay policy, satin density floor, and coverage limit in o
 | `fillunderlayspacing mm` | row spacing for tatami underlay, 0.25–5 mm; edge passes are unaffected                                                                                                                                                                                                                                                              |
 | `fillunderlayangle deg`  | tatami-underlay angle relative to the topping direction. Plain fills use `fillangle + deg`; directional fills rotate their local field by `deg` before mapping it through the fill transform. Any finite degree value is accepted                                                                                                   |
 | `fillinset mm`           | sticky 0–10 mm inset for the complete fill construction region. Applied after authored transforms in hoop space. Underlay follows the inset region. `fillinset 0` is the byte-identical compatibility path                                                                                                                          |
+| `fillstagger 'mode'`     | sticky topping-row phase policy: `'legacy'`, `'brick'`, `'progressive'`, or `'random'`. Underlay retains its resolved legacy phase behavior                                                                                                                                                                                         |
+| `fillstaggeramount n`    | sticky 0–1 wrapped phase fraction for non-legacy policies, default 0.65. Both values are included in `stitchscope`                                                                                                                                                                                                                  |
 | `shortstitch 0/1`        | on by default: on tight satin curves, alternate inner-edge stitches pull in to 60% width. Column wider than the curve radius warns (can't sew cleanly at any setting)                                                                                                                                                               |
 | `maxdensity n`           | coverage warning threshold in layers (default 3.5; `maxdensity 0` silences). Coverage = thread layers on a 1 mm grid (1 layer ≈ one clean satin/fill pass); hotspots warn with coordinates and source lines; ≥ 5 penetrations within 0.15 mm flagged separately. Past ~2.5–3.5 layers fabric fails — raise the limit only knowingly |
 | `autotrim mm`            | travels ≥ this length (default 7, configurable 3–30, `autotrim 0` off) get an automatic `trim` before the jump; never inserted when nothing was sewn since the last cut                                                                                                                                                             |

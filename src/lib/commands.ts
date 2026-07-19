@@ -1,6 +1,7 @@
 // ---------- Command tables ----------
 
 import { EMBROIDERY_MODE_REGISTRIES } from './embroidery-registry.ts';
+import { FILL_CONSTRUCTION_MODE_REGISTRIES } from './fill-profile.ts';
 
 export { FABRICS } from './embroidery-registry.ts';
 
@@ -66,6 +67,8 @@ export const BUILTIN_ARITY: Record<string, number> = {
   fillangle: 1,
   fillspacing: 1,
   fillinset: 1,
+  fillstagger: 1,
+  fillstaggeramount: 1,
   filllen: 1,
   lock: 1,
   pullcomp: 1,
@@ -138,8 +141,10 @@ export const EFFECT_ARITY: Record<string, { min: number; max: number }> = {
 };
 
 /** Builtins that take a single quoted-word argument, with their allowed words. */
-export const QWORD_BUILTINS: Readonly<Record<string, readonly string[]>> =
-  EMBROIDERY_MODE_REGISTRIES;
+export const QWORD_BUILTINS: Readonly<Record<string, readonly string[]>> = {
+  ...EMBROIDERY_MODE_REGISTRIES,
+  ...FILL_CONSTRUCTION_MODE_REGISTRIES,
+};
 
 export const FUNC_ARITY: Record<string, number> = {
   random: 1,

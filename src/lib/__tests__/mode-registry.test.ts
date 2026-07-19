@@ -5,6 +5,7 @@ import {
   SATIN_UNDERLAY_MODES,
 } from '../embroidery-registry.ts';
 import { resolveMode, unknownModeMessage } from '../mode-registry.ts';
+import { FILL_CONSTRUCTION_MODE_REGISTRIES, FILL_STAGGER_MODES } from '../fill-profile.ts';
 
 describe('shared mode registries', () => {
   it('resolves case-insensitively and retains the registry literal type', () => {
@@ -25,5 +26,6 @@ describe('shared mode registries', () => {
 
   it('keeps every quoted embroidery command in the focused registry', () => {
     expect(Object.keys(EMBROIDERY_MODE_REGISTRIES)).toEqual(['fabric', 'underlay', 'fillunderlay']);
+    expect(FILL_CONSTRUCTION_MODE_REGISTRIES).toEqual({ fillstagger: FILL_STAGGER_MODES });
   });
 });

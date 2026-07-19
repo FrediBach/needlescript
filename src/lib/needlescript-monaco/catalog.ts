@@ -3,7 +3,7 @@
 import { FABRIC_MODES, FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery-registry.ts';
 import { PLAN_MODES } from '../travel-planner.ts';
 import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
-import { FILL_CONSTRUCTION_RANGES } from '../fill-profile.ts';
+import { FILL_CONSTRUCTION_RANGES, FILL_STAGGER_MODES } from '../fill-profile.ts';
 
 export type NSItemKind = 'keyword' | 'function' | 'variable' | 'constant';
 
@@ -766,6 +766,25 @@ export const NS_ITEMS: NSItem[] = [
     insertText: 'fillinset ${1:mm}',
     isSnippet: true,
     params: [['mm']],
+  },
+  {
+    label: 'fillstagger',
+    kindName: 'function',
+    detail: 'choose fill-row penetration staggering',
+    documentation:
+      "Choose the topping-row phase policy. `'legacy'` preserves existing output; `'brick'` alternates 0 and `fillstaggeramount`; `'progressive'` repeats the wrapped four-row cycle `0, amount, 3×amount, 2×amount`; `'random'` hashes row geometry into a stable phase without drawing from the seeded RNG. A `fill shape @fn` reporter retains its cumulative phase as the base, then the policy offset is added and wrapped. Fill underlay is unaffected.",
+    insertText: modeCommandSnippet('fillstagger', FILL_STAGGER_MODES, "'"),
+    isSnippet: true,
+    params: [['mode']],
+  },
+  {
+    label: 'fillstaggeramount',
+    kindName: 'function',
+    detail: 'fill stagger phase amount (fraction)',
+    documentation: `Set the wrapped phase fraction used by non-legacy fill staggering. Range ${FILL_CONSTRUCTION_RANGES.staggerAmount.min}–${FILL_CONSTRUCTION_RANGES.staggerAmount.max}; default ${FILL_CONSTRUCTION_RANGES.staggerAmount.default}. With fixed fill length, the fraction is multiplied by that length. List/reporter forms use the first effective stitch length of each row. Policy-created edge fragments below 0.4 mm are merged with a spatial, source-attributed warning.`,
+    insertText: 'fillstaggeramount ${1:' + FILL_CONSTRUCTION_RANGES.staggerAmount.default + '}',
+    isSnippet: true,
+    params: [['fraction']],
   },
   {
     label: 'filllen',

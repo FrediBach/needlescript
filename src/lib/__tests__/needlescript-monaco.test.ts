@@ -11,6 +11,7 @@ import { STANDARD_LIBRARY_PROCEDURES } from '../standard-library/index.ts';
 import { CORE_COMMAND_NAMES } from '../commands.ts';
 import { EMBROIDERY_MODE_REGISTRIES } from '../embroidery-registry.ts';
 import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
+import { FILL_CONSTRUCTION_MODE_REGISTRIES } from '../fill-profile.ts';
 import { catalogCoverageGaps, catalogModeGaps } from './helpers/catalog-coverage.ts';
 
 describe('NeedleScript Monaco symbol analysis', () => {
@@ -24,6 +25,11 @@ describe('NeedleScript Monaco symbol analysis', () => {
     );
     gaps.push(...catalogModeGaps('underlaypasses', SATIN_UNDERLAY_PASS_KINDS, NS_ITEM_MAP));
     gaps.push(...catalogModeGaps('fillunderlaypasses', FILL_UNDERLAY_PASS_KINDS, NS_ITEM_MAP));
+    gaps.push(
+      ...Object.entries(FILL_CONSTRUCTION_MODE_REGISTRIES).flatMap(([command, modes]) =>
+        catalogModeGaps(command, modes, NS_ITEM_MAP),
+      ),
+    );
     expect(gaps).toEqual([]);
   });
 
