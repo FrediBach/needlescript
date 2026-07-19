@@ -19,6 +19,11 @@ interface SymbolCacheEntry {
 
 const symbolCache = new WeakMap<MonacoEditor.ITextModel, SymbolCacheEntry>();
 
+function catalogDocumentation(item: (typeof NS_ITEMS)[number]): string {
+  if (!item.example) return item.documentation;
+  return `${item.documentation}\n\n**Example**\n\n\`\`\`needlescript\n${item.example}\n\`\`\``;
+}
+
 function userSymbolsFor(model: MonacoEditor.ITextModel): UserSymbol[] {
   const version = model.getVersionId();
   const cached = symbolCache.get(model);
@@ -43,7 +48,7 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
     kind: kindMap[item.kindName],
     detail: item.detail,
     documentation: {
-      value: item.documentation,
+      value: catalogDocumentation(item),
       isTrusted: true,
     } as IMarkdownString,
     insertText: item.insertText,
@@ -165,7 +170,7 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
           }
         }
 
-        const content = `${sigLine}\n\n${item.documentation}`;
+        const content = `${sigLine}\n\n${catalogDocumentation(item)}`;
 
         return {
           contents: [{ value: content, isTrusted: true }],
@@ -228,7 +233,7 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
           return {
             label,
             documentation: {
-              value: item.documentation,
+              value: catalogDocumentation(item),
               isTrusted: true,
             } as IMarkdownString,
             parameters,

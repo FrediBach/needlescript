@@ -14,7 +14,54 @@ import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay
 import { FILL_CONSTRUCTION_MODE_REGISTRIES } from '../fill-profile.ts';
 import { SATIN_CONSTRUCTION_MODE_REGISTRIES } from '../satin-profile.ts';
 import { PREFLIGHT_MODES } from '../preflight.ts';
-import { catalogCoverageGaps, catalogModeGaps } from './helpers/catalog-coverage.ts';
+import { PLAN_MODES } from '../travel-planner.ts';
+import {
+  catalogCoverageGaps,
+  catalogExampleGaps,
+  catalogModeGaps,
+} from './helpers/catalog-coverage.ts';
+
+const EMBROIDERY_RESULT_COMMANDS = [
+  'stitchscope',
+  'satincap',
+  'satincaplen',
+  'satinjoin',
+  'satincorner',
+  'satinwide',
+  'satinmaxwidth',
+  'satinsplitoverlap',
+  'fillinset',
+  'filledgerun',
+  'filledgeshort',
+  'fillstagger',
+  'fillstaggeramount',
+  'fillconnect',
+  'compensation',
+  'plan',
+  'preflight',
+  'planbarrier',
+  'atomic',
+  'routegroup',
+  'fabric',
+  'fabricgrain',
+  'fabricstretch',
+  'threadprofile',
+  'threadwidth',
+  'needle',
+  'stabilizer',
+  'topping',
+  'underlay',
+  'underlaypasses',
+  'underlaylen',
+  'underlayinset',
+  'underlayspacing',
+  'fillunderlay',
+  'fillunderlaypasses',
+  'fillunderlaylen',
+  'fillunderlayinset',
+  'fillunderlayspacing',
+  'fillunderlayangle',
+] as const;
 
 describe('NeedleScript Monaco symbol analysis', () => {
   it('covers every Core command with completion, hover, and signature metadata', () => {
@@ -38,7 +85,12 @@ describe('NeedleScript Monaco symbol analysis', () => {
       ),
     );
     gaps.push(...catalogModeGaps('preflight', PREFLIGHT_MODES, NS_ITEM_MAP));
+    gaps.push(...catalogModeGaps('plan', PLAN_MODES, NS_ITEM_MAP));
     expect(gaps).toEqual([]);
+  });
+
+  it('provides a concise catalog example for every embroidery-results command', () => {
+    expect(catalogExampleGaps(EMBROIDERY_RESULT_COMMANDS, NS_ITEM_MAP)).toEqual([]);
   });
 
   it('highlights stitchscope as a sewing block command', () => {
@@ -72,6 +124,23 @@ describe('NeedleScript Monaco symbol analysis', () => {
     expect(tokenizer?.stitchCmds).toEqual(
       expect.arrayContaining(['plan', 'planbarrier', 'preflight']),
     );
+  });
+
+  it('highlights embroidery construction and material commands as stitch commands', () => {
+    let tokenizer: { stitchCmds?: string[] } | undefined;
+    registerNeedlescriptTokenizer({
+      languages: {
+        setMonarchTokensProvider: (_language: string, definition: unknown) => {
+          tokenizer = definition as { stitchCmds?: string[] };
+        },
+      },
+    } as never);
+
+    const blockCommands = new Set(['stitchscope', 'atomic', 'routegroup']);
+    const stitchCommands = EMBROIDERY_RESULT_COMMANDS.filter(
+      (command) => !blockCommands.has(command),
+    );
+    expect(tokenizer?.stitchCmds).toEqual(expect.arrayContaining(stitchCommands));
   });
 
   it('extracts modern and classic procedures and variables with source lines', () => {

@@ -1746,6 +1746,8 @@ place first.
 
 ### Session 9.1 — Monaco, AI prompt, and catalog audit
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Ensure all new commands and modes have completions, hover text, signatures, examples, and syntax
@@ -1754,6 +1756,20 @@ Tasks:
 - Add generation guidance for fill inset, underlay profiles, satin corners, planner barriers, and
   material intent.
 - Add negative guidance: do not enable automatic split/compensation without explicit intent.
+
+Implementation note: the audit now pins completion, hover, signature, example, registered-mode, and
+Monarch syntax-category coverage for the embroidery-results command surface. Catalog examples are
+structured metadata rendered consistently in completion, hover, and signature documentation. The
+missing Phase 4/5 fill-edge and satin cap/join/wide commands are classified as stitch commands, and
+plan modes now participate in the same registry-driven catalog-mode coverage as construction and
+preflight modes.
+
+`ai-system-prompt.md` is the single prompt source imported verbatim by `src/lib/ai-prompt.ts`; there
+is no generated duplicate to synchronize. It now covers fill inset and connector policy,
+parameterized satin/fill underlay, cap/corner/wide-column construction, barriers/atomic route
+groups, portable material intent, directional compensation, and preflight. Focused prompt tests pin
+every relevant command and registered mode plus the explicit rule that split satin and directional
+compensation remain opt-in. No language/runtime semantics changed in this audit.
 
 ### Session 9.2 — SVG staging integration
 

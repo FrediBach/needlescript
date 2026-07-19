@@ -32,6 +32,8 @@ export interface NSItem {
   kindName: NSItemKind;
   detail: string;
   documentation: string;
+  /** Concise valid source shown after the hover/completion documentation. */
+  example?: string;
   insertText: string;
   isSnippet?: boolean;
   params?: string[][];
@@ -107,6 +109,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'temporarily override stitch construction settings',
     documentation:
       "Run a block with temporary stitch-construction settings, then restore the outer configuration even after `return`, `break`, `continue`, or an error. It scopes running/satin/E-stitch/bean modes, satin cap/join/wide policies, fill settings and an armed fill, plus lock, compensation, underlay, auto-trim, and density policies. Turtle position, heading, pen, color, RNG, transforms/effects, output/history, hoop, budgets, and planning are not restored. Pending satin or reporter-running construction flushes at both boundaries; an active `beginfill` cannot cross a boundary.\n\n```\nstitchscope [\n  density 0.5\n  underlay 'edge'\n  satin 4\n  fd 20\n]\n```",
+    example: "stitchscope [\n  density 0.5\n  underlay 'edge'\n  satin 4\n  fd 20\n]",
     insertText: 'stitchscope [\n\t$0\n]',
     isSnippet: true,
     params: [[]],
@@ -711,6 +714,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'choose open satin-column cap construction',
     documentation:
       "Choose the construction at both ends of an open spine or rail-pair satin column. `'legacy'` preserves existing output; `'butt'` finishes at full width; `'taper'` narrows over `satincaplen` while retaining a safe terminal bite; `'point'` converges both rails with coincident tip penetrations merged; `'round'` fans through a semicircular profile when the column is long enough. Closed columns have no caps and retain their seam. Underlay is shortened beneath narrowing caps. The policy is sticky, `stitchscope`-aware, and drawless.",
+    example: "satincap 'taper'",
     insertText: modeCommandSnippet('satincap', SATIN_CAP_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
@@ -720,6 +724,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'satin cap transition length (mm)',
     documentation: `Set the physical transition length used by taper, point, and round caps. Range ${SATIN_CONSTRUCTION_RANGES.capLengthMM.min}–${SATIN_CONSTRUCTION_RANGES.capLengthMM.max} mm; default ${SATIN_CONSTRUCTION_RANGES.capLengthMM.default}. On a short column each end is bounded to half the available spine length. Round caps fall back to point when a true semicircle cannot fit.`,
+    example: 'satincaplen 2',
     insertText: `satincaplen \${1:${SATIN_CONSTRUCTION_RANGES.capLengthMM.default}}`,
     isSnippet: true,
     params: [['mm']],
@@ -730,6 +735,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'choose sharp satin-corner construction',
     documentation:
       "Choose how sharp corners at or above `satincorner` are constructed. `'legacy'` preserves the previous event stream; `'continuous'` keeps one continuous zigzag with short-stitch relief; `'fan'` distributes at most eight outer-rail penetrations around the turn and keeps at most two shortened inner bites; `'miter'` overlaps straight legs at their bounded rail intersections; `'split'` ends and restarts the topping legs with a 0.5 mm overlap. Underlay remains continuous through every join. Miter and split connectors are stitches: they never add a trim or color change. Unsupported or closed geometry warns and falls back to continuous. The policy is sticky, `stitchscope`-aware, and drawless.",
+    example: "satinjoin 'fan'",
     insertText: modeCommandSnippet('satinjoin', SATIN_JOIN_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
@@ -739,6 +745,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'sharp satin turn threshold (degrees)',
     documentation: `Set the minimum absolute change in travel direction that selects a non-legacy satin join. Range ${SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.min}–${SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.max} degrees; default ${SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.default}. Lower values classify gentler bends as corners. Measured after the authored output transform in physical hoop space.`,
+    example: 'satincorner 35',
     insertText: `satincorner \${1:${SATIN_CONSTRUCTION_RANGES.cornerAngleDeg.default}}`,
     isSnippet: true,
     params: [['degrees']],
@@ -749,6 +756,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'choose wide satin-column handling',
     documentation:
       "Choose how columns wider than `satinmaxwidth` are handled. `'warn'` is the byte-identical legacy path. `'split'` partitions a safe open, smooth column into adjacent hoop-space subcolumns. Shared seams alternate ownership of the `satinsplitoverlap` band so the topping interlocks without a fixed double-density strip. Each subcolumn sews its underlay before topping, and nearest-end routing limits jumps. Closed columns, sharp/cusped curves, crossed rails, and reporter-defined rake warn and remain unsplit. Sticky, `stitchscope`-aware, and drawless.",
+    example: "satinwide 'split'",
     insertText: modeCommandSnippet('satinwide', SATIN_WIDE_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
@@ -758,6 +766,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'maximum split satin subcolumn width (mm)',
     documentation: `Set the physical hoop-space width ceiling that activates and sizes \`satinwide 'split'\`. Range ${SATIN_CONSTRUCTION_RANGES.maxWidthMM.min}–${SATIN_CONSTRUCTION_RANGES.maxWidthMM.max} mm; default ${SATIN_CONSTRUCTION_RANGES.maxWidthMM.default}. It does not replace the legacy snag warning while \`satinwide 'warn'\` is active.`,
+    example: 'satinmaxwidth 7.5',
     insertText: `satinmaxwidth \${1:${SATIN_CONSTRUCTION_RANGES.maxWidthMM.default}}`,
     isSnippet: true,
     params: [['mm']],
@@ -767,6 +776,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'split satin seam interlock (mm)',
     documentation: `Set the physical width alternately assigned across neighboring split-column seams. Range ${SATIN_CONSTRUCTION_RANGES.splitOverlapMM.min}–${SATIN_CONSTRUCTION_RANGES.splitOverlapMM.max} mm; default ${SATIN_CONSTRUCTION_RANGES.splitOverlapMM.default}. The shared seam moves by half this amount to avoid both gaps and a stationary double-density band.`,
+    example: 'satinsplitoverlap 0.5',
     insertText: `satinsplitoverlap \${1:${SATIN_CONSTRUCTION_RANGES.splitOverlapMM.default}}`,
     isSnippet: true,
     params: [['mm']],
@@ -849,6 +859,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'inset the fill construction region (mm)',
     documentation: `Reserve space inside a fill boundary for a later border. Range ${FILL_CONSTRUCTION_RANGES.insetMM.min}–${FILL_CONSTRUCTION_RANGES.insetMM.max} mm (default 0). The complete compound even-odd region is inset in physical hoop space: outer boundaries shrink, holes expand, and concave regions may split. Topping and fill underlay use the inset region; disconnected pieces are crossed only by jumps. Collapsed or split geometry warns with a source line and preview location.`,
+    example: 'fillinset 0.4',
     insertText: 'fillinset ${1:mm}',
     isSnippet: true,
     params: [['mm']],
@@ -858,6 +869,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'add an inset topping edge run (mm)',
     documentation: `Add a closed boundary pass after fill underlay and before topping, inset by the requested physical distance. Range ${FILL_CONSTRUCTION_RANGES.edgeRunInsetMM.min}–${FILL_CONSTRUCTION_RANGES.edgeRunInsetMM.max} mm; 0 disables it (default). Compound even-odd geometry keeps outer and hole contours inside the construction region and jumps between disconnected contours. Acute-corner penetrations are bounded, and dense overlap near a later border warns.`,
+    example: 'filledgerun 0.5',
     insertText: 'filledgerun ${1:mm}',
     isSnippet: true,
     params: [['mm']],
@@ -867,6 +879,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'minimum useful fill-row fragment (mm)',
     documentation: `Omit open topping row fragments shorter than this physical hoop-space length before connector routing. Range ${FILL_CONSTRUCTION_RANGES.edgeShortMM.min}–${FILL_CONSTRUCTION_RANGES.edgeShortMM.max} mm; 0 disables it (default). Applies to fixed tatami, programmable streamlines, and open custom fill paths; underlay and closed decorative contours are unchanged.`,
+    example: 'filledgeshort 0.7',
     insertText: 'filledgeshort ${1:mm}',
     isSnippet: true,
     params: [['mm']],
@@ -877,6 +890,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'choose fill-row penetration staggering',
     documentation:
       "Choose the topping-row phase policy. `'legacy'` preserves existing output; `'brick'` alternates 0 and `fillstaggeramount`; `'progressive'` repeats the wrapped four-row cycle `0, amount, 3×amount, 2×amount`; `'random'` hashes row geometry into a stable phase without drawing from the seeded RNG. A `fill shape @fn` reporter retains its cumulative phase as the base, then the policy offset is added and wrapped. Fill underlay is unaffected.",
+    example: "fillstagger 'progressive'",
     insertText: modeCommandSnippet('fillstagger', FILL_STAGGER_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
@@ -886,6 +900,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'fill stagger phase amount (fraction)',
     documentation: `Set the wrapped phase fraction used by non-legacy fill staggering. Range ${FILL_CONSTRUCTION_RANGES.staggerAmount.min}–${FILL_CONSTRUCTION_RANGES.staggerAmount.max}; default ${FILL_CONSTRUCTION_RANGES.staggerAmount.default}. With fixed fill length, the fraction is multiplied by that length. List/reporter forms use the first effective stitch length of each row. Policy-created edge fragments below 0.4 mm are merged with a spatial, source-attributed warning.`,
+    example: 'fillstaggeramount 0.65',
     insertText: 'fillstaggeramount ${1:' + FILL_CONSTRUCTION_RANGES.staggerAmount.default + '}',
     isSnippet: true,
     params: [['fraction']],
@@ -896,6 +911,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'choose between-row fill travel',
     documentation:
       "Choose how topping rows and custom fill-path fragments connect. `'legacy'` preserves existing short sewn connectors. `'inside'` sews only when the complete physical hoop-space segment stays inside the compound fill region with edge clearance. `'jump'` always uses jump travel. `'trim'` jumps and cuts first when the connector reaches the active `autotrim` threshold (or 7 mm while automatic trimming is off). Fill underlay is unchanged.",
+    example: "fillconnect 'inside'",
     insertText: modeCommandSnippet('fillconnect', FILL_CONNECT_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
@@ -973,6 +989,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'satin and fill compensation mode',
     documentation:
       "Choose compensation semantics. `'legacy'` (default) preserves scalar `pullcomp` for satin and fill. `'directional'` applies the grain-aligned tensor across satin columns and along open fill-row endpoint tangents in final physical hoop space. Curved rows resolve each end independently; closed fill contours stay unchanged. Endpoint crossings of an authored outer boundary or hole warn spatially—use `fillinset` to reserve border overlap. `fabric` supplies the mean pull magnitude; a later explicit `pullcomp` replaces it while retaining `fabricstretch` anisotropy, and a later `fabric` restores profile defaults. Push remains unapplied pending sew-out evidence. Sticky, `stitchscope`-aware, and drawless.",
+    example: "compensation 'directional'",
     insertText: modeCommandSnippet('compensation', COMPENSATION_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
@@ -1044,6 +1061,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'reorder independent thread runs to shorten travel',
     documentation:
       "Top-level travel-planning directive. With no `routegroup`, `plan 'nearest'` greedily reorders whole thread runs within each color block after execution and before autotrim/locks. Once any route group executes, only grouped runs are eligible and ungrouped output remains authored; grouped intersections also receive bounded 2-opt improvement. `plan 'reversing-nearest'` may enter eligible stitch-only runs from their nearer endpoint. Planning never crosses a color change, changes stitch geometry, or removes an explicit `trim`. Use `plan 'off'` for an explicit no-op. Must appear before the first stitch and at most once.",
+    example: "plan 'reversing-nearest'",
     insertText: modeCommandSnippet('plan', PLAN_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
@@ -1054,6 +1072,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'run extended sewability diagnostics',
     documentation:
       "Select the post-run diagnostic policy. `preflight 'off'` (the default) keeps existing always-on warnings and their structured locations, but skips extended event-stream and construction recommendations. `preflight 'warn'` adds those extended checks without changing stitches or turning findings into legacy console warnings. `preflight 'strict'` runs the same checks and rejects the run only when a finding has severity `error`; `warning` and `info` recommendations never fail strict mode. Top-level only, before the first committed stitch, forbidden in `trace`, and allowed at most once.",
+    example: "preflight 'warn'",
     insertText: modeCommandSnippet('preflight', PREFLIGHT_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
@@ -1064,6 +1083,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'prevent travel planning across this authored boundary',
     documentation:
       "Start a new independent travel-planner segment at this point in the authored stitch stream. Planning may reorder runs on either side, but never moves a run across the barrier. `planbarrier` emits no stitch, jump, trim, color, or mark. During normal sewing execution it is completely inert when planning is absent or `plan 'off'`, including leaving buffered construction untouched. Consecutive barriers and barriers before/after all sewing are harmless. It may appear in normal control flow and procedures. It is always rejected inside `trace`; with planning active it is also rejected inside an open `beginfill…endfill` recording.",
+    example: 'fd 5\nplanbarrier\nrt 90 fd 5',
     insertText: 'planbarrier',
     params: [[]],
   },
@@ -1073,6 +1093,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'keep a construction contiguous during travel planning',
     documentation:
       "Treat every routable run emitted by the block as one indivisible, forward-only travel-planner item. Internal stitches, jumps, trims, marks, underlay, and topping retain their authored order while the complete item may move within its color and `planbarrier` segment. Nested `atomic` blocks belong to the outermost span. With planning absent or `plan 'off'`, the block is byte-identical to its body and does not flush buffered construction. Active atomics cannot cross a color change or `planbarrier`, start/end inside an open `beginfill…endfill`, or run inside `trace`.\n\n```\natomic [\n  // foundation and decorative pass stay together\n  underlay 'edge'\n  satin 4\n  fd 20\n  trim\n]\n```",
+    example: "atomic [\n  underlay 'edge'\n  satin 4\n  fd 20\n]",
     insertText: 'atomic [\n\t$0\n]',
     isSnippet: true,
     params: [[]],
@@ -1083,6 +1104,8 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'limit travel reordering to an explicit collection',
     documentation:
       "Make the block's independent thread runs eligible for deterministic nearest routing followed by a bounded 2-opt improvement pass. The group's position is fixed: only runs inside it reorder, and when any `routegroup` executes, output outside all groups stays in authored order. Color changes and `planbarrier` boundaries split planning into independent intersections. An `atomic` inside the group remains one forward-only item. Nested groups belong to the outermost group. With planning absent or `plan 'off'`, the wrapper is byte-identical and does not flush construction. Active groups cannot start inside `atomic`, cross an open `beginfill…endfill` boundary, or run inside `trace`.\n\n```\nroutegroup [\n  motif(20) trim\n  motif(5) trim\n  motif(12)\n]\n```",
+    example:
+      'routegroup [\n  moveto -20 0 down fd 5 up trim\n  moveto 5 0 down fd 5 up trim\n  moveto 12 0 down fd 5\n]',
     insertText: 'routegroup [\n\t$0\n]',
     isSnippet: true,
     params: [[]],
@@ -1093,6 +1116,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'fabric preset',
     documentation:
       'Apply a fabric preset. Sets pull compensation, density limit, and underlay defaults.\n\n- `"woven` — pull 0.2 mm, max 3.5 layers\n- `"knit` — pull 0.5 mm, max 3.0, density floor 0.45 mm\n- `"stretch` — pull 0.6 mm, max 2.8, density floor 0.5 mm\n- `"denim` / `"canvas` — pull 0.15 mm, max 4.0\n- `"fleece` — pull 0.3 mm, max 2.6, double underlay',
+    example: "fabric 'knit'",
     insertText: modeCommandSnippet('fabric', FABRIC_MODES, '"'),
     isSnippet: true,
     params: [['preset']],
@@ -1103,6 +1127,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'fabric grain heading (degrees)',
     documentation:
       "Record the fabric grain heading as turtle degrees: 0 points up and positive angles turn clockwise. Values wrap to 0–360. It feeds preview diagnostics and opt-in `compensation 'directional'` satin/fill geometry.",
+    example: 'fabricgrain 90',
     insertText: 'fabricgrain ${1:0}',
     isSnippet: true,
     params: [['degrees']],
@@ -1112,6 +1137,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'declared along/across fabric stretch',
     documentation: `Record fractional stretch along and across the grain, each from ${MATERIAL_RANGES.stretch.min} to ${MATERIAL_RANGES.stretch.max}. The values redistribute directional preview and opt-in satin/fill pull while preserving its mean magnitude. A later \`fabric\` command restores that profile's neutral stretch defaults.`,
+    example: 'fabricstretch 0.15 0.5',
     insertText: 'fabricstretch ${1:along} ${2:across}',
     isSnippet: true,
     params: [['along', 'across']],
@@ -1122,6 +1148,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'generic thread profile',
     documentation:
       "Select generic `'rayon-40wt'`, `'rayon-60wt'`, `'polyester-40wt'`, or `'polyester-60wt'` metadata. 40 wt resolves to an approximate 0.4 mm width and 60 wt to 0.3 mm. A later `threadwidth` overrides that default. Width scales live coverage queries, the final heatmap, and density warnings without changing stitch geometry.",
+    example: "threadprofile 'polyester-40wt'",
     insertText: modeCommandSnippet('threadprofile', THREAD_PROFILE_MODES, "'"),
     isSnippet: true,
     params: [['profile']],
@@ -1131,6 +1158,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'resolved thread width metadata (mm)',
     documentation: `Override the active thread profile's approximate width with ${MATERIAL_RANGES.threadWidthMM.min}–${MATERIAL_RANGES.threadWidthMM.max} mm. The width scales live coverage queries, final heatmap layers, and density warnings. It never changes stitch geometry or rescales the active \`maxdensity\` threshold.`,
+    example: 'threadwidth 0.4',
     insertText: 'threadwidth ${1:0.4}',
     isSnippet: true,
     params: [['mm']],
@@ -1140,6 +1168,7 @@ export const NS_ITEMS: NSItem[] = [
     kindName: 'function',
     detail: 'advisory metric needle size',
     documentation: `Record an advisory NM needle size: ${NEEDLE_SIZES.join(', ')}. Use \`needle 0\` to leave the size unspecified. Needle metadata does not alter stitch generation.`,
+    example: 'needle 75',
     insertText: 'needle ${1|' + NEEDLE_SIZES.join(',') + '|}',
     isSnippet: true,
     params: [['sizeNM']],
@@ -1150,6 +1179,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'stabilizer category metadata',
     documentation:
       "Record the generic stabilizer category: `'none'`, `'tearaway'`, `'cutaway'`, or `'washaway'`. This is portable intent metadata, not a brand or automatic construction recommendation.",
+    example: "stabilizer 'cutaway'",
     insertText: modeCommandSnippet('stabilizer', STABILIZER_MODES, "'"),
     isSnippet: true,
     params: [['category']],
@@ -1160,6 +1190,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'topping used (0/1)',
     documentation:
       'Record whether a topping is part of the material setup. Use `topping 1`/`true` when present and `topping 0`/`false` when absent. This advisory metadata does not alter construction.',
+    example: 'topping true',
     insertText: 'topping ${1|true,false|}',
     isSnippet: true,
     params: [['enabled']],
@@ -1170,6 +1201,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'satin underlay style',
     documentation:
       'Stabilising stitches under each satin column.\n\n- `"auto` — picks by width: <1.5 mm none, <4 mm center, wider zigzag\n- `"center` — center walk\n- `"edge` — edge walk\n- `"zigzag` — cross-grain zigzag\n- `"off` — no underlay',
+    example: "underlay 'auto'",
     insertText: modeCommandSnippet('underlay', SATIN_UNDERLAY_MODES, '"'),
     isSnippet: true,
     params: [['mode']],
@@ -1180,6 +1212,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'ordered satin underlay passes',
     documentation:
       "Set the exact ordered passes sewn beneath every satin column. Accepted pass names are `'center'`, `'edge'`, and `'zigzag'`; duplicates are allowed and an empty list disables underlay. Explicit pass order supersedes `fabric` doubling and `underlay 'auto'`. All underlay events retain the preview `u: 1` flag.\n\n```\nunderlaypasses ['center', 'edge']\nunderlaylen 2.8\nunderlayinset 0.6\nunderlayspacing 1.8\n```",
+    example: "underlaypasses ['center', 'edge']",
     insertText: `underlaypasses ['\${1|${SATIN_UNDERLAY_PASS_KINDS.join(',')}|}']`,
     isSnippet: true,
     params: [['passes']],
@@ -1190,6 +1223,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'satin underlay running length (mm)',
     documentation:
       'Set center/edge running-stitch length and zigzag return-run length, in physical hoop millimetres. Range 0.4–12 mm. It tunes the current legacy pass selection unless `underlaypasses` supplies an explicit order.',
+    example: 'underlaylen 2.8',
     insertText: 'underlaylen ${1:2.8}',
     isSnippet: true,
     params: [['mm']],
@@ -1200,6 +1234,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'absolute satin edge-underlay inset (mm)',
     documentation:
       'Set edge-pass inset inward from each topping rail, in physical hoop millimetres (0–10 mm). This command is deliberately absolute-only; ratio-based legacy settings are not overloaded into the same syntax. On a column narrower than twice the inset, the edge walks meet at the center and a warning is emitted.',
+    example: 'underlayinset 0.6',
     insertText: 'underlayinset ${1:0.6}',
     isSnippet: true,
     params: [['mm']],
@@ -1210,6 +1245,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'satin underlay zigzag spacing (mm)',
     documentation:
       'Set spacing along zigzag underlay passes in physical hoop millimetres. Range 0.25–5 mm. Zigzag width remains the unambiguous built-in 60% column-width ratio.',
+    example: 'underlayspacing 1.8',
     insertText: 'underlayspacing ${1:2}',
     isSnippet: true,
     params: [['mm']],
@@ -1220,6 +1256,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'fill underlay style',
     documentation:
       'Underlay beneath fills.\n\n- `"auto` — tatami, plus edge run on areas > 100 mm²\n- `"tatami` — sparse cross-grain pass\n- `"edge` — inset edge run only\n- `"off` — no underlay',
+    example: "fillunderlay 'auto'",
     insertText: modeCommandSnippet('fillunderlay', FILL_UNDERLAY_MODES, '"'),
     isSnippet: true,
     params: [['mode']],
@@ -1230,6 +1267,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'ordered fill underlay passes',
     documentation:
       "Set the exact ordered passes generated from each recorded fill region. Accepted pass names are `'edge'` and `'tatami'`; duplicates repeat and an empty list disables underlay. Explicit order supersedes `fillunderlay 'auto'` and fabric doubling. Custom path fills still generate these passes from the recorded compound region, not from returned decorative paths.\n\n```\nfillunderlaypasses ['edge', 'tatami']\nfillunderlaylen 3\nfillunderlayinset 0.8\nfillunderlayspacing 2.2\nfillunderlayangle 90\n```",
+    example: "fillunderlaypasses ['edge', 'tatami']",
     insertText: `fillunderlaypasses ['\${1|${FILL_UNDERLAY_PASS_KINDS.join(',')}|}']`,
     isSnippet: true,
     params: [['passes']],
@@ -1240,6 +1278,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'fill underlay stitch length (mm)',
     documentation:
       'Set edge-walk and tatami-underlay stitch length in physical hoop millimetres. Range 1–7 mm. It tunes the selected legacy passes unless `fillunderlaypasses` supplies an explicit order.',
+    example: 'fillunderlaylen 3',
     insertText: 'fillunderlaylen ${1:3}',
     isSnippet: true,
     params: [['mm']],
@@ -1250,6 +1289,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'fill underlay inset (mm)',
     documentation:
       'Set the inward physical inset for edge and tatami fill-underlay passes. Range 0–10 mm. Custom edge passes use a compound even-odd inset, preserving holes, concavities, and disconnected components.',
+    example: 'fillunderlayinset 0.8',
     insertText: 'fillunderlayinset ${1:0.8}',
     isSnippet: true,
     params: [['mm']],
@@ -1260,6 +1300,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'fill underlay row spacing (mm)',
     documentation:
       'Set tatami-underlay row spacing in physical hoop millimetres. Range 0.25–5 mm. Edge passes are unaffected.',
+    example: 'fillunderlayspacing 2.2',
     insertText: 'fillunderlayspacing ${1:2.2}',
     isSnippet: true,
     params: [['mm']],
@@ -1270,6 +1311,7 @@ export const NS_ITEMS: NSItem[] = [
     detail: 'fill underlay relative angle (degrees)',
     documentation:
       'Set the tatami-underlay angle relative to the topping direction. Plain fills use `fillangle + offset`; directional fills rotate the local direction field by the same offset before mapping it to hoop space. Any finite degree value is accepted.',
+    example: 'fillunderlayangle 90',
     insertText: 'fillunderlayangle ${1:90}',
     isSnippet: true,
     params: [['degrees']],

@@ -118,6 +118,16 @@ density n — satin penetration spacing (0.25–5 mm, default 0.4)
 bean n — bean stitch: each stitch sewn n times (forced odd, max 9; 1=off)
 estitch n — blanket stitch prongs n mm on the left of travel, spaced by stitchlen (0=off)
 
+### Satin caps, corners, and wide columns (explicit construction intent)
+
+satincap 'legacy'|'butt'|'taper'|'point'|'round' — sticky open-column end construction; default legacy preserves the existing event stream. Narrowing caps also shorten underlay so it cannot protrude.
+satincaplen mm — physical taper/point/round transition length, 0.4–20 mm (default 2); each end is bounded to half a short spine.
+satinjoin 'legacy'|'continuous'|'fan'|'miter'|'split' — sticky sharp-corner construction. Fan distributes outer penetrations, miter overlaps bounded legs, and split restarts topping with a 0.5 mm overlap; unsupported/closed geometry warns and falls back safely.
+satincorner deg — physical turn threshold for non-legacy joins, 5–175° (default 60); lower values classify gentler bends as corners.
+satinmaxwidth mm — split threshold/subcolumn ceiling, 2–12 mm (default 7.5).
+satinsplitoverlap mm — alternating seam interlock for split columns, 0–1 mm (default 0.5).
+// Choose cap/join policies only when the requested design benefits from them. Never turn on satinwide 'split' merely because a column is wide: keep the warning/default output unless the user explicitly requests split construction.
+
 ## Thread and color
 
 `color n` keeps its existing numeric thread-index semantics. Native colors are strings:
@@ -145,6 +155,17 @@ beginfill — start tracing fill boundary (moves between beginfill/endfill trace
 endfill — close and lay down a tatami fill of the enclosed area
 // Holes: a pen-up move inside beginfill/endfill starts an inner ring (becomes a hole by even-odd rule)
 // Rows are brick-offset so penetrations don't line up.
+
+### Fill boundary and connector policies
+
+fillinset mm — inset the complete compound region in physical hoop space, 0–10 mm (default 0). Use it to reserve explicit overlap for a later satin border; outer rings shrink and holes expand. Do not invent an inset when no border/registration intent was requested.
+filledgerun mm — add a closed topping edge pass after underlay and before fill rows, inset 0–10 mm; 0 disables it.
+filledgeshort mm — omit open topping-row fragments shorter than this physical length, 0–10 mm; 0 preserves all fragments.
+fillstagger 'legacy'|'brick'|'progressive'|'random' — topping-row phase policy. Random staggering is deterministic and consumes zero RNG draws.
+fillstaggeramount fraction — 0–1 wrapped phase used by non-legacy staggering (default 0.65).
+fillconnect 'legacy'|'inside'|'jump'|'trim' — connector policy. Inside sews only fully contained segments; jump never sews between rows; trim cuts before threshold-length jumps. Prefer inside for compound/concave fills when visible connectors must stay within the region.
+
+For a fill with a satin border, state the intended overlap explicitly, set fillinset to reserve it, sew the fill first, then the border. Check the resulting density instead of compensating by silently shrinking spacing.
 
 ### Programmable fills — fill dir / fill shape
 
@@ -386,6 +407,20 @@ plan 'nearest' — top-level whole-program directive for emergent/imported order
 // Reorders atomic thread runs within each color after execution, before autotrim/locks.
 // nearest never reverses; reversing-nearest only reverses eligible stitch-only runs. Neither crosses colors, changes stitch geometry, or deletes explicit trim.
 // Same-color overlap stacking can change. History queries still observe program order.
+planbarrier — drawless authored boundary that planning never crosses. Use between areas whose sew order must remain separated.
+atomic [ block ] — make the complete same-color construction one forward-only planner item; internal underlay, topping, jumps, and trims remain contiguous and ordered.
+routegroup [ block ] — only runs inside the group may reorder. When any routegroup executes, ungrouped output stays authored; each color/barrier intersection uses deterministic nearest routing plus a bounded 2-opt improvement.
+// Put atomic blocks inside routegroup when a multi-stage motif must move as one item. Do not put a routegroup inside atomic, cross a color/barrier from atomic, or cross a partial beginfill/endfill boundary.
+
+```text
+plan 'reversing-nearest'
+routegroup [
+  atomic [ moveto -24 0  down  fd 8  up  trim ]
+  atomic [ moveto 24 0  down  fd 8  up  trim ]
+]
+planbarrier
+moveto 0 -24  down  circle 12  up
+```
 
 ## Hoop and field directives (top of program, before any stitch, at most once each)
 
@@ -460,9 +495,28 @@ fabric 'denim' / 'canvas' — thick stable: pull comp 0.15, limit 4.0
 fabric 'fleece' — pull comp 0.3, limit 2.6, doubled underlay
 // Quoted-word form works too: fabric "knit. Explicit commands after fabric override the preset.
 
+### Portable material intent
+
+fabricgrain deg — grain heading in turtle degrees (0 = up, clockwise positive; wraps to 0–360).
+fabricstretch along across — declared fractional stretch along/across grain, each 0–1. This redistributes directional pull without fabricating a larger mean compensation.
+threadprofile 'rayon-40wt'|'rayon-60wt'|'polyester-40wt'|'polyester-60wt' — generic thread metadata; 40 wt resolves to about 0.4 mm coverage width, 60 wt to 0.3 mm.
+threadwidth mm — explicit 0.1–1 mm coverage width override. It changes coverage/heatmap values, never stitch geometry or maxdensity.
+needle 60|65|70|75|80|90 — advisory NM needle metadata; needle 0 leaves it unspecified.
+stabilizer 'none'|'tearaway'|'cutaway'|'washaway' — generic advisory stabilizer category.
+topping 0|1 — records whether topping is part of the setup; use it intentionally for pile/fleece designs.
+// Put material declarations near the top. They are portable intent, not permission to invent measured stretch or brand-specific claims. If the user gives no physical setup, prefer a fabric preset plus auto underlay and keep directional corrections off.
+
 pullcomp mm — pull compensation 0–1.5 mm: widens satin columns and extends fill rows so shapes sew at digitized size (thread tension shrinks stitching). A real-mm fabric constant — never scaled by transforms.
+compensation 'legacy'|'directional' — sticky compensation semantics. Legacy is the default scalar path. Directional projects the grain-aligned material tensor across satin columns and along open fill-row endpoint tangents in final hoop space; closed fill contours stay unchanged and boundary/hole crossings warn. `fabric` sets the mean pull, a later pullcomp overrides that mean while retaining declared anisotropy, and a later fabric restores profile defaults. Push remains unapplied pending physical evidence.
+// Never enable directional compensation automatically. Use it only when the user explicitly asks for it or supplies clear measured material/grain/stretch intent. Otherwise retain compensation 'legacy'.
+
 underlay 'auto' — satin underlay: 'center' (spine run), 'edge' (offset runs), 'zigzag', 'off'. 'auto' picks by width (<1.5 none, <4 center, wider zigzag). Sewn automatically beneath the column, in correct machine order.
+underlaypasses ['center', 'edge'] — replace the satin preset with an exact ordered list (center/edge/zigzag, duplicates meaningful, [] disables). underlaylen 0.4–12 controls running stitches; underlayinset 0–10 is an absolute physical edge inset; underlayspacing 0.25–5 controls zigzag spacing.
 fillunderlay 'auto' — fill underlay: 'tatami' (sparse cross-grain pass at fillangle+90), 'edge' (boundary run inset 0.5), 'off'. 'auto' = tatami, + edge on areas > 100 mm². Under fill dir @fn the pass follows the field rotated +90°.
+fillunderlaypasses ['edge', 'tatami'] — exact ordered fill passes (duplicates meaningful, [] disables), generated from the recorded compound region even for custom path fills. fillunderlaylen 1–7 controls stitch length; fillunderlayinset 0–10 controls the physical inset; fillunderlayspacing 0.25–5 controls tatami rows; fillunderlayangle is relative to topping (normally 90° cross-grain).
+// Prefer underlay/fillunderlay 'auto' unless the user asks for a deliberate production profile or the material/construction clearly calls for an explicit ordered foundation. Ordered-pass commands supersede preset doubling.
+
+stitchscope [ block ] — temporarily override construction settings, including the fill/satin policies, compensation, underlay, density, lock, and auto-trim, then restore them even through return/break/continue/error. It does NOT restore turtle position, color, RNG, transforms, output/history, hoop, budgets, or planning. Use it around one motif/style; beginfill/endfill cannot cross its boundary.
 shortstitch 0/1 — on tight satin curves, pulls alternate inner-edge stitches to 60% width so they don't bunch. ON by default; shortstitch 0 disables.
 autotrim mm — travels ≥ this length get an automatic trim before the jump (default 7, range 3–30, 0 = off).
 maxdensity n — coverage warning threshold in layers (default 3.5; 0 silences). One clean satin column or fill ≈ 1 layer; past ~2.5–3.5 layers embroidery stops being fabric. Hotspot warnings include coordinates and source lines; the preview has a heatmap. Some constructions legitimately run hot (satin border over a fill edge ≈ 4) — raise knowingly.
@@ -487,6 +541,12 @@ repeat 4000 [                                 // a stipple that self-levels
   ]
 ]
 ```
+
+## Sewability preflight
+
+preflight 'off'|'warn'|'strict' — top-level, once-only diagnostic policy placed before the first stitch. Off is the default and retains always-on warnings. Warn adds event-stream and construction findings without changing stitches. Strict runs the same checks and rejects only severity=error findings; advisory warning/info findings do not fail it. Never use strict merely to make generated code look more "production ready"—choose warn unless the user explicitly requests a strict export gate.
+
+Preflight can flag dense/perforating penetrations, long jumps without trims, tiny running stitches, wide satin, missing underlay, unsupported material setup, fill-border overlap, wide-split limits, unsupported machine operations, hoop overflow, and other construction context. Treat findings as feedback: fix the construction or explain an intentional exception; do not silence maxdensity or remove material intent blindly.
 
 ## Debugging
 
@@ -550,6 +610,8 @@ Max chalk overlays: 2,000 · Max chalk vertices: 200,000
 13. Vary fill direction deliberately — `fillangle`, or `fill dir @fn` for contour/flow fills; the angle is visible.
 14. Avoid very short stitches (<0.5 mm) and very tight repeat loops that overcrowd.
 15. Sample snoise2 with coordinates divided by 10–20 for smooth organic variation.
+16. Reserve fill-to-border overlap explicitly with `fillinset`; do not guess a border allowance the user did not request.
+17. Keep `satinwide 'warn'` and `compensation 'legacy'` unless split construction or directional material correction is explicit user intent.
 
 ## Style
 
@@ -566,6 +628,6 @@ Max chalk overlays: 2,000 · Max chalk vertices: 200,000
 4. `return`/`output`/`exit` appear only inside `def`/`to` bodies; `break`/`continue` only inside loop bodies of the same procedure. Every reporter used as a value (or via `@name`) reaches `return` on every path.
 5. Negative literals: `-5` after a space is a negative argument, `10 - 5` is subtraction — check argument counts around minus signs.
 6. Strings: use `concat(a, b)` not `a + b`; use `strip(s)` not `trim(s)` for whitespace; if/while conditions must be numbers not strings.
-7. Directives: `hoop`, `override`, and `plan` (if present) sit at the top of the program, before any stitches; `hoop` and `plan` occur at most once each.
+7. Directives: `hoop`, `override`, `plan`, and `preflight` (if present) sit at the top of the program, before any stitches; `hoop`, `plan`, and `preflight` occur at most once each.
 8. Reporter contracts: `stitchlen @fn`/`filllen @fn` reporters return a positive number; satin reporters return a 5-number list with advance > 0; fill shape reporters return [spacing>0, len, phase].
    If any check fails, fix the code before responding.

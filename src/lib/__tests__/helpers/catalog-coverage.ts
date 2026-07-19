@@ -42,3 +42,10 @@ export function catalogModeGaps(
     return gaps;
   });
 }
+
+export function catalogExampleGaps(
+  commands: Iterable<string>,
+  catalog: ReadonlyMap<string, NSItem>,
+): string[] {
+  return [...commands].sort().filter((command) => !catalog.get(command)?.example?.trim());
+}
