@@ -67,6 +67,8 @@ export interface ConstructionConfigSnapshot {
   readonly fillAngle: number;
   readonly fillSpacing: number;
   readonly fillInset: number;
+  readonly fillEdgeRun: number;
+  readonly fillEdgeShort: number;
   readonly fillStagger: FillStaggerMode;
   readonly fillStaggerAmount: number;
   readonly fillConnect: FillConnectMode;
@@ -120,6 +122,8 @@ interface MachineSnapshot {
   fillAngle: number;
   fillSpacing: number;
   fillInset: number;
+  fillEdgeRun: number;
+  fillEdgeShort: number;
   fillStagger: FillStaggerMode;
   fillStaggerAmount: number;
   fillConnect: FillConnectMode;
@@ -211,6 +215,8 @@ export abstract class MachineCore {
   fillAngle = 0;
   fillSpacing = 0.4;
   fillInset = 0;
+  fillEdgeRun: number = FILL_CONSTRUCTION_RANGES.edgeRunInsetMM.default;
+  fillEdgeShort: number = FILL_CONSTRUCTION_RANGES.edgeShortMM.default;
   fillStagger: FillStaggerMode = 'legacy';
   fillStaggerAmount: number = FILL_CONSTRUCTION_RANGES.staggerAmount.default;
   fillConnect: FillConnectMode = 'legacy';
@@ -372,6 +378,8 @@ export abstract class MachineCore {
       fillAngle: this.fillAngle,
       fillSpacing: this.fillSpacing,
       fillInset: this.fillInset,
+      fillEdgeRun: this.fillEdgeRun,
+      fillEdgeShort: this.fillEdgeShort,
       fillStagger: this.fillStagger,
       fillStaggerAmount: this.fillStaggerAmount,
       fillConnect: this.fillConnect,
@@ -425,6 +433,8 @@ export abstract class MachineCore {
       this.fillAngle = snapshot.fillAngle;
       this.fillSpacing = snapshot.fillSpacing;
       this.fillInset = snapshot.fillInset;
+      this.fillEdgeRun = snapshot.fillEdgeRun;
+      this.fillEdgeShort = snapshot.fillEdgeShort;
       this.fillStagger = snapshot.fillStagger;
       this.fillStaggerAmount = snapshot.fillStaggerAmount;
       this.fillConnect = snapshot.fillConnect;
@@ -536,6 +546,8 @@ export abstract class MachineCore {
       fillAngle: this.fillAngle,
       fillSpacing: this.fillSpacing,
       fillInset: this.fillInset,
+      fillEdgeRun: this.fillEdgeRun,
+      fillEdgeShort: this.fillEdgeShort,
       fillStagger: this.fillStagger,
       fillStaggerAmount: this.fillStaggerAmount,
       fillConnect: this.fillConnect,
@@ -661,6 +673,8 @@ export abstract class MachineCore {
     this.fillAngle = snap.fillAngle;
     this.fillSpacing = snap.fillSpacing;
     this.fillInset = snap.fillInset;
+    this.fillEdgeRun = snap.fillEdgeRun;
+    this.fillEdgeShort = snap.fillEdgeShort;
     this.fillStagger = snap.fillStagger;
     this.fillStaggerAmount = snap.fillStaggerAmount;
     this.fillConnect = snap.fillConnect;

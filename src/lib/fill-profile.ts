@@ -32,6 +32,8 @@ export const FILL_CONNECT_TRIM_DEFAULT_MM = 7;
 /** Central physical bounds for fill construction controls. */
 export const FILL_CONSTRUCTION_RANGES = Object.freeze({
   insetMM: Object.freeze({ min: 0, max: 10 }),
+  edgeRunInsetMM: Object.freeze({ min: 0, max: 10, default: 0 }),
+  edgeShortMM: Object.freeze({ min: 0, max: 10, default: 0 }),
   staggerAmount: Object.freeze({ min: 0, max: 1, default: 0.65 }),
 });
 

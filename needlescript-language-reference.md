@@ -392,8 +392,9 @@ stitchscope [
 
 The scope snapshots and restores running-stitch numeric/list/reporter forms and list progress; bean
 and E-stitch modes; satin width/reporter, density, and alternating side; fill angle, spacing,
-connector/stagger policies, length forms, and pending programmable/custom fill arm; plus lock, pull
-compensation, satin/fill underlay, double underlay, short-stitch, auto-trim, and max-density settings.
+construction/edge-run insets, minimum useful edge-fragment length, connector/stagger policies,
+length forms, and pending programmable/custom fill arm; plus lock, pull compensation, satin/fill
+underlay, double underlay, short-stitch, auto-trim, and max-density settings.
 `fabric` changes those same construction fields and is therefore scoped.
 
 It does **not** restore turtle position/heading/pen or the `push`/`pop` stack; variables; events,
@@ -451,6 +452,8 @@ endfill
 | `fillangle deg`                           | direction of fill rows (default 0). Thread is shiny — the angle is a visible design choice                                                                                                                                                                                                                        |
 | `fillspacing mm`                          | row spacing, 0.25–5 mm (default **0.4**)                                                                                                                                                                                                                                                                          |
 | `fillinset mm`                            | inset the complete compound fill region by 0–10 physical mm (default **0**) to reserve border overlap. Outer boundaries shrink, holes expand, and split components are joined only by jumps. Topping and fill underlay use the inset region; collapsed/split results warn with a source line and preview location |
+| `filledgerun mm`                          | add an inset closed boundary pass after fill underlay and before topping. 0–10 physical mm; default **0** disables it. Compound contours remain inside the construction region and use jumps between disconnected pieces                                                                                          |
+| `filledgeshort mm`                        | minimum useful open topping-row fragment length in physical hoop-space mm, 0–10; default **0** disables filtering. Applies to fixed, programmable, and custom-path fills; closed contours and underlay are unchanged                                                                                              |
 | `fillstagger 'mode'`                      | topping penetration phase: `'legacy'` (existing output), `'brick'` (alternating), `'progressive'` (four-row cycle), or `'random'` (stable geometry hash; zero RNG draws). See §16.3                                                                                                                               |
 | `fillstaggeramount fraction`              | wrapped 0–1 phase amount for non-legacy staggering (default **0.65**). With fixed fill length this is a fraction of that length; list/reporter forms use each row's first effective length                                                                                                                        |
 | `fillconnect 'mode'`                      | topping travel between rows/fragments: `'legacy'` (existing routing), `'inside'` (complete connector stays inside with edge clearance), `'jump'` (always jump), or `'trim'` (jump and cut at the active auto-trim threshold; 7 mm if auto-trim is off)                                                            |
@@ -963,6 +966,8 @@ Applies pull comp, underlay policy, satin density floor, and coverage limit in o
 | `fillunderlayspacing mm` | row spacing for tatami underlay, 0.25–5 mm; edge passes are unaffected                                                                                                                                                                                                                                                              |
 | `fillunderlayangle deg`  | tatami-underlay angle relative to the topping direction. Plain fills use `fillangle + deg`; directional fills rotate their local field by `deg` before mapping it through the fill transform. Any finite degree value is accepted                                                                                                   |
 | `fillinset mm`           | sticky 0–10 mm inset for the complete fill construction region. Applied after authored transforms in hoop space. Underlay follows the inset region. `fillinset 0` is the byte-identical compatibility path                                                                                                                          |
+| `filledgerun mm`         | sticky 0–10 mm physical inset for an extra topping edge run; 0 disables it (default). The pass is sewn after all fill underlay and before topping, uses the active effective fill length, and jumps between separate compound contours. Included in `stitchscope`                                                                   |
+| `filledgeshort mm`       | sticky 0–10 mm minimum physical length for useful open topping fragments; 0 disables it (default). Short fragments are omitted before connector routing in fixed, programmable, and custom-path fills. Closed custom contours and underlay are unaffected. Included in `stitchscope`                                                |
 | `fillstagger 'mode'`     | sticky topping-row phase policy: `'legacy'`, `'brick'`, `'progressive'`, or `'random'`. Underlay retains its resolved legacy phase behavior                                                                                                                                                                                         |
 | `fillstaggeramount n`    | sticky 0–1 wrapped phase fraction for non-legacy policies, default 0.65. Both values are included in `stitchscope`                                                                                                                                                                                                                  |
 | `fillconnect 'mode'`     | sticky topping connector policy: `'legacy'`, `'inside'`, `'jump'`, or `'trim'`. `inside` requires compound-region containment with 0.1 mm edge clearance; `jump` never adds connector coverage; `trim` jumps and cuts at active `autotrim`, falling back to 7 mm when automatic trimming is off. Included in `stitchscope`          |
@@ -1013,6 +1018,27 @@ jumps rather than sewn connectors across the resulting fabric gaps. Empty, parti
 and split results warn with the `endfill` source line and a hoop-space preview location. The command
 is deterministic and consumes zero RNG draws. At the default `fillinset 0`, the geometry operation
 is skipped entirely, preserving existing events and warnings byte-for-byte.
+
+`filledgerun` is also sticky and `stitchscope`-aware. A positive value offsets the already resolved
+construction region inward once more in physical hoop space, then sews every resulting closed
+contour with the active effective fill stitch length. This optional topping pass has the fixed order
+**fill underlay → edge run → fill topping**. Outer and hole contours stay within the compound
+even-odd construction region, and separate contours connect only by jumps. Offset collapse omits
+the edge run with a spatial warning. The corner guard retains at most two visits within a 0.15 mm
+needle-hole radius when the shortcut remains contained, allowing one closed-contour seam return
+without letting acute or collapsed corners accumulate repeated penetrations. At program end, edge
+run samples are checked against final coverage (so a satin border sewn afterward is visible); dense
+border overlap warns with a location and recommends more inset or omitting the redundant edge run.
+`maxdensity 0` silences this coverage warning. `filledgerun 0` bypasses all geometry and preserves
+legacy output.
+
+`filledgeshort` permanently means the **minimum useful open topping row-fragment length**, not a
+stitch-length adjustment at row ends. The measurement is made after transforms in physical hoop
+space and after pull compensation, before penetration subdivision and connector routing. Fixed
+tatami rows, programmable streamlines, and open custom fill paths shorter than the configured value
+are omitted with one spatial warning per fill. Underlay and closed decorative contours are never
+filtered. `filledgeshort 0` is the byte-identical compatibility path. The policy is deterministic,
+drawless, and does not consume seeded RNG values.
 
 `fillconnect` controls only topping travel between generated rows or clipped custom-path fragments;
 fill underlay keeps its resolved legacy routing. The default `'legacy'` path is byte-identical.

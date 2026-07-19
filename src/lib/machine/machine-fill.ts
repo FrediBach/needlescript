@@ -30,6 +30,10 @@ import type { FillConnectorAction } from '../fill-profile.ts';
 
 export class FillMachine extends SatinMachine {
   private _fillStaggerShortWarned = false;
+  private _fillEdgeShortWarned = false;
+  private _fillEdgeRunEmitted = false;
+  private _fillEdgeRunSamples: { x: number; y: number; line?: number }[] = [];
+  private _fillEdgeRunOverlapWarned = false;
   private _activeFillConnectorId = 0;
 
   beginFill() {
@@ -182,6 +186,167 @@ export class FillMachine extends SatinMachine {
       index,
       points: [{ x, y }],
       lines: this.currentLine === undefined ? [] : [this.currentLine],
+      kind: 'fill',
+    });
+  }
+
+  _noteFillEdgeShort(x: number, y: number) {
+    if (this._fillEdgeShortWarned) return;
+    this._fillEdgeShortWarned = true;
+    const lineSuffix = this.currentLine === undefined ? '' : ` (line ${this.currentLine})`;
+    const index = this.warnings.length;
+    this.warnings.push(
+      `filledgeshort ${this.fillEdgeShort} mm omitted a shorter topping row fragment near (${x.toFixed(1)}, ${y.toFixed(1)})${lineSuffix}`,
+    );
+    this.constructionWarningLocations.push({
+      index,
+      points: [{ x, y }],
+      lines: this.currentLine === undefined ? [] : [this.currentLine],
+      kind: 'fill',
+    });
+  }
+
+  _noteFillEdgeRun(message: string, point: [number, number]) {
+    const lineSuffix = this.currentLine === undefined ? '' : ` (line ${this.currentLine})`;
+    const index = this.warnings.length;
+    this.warnings.push(`${message}${lineSuffix}`);
+    this.constructionWarningLocations.push({
+      index,
+      points: [{ x: point[0], y: point[1] }],
+      lines: this.currentLine === undefined ? [] : [this.currentLine],
+      kind: 'fill',
+    });
+  }
+
+  /**
+   * Bound coincident edge-run penetrations produced by collapsed/acute offset
+   * corners. Two visits are retained so a closed contour may return to its
+   * seam; later visits within one needle-hole radius are omitted.
+   */
+  _guardFillEdgeRun(
+    points: FillPoint[],
+    constructionRings: [number, number][][],
+  ): { points: FillPoint[]; droppedAt?: [number, number] } {
+    const radius = 0.15;
+    const cell = radius;
+    const buckets = new Map<string, [number, number][]>();
+    const key = (x: number, y: number) => `${Math.floor(x / cell)},${Math.floor(y / cell)}`;
+    const add = (p: [number, number]) => {
+      const k = key(p[0], p[1]);
+      const bucket = buckets.get(k);
+      if (bucket) bucket.push(p);
+      else buckets.set(k, [p]);
+    };
+    const nearby = (p: [number, number]) => {
+      const ix = Math.floor(p[0] / cell),
+        iy = Math.floor(p[1] / cell);
+      let count = 0;
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++)
+          for (const prior of buckets.get(`${ix + dx},${iy + dy}`) ?? [])
+            if (Math.hypot(prior[0] - p[0], prior[1] - p[1]) <= radius) count++;
+      return count;
+    };
+
+    const kept: FillPoint[] = [];
+    let droppedAt: [number, number] | undefined;
+    for (let i = 0; i < points.length; i++) {
+      const point = points[i];
+      const p: [number, number] = [point.x, point.y];
+      const previous = kept[kept.length - 1];
+      const next = points[i + 1];
+      const maySkip =
+        nearby(p) >= 2 &&
+        previous !== undefined &&
+        next !== undefined &&
+        segmentInsideCompoundRegion(
+          constructionRings,
+          [previous.x, previous.y],
+          [next.x, next.y],
+          0,
+        );
+      if (maySkip) {
+        droppedAt ??= p;
+        continue;
+      }
+      kept.push(point);
+      add(p);
+    }
+    return { points: kept, ...(droppedAt ? { droppedAt } : {}) };
+  }
+
+  /** Emit the opt-in edge run after underlay and before topping. */
+  _emitFillEdgeRun(rings: [number, number][][]) {
+    if (this._fillEdgeRunEmitted || !(this.fillEdgeRun > 0)) return;
+    this._fillEdgeRunEmitted = true;
+    const insetRings = offsetCompoundRegion(
+      rings,
+      -this.fillEdgeRun,
+      this.currentLine,
+      this.effectiveLimits.maxClipVerts,
+      'filledgerun',
+    );
+    if (!insetRings.length) {
+      const location = rings[0]?.[0] ?? [0, 0];
+      this._noteFillEdgeRun(
+        `filledgerun ${this.fillEdgeRun} mm collapsed inside this construction region — edge run omitted`,
+        location,
+      );
+      return;
+    }
+
+    let cornerWarned = false;
+    for (const ring of insetRings) {
+      if (ring.length < 3) continue;
+      const closed: FillPoint[] = ring.map(([x, y]) => ({ x, y, jump: false }));
+      closed.push({ ...closed[0] });
+      const guarded = this._guardFillEdgeRun(
+        this._subdividePts(closed, this._fillConnectorStitchLength()),
+        rings,
+      );
+      if (guarded.droppedAt && !cornerWarned) {
+        cornerWarned = true;
+        this._noteFillEdgeRun(
+          'filledgerun bounded repeated penetrations at an acute or collapsed corner',
+          guarded.droppedAt,
+        );
+      }
+      if (!guarded.points.length) continue;
+      const first = guarded.points[0];
+      if (
+        this.started &&
+        this.lastEmit &&
+        Math.hypot(first.x - this.lastEmit.x, first.y - this.lastEmit.y) > 0.05
+      )
+        this._push('jump', first.x, first.y, false);
+      this._emitFillPts(guarded.points, false);
+      for (const point of guarded.points) {
+        if (this._fillEdgeRunSamples.length >= 2000) break;
+        this._fillEdgeRunSamples.push({ x: point.x, y: point.y, line: this.currentLine });
+      }
+    }
+  }
+
+  /**
+   * Run after all authored stitching is committed so a satin border sewn after
+   * its fill is visible to the live coverage grid.
+   */
+  finalizeFillEdgeWarnings() {
+    if (this._fillEdgeRunOverlapWarned || !(this.maxDensity > 0)) return;
+    const threshold = Math.min(this.maxDensity, 2.5);
+    const sample = this._fillEdgeRunSamples.find(
+      ({ x, y }) => this.density.coverAvg(x, y, 0.75) > threshold,
+    );
+    if (!sample) return;
+    this._fillEdgeRunOverlapWarned = true;
+    const index = this.warnings.length;
+    this.warnings.push(
+      `filledgerun overlaps ${threshold.toFixed(1)}+ layers of border coverage near (${sample.x.toFixed(1)}, ${sample.y.toFixed(1)}) — increase the inset or omit the edge run beneath a satin border`,
+    );
+    this.constructionWarningLocations.push({
+      index,
+      points: [{ x: sample.x, y: sample.y }],
+      lines: sample.line === undefined ? [] : [sample.line],
       kind: 'fill',
     });
   }
@@ -802,6 +967,13 @@ export class FillMachine extends SatinMachine {
           ? this._insetStreamline(poly, opts.insetMM)
           : this._extendForPullComp(poly);
       if (poly.length < 2) continue;
+      if (!opts.underlay && this.fillEdgeShort > 0) {
+        const finalPoly = this.fillHasWarp ? poly.map(([x, y]) => toFinal(x, y)) : poly;
+        if (pathlen(finalPoly) < this.fillEdgeShort) {
+          this._noteFillEdgeShort(finalPoly[0][0], finalPoly[0][1]);
+          continue;
+        }
+      }
       const v = vOf(r);
       const policyActive = !opts.underlay && this.fillStagger !== 'legacy';
       const rowPhase = policyActive
@@ -1032,6 +1204,8 @@ export class FillMachine extends SatinMachine {
     this._closeRing();
     this.recording = false;
     this._fillStaggerShortWarned = false;
+    this._fillEdgeShortWarned = false;
+    this._fillEdgeRunEmitted = false;
     if (!this.rings.length) {
       this.warnings.push('fill skipped — the boundary needs at least 3 pen-down points');
       if (this.fillArmed) {
@@ -1148,6 +1322,7 @@ export class FillMachine extends SatinMachine {
           const profile = this._resolveFillUnderlay(rings, this.fillSpacing, 'scanline');
           this._emitScanlineFillUnderlay(profile, rings, this.fillAngle, endNear);
         }
+        this._emitFillEdgeRun(rings);
         const savedLocalRings = this.localRings;
         this.localRings = rings.map((ring) =>
           ring.map((point) => apply(inv, point[0], point[1]) as [number, number]),
@@ -1178,12 +1353,15 @@ export class FillMachine extends SatinMachine {
         const stitchLen = this.fillLen ?? Math.min(Math.max(this.stitchLen, 1), 7);
         const underlayProfile = this._resolveFillUnderlay(rings, this.fillSpacing, 'scanline');
         this._emitScanlineFillUnderlay(underlayProfile, rings, this.fillAngle, endNear);
+        this._emitFillEdgeRun(rings);
         const points = generateFill(rings, {
           angle: this.fillAngle,
           spacing: this.fillSpacing,
           stitchLen,
           endNear,
           comp: this.pullComp,
+          minRowLengthMM: this.fillEdgeShort,
+          onShortRow: (x, y) => this._noteFillEdgeShort(x, y),
           safeConnect: this.fillInset > 0,
           stagger: this.fillStagger,
           staggerAmount: this.fillStaggerAmount,
@@ -1232,6 +1410,7 @@ export class FillMachine extends SatinMachine {
       // from the decorative paths returned by the custom generator.
       const underlayProfile = this._resolveFillUnderlay(rings, this.fillSpacing, 'scanline');
       this._emitScanlineFillUnderlay(underlayProfile, rings, this.fillAngle, endNear);
+      this._emitFillEdgeRun(rings);
 
       const lengthAt = (si: number, p: [number, number]) => {
         if (this.fillLenReporter) return this.fillLenReporter(0, 0, si, this._mapFill(p[0], p[1]));
@@ -1274,6 +1453,10 @@ export class FillMachine extends SatinMachine {
           ? clipped[row].path
           : this._extendForPullComp(clipped[row].path);
         const hoop = local.map((p) => this._mapFill(p[0], p[1]));
+        if (!clipped[row].closed && this.fillEdgeShort > 0 && pathlen(hoop) < this.fillEdgeShort) {
+          this._noteFillEdgeShort(hoop[0][0], hoop[0][1]);
+          continue;
+        }
         const subdivided = this._walkStreamline(
           hoop,
           row,
@@ -1350,6 +1533,7 @@ export class FillMachine extends SatinMachine {
         const profile = this._resolveFillUnderlay(rings, this.fillSpacing, 'scanline');
         this._emitScanlineFillUnderlay(profile, rings, this.fillAngle, endNear);
       }
+      this._emitFillEdgeRun(rings);
       const savedLocalRings = this.localRings;
       const savedFillCTM = this.fillCTM;
       const savedFillHasWarp = this.fillHasWarp;
@@ -1493,6 +1677,7 @@ export class FillMachine extends SatinMachine {
             });
           }
         }
+        this._emitFillEdgeRun(rings);
         this._generateProgrammableFill({
           dir,
           shape,
@@ -1511,6 +1696,7 @@ export class FillMachine extends SatinMachine {
     // ---- Underlay (sewn first, so the topping rides on a stable base) ----
     const underlayProfile = this._resolveFillUnderlay(rings, useSpacing, 'scanline');
     this._emitScanlineFillUnderlay(underlayProfile, rings, useAngle, endNear);
+    this._emitFillEdgeRun(rings);
 
     // ---- Topping ----
     const pts = generateFill(rings, {
@@ -1519,6 +1705,8 @@ export class FillMachine extends SatinMachine {
       stitchLen: useLen,
       endNear,
       comp: this.pullComp, // rows run along the stitch axis: extend against pull
+      minRowLengthMM: this.fillEdgeShort,
+      onShortRow: (x, y) => this._noteFillEdgeShort(x, y),
       safeConnect: this.fillInset > 0,
       stagger: this.fillStagger,
       staggerAmount: this.fillStaggerAmount,

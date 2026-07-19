@@ -58,7 +58,7 @@ Tightly-coupled collaborators live one level up:
 - `affine.ts` — the 2×3 matrix math shared by the transform stack.
 - `underlay-profile.ts` — ordered satin/fill underlay pass types, centralized numeric ranges, pure
   validation, and context-aware lowering of legacy modes and `fabric` presets.
-- `fill-profile.ts` — fill inset/stagger ranges, connector/stagger mode registries, internal
+- `fill-profile.ts` — fill inset/edge/stagger ranges, connector/stagger mode registries, internal
   connector classification types, and pure drawless row-phase calculation including geometry
   hashing.
 - `rail-pair.ts` — pure rail orientation, seam/checkpoint projection, arc-length pairing, and derived-spine interpolation shared by `satinbetween` and `railspine`.
@@ -98,19 +98,19 @@ caller's line, when inside a procedure) so previews can highlight the responsibl
 The public `Machine` class is a small facade over `FillMachine`, `SatinMachine`, and
 `MachineCore`. Together they form one mutable machine object; its state groups into:
 
-| Group           | Fields                                                                                                                                                         | Notes                                                                 |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Turtle          | `x`, `y`, `heading`, `penDown`                                                                                                                                 | always in **local** space                                             |
-| Stitch config   | `stitchLen`, `stitchLenList`/`Reporter`, `mode`, `beanRepeats`                                                                                                 | one of numeric / list / reporter stitch-length forms active at a time |
-| Satin           | `satinWidth`, `satinSpacing`, `satinSide`, `eWidth`, `satinReporter`, `satinPath`                                                                              | buffered column                                                       |
-| Fill            | `fillAngle`, `fillSpacing`, `fillInset`, `fillStagger`/`Amount`, `fillConnect`, `fillLen`(+list/reporter), `fillArmed`, `fillDirReporter`, `fillShapeReporter` | tatami + programmable                                                 |
-| Physics         | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity`                                           | selectors lower to typed profiles at generation time                  |
-| Output          | `events`, `warnings`, `colorIdx`, `lastEmit`, `started`                                                                                                        | accumulation                                                          |
-| Transform stack | `ctm`, `outLayers`, `hasWarp`, `penLayers`, `declumpStack`                                                                                                     | see §6                                                                |
-| Hoop            | `hoopInfo`, `hoopSet`, `fieldLocked`, `fieldOverflows`                                                                                                         | see §9                                                                |
-| Budgets         | `effectiveLimits`, `activeOverrides`                                                                                                                           | see §10                                                               |
-| Coverage        | `density` (a `DensityGrid`), `usedQuery`                                                                                                                       | see §8                                                                |
-| Trace           | `traceRecording`, `traceRuns`, `noEmit`                                                                                                                        | see §11                                                               |
+| Group           | Fields                                                                                                                                                                                         | Notes                                                                 |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Turtle          | `x`, `y`, `heading`, `penDown`                                                                                                                                                                 | always in **local** space                                             |
+| Stitch config   | `stitchLen`, `stitchLenList`/`Reporter`, `mode`, `beanRepeats`                                                                                                                                 | one of numeric / list / reporter stitch-length forms active at a time |
+| Satin           | `satinWidth`, `satinSpacing`, `satinSide`, `eWidth`, `satinReporter`, `satinPath`                                                                                                              | buffered column                                                       |
+| Fill            | `fillAngle`, `fillSpacing`, `fillInset`, `fillEdgeRun`, `fillEdgeShort`, `fillStagger`/`Amount`, `fillConnect`, `fillLen`(+list/reporter), `fillArmed`, `fillDirReporter`, `fillShapeReporter` | tatami + programmable                                                 |
+| Physics         | `lockLen`, `pullComp`, `underlayMode`, `fillUnderlayMode`, `doubleUnderlay`, `shortStitch`, `autoTrim`, `maxDensity`                                                                           | selectors lower to typed profiles at generation time                  |
+| Output          | `events`, `warnings`, `colorIdx`, `lastEmit`, `started`                                                                                                                                        | accumulation                                                          |
+| Transform stack | `ctm`, `outLayers`, `hasWarp`, `penLayers`, `declumpStack`                                                                                                                                     | see §6                                                                |
+| Hoop            | `hoopInfo`, `hoopSet`, `fieldLocked`, `fieldOverflows`                                                                                                                                         | see §9                                                                |
+| Budgets         | `effectiveLimits`, `activeOverrides`                                                                                                                                                           | see §10                                                               |
+| Coverage        | `density` (a `DensityGrid`), `usedQuery`                                                                                                                                                       | see §8                                                                |
+| Trace           | `traceRecording`, `traceRuns`, `noEmit`                                                                                                                                                        | see §11                                                               |
 
 `effectiveLimits` starts as a mutable copy of `STOCK_LIMITS`
 (`machine/machine-core.ts`) so `override` can raise/lower budgets per run without
@@ -122,8 +122,9 @@ touching the shared constants.
 constructed, and `restoreConstructionConfig(snapshot)` restores only those settings. The typed
 `ConstructionConfigSnapshot` includes running-stitch numeric/list/reporter forms and list progress;
 bean and E-stitch modes; satin width/reporter, spacing, alternating side, and optional custom
-underlay pass/length/inset/spacing overrides; fill angle, spacing, construction inset, stagger mode
-and amount, connector policy, fill-underlay pass/length/inset/spacing/relative-angle overrides,
+underlay pass/length/inset/spacing overrides; fill angle, spacing, construction inset, edge-run
+inset, minimum useful row-fragment length, stagger mode and amount, connector policy,
+fill-underlay pass/length/inset/spacing/relative-angle overrides,
 length forms, and an unused one-shot fill arm; and the lock, pull-compensation, underlay,
 short-stitch, auto-trim, and density settings. Current `fabric` presets resolve into these same
 physics fields, so their construction effects are scoped without treating warning notes as state.
@@ -325,6 +326,25 @@ added to public `StitchEvent` or exported formats; later construction-aware pref
 directly. Only a connector emitted as `stitch` feeds `DensityGrid`, so jump/trim policies never
 become topping coverage or history. Since their run boundaries are ordinary jump/trim events, the
 existing planner, auto-trim, and lock passes require no special cases.
+
+`fillEdgeRun` defaults to zero. A positive physical inset runs the Clipper-backed compound-region
+offset after normal underlay has completed and before any topping rows or custom paths. The pass
+subdivides closed contours with the active effective fill length, emits explicit jumps between
+separate contours, and is topping (`u` is unset). A spatial corner guard caps visits within a
+0.15 mm needle-hole radius at two when skipping the extra point leaves a segment contained in the
+construction region; this permits one seam return while preventing collapsed or acute offset
+corners from stacking penetrations. Edge-run samples remain internal until execution finishes, when
+the live `DensityGrid` checks them against final border coverage. This catches redundant overlap
+even when a satin border is authored after the fill. Zero bypasses offsetting, sampling, warnings,
+and event changes.
+
+`fillEdgeShort` also defaults to zero and has settled semantics as a minimum useful **open topping
+row-fragment length**, measured in final physical hoop space after pull compensation. Fixed tatami
+filters scan spans before routing; programmable streamlines and open custom paths filter their
+physical polylines before splitting and connector classification. Omitted fragments produce one
+spatial/source warning per fill. Underlay and closed custom contours bypass the policy. Because the
+filter runs before connector routing, sidecar records and coverage never contain phantom travel to
+an omitted fragment.
 
 Extended `filllen`/`stitchlen` list and reporter forms also route a plain fill through
 the programmable generator so the per-row length function is honored (`2448`).

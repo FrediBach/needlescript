@@ -67,6 +67,8 @@ export const BUILTIN_ARITY: Record<string, number> = {
   fillangle: 1,
   fillspacing: 1,
   fillinset: 1,
+  filledgerun: 1,
+  filledgeshort: 1,
   fillstagger: 1,
   fillstaggeramount: 1,
   fillconnect: 1,

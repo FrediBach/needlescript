@@ -24,6 +24,10 @@ export interface FillOpts {
   endNear?: { x: number; y: number };
   /** Extend (+) or inset (−) each row end along the stitch axis, in mm. */
   comp?: number;
+  /** Omit topping row fragments shorter than this physical length. */
+  minRowLengthMM?: number;
+  /** Called once per row fragment omitted by `minRowLengthMM`. */
+  onShortRow?: (x: number, y: number) => void;
   /** Require every sewn row connector to remain inside the compound region. */
   safeConnect?: boolean;
   /** Opt-in topping phase policy. Omitted/legacy preserves the historical path. */
@@ -268,7 +272,12 @@ export function generateFill(rings: [number, number][][], opt: FillOpts): FillPo
     for (let i = 0; i + 1 < xs.length; i += 2) {
       const a0 = xs[i] - comp,
         a1 = xs[i + 1] + comp;
-      if (a1 - a0 >= 0.5) segs.push({ x0: a0, x1: a1, y, row: rowIdx });
+      if (a1 - a0 >= Math.max(0.5, opt.minRowLengthMM ?? 0))
+        segs.push({ x0: a0, x1: a1, y, row: rowIdx });
+      else if ((opt.minRowLengthMM ?? 0) > 0 && a1 - a0 >= 0.5) {
+        const [x, yy] = unrot([(a0 + a1) / 2, y]);
+        opt.onShortRow?.(x, yy);
+      }
     }
     if (segs.length) rows.push(segs);
   }

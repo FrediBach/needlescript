@@ -862,6 +862,8 @@ keeps legacy routing, and only actually sewn connectors feed density/history.
 
 ### Session 4.4 — Edge run and edge-shortening policies
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Implement `filledgerun` as an opt-in inset boundary pass after underlay and before or after topping;
@@ -876,6 +878,18 @@ Acceptance criteria:
 - Edge runs remain inside the construction region.
 - Acute corners do not accumulate unbounded coincident penetrations.
 - The option is disabled by default.
+
+Implementation note: `filledgerun mm` is a sticky, `stitchscope`-aware 0–10 mm inset boundary
+pass, disabled at zero. Its fixed order is fill underlay, edge run, then topping. It offsets the
+resolved compound construction region in physical hoop space, uses the effective fill stitch
+length, and jumps between disconnected contours. A containment-checked corner guard retains at
+most two visits within a 0.15 mm needle-hole radius, allowing the closed seam without unbounded
+acute-corner stacking. Final live coverage is sampled at edge-run points so dense overlap with a
+later satin border raises a spatial warning. `filledgeshort mm` is permanently defined as the
+minimum useful open topping row-fragment length in final physical hoop space; fixed rows,
+programmable streamlines, and open custom fill paths are filtered before subdivision and connector
+routing, while underlay and closed contours are unchanged. Both controls default to zero, consume
+no RNG draws, and preserve the legacy event stream when disabled.
 
 ### Session 4.5 — Containment-aware fill declump
 

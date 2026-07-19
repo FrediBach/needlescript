@@ -881,6 +881,31 @@ export function initExecCmdHandler(
         ctx.m.fillInset = a[0];
         return;
       }
+      case 'filledgerun': {
+        ctx.traceNote(
+          'filledgerun',
+          'note: filledgerun inside trace has no effect on the captured path',
+        );
+        const { min, max } = FILL_CONSTRUCTION_RANGES.edgeRunInsetMM;
+        if (!Number.isFinite(a[0]) || a[0] < min || a[0] > max)
+          throw new NeedlescriptError(`filledgerun must be between ${min} and ${max} mm`, st.line);
+        ctx.m.fillEdgeRun = a[0];
+        return;
+      }
+      case 'filledgeshort': {
+        ctx.traceNote(
+          'filledgeshort',
+          'note: filledgeshort inside trace has no effect on the captured path',
+        );
+        const { min, max } = FILL_CONSTRUCTION_RANGES.edgeShortMM;
+        if (!Number.isFinite(a[0]) || a[0] < min || a[0] > max)
+          throw new NeedlescriptError(
+            `filledgeshort must be between ${min} and ${max} mm`,
+            st.line,
+          );
+        ctx.m.fillEdgeShort = a[0];
+        return;
+      }
       case 'fillstaggeramount': {
         ctx.traceNote(
           'fillstaggeramount',

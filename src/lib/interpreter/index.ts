@@ -138,6 +138,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   }
   if (m.fillArmed && m.fillArmLine !== undefined)
     m.warnings.push(`a fill arming on line ${m.fillArmLine} was never used`);
+  m.finalizeFillEdgeWarnings();
   warningLocations.push(...m.constructionWarningLocations);
   if (m.tinyDropped > 0) {
     const spots = m.tinyDroppedSpots;

@@ -28,6 +28,8 @@ describe('machine construction configuration snapshots', () => {
     machine.fillAngle = 37;
     machine.fillSpacing = 0.65;
     machine.fillInset = 0.75;
+    machine.fillEdgeRun = 0.9;
+    machine.fillEdgeShort = 0.7;
     machine.fillStagger = 'progressive';
     machine.fillStaggerAmount = 0.7;
     machine.fillConnect = 'inside';
@@ -87,6 +89,8 @@ describe('machine construction configuration snapshots', () => {
     machine.fillAngle = 0;
     machine.fillSpacing = 1;
     machine.fillInset = 0;
+    machine.fillEdgeRun = 0;
+    machine.fillEdgeShort = 0;
     machine.fillStagger = 'legacy';
     machine.fillStaggerAmount = 0.65;
     machine.fillConnect = 'legacy';
@@ -129,6 +133,8 @@ describe('machine construction configuration snapshots', () => {
       fillAngle: 37,
       fillSpacing: 0.65,
       fillInset: 0.75,
+      fillEdgeRun: 0.9,
+      fillEdgeShort: 0.7,
       fillStagger: 'progressive',
       fillStaggerAmount: 0.7,
       fillConnect: 'inside',
