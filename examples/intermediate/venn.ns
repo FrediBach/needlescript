@@ -15,6 +15,8 @@
 //  already a physical fact, so there's nothing to reconstruct.)
 // ============================================================
 
+plan 'reversing-nearest'
+
 // --- geometry ---
 let r   = 20       // [10:35] circle radius, mm
 let off = 11       // [2:25] centre offset — smaller = more overlap
