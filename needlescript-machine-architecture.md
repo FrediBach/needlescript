@@ -662,6 +662,17 @@ endpoints; width-only satin/E-stitch advisories have source attribution but no i
 Issues follow legacy warning-index order, so ordering and copied hoop-space coordinates are
 deterministic. Exporters still consume only `events`, and preflight never rewrites them.
 
+`preflight-event-stream.ts` then scans the final planned/autotrimmed stream captured immediately
+before locks. Its bounded, fixed-order checks cover short-stitch runs, local reversals, moving-window
+near-hole penetrations, long sewn spans, untrimmed jump chains, profile-limited continuous stitch
+runs, and tight sharp-turn clusters. The default metrics are: eight consecutive segments shorter
+than 1.5 × the 0.4 mm reliable movement; four reversals of at least 150° within 1 mm; eight
+penetrations within 0.3 mm among the latest twenty; sewn spans above 8 mm; jump chains above 12 mm;
+20,000 stitches without trim/color; and six 75°–150° turns on at-most-1 mm segments within 2 mm.
+Each check yields at most three issues with at most sixteen points. These are conservative
+engineering defaults and deliberately have no fabric/thread multiplier pending physical sew-out
+evidence; resolved thread width already influences the separate coverage metric.
+
 ---
 
 ## 14. Design themes
@@ -684,27 +695,28 @@ deterministic. Exporters still consume only `events`, and preflight never rewrit
 
 ## 15. File reference
 
-| File                       | Responsibility                                                         |
-| -------------------------- | ---------------------------------------------------------------------- |
-| `machine.ts`               | re-export shim → `machine/index.ts`                                    |
-| `machine/index.ts`         | barrel: `LIMITS`, `STOCK_LIMITS`, `OVERRIDE_*`, `BudgetKey`, `Machine` |
-| `machine/limits.ts`        | physics constants + overridable per-run budgets                        |
-| `machine/machine.ts`       | public `Machine` facade and color/trim commands                        |
-| `machine/machine-core.ts`  | shared state, turtle motion, stacks, emission, trace, and `travel`     |
-| `machine/machine-satin.ts` | satin columns and buffered running stitches                            |
-| `machine/machine-fill.ts`  | fill recording plus built-in and programmable fill generation          |
-| `machine/fill.ts`          | standalone tatami scanline fill generator                              |
-| `affine.ts`                | 2×3 affine matrix math shared by the transform stack                   |
-| `satin-profile.ts`         | satin cap mode registry, ranges, and pure profile helpers              |
-| `rail-pair.ts`             | shared rail orientation, checkpoints, pairing, and derived spine       |
-| `postprocess.ts`           | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`         |
-| `preflight.ts`             | pure structured-issue adapter and resolved diagnostic profile          |
-| `routing.ts`               | generic deterministic route algorithms and endpoint model              |
-| `travel-planner.ts`        | thread-run partitioning, plan modes, and connector reconstruction      |
-| `effects.ts`, `declump.ts` | after-split effect maps and declump fold state                         |
-| `hoop-presets.ts`          | hoop presets and sewable-field geometry                                |
-| `embroidery-registry.ts`   | material profiles plus the compatible `FABRICS` construction view      |
-| `types.ts`                 | `StitchEvent`, `HoopInfo`, `RunResult`, `DesignStats`, density types   |
+| File                        | Responsibility                                                         |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `machine.ts`                | re-export shim → `machine/index.ts`                                    |
+| `machine/index.ts`          | barrel: `LIMITS`, `STOCK_LIMITS`, `OVERRIDE_*`, `BudgetKey`, `Machine` |
+| `machine/limits.ts`         | physics constants + overridable per-run budgets                        |
+| `machine/machine.ts`        | public `Machine` facade and color/trim commands                        |
+| `machine/machine-core.ts`   | shared state, turtle motion, stacks, emission, trace, and `travel`     |
+| `machine/machine-satin.ts`  | satin columns and buffered running stitches                            |
+| `machine/machine-fill.ts`   | fill recording plus built-in and programmable fill generation          |
+| `machine/fill.ts`           | standalone tatami scanline fill generator                              |
+| `affine.ts`                 | 2×3 affine matrix math shared by the transform stack                   |
+| `satin-profile.ts`          | satin cap mode registry, ranges, and pure profile helpers              |
+| `rail-pair.ts`              | shared rail orientation, checkpoints, pairing, and derived spine       |
+| `postprocess.ts`            | `DensityGrid` + `applyLocks` / `applyAutoTrim` / `designStats`         |
+| `preflight.ts`              | pure structured-issue adapter and resolved diagnostic profile          |
+| `preflight-event-stream.ts` | bounded pure checks over completed pre-lock events                     |
+| `routing.ts`                | generic deterministic route algorithms and endpoint model              |
+| `travel-planner.ts`         | thread-run partitioning, plan modes, and connector reconstruction      |
+| `effects.ts`, `declump.ts`  | after-split effect maps and declump fold state                         |
+| `hoop-presets.ts`           | hoop presets and sewable-field geometry                                |
+| `embroidery-registry.ts`    | material profiles plus the compatible `FABRICS` construction view      |
+| `types.ts`                  | `StitchEvent`, `HoopInfo`, `RunResult`, `DesignStats`, density types   |
 
 Machine behavior is exercised by tests in `src/lib/__tests__/` — notably
 `engine.test.ts`, `satin-shape.test.ts`, `fill-shape.test.ts`, `transforms.test.ts`,

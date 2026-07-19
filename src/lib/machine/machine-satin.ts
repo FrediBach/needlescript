@@ -22,6 +22,7 @@ import {
 import type { AnalyzedColumn, AnalyzedColumnSample } from '../column-analysis.ts';
 import {
   SATIN_CORNER_LIMITS,
+  DEFAULT_PREFERRED_SATIN_CHORD_MM,
   satinSplitCount,
   satinSplitSeamFraction,
   satinCapUnderlayInset,
@@ -1334,10 +1335,10 @@ export class SatinMachine extends MachineCore {
     let snagWarned = false;
     for (const point of topping) {
       const d = previous ? Math.hypot(point.x - previous.x, point.y - previous.y) : 0;
-      if (d > 8 && !snagWarned) {
+      if (d > DEFAULT_PREFERRED_SATIN_CHORD_MM && !snagWarned) {
         const index = this.warnings.length;
         this.warnings.push(
-          `satinbetween: a realized stitch spans ${d.toFixed(1)} mm — stitches over ~8 mm tend to snag`,
+          `satinbetween: a realized stitch spans ${d.toFixed(1)} mm — stitches over ~${DEFAULT_PREFERRED_SATIN_CHORD_MM} mm tend to snag`,
         );
         this.constructionWarningLocations.push({
           index,
@@ -2234,10 +2235,10 @@ export class SatinMachine extends MachineCore {
 
     // Snag: keys off the realized chord, which for a raked stitch is the
     // hypotenuse across width and longitudinal span — not leftw + rightw (§5.2).
-    if (maxChord > 8) {
+    if (maxChord > DEFAULT_PREFERRED_SATIN_CHORD_MM) {
       const index = this.warnings.length;
       this.warnings.push(
-        `satin @fn: a realized stitch spans ${maxChord.toFixed(1)} mm — stitches over ~8 mm tend to snag; reduce the rake or width`,
+        `satin @fn: a realized stitch spans ${maxChord.toFixed(1)} mm — stitches over ~${DEFAULT_PREFERRED_SATIN_CHORD_MM} mm tend to snag; reduce the rake or width`,
       );
       this.constructionWarningLocations.push({
         index,

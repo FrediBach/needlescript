@@ -11,6 +11,9 @@ export type SatinJoinMode = (typeof SATIN_JOIN_MODES)[number];
 export const SATIN_WIDE_MODES = defineModes(['warn', 'split']);
 export type SatinWideMode = (typeof SATIN_WIDE_MODES)[number];
 
+/** Default realized satin-chord recommendation used by warnings and preflight. */
+export const DEFAULT_PREFERRED_SATIN_CHORD_MM = 8;
+
 /** Central physical bounds for satin cap construction controls. */
 export const SATIN_CONSTRUCTION_RANGES = Object.freeze({
   capLengthMM: Object.freeze({ min: 0.4, max: 20, default: 2 }),

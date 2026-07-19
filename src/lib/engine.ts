@@ -59,6 +59,10 @@ export type {
 export { buildPreflightResult, resolveMachineProfile } from './preflight.ts';
 export type { PreflightInput } from './preflight.ts';
 export {
+  analyzeEventStreamPreflight,
+  EVENT_STREAM_PREFLIGHT_THRESHOLDS,
+} from './preflight-event-stream.ts';
+export {
   COLOR_NAMES,
   DEFAULT_PALETTE,
   DEFAULT_BACKGROUND,
@@ -168,6 +172,7 @@ export {
   SATIN_CAP_MODES,
   SATIN_JOIN_MODES,
   SATIN_WIDE_MODES,
+  DEFAULT_PREFERRED_SATIN_CHORD_MM,
   SATIN_CONSTRUCTION_RANGES,
   SATIN_CORNER_LIMITS,
   SATIN_CONSTRUCTION_MODE_REGISTRIES,

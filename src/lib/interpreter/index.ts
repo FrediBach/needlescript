@@ -247,6 +247,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   }
 
   let locks = 0;
+  const preflightEvents = m.events;
   if (m.lockLen > 0) {
     const secured = applyLocks(m.events, m.lockLen);
     m.events = secured.events;
@@ -407,6 +408,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     warnings: m.warnings,
     warningLocations,
     preflight: buildPreflightResult({
+      events: preflightEvents,
       warnings: m.warnings,
       warningLocations,
       hoop: m.hoopInfo,

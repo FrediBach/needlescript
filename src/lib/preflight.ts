@@ -1,18 +1,20 @@
 import { inHoopOuter } from './hoop-presets.ts';
 import { LIMITS } from './machine/limits.ts';
+import { analyzeEventStreamPreflight } from './preflight-event-stream.ts';
+import { DEFAULT_PREFERRED_SATIN_CHORD_MM } from './satin-profile.ts';
 import type {
   HoopInfo,
   PreflightIssue,
   PreflightResult,
   PreflightSeverity,
   ResolvedMachineProfile,
+  StitchEvent,
   WarningLocation,
 } from './types.ts';
 
 const SAME_HOLE_PENETRATION_LIMIT = 5;
-const PREFERRED_SATIN_STITCH_MM = 8;
-
 export interface PreflightInput {
+  events: readonly StitchEvent[];
   warnings: readonly string[];
   warningLocations: readonly WarningLocation[];
   hoop: HoopInfo;
@@ -25,7 +27,10 @@ export function resolveMachineProfile(maximumDensityLayers: number): ResolvedMac
     name: 'NeedleScript default',
     minimumReliableMovementMM: LIMITS.minStitch,
     maximumStitchMM: LIMITS.maxStitch,
-    maximumPreferredSatinStitchMM: PREFERRED_SATIN_STITCH_MM,
+    maximumPreferredSewnStitchMM: DEFAULT_PREFERRED_SATIN_CHORD_MM,
+    maximumPreferredSatinStitchMM: DEFAULT_PREFERRED_SATIN_CHORD_MM,
+    maximumPreferredJumpMM: LIMITS.maxStitch,
+    maximumConsecutiveStitches: 20_000,
     maximumDensityLayers,
     sameHolePenetrationLimit: SAME_HOLE_PENETRATION_LIMIT,
   };
@@ -96,7 +101,8 @@ function uniqueLines(lines: readonly number[]): number[] {
  * This function is deliberately pure: it neither rewrites events nor warnings.
  */
 export function buildPreflightResult(input: PreflightInput): PreflightResult {
-  const issues: PreflightIssue[] = input.warningLocations
+  const profile = resolveMachineProfile(input.maximumDensityLayers);
+  const legacyIssues: PreflightIssue[] = input.warningLocations
     .toSorted((a, b) => a.index - b.index)
     .flatMap((location) => {
       const descriptor = issueDescriptor(location, input.hoop);
@@ -112,11 +118,12 @@ export function buildPreflightResult(input: PreflightInput): PreflightResult {
       ];
     });
 
+  const issues = [...legacyIssues, ...analyzeEventStreamPreflight(input.events, profile)];
   const count = (severity: PreflightSeverity) =>
     issues.reduce((total, issue) => total + Number(issue.severity === severity), 0);
   return {
     issues,
-    profile: resolveMachineProfile(input.maximumDensityLayers),
+    profile,
     summary: {
       total: issues.length,
       info: count('info'),

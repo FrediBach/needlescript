@@ -1566,6 +1566,8 @@ ordering, and the distinction between the inset field and the physical hoop.
 
 ### Session 8.2 — New event-stream checks
 
+Status: complete (2026-07-19)
+
 Add checks that do not require original construction regions:
 
 - clusters of short stitches, not only individual tiny stitches;
@@ -1582,6 +1584,26 @@ Each check needs:
 - fabric/thread/profile sensitivity where justified;
 - spatial and line attribution;
 - a fixture that triggers it and a neighboring safe fixture that does not.
+
+Implementation note: `preflight-event-stream.ts` now performs a pure bounded scan of the completed
+post-plan/post-autotrim, pre-lock event stream. Fixed-order checks add stable structured issues for
+eight consecutive sub-0.6 mm stitch segments, four 150°+ reversals within 1 mm, eight penetrations
+within 0.3 mm over a twenty-penetration window, sewn spans beyond the resolved 8 mm preference,
+untrimmed jump chains beyond the resolved 12 mm preference, more than 20,000 stitches without a
+trim/color boundary, and six 75°–150° direction changes on ≤1 mm segments within 2 mm. Every check
+is capped at three issues and sixteen displayed points, retaining deterministic source-line and
+hoop-space attribution. The earlier realized satin snag diagnostic supplies the construction-known
+8 mm satin-chord check without guessing which arbitrary running stitches are satin.
+
+These extended checks add structured issues only; they do not append legacy warning strings or
+change events. Tie-off locks are excluded to prevent deliberate securing stitches from becoming
+false short/reversal/near-hole findings. Movement, sewn-span, jump, satin, and continuous-run
+ceilings are recorded in `ResolvedMachineProfile`; spatial/window constants live in the exported
+`EVENT_STREAM_PREFLIGHT_THRESHOLDS` registry. No fabric-, needle-, or thread-specific multiplier is
+claimed yet: thread width continues to affect coverage, while other tuning remains neutral pending
+the physical evidence gate from Session 7.6. Trigger and adjacent-safe fixtures pin every metric,
+including trimmed versus untrimmed travel and a recommendation-only `info` severity for the
+continuous-run advisory.
 
 ### Session 8.3 — Construction-aware checks
 

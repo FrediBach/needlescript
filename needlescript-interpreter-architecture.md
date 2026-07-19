@@ -573,9 +573,12 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    to the stitch/jump playback index, and classify/snapshot chalkable final globals.
 8. **Assemble structured preflight** (`preflight.ts`): the pure adapter sorts locatable diagnostic
    sidecars by their legacy warning index, maps them to stable codes/severities/suggestions, copies
-   deterministic hoop-space points and source lines, and counts severities. It does not mutate the
+   deterministic hoop-space points and source lines, then appends the fixed-order results from the
+   pure event-stream analyzer and counts severities. Event-stream analysis sees planned/autotrimmed
+   events before `applyLocks`, excluding deliberate tie-off micro-stitches. It does not mutate the
    completed events or the legacy warning array. Density hotspots, same-hole stacks, merged tiny
-   movements, field/physical-hoop overflow, and satin snag advisories participate; unrelated fill
+   movements, field/physical-hoop overflow, satin snag advisories, short/reversal/near-hole and
+   sharp-turn clusters, long sewn/jump spans, and continuous runs participate; unrelated fill
    construction warnings remain string-only until construction-aware preflight.
 9. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
    `warningLocations`, optional `preflight`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `activeHoop`, `activeOverrides`,
@@ -596,8 +599,11 @@ Because chalk never enters `events`, machine-export inertness is structural rath
 than an exporter filtering rule.
 
 `RunResult.preflight.profile` currently records the built-in movement, stitch, satin, density, and
-same-hole thresholds. It is intentionally a resolved value object so a later local machine profile
-can extend the result without embedding machine-specific correction in NeedleScript source.
+same-hole thresholds plus preferred jump and continuous-run ceilings. It is intentionally a
+resolved value object so a later local machine profile can extend the result without embedding
+machine-specific correction in NeedleScript source. The event-stream spatial/window metrics live in
+the exported `EVENT_STREAM_PREFLIGHT_THRESHOLDS` registry rather than being repeated through the
+analyzer.
 
 ---
 

@@ -67,7 +67,10 @@ export interface ResolvedMachineProfile {
   name: string;
   minimumReliableMovementMM: number;
   maximumStitchMM: number;
+  maximumPreferredSewnStitchMM: number;
   maximumPreferredSatinStitchMM: number;
+  maximumPreferredJumpMM: number;
+  maximumConsecutiveStitches: number;
   maximumDensityLayers: number;
   sameHolePenetrationLimit: number;
 }
