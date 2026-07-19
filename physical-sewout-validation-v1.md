@@ -67,18 +67,20 @@ gaps, fabric show-through, thread sinking, needle damage, and design shift durin
 ## Minimum specimen matrix
 
 Use locally available unbranded material descriptions; do not infer a fabric class from appearance
-alone. `D01` may use either denim or canvas, but record which. `P01` is optional when no pile fabric
-is available. The controls deliberately cover both 40 wt and 60 wt thread and NM 65, 75, and 90
-needles without requiring a full factorial experiment.
+alone. `D02` and `P01` are optional when canvas or pile fabric is unavailable. The controls
+deliberately cover both 40 wt and 60 wt thread and NM 65, 75, and 90 needles without requiring a full
+factorial experiment. The fixture test compiles every listed source setup and checks hoop
+containment; this is software validation, not physical evidence.
 
-| Specimen | Source setup                                                     | Physical setup to record              | State            |
-| -------- | ---------------------------------------------------------------- | ------------------------------------- | ---------------- |
-| W01      | woven / polyester-40wt / NM 75 / tearaway / no topping           | stable woven baseline                 | pending          |
-| K01      | knit / polyester-40wt / NM 75 / cutaway / no topping             | knit; identify construction and wale  | pending          |
-| X01      | stretch / polyester-40wt / NM 75 / cutaway / no topping          | stretch fabric; identify stretch axes | pending          |
-| D01      | denim or canvas / polyester-40wt / NM 90 / tearaway / no topping | identify denim or canvas and weight   | pending          |
-| P01      | fleece / polyester-40wt / NM 75 / cutaway / topping              | fleece/pile when available            | pending/optional |
-| W02      | woven / rayon-60wt / NM 65 / tearaway / no topping               | same fabric lot as W01 when possible  | pending          |
+| Specimen | Source setup                                            | Physical setup to record                | State            |
+| -------- | ------------------------------------------------------- | --------------------------------------- | ---------------- |
+| W01      | woven / polyester-40wt / NM 75 / tearaway / no topping  | stable woven baseline                   | pending          |
+| K01      | knit / polyester-40wt / NM 75 / cutaway / no topping    | knit; identify construction and wale    | pending          |
+| X01      | stretch / polyester-40wt / NM 75 / cutaway / no topping | stretch fabric; identify stretch axes   | pending          |
+| D01      | denim / polyester-40wt / NM 90 / tearaway / no topping  | identify denim construction and weight  | pending          |
+| D02      | canvas / polyester-40wt / NM 90 / tearaway / no topping | identify canvas construction and weight | pending/optional |
+| P01      | fleece / polyester-40wt / NM 75 / cutaway / topping     | fleece/pile when available              | pending/optional |
+| W02      | woven / rayon-60wt / NM 65 / tearaway / no topping      | same fabric lot as W01 when possible    | pending          |
 
 The slash-separated values correspond to `sheet_fabric`, `sheet_thread`, `sheet_needle`,
 `sheet_stabilizer`, and `sheet_topping` at the top of the source. Save the exported machine file with

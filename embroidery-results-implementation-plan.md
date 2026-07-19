@@ -1493,8 +1493,9 @@ grain orientation, neutral declared stretch, and directional compensation mode r
 thread/needle matrix, post-hoop-release protocol, per-specimen machine/speed/setup record, blank
 measurement tables, and the evidence review gate. The blanks are explicitly pending rather than
 fabricated data. A fixture test pins the sheet's target order, default metadata, compensation modes,
-and 130 × 180 mm hoop containment. No profile recommendation was promoted: directional fabric defaults
-remain neutral and push remains zero until completed physical records are committed.
+the complete woven/knit/stretch/denim/canvas/fleece specimen matrix, and 130 × 180 mm hoop
+containment. No profile recommendation was promoted: directional fabric defaults remain neutral and
+push remains zero until completed physical records are committed.
 
 ## 16. Phase 8: preflight and machine calibration
 
