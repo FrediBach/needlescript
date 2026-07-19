@@ -4,7 +4,13 @@ import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { editor, IDisposable } from 'monaco-editor';
 import type { ConsoleMessage } from '../App.tsx';
 import type { LineStitchBounds } from '../App.tsx';
-import type { ChalkDataVar, ReferenceDataVar, WarningLocation } from '../lib/engine.ts';
+import type {
+  ChalkDataVar,
+  PreflightIssue,
+  PreflightResult,
+  ReferenceDataVar,
+  WarningLocation,
+} from '../lib/engine.ts';
 import type { ParamItem } from '../lib/parse-parameters.ts';
 import type { AIModelInfo } from '../hooks/useAI.ts';
 import { registerNeedlescript, scheduleNeedlescriptProviders } from '../lib/needlescript-monaco.ts';
@@ -21,6 +27,7 @@ import ParametersPanel from './ParametersPanel.tsx';
 import styles from './EditorPane.module.css';
 import { Input } from '@/components/ui/input.tsx';
 import type { EditorContextActions } from './MachineMenu.tsx';
+import PreflightPanel from './PreflightPanel.tsx';
 
 interface Props {
   source: string;
@@ -29,9 +36,12 @@ interface Props {
   onEditorReady?: () => void;
   onRun: (src?: string) => void;
   messages: ConsoleMessage[];
+  preflight?: PreflightResult;
   isDragging: boolean;
   activeLine: number | null; // source line currently sewing (playback), 1-based
   onWarnHover: (loc: WarningLocation | null) => void;
+  onPreflightHover: (issue: PreflightIssue | null) => void;
+  onPreflightSelect: (issue: PreflightIssue) => void;
   /** Compiler error markers to display as squiggles in the editor.
    *  Pass an empty array (or omit) to clear any existing markers. */
   errorMarkers?: ReadonlyArray<{ message: string; line: number }>;
@@ -104,9 +114,12 @@ export default function EditorPane({
   onEditorReady,
   onRun,
   messages,
+  preflight,
   isDragging,
   activeLine,
   onWarnHover,
+  onPreflightHover,
+  onPreflightSelect,
   errorMarkers,
   lineStitchMap,
   onHoverLine,
@@ -250,6 +263,32 @@ export default function EditorPane({
       onRunRef.current(src);
     },
     [onSourceChange],
+  );
+
+  const selectPreflightIssue = useCallback(
+    (issue: PreflightIssue) => {
+      const ed = editorRef.current;
+      const model = ed?.getModel();
+      if (ed && model && issue.lines.length > 0) {
+        const lines = [...new Set(issue.lines)]
+          .filter((line) => line >= 1 && line <= model.getLineCount())
+          .toSorted((a, b) => a - b);
+        if (lines.length > 0) {
+          ed.setSelections(
+            lines.map((line) => ({
+              selectionStartLineNumber: line,
+              selectionStartColumn: 1,
+              positionLineNumber: line,
+              positionColumn: model.getLineMaxColumn(line),
+            })),
+          );
+          ed.revealLineInCenter(lines[0], 0);
+          ed.focus();
+        }
+      }
+      onPreflightSelect(issue);
+    },
+    [onPreflightSelect],
   );
 
   // ── Monaco lifecycle callbacks ──────────────────────────────────────
@@ -725,6 +764,13 @@ export default function EditorPane({
         aria-live="polite"
         style={{ height: consoleHeight }}
       >
+        {preflight && (
+          <PreflightPanel
+            result={preflight}
+            onIssueHover={onPreflightHover}
+            onIssueSelect={selectPreflightIssue}
+          />
+        )}
         {messages.map((msg) => (
           <div
             key={msg.id}

@@ -660,10 +660,12 @@ same-hole penetration stacks, merged tiny movements, sewable-field and physical-
 satin snag risk. Realized rail-pair and programmable-satin snag sidecars retain the measured chord
 endpoints; width-only satin/E-stitch advisories have source attribution but no invented coordinate.
 Issues follow legacy warning-index order, so ordering and copied hoop-space coordinates are
-deterministic. Exporters still consume only `events`, and preflight never rewrites them.
+deterministic. Exporters still consume only `events`, and preflight never rewrites them. With no
+directive or `preflight 'off'`, these compatibility diagnostics are the complete structured result.
 
-`preflight-event-stream.ts` then scans the final planned/autotrimmed stream captured immediately
-before locks. Its bounded, fixed-order checks cover short-stitch runs, local reversals, moving-window
+`preflight 'warn'` and `'strict'` additionally run `preflight-event-stream.ts` over the final
+planned/autotrimmed stream captured immediately before locks. Its bounded, fixed-order checks cover
+short-stitch runs, local reversals, moving-window
 near-hole penetrations, long sewn spans, untrimmed jump chains, profile-limited continuous stitch
 runs, and tight sharp-turn clusters. The default metrics are: eight consecutive segments shorter
 than 1.5 × the 0.4 mm reliable movement; four reversals of at least 150° within 1 mm; eight
@@ -689,7 +691,10 @@ authored fill boundary. Each check emits at most three structured issues with at
 Fill/border analysis is bounded to 4,096 construction pairs and 2,048 satin samples per construction;
 split hotspots use a 0.3 mm spatial grid. The thresholds live in exported
 `CONSTRUCTION_PREFLIGHT_THRESHOLDS`; no arbitrary running stitch is classified as fill, border,
-underlay, or split satin.
+underlay, or split satin. The `warn` and `strict` modes produce the same issue list. After the pure
+analyzers return, strict finalization fails only when an issue is already classified as severity
+`error`; warning/info recommendations never become fatal merely because strict mode was requested.
+No preflight mode rewrites, reorders, inserts, or removes an event.
 
 ---
 

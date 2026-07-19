@@ -11,6 +11,7 @@ import {
   THREAD_PROFILE_MODES,
 } from '../embroidery-registry.ts';
 import { PLAN_MODES } from '../travel-planner.ts';
+import { PREFLIGHT_MODES } from '../preflight.ts';
 import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
 import {
   FILL_CONNECT_MODES,
@@ -1044,6 +1045,16 @@ export const NS_ITEMS: NSItem[] = [
     documentation:
       "Top-level travel-planning directive. With no `routegroup`, `plan 'nearest'` greedily reorders whole thread runs within each color block after execution and before autotrim/locks. Once any route group executes, only grouped runs are eligible and ungrouped output remains authored; grouped intersections also receive bounded 2-opt improvement. `plan 'reversing-nearest'` may enter eligible stitch-only runs from their nearer endpoint. Planning never crosses a color change, changes stitch geometry, or removes an explicit `trim`. Use `plan 'off'` for an explicit no-op. Must appear before the first stitch and at most once.",
     insertText: modeCommandSnippet('plan', PLAN_MODES, "'"),
+    isSnippet: true,
+    params: [['mode']],
+  },
+  {
+    label: 'preflight',
+    kindName: 'function',
+    detail: 'run extended sewability diagnostics',
+    documentation:
+      "Select the post-run diagnostic policy. `preflight 'off'` (the default) keeps existing always-on warnings and their structured locations, but skips extended event-stream and construction recommendations. `preflight 'warn'` adds those extended checks without changing stitches or turning findings into legacy console warnings. `preflight 'strict'` runs the same checks and rejects the run only when a finding has severity `error`; `warning` and `info` recommendations never fail strict mode. Top-level only, before the first committed stitch, forbidden in `trace`, and allowed at most once.",
+    insertText: modeCommandSnippet('preflight', PREFLIGHT_MODES, "'"),
     isSnippet: true,
     params: [['mode']],
   },

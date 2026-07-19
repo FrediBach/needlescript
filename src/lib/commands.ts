@@ -123,6 +123,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
   // in interpreter.ts — but still registered here for arity and RESERVED.
   hoop: 1,
   override: 2,
+  preflight: 1,
   plan: 1,
   planbarrier: 0,
 };

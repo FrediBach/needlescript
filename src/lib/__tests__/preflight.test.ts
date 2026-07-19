@@ -17,6 +17,7 @@ describe('structured preflight result', () => {
 
     expect(result.warnings).toEqual([]);
     expect(result.preflight).toEqual({
+      mode: 'off',
       issues: [],
       profile: {
         name: 'NeedleScript default',
@@ -103,6 +104,44 @@ moveto 60 0
 repeat 4 [ fd 0.4 bk 0.4 ]`;
 
     expect(run(source).preflight).toEqual(run(source).preflight);
+  });
+
+  it('keeps extended checks opt-in while preserving legacy always-on diagnostics', () => {
+    const source = 'lock 0 stitchlen 0.5 fd 4.5';
+    const defaultResult = run(source);
+    const off = run(`preflight 'off'\n${source}`);
+    const warn = run(`preflight 'warn'\n${source}`);
+
+    expect(defaultResult.preflight?.mode).toBe('off');
+    expect(off.preflight?.issues).toEqual(defaultResult.preflight?.issues);
+    expect(off.preflight?.issues.some(({ code }) => code === 'stitch.short-cluster')).toBe(false);
+    expect(warn.preflight?.issues.some(({ code }) => code === 'stitch.short-cluster')).toBe(true);
+    expect(warn.events).toEqual(off.events);
+    expect(warn.warnings).toEqual(off.warnings);
+  });
+
+  it('strict fails only error-severity issues and leaves recommendations non-fatal', () => {
+    const recommendation = run("preflight 'strict'\nlock 0 stitchlen 0.5 fd 4.5");
+
+    expect(recommendation.preflight?.issues).toContainEqual(
+      expect.objectContaining({ code: 'stitch.short-cluster', severity: 'warning' }),
+    );
+    expect(() => run("preflight 'strict'\nhoop '5x7'\nmoveto 70 0\nfd 1")).toThrow(
+      /preflight strict failed \[hoop\.unreachable\]/,
+    );
+  });
+
+  it('validates preflight mode and directive placement', () => {
+    expect(() => run("preflight 'warning'\nfd 1")).toThrow(/Unknown preflight 'warning'/);
+    expect(() => run("preflight 'warn'\npreflight 'off'\nfd 1")).toThrow(
+      /preflight already set on line 1/,
+    );
+    expect(() => run("fd 1\npreflight 'warn'")).toThrow(
+      /preflight must run before the first stitch/,
+    );
+    expect(() => run("repeat 1 [ preflight 'warn' ]")).toThrow(
+      /preflight must be at the top level/,
+    );
   });
 });
 
@@ -217,7 +256,7 @@ describe('event-stream preflight checks', () => {
   });
 
   it('integrates new issues without adding legacy warning strings or lock false positives', () => {
-    const result = run('lock 0 autotrim 0\nfd 1\nup fd 20\ndown fd 1');
+    const result = run("preflight 'warn'\nlock 0 autotrim 0\nfd 1\nup fd 20\ndown fd 1");
     const locked = run('fd 10');
 
     expect(result.preflight?.issues.some(({ code }) => code === 'travel.long-untrimmed-jump')).toBe(

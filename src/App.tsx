@@ -20,6 +20,8 @@ import type {
   ChalkDataVar,
   ReferenceDataVar,
   ColorTableEntry,
+  PreflightIssue,
+  PreflightResult,
 } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
 import { toDST } from './lib/dst.ts';
@@ -131,6 +133,7 @@ export interface DesignState {
   density: DensityResult | null; // local density analysis
   stats: DesignStats | null;
   warnings: string[];
+  preflight?: PreflightResult;
   name: string;
   ok: boolean;
   /** Set by the `hoop` directive; undefined = default round100. */
@@ -151,6 +154,17 @@ export interface ConsoleMessage {
   loc?: WarningLocation; // present for hover-locatable hotspot warnings
 }
 
+function preflightIssueLocation(issue: PreflightIssue): WarningLocation {
+  return {
+    index: -1,
+    points: issue.points,
+    lines: issue.lines,
+    // The canvas consumes only points/lines; `fill` is the neutral existing
+    // location kind for a structured diagnostic that is not a legacy warning.
+    kind: 'fill',
+  };
+}
+
 const INITIAL_DESIGN: DesignState = {
   events: [],
   pts: [],
@@ -158,6 +172,7 @@ const INITIAL_DESIGN: DesignState = {
   density: null,
   stats: null,
   warnings: [],
+  preflight: undefined,
   chalk: [],
   dataVars: [],
   referenceVars: [],
@@ -293,6 +308,7 @@ export default function App() {
   // Location of the warning currently hovered in the console — drives the
   // preview marker and playback-bar part highlight. null = nothing hovered.
   const [hoverWarn, setHoverWarn] = useState<WarningLocation | null>(null);
+  const [selectedPreflightLoc, setSelectedPreflightLoc] = useState<WarningLocation | null>(null);
   const [program, dispatch] = useReducer(programReducer, {
     design: INITIAL_DESIGN,
     messages: [],
@@ -412,6 +428,7 @@ export default function App() {
       const t0 = performance.now();
       // A fresh compile invalidates any hovered warning marker.
       setHoverWarn(null);
+      setSelectedPreflightLoc(null);
       // Separator with a human-readable timestamp so consecutive compiles are
       // visually distinguishable in the console.
       addMsg(new Date().toLocaleTimeString(), 'time');
@@ -485,6 +502,7 @@ export default function App() {
         density: result.density,
         stats,
         warnings,
+        preflight: result.preflight,
         name: designName,
         ok: true,
         activeHoop: result.activeHoop,
@@ -1012,9 +1030,12 @@ export default function App() {
             onEditorReady={handleEditorReady}
             onRun={handleRun}
             messages={messages}
+            preflight={design.preflight}
             isDragging={isDragging}
             activeLine={activeLine}
             onWarnHover={setHoverWarn}
+            onPreflightHover={(issue) => setHoverWarn(issue ? preflightIssueLocation(issue) : null)}
+            onPreflightSelect={(issue) => setSelectedPreflightLoc(preflightIssueLocation(issue))}
             errorMarkers={errorMarkers}
             lineStitchMap={lineStitchMap}
             onHoverLine={setHoveredEditorLine}
@@ -1051,7 +1072,7 @@ export default function App() {
           onScrubChange={(pos) => dispatch({ type: 'scrub', pos })}
           activeLine={activeLine}
           lineSegments={lineSegments}
-          warningLoc={hoverWarn}
+          warningLoc={hoverWarn ?? selectedPreflightLoc}
           hoveredLineBounds={hoveredLineBounds}
           showDensity={showDensity}
           onToggleDensity={() => setShowDensity((v) => !v)}

@@ -77,6 +77,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     // Structural block depth: incremented inside loops/if/planner/transform/effect blocks
     // so that the `hoop` and `override` placement guards can detect nested placement.
     structuralDepth: 0,
+    preflightMode: 'off',
+    preflightLine: undefined,
     planMode: null,
     planLine: undefined,
     planBarrierOffsets: [] as number[],
@@ -403,18 +405,29 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       `note: design uses ${allIndices.size} thread slots — plan the thread changes for your machine`,
     );
 
+  const preflight = buildPreflightResult({
+    events: preflightEvents,
+    warnings: m.warnings,
+    warningLocations,
+    hoop: m.hoopInfo,
+    maximumDensityLayers: m.maxDensity,
+    mode: ctx.preflightMode,
+    constructionRecords: m.constructionRecords,
+  });
+  if (ctx.preflightMode === 'strict') {
+    const blockingIssue = preflight.issues.find(({ severity }) => severity === 'error');
+    if (blockingIssue)
+      throw new NeedlescriptError(
+        `preflight strict failed [${blockingIssue.code}]: ${blockingIssue.message}`,
+        blockingIssue.lines[0] ?? ctx.preflightLine,
+      );
+  }
+
   const result: RunResult = {
     events: m.events,
     warnings: m.warnings,
     warningLocations,
-    preflight: buildPreflightResult({
-      events: preflightEvents,
-      warnings: m.warnings,
-      warningLocations,
-      hoop: m.hoopInfo,
-      maximumDensityLayers: m.maxDensity,
-      constructionRecords: m.constructionRecords,
-    }),
+    preflight,
     printed: ctx.printed,
     locks,
     density,

@@ -155,6 +155,7 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'fillunderlayangle',
       'hoop', // hoop directive (§hoop)
       'override', // override directive (§override)
+      'preflight',
       'plan',
       'planbarrier',
     ],

@@ -1646,6 +1646,8 @@ construction metadata.
 
 ### Session 8.4 — `preflight` command and playground presentation
 
+Status: complete (2026-07-19)
+
 Tasks:
 
 - Implement top-level `preflight 'off'|'warn'|'strict'` before committed stitches.
@@ -1660,6 +1662,25 @@ Acceptance criteria:
 - Preflight never changes events.
 - UI navigation selects the relevant source lines and design points.
 - Strict mode cannot fail on a recommendation-only issue.
+
+Implementation note: `preflight 'off'|'warn'|'strict'` is a case-insensitive Core directive that
+must run at top level before the first committed stitch, outside `trace`, and at most once. The
+effective default is `off`: existing warning strings and their structured counterparts remain
+always on, while the Session 8.2/8.3 event-stream and construction checks are opt-in in `warn` and
+`strict`. All modes read the completed pre-lock diagnostic stream without mutating it, and fixtures
+pin identical event arrays and legacy warnings between `off` and `warn`.
+
+`strict` builds the same deterministic issue list as `warn` and fails finalization only on the first
+issue already classified as severity `error`. Recommendation-only `warning` and `info` findings are
+never promoted by the mode. The current strict errors are physical-hoop unreachability and explicit
+construction layer-order violations.
+
+The playground console now presents the current run's issues in severity groups with nested stable
+code groups. Hovering previews all known design points on the stage; selecting a finding persists
+those markers and creates Monaco selections for every attributed source line. A local show/hide
+control filters info findings without changing source, invoking the compiler, or modifying the
+`RunResult`. Monaco completion, hover documentation, signature metadata, and syntax highlighting
+cover the new directive and all three registered modes.
 
 ### Session 8.5 — Local machine profile and calibration
 

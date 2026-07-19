@@ -1,4 +1,4 @@
-import type { ASTNode, ChalkEvent, ExprNode, ColorTableEntry } from '../types.ts';
+import type { ASTNode, ChalkEvent, ExprNode, ColorTableEntry, PreflightMode } from '../types.ts';
 import type { PlanAtomicSpan, PlanMode, PlanRouteGroupSpan } from '../travel-planner.ts';
 import type { Machine } from '../machine.ts';
 import type { Val, NsList, FuncRef, ComposedRef, RefSignature } from '../list.ts';
@@ -35,6 +35,8 @@ export interface RunContext {
   insideFillGenerator: number;
   traceNoted: Set<string>;
   structuralDepth: number;
+  preflightMode: PreflightMode;
+  preflightLine?: number;
   planMode: PlanMode | 'off' | null;
   planLine?: number;
   /** Sparse authored event offsets at which a new planner segment begins. */

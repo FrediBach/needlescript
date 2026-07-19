@@ -124,6 +124,7 @@ state from it and installs its functions onto it.
 | `insideTrace`         | trace-sandbox nesting depth                                                                                        |
 | `traceNoted`          | one-time notes already emitted inside trace                                                                        |
 | `structuralDepth`     | structural block nesting (loop/if/stitchscope/atomic/routegroup/transform/effect) — for directive placement guards |
+| `preflightMode/Line`  | selected post-run diagnostic policy (`off`/`warn`/`strict`) and directive source line                              |
 | `planMode/planLine`   | selected post-run travel strategy and its source line                                                              |
 | `planBarrierOffsets`  | sparse authored event offsets recorded by active `planbarrier` commands                                            |
 | `planAtomicSpans`     | sparse outermost `[start,end)` event spans recorded by active `atomic` blocks                                      |
@@ -573,8 +574,10 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    to the stitch/jump playback index, and classify/snapshot chalkable final globals.
 8. **Assemble structured preflight** (`preflight.ts`): the pure adapter sorts locatable diagnostic
    sidecars by their legacy warning index, maps them to stable codes/severities/suggestions, copies
-   deterministic hoop-space points and source lines, then appends the fixed-order results from the
-   pure event-stream and construction analyzers and counts severities. Event-stream analysis sees planned/autotrimmed
+   deterministic hoop-space points and source lines, then, when `preflight 'warn'` or `'strict'` is
+   active, appends the fixed-order results from the pure event-stream and construction analyzers and
+   counts severities. With no directive or `preflight 'off'`, only the structured counterparts to
+   legacy always-on diagnostics remain. Event-stream analysis sees planned/autotrimmed
    events before `applyLocks`, excluding deliberate tie-off micro-stitches. It does not mutate the
    completed events or the legacy warning array. Density hotspots, same-hole stacks, merged tiny
    movements, field/physical-hoop overflow, satin snag advisories, short/reversal/near-hole and
@@ -582,7 +585,9 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    construction warnings remain string-only. Construction analysis additionally consumes internal
    fill/satin IDs, boundaries, layer event identities, connector records, and split lanes to check
    containment, fill/border registration and stacking, split overlap, and post-plan layer order. It
-   never infers construction roles from ordinary running stitches.
+   never infers construction roles from ordinary running stitches. `preflight 'strict'` rejects
+   finalization only when this completed list contains severity `error`; warning/info
+   recommendations are never fatal. The check reads the completed stream and does not mutate it.
 9. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
    `warningLocations`, optional `preflight`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional
@@ -607,6 +612,11 @@ resolved value object so a later local machine profile can extend the result wit
 machine-specific correction in NeedleScript source. The event-stream spatial/window metrics live in
 the exported `EVENT_STREAM_PREFLIGHT_THRESHOLDS` registry rather than being repeated through the
 analyzer.
+
+`RunResult.preflight.mode` records the effective policy, including the default `off`. The playground
+groups current findings by severity and stable code. Clicking a finding creates Monaco selections
+for all attributed source lines and persists its points as stage markers; hover is temporary. The
+show-info toggle filters only rendered findings and never recompiles or changes the result.
 
 ---
 

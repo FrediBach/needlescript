@@ -43,6 +43,7 @@ export interface WarningLocation {
 }
 
 export type PreflightSeverity = 'info' | 'warning' | 'error';
+export type PreflightMode = 'off' | 'warn' | 'strict';
 
 /** A stable, machine-readable counterpart to an existing sewability warning. */
 export interface PreflightIssue {
@@ -76,9 +77,11 @@ export interface ResolvedMachineProfile {
 }
 
 export interface PreflightResult {
+  /** Effective source-selected policy. `off` retains compatibility diagnostics only. */
+  mode: PreflightMode;
   issues: PreflightIssue[];
   profile: ResolvedMachineProfile;
-  summary: Record<string, number>;
+  summary: Record<PreflightSeverity | 'total', number>;
 }
 
 /** Physical hoop and derived sewable field, as configured by the `hoop` command. */

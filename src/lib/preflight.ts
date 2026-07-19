@@ -4,9 +4,11 @@ import { analyzeEventStreamPreflight } from './preflight-event-stream.ts';
 import { analyzeConstructionPreflight } from './preflight-construction.ts';
 import type { ConstructionRecord } from './construction-metadata.ts';
 import { DEFAULT_PREFERRED_SATIN_CHORD_MM } from './satin-profile.ts';
+import { defineModes } from './mode-registry.ts';
 import type {
   HoopInfo,
   PreflightIssue,
+  PreflightMode,
   PreflightResult,
   PreflightSeverity,
   ResolvedMachineProfile,
@@ -15,12 +17,15 @@ import type {
 } from './types.ts';
 
 const SAME_HOLE_PENETRATION_LIMIT = 5;
+export const PREFLIGHT_MODES: readonly PreflightMode[] = defineModes(['off', 'warn', 'strict']);
+
 export interface PreflightInput {
   events: readonly StitchEvent[];
   warnings: readonly string[];
   warningLocations: readonly WarningLocation[];
   hoop: HoopInfo;
   maximumDensityLayers: number;
+  mode?: PreflightMode;
   constructionRecords?: readonly ConstructionRecord[];
 }
 
@@ -104,6 +109,7 @@ function uniqueLines(lines: readonly number[]): number[] {
  * This function is deliberately pure: it neither rewrites events nor warnings.
  */
 export function buildPreflightResult(input: PreflightInput): PreflightResult {
+  const mode = input.mode ?? 'off';
   const profile = resolveMachineProfile(input.maximumDensityLayers);
   const legacyIssues: PreflightIssue[] = input.warningLocations
     .toSorted((a, b) => a.index - b.index)
@@ -121,14 +127,18 @@ export function buildPreflightResult(input: PreflightInput): PreflightResult {
       ];
     });
 
-  const issues = [
-    ...legacyIssues,
-    ...analyzeEventStreamPreflight(input.events, profile),
-    ...analyzeConstructionPreflight(input.constructionRecords ?? [], input.events),
-  ];
+  const extendedIssues =
+    mode === 'off'
+      ? []
+      : [
+          ...analyzeEventStreamPreflight(input.events, profile),
+          ...analyzeConstructionPreflight(input.constructionRecords ?? [], input.events),
+        ];
+  const issues = [...legacyIssues, ...extendedIssues];
   const count = (severity: PreflightSeverity) =>
     issues.reduce((total, issue) => total + Number(issue.severity === severity), 0);
   return {
+    mode,
     issues,
     profile,
     summary: {

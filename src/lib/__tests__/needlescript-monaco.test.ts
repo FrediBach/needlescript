@@ -13,6 +13,7 @@ import { EMBROIDERY_MODE_REGISTRIES } from '../embroidery-registry.ts';
 import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
 import { FILL_CONSTRUCTION_MODE_REGISTRIES } from '../fill-profile.ts';
 import { SATIN_CONSTRUCTION_MODE_REGISTRIES } from '../satin-profile.ts';
+import { PREFLIGHT_MODES } from '../preflight.ts';
 import { catalogCoverageGaps, catalogModeGaps } from './helpers/catalog-coverage.ts';
 
 describe('NeedleScript Monaco symbol analysis', () => {
@@ -36,6 +37,7 @@ describe('NeedleScript Monaco symbol analysis', () => {
         catalogModeGaps(command, modes, NS_ITEM_MAP),
       ),
     );
+    gaps.push(...catalogModeGaps('preflight', PREFLIGHT_MODES, NS_ITEM_MAP));
     expect(gaps).toEqual([]);
   });
 
@@ -67,7 +69,9 @@ describe('NeedleScript Monaco symbol analysis', () => {
       },
     } as never);
 
-    expect(tokenizer?.stitchCmds).toEqual(expect.arrayContaining(['plan', 'planbarrier']));
+    expect(tokenizer?.stitchCmds).toEqual(
+      expect.arrayContaining(['plan', 'planbarrier', 'preflight']),
+    );
   });
 
   it('extracts modern and classic procedures and variables with source lines', () => {

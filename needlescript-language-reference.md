@@ -972,6 +972,32 @@ Presets (case-insensitive): `'round100'` (default), `'4x4'` 100×100, `'5x7'` 13
 
 Hoop-agnostic margin idiom: `let margin = first(offsetpath(fieldpath(), -6))`.
 
+### `preflight` directive
+
+`preflight 'off'|'warn'|'strict'` selects the post-run sewability policy. It is top-level only,
+must execute before the first committed stitch, is forbidden in `trace`, and may appear at most
+once. Modes are case-insensitive and consume zero RNG draws.
+
+- **`off` (default):** preserves the existing always-on warning strings and their structured
+  density, same-hole, tiny-movement, hoop-overflow, and satin-snag locations. It skips the extended
+  event-stream and construction checks.
+- **`warn`:** adds the bounded extended checks for short/reversal/near-hole clusters, long sewn or
+  jump spans, continuous runs, sharp-turn clusters, and explicit fill/satin construction
+  relationships. These are structured `RunResult.preflight.issues`; they do not add legacy warning
+  strings and never change events.
+- **`strict`:** runs exactly the same checks as `warn`, then rejects the run if and only if at least
+  one issue has severity `error`. It reports the first error in deterministic issue order. Severity
+  `warning` and `info` findings are recommendations and can never fail strict mode. The current
+  strict errors are a penetration outside the physical hoop (`hoop.unreachable`) and a known
+  construction planned with topping before underlay (`construction.layer-order`). Adding another
+  strict-failing code requires promoting that code to severity `error` in a reviewed policy change.
+
+All modes analyze completed output without rewriting it. Consequently `off`, `warn`, and a
+successful `strict` run produce identical event arrays for identical source and seed. In the
+playground, findings are grouped by severity and stable code; selecting one selects every attributed
+source line and highlights its known hoop-space design points. Info findings can be hidden locally
+without recompiling.
+
 ### `plan` directive
 
 `plan 'nearest'` enables whole-design travel planning. `plan 'reversing-nearest'` uses the same route but may reverse eligible runs when their exit is the nearer entry point. `plan 'off'` is the default and a byte-identical no-op. Like `hoop`, it is top-level only, before any committed stitch, forbidden in `trace`, and allowed at most once.

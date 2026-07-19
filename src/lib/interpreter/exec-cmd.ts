@@ -23,6 +23,7 @@ import { didYouMean } from '../suggestions.ts';
 import { resolveMode, unknownModeMessage } from '../mode-registry.ts';
 import type { RunContext } from './context.ts';
 import { PLAN_MODES } from '../travel-planner.ts';
+import { PREFLIGHT_MODES } from '../preflight.ts';
 import { apply } from '../affine.ts';
 import { inspectChalkValue } from '../chalk.ts';
 import type { ChalkStyle } from '../types.ts';
@@ -570,6 +571,44 @@ export function initExecCmdHandler(
           ...profile.material,
         };
       }
+      return;
+    }
+    // ---------- preflight — select the post-run diagnostic policy ----------
+    if (st.name === 'preflight') {
+      if (ctx.insideTrace > 0)
+        throw new NeedlescriptError(
+          'preflight is a program directive — add it to the top of the editor and re-run',
+          st.line,
+        );
+      if (ctx.structuralDepth > 0 || depth > 0)
+        throw new NeedlescriptError(
+          'preflight must be at the top level — not inside a loop, if branch, or procedure; put it near the top of the program',
+          st.line,
+        );
+      if (ctx.m.started)
+        throw new NeedlescriptError(
+          'preflight must run before the first stitch; move it to the top of the program',
+          st.line,
+        );
+      if (ctx.preflightLine !== undefined)
+        throw new NeedlescriptError(
+          `preflight already set on line ${ctx.preflightLine} — only one preflight directive is allowed per program`,
+          st.line,
+        );
+      const modeValue = vals[0];
+      if (typeof modeValue !== 'string')
+        throw new NeedlescriptError(
+          `preflight expects a string mode, got ${describeVal(modeValue)} — e.g. preflight 'warn'`,
+          st.line,
+        );
+      const mode = resolveMode(modeValue, PREFLIGHT_MODES);
+      if (mode === undefined)
+        throw new NeedlescriptError(
+          unknownModeMessage('preflight', modeValue, PREFLIGHT_MODES),
+          st.line,
+        );
+      ctx.preflightMode = mode;
+      ctx.preflightLine = st.line;
       return;
     }
     // ---------- plan — configure the post-run travel strategy ----------

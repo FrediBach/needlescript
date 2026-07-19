@@ -27,6 +27,7 @@ export type {
   StitchEvent,
   RunResult,
   WarningLocation,
+  PreflightMode,
   PreflightSeverity,
   PreflightIssue,
   PreflightResult,
@@ -56,7 +57,7 @@ export type {
   DirectionalCompensationSample,
   DirectionalCompensationPreview,
 } from './types.ts';
-export { buildPreflightResult, resolveMachineProfile } from './preflight.ts';
+export { buildPreflightResult, PREFLIGHT_MODES, resolveMachineProfile } from './preflight.ts';
 export type { PreflightInput } from './preflight.ts';
 export {
   analyzeEventStreamPreflight,

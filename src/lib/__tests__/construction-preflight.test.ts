@@ -70,7 +70,8 @@ describe('construction-aware preflight', () => {
       codes([fillRecord({ events: [{ event: inside, layer: 'underlay' }] })], [inside]),
     ).not.toContain('construction.underlay-outside-topping');
 
-    const narrowed = run(`def narrow(t,s,i,u) [
+    const narrowed = run(`preflight 'warn'
+      def narrow(t,s,i,u) [
         if s < 0.5 [ return [0.4, 0.2, 0.2, 0, 0] ]
         return [0.4, 2, 2, 0, 0]
       ]
@@ -81,7 +82,7 @@ describe('construction-aware preflight', () => {
   });
 
   it('reports small and dense explicit fill-to-satin-border overlap', () => {
-    const common = `lock 0 autotrim 0 maxdensity 0 fillunderlay 'off'
+    const common = `preflight 'warn' lock 0 autotrim 0 maxdensity 0 fillunderlay 'off'
       fillspacing 2 filllen 2`;
     const construction = `beginfill repeat 4 [ fd 20 rt 90 ] endfill
       satin 4 repeat 4 [ fd 20 rt 90 ] satin 0`;
@@ -107,7 +108,7 @@ describe('construction-aware preflight', () => {
   });
 
   it('identifies explicit edge-run and satin-border stacking', () => {
-    const result = run(`lock 0 autotrim 0 maxdensity 0 fillunderlay 'off'
+    const result = run(`preflight 'warn' lock 0 autotrim 0 maxdensity 0 fillunderlay 'off'
       fillspacing 2 filllen 2 filledgerun 0.2
       beginfill repeat 4 [ fd 20 rt 90 ] endfill
       satin 2 repeat 4 [ fd 20 rt 90 ] satin 0`);
@@ -210,12 +211,14 @@ describe('construction-aware preflight', () => {
 
     for (const source of sources)
       expect(
-        run(source).preflight?.issues.some(({ code }) => code === 'construction.layer-order'),
+        run(`preflight 'warn'\n${source}`).preflight?.issues.some(
+          ({ code }) => code === 'construction.layer-order',
+        ),
       ).toBe(false);
   });
 
   it('does not infer construction relationships from ordinary running stitches', () => {
-    const result = run('lock 0 repeat 8 [ fd 1 rt 45 ]');
+    const result = run("preflight 'warn' lock 0 repeat 8 [ fd 1 rt 45 ]");
 
     expect(
       result.preflight?.issues.some(({ code }) =>
