@@ -1,6 +1,13 @@
 // ---------- Fill recording and generation ----------
 
-import { type FillPoint, evenOddInside, generateFill, generateFillRows } from './fill.ts';
+import {
+  type FillPoint,
+  type GeneratedFillConnector,
+  evenOddInside,
+  generateFill,
+  generateFillRows,
+  segmentInsideCompoundRegion,
+} from './fill.ts';
 import { NeedlescriptError } from '../errors.ts';
 import { IDENTITY, apply, invert, linApply } from '../affine.ts';
 import { vfromheading, vheading } from '../genmath.ts';
@@ -14,10 +21,16 @@ import type {
   FillUnderlayProfile,
   LegacyFillGenerator,
 } from '../underlay-profile.ts';
-import { fillStaggerOffset } from '../fill-profile.ts';
+import {
+  FILL_CONNECT_EDGE_MARGIN_MM,
+  FILL_CONNECT_TRIM_DEFAULT_MM,
+  fillStaggerOffset,
+} from '../fill-profile.ts';
+import type { FillConnectorAction } from '../fill-profile.ts';
 
 export class FillMachine extends SatinMachine {
   private _fillStaggerShortWarned = false;
+  private _activeFillConnectorId = 0;
 
   beginFill() {
     if (this.recording)
@@ -73,9 +86,72 @@ export class FillMachine extends SatinMachine {
       else if (d0 > 0.05) this._emitPen(first.x, first.y, u);
     }
     for (let i = 1; i < pts.length; i++) {
+      if (pts[i].trim && this.lastEmit) this._push('trim', this.lastEmit.x, this.lastEmit.y, false);
       if (pts[i].jump) this._push('jump', pts[i].x, pts[i].y, u);
       else this._emitPen(pts[i].x, pts[i].y, u);
     }
+  }
+
+  _fillConnectorTrimThreshold() {
+    return this.autoTrim > 0 ? this.autoTrim : FILL_CONNECT_TRIM_DEFAULT_MM;
+  }
+
+  _fillConnectorStitchLength() {
+    const candidate =
+      this.fillLen ??
+      this.fillLenList?.[this.fillLenListPhase % this.fillLenList.length] ??
+      this.stitchLenList?.[this.stitchLenListPhase % this.stitchLenList.length] ??
+      this.stitchLen;
+    return Math.min(Math.max(candidate, 1), 7);
+  }
+
+  _recordFillConnector(connector: GeneratedFillConnector) {
+    this.fillConnectorRecords.push({
+      fillId: this._activeFillConnectorId,
+      ...connector,
+      line: this.currentLine,
+    });
+  }
+
+  /** Emit one non-legacy topping connector in final physical hoop space. */
+  _emitPolicyFillConnector(
+    to: [number, number],
+    rings: [number, number][][],
+  ): FillConnectorAction | undefined {
+    if (!this.lastEmit) return;
+    const from: [number, number] = [this.lastEmit.x, this.lastEmit.y];
+    const distanceMM = Math.hypot(to[0] - from[0], to[1] - from[1]);
+    if (distanceMM < 0.05) return;
+    const contained =
+      this.fillConnect === 'inside' ? segmentInsideCompoundRegion(rings, from, to) : undefined;
+    const action =
+      this.fillConnect === 'inside' && contained
+        ? 'sew'
+        : this.fillConnect === 'trim' && distanceMM >= this._fillConnectorTrimThreshold()
+          ? 'trim-jump'
+          : 'jump';
+    this._recordFillConnector({
+      policy: this.fillConnect,
+      action,
+      from,
+      to,
+      distanceMM,
+      ...(contained === undefined ? {} : { contained }),
+      edgeMarginMM: FILL_CONNECT_EDGE_MARGIN_MM,
+    });
+    if (action === 'sew') {
+      const steps = Math.max(1, Math.ceil(distanceMM / this._fillConnectorStitchLength()));
+      for (let step = 1; step <= steps; step++)
+        this._emitPen(
+          from[0] + ((to[0] - from[0]) * step) / steps,
+          from[1] + ((to[1] - from[1]) * step) / steps,
+          false,
+        );
+      return action;
+    }
+    if (action === 'trim-jump') this._push('trim', from[0], from[1], false);
+    this._push('jump', to[0], to[1], false);
+    return action;
   }
 
   /** Conservative containment check for a prospective sewn fill connector. */
@@ -716,6 +792,7 @@ export class FillMachine extends SatinMachine {
     };
 
     let cumPhase = 0;
+    let emittedToppingRow = false;
     for (let r = 0; r < rows.length; r++) {
       let poly = rows[r];
       // Boustrophedon: alternate row direction in placement order (§8/§14).
@@ -762,7 +839,16 @@ export class FillMachine extends SatinMachine {
         const [fx, fy] = toFinal(p[0], p[1]);
         return { x: fx, y: fy, jump: false };
       });
-      this._emitFillPts(fillPts, opts.underlay, this.fillInset > 0 ? hoopRings : undefined);
+      const connectorAction =
+        !opts.underlay && this.fillConnect !== 'legacy' && emittedToppingRow
+          ? this._emitPolicyFillConnector([fillPts[0].x, fillPts[0].y], hoopRings)
+          : undefined;
+      this._emitFillPts(
+        connectorAction === 'sew' ? fillPts.slice(1) : fillPts,
+        opts.underlay,
+        this.fillInset > 0 ? hoopRings : undefined,
+      );
+      if (!opts.underlay) emittedToppingRow = true;
     }
   }
 
@@ -979,6 +1065,7 @@ export class FillMachine extends SatinMachine {
       }
       return;
     }
+    this._activeFillConnectorId = this.fillConnectorNextId++;
     if (this.fillArmed && this.fillInset > 0) {
       const inv = invert(this.fillCTM);
       if (!inv)
@@ -1101,6 +1188,9 @@ export class FillMachine extends SatinMachine {
           stagger: this.fillStagger,
           staggerAmount: this.fillStaggerAmount,
           onShortEdge: (x, y) => this._noteFillStaggerShort(x, y),
+          connectorPolicy: this.fillConnect,
+          connectorTrimThresholdMM: this._fillConnectorTrimThreshold(),
+          onConnector: (connector) => this._recordFillConnector(connector),
         });
         this._emitFillPts(points, false, this.fillInset > 0 ? rings : undefined);
         const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
@@ -1178,6 +1268,7 @@ export class FillMachine extends SatinMachine {
           }
         return true;
       };
+      let emittedCustomPath = false;
       for (let row = 0; row < clipped.length; row++) {
         const local = clipped[row].closed
           ? clipped[row].path
@@ -1202,12 +1293,29 @@ export class FillMachine extends SatinMachine {
             ? (p) => this._noteFillStaggerShort(p[0], p[1])
             : undefined,
         );
-        const sewConnector = previousLocal ? connectorInside(previousLocal, local[0]) : true;
-        for (let i = 0; i < subdivided.length; i++)
-          all.push({ x: subdivided[i][0], y: subdivided[i][1], jump: i === 0 && !sewConnector });
+        if (this.fillConnect !== 'legacy') {
+          const connectorAction = emittedCustomPath
+            ? this._emitPolicyFillConnector(subdivided[0], rings)
+            : undefined;
+          this._emitFillPts(
+            (connectorAction === 'sew' ? subdivided.slice(1) : subdivided).map(([x, y]) => ({
+              x,
+              y,
+              jump: false,
+            })),
+            false,
+            this.fillInset > 0 ? rings : undefined,
+          );
+          emittedCustomPath = true;
+        } else {
+          const sewConnector = previousLocal ? connectorInside(previousLocal, local[0]) : true;
+          for (let i = 0; i < subdivided.length; i++)
+            all.push({ x: subdivided[i][0], y: subdivided[i][1], jump: i === 0 && !sewConnector });
+        }
         previousLocal = local[local.length - 1];
       }
-      this._emitFillPts(all, false, this.fillInset > 0 ? rings : undefined);
+      if (this.fillConnect === 'legacy')
+        this._emitFillPts(all, false, this.fillInset > 0 ? rings : undefined);
       const back = Math.hypot((this.lastEmit?.x ?? 0) - hx, (this.lastEmit?.y ?? 0) - hy);
       if (back > 0.6) this._push('jump', hx, hy);
       return;
@@ -1415,6 +1523,9 @@ export class FillMachine extends SatinMachine {
       stagger: this.fillStagger,
       staggerAmount: this.fillStaggerAmount,
       onShortEdge: (x, y) => this._noteFillStaggerShort(x, y),
+      connectorPolicy: this.fillConnect,
+      connectorTrimThresholdMM: this._fillConnectorTrimThreshold(),
+      onConnector: (connector) => this._recordFillConnector(connector),
     });
     if (!pts.length) {
       this.warnings.push('fill skipped — the area is too small to fill at this spacing');

@@ -824,6 +824,8 @@ source-attributed warning.
 
 ### Session 4.3 — Connector policies
 
+Status: complete (2026-07-19)
+
 Purpose: make between-row travel explicit and safe.
 
 Policies:
@@ -846,6 +848,17 @@ Acceptance criteria:
 - `inside` never sews across a hole or outside a concave boundary.
 - `jump` does not alter row penetrations.
 - Planner and auto-trim still see accurate run boundaries.
+
+Implementation note: `fillconnect` is a sticky, `stitchscope`-aware topping policy backed by the
+central `legacy`/`inside`/`jump`/`trim` registry. `legacy` retains byte-identical fixed,
+programmable, and custom-path routing. `inside` classifies the complete straight connector in final
+hoop space against compound even-odd geometry, rejecting holes, concave exits, boundary touches,
+and segments without 0.1 mm edge clearance outside their endpoint ramps. `jump` always emits a
+non-sewing connector; `trim` also emits a cut when the physical distance reaches active `autotrim`,
+or the existing 7 mm default while general auto-trimming is disabled. Custom paths keep their
+returned/clipped order. An internal per-fill sidecar records policy, action, containment, endpoints,
+distance, margin, and line for future preflight without changing the public event schema. Underlay
+keeps legacy routing, and only actually sewn connectors feed density/history.
 
 ### Session 4.4 — Edge run and edge-shortening policies
 

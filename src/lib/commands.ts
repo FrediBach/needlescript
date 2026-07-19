@@ -69,6 +69,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
   fillinset: 1,
   fillstagger: 1,
   fillstaggeramount: 1,
+  fillconnect: 1,
   filllen: 1,
   lock: 1,
   pullcomp: 1,

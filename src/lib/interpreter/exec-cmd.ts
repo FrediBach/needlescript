@@ -398,6 +398,24 @@ export function initExecCmdHandler(
       ctx.m.fillStagger = mode;
       return;
     }
+    if (st.name === 'fillconnect') {
+      ctx.traceNote(
+        'fillconnect',
+        'note: fillconnect inside trace has no effect on the captured path',
+      );
+      const modeVal = vals[0];
+      if (typeof modeVal !== 'string')
+        throw new NeedlescriptError(
+          `fillconnect expects a string mode, got ${describeVal(modeVal)} — e.g. fillconnect 'inside'`,
+          st.line,
+        );
+      const allowed = FILL_CONSTRUCTION_MODE_REGISTRIES.fillconnect;
+      const mode = resolveMode(modeVal, allowed);
+      if (mode === undefined)
+        throw new NeedlescriptError(unknownModeMessage('fillconnect', modeVal, allowed), st.line);
+      ctx.m.fillConnect = mode;
+      return;
+    }
     // String-argument mode commands — handled before the bulk num() conversion.
     if (st.name === 'fabric' || st.name === 'underlay' || st.name === 'fillunderlay') {
       ctx.traceNote(st.name, `note: ${st.name} inside trace has no effect on the captured path`);

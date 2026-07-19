@@ -3,7 +3,11 @@
 import { FABRIC_MODES, FILL_UNDERLAY_MODES, SATIN_UNDERLAY_MODES } from '../embroidery-registry.ts';
 import { PLAN_MODES } from '../travel-planner.ts';
 import { FILL_UNDERLAY_PASS_KINDS, SATIN_UNDERLAY_PASS_KINDS } from '../underlay-profile.ts';
-import { FILL_CONSTRUCTION_RANGES, FILL_STAGGER_MODES } from '../fill-profile.ts';
+import {
+  FILL_CONNECT_MODES,
+  FILL_CONSTRUCTION_RANGES,
+  FILL_STAGGER_MODES,
+} from '../fill-profile.ts';
 
 export type NSItemKind = 'keyword' | 'function' | 'variable' | 'constant';
 
@@ -785,6 +789,16 @@ export const NS_ITEMS: NSItem[] = [
     insertText: 'fillstaggeramount ${1:' + FILL_CONSTRUCTION_RANGES.staggerAmount.default + '}',
     isSnippet: true,
     params: [['fraction']],
+  },
+  {
+    label: 'fillconnect',
+    kindName: 'function',
+    detail: 'choose between-row fill travel',
+    documentation:
+      "Choose how topping rows and custom fill-path fragments connect. `'legacy'` preserves existing short sewn connectors. `'inside'` sews only when the complete physical hoop-space segment stays inside the compound fill region with edge clearance. `'jump'` always uses jump travel. `'trim'` jumps and cuts first when the connector reaches the active `autotrim` threshold (or 7 mm while automatic trimming is off). Fill underlay is unchanged.",
+    insertText: modeCommandSnippet('fillconnect', FILL_CONNECT_MODES, "'"),
+    isSnippet: true,
+    params: [['mode']],
   },
   {
     label: 'filllen',

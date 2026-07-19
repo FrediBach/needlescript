@@ -1,8 +1,21 @@
 // ---------- Tatami fill ----------
 
-import { FILL_CONSTRUCTION_RANGES, fillStaggerOffset } from '../fill-profile.ts';
-import type { FillStaggerMode } from '../fill-profile.ts';
+import {
+  FILL_CONNECT_EDGE_MARGIN_MM,
+  FILL_CONNECT_TRIM_DEFAULT_MM,
+  FILL_CONSTRUCTION_RANGES,
+  fillStaggerOffset,
+} from '../fill-profile.ts';
+import type {
+  FillConnectMode,
+  FillConnectorAction,
+  FillConnectorRecord,
+  FillStaggerMode,
+} from '../fill-profile.ts';
+import { segdist, segisect } from '../genmath.ts';
 import { LIMITS } from './limits.ts';
+
+export type GeneratedFillConnector = Omit<FillConnectorRecord, 'fillId' | 'line'>;
 
 export interface FillOpts {
   angle: number;
@@ -18,12 +31,20 @@ export interface FillOpts {
   staggerAmount?: number;
   /** Called when a policy-created sub-minimum edge fragment is merged away. */
   onShortEdge?: (x: number, y: number) => void;
+  /** Opt-in topping connector policy. Omitted/legacy preserves historical routing. */
+  connectorPolicy?: FillConnectMode;
+  /** Physical threshold for `trim`; defaults to the standard 7 mm auto-trim distance. */
+  connectorTrimThresholdMM?: number;
+  /** Internal construction sidecar callback; does not affect generated points. */
+  onConnector?: (connector: GeneratedFillConnector) => void;
 }
 
 export interface FillPoint {
   x: number;
   y: number;
   jump: boolean;
+  /** Cut at the preceding point before taking this jump. */
+  trim?: boolean;
 }
 
 /** Routed, unsplit tatami row spines. Pull compensation and brick subdivision are omitted. */
@@ -119,6 +140,82 @@ export function evenOddInside(rings: [number, number][][], px: number, py: numbe
   return inside;
 }
 
+const pointOnCompoundBoundary = (
+  rings: [number, number][][],
+  point: [number, number],
+  tolerance: number,
+) =>
+  rings.some((ring) =>
+    ring.some((a, index) => segdist(point, a, ring[(index + 1) % ring.length]) <= tolerance),
+  );
+
+const segmentDistance = (
+  a: [number, number],
+  b: [number, number],
+  c: [number, number],
+  d: [number, number],
+) => {
+  if (segisect(a, b, c, d)) return 0;
+  return Math.min(segdist(a, c, d), segdist(b, c, d), segdist(c, a, b), segdist(d, a, b));
+};
+
+/**
+ * Return whether a complete connector stays inside a compound even-odd region.
+ * Boundary endpoints are allowed because scan rows terminate there; the open
+ * connector must immediately enter the region, never cross/touch another edge,
+ * and retain the requested clearance away from those endpoint ramps.
+ */
+export function segmentInsideCompoundRegion(
+  rings: [number, number][][],
+  from: [number, number],
+  to: [number, number],
+  edgeMarginMM = FILL_CONNECT_EDGE_MARGIN_MM,
+): boolean {
+  const dx = to[0] - from[0],
+    dy = to[1] - from[1];
+  const distance = Math.hypot(dx, dy);
+  if (distance < 1e-6) return true;
+
+  const boundaryTolerance = 1e-6;
+  const endpointAllowed = (point: [number, number]) =>
+    evenOddInside(rings, point[0], point[1]) ||
+    pointOnCompoundBoundary(rings, point, boundaryTolerance);
+  if (!endpointAllowed(from) || !endpointAllowed(to)) return false;
+
+  const at = (t: number): [number, number] => [from[0] + dx * t, from[1] + dy * t];
+  const rampMM = Math.min(Math.max(edgeMarginMM * 2, 0.002), distance * 0.25);
+  const rampT = rampMM / distance;
+  for (const t of [rampT, 0.5, 1 - rampT]) {
+    const p = at(t);
+    if (!evenOddInside(rings, p[0], p[1])) return false;
+  }
+
+  // Any boundary hit away from the two authored row endpoints means the
+  // connector crosses a hole, exits a concavity, or rides/touches an edge.
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i],
+        b = ring[(i + 1) % ring.length];
+      const hit = segisect(from, to, a, b);
+      if (!hit) continue;
+      const t = ((hit[0] - from[0]) * dx + (hit[1] - from[1]) * dy) / (distance * distance);
+      if (t > boundaryTolerance / distance && t < 1 - boundaryTolerance / distance) return false;
+    }
+  }
+
+  if (!(edgeMarginMM > 0)) return true;
+  const innerFrom = at(rampT),
+    innerTo = at(1 - rampT);
+  for (const ring of rings)
+    for (let i = 0; i < ring.length; i++)
+      if (
+        segmentDistance(innerFrom, innerTo, ring[i], ring[(i + 1) % ring.length]) <
+        edgeMarginMM - 1e-6
+      )
+        return false;
+  return true;
+}
+
 export function generateFill(rings: [number, number][][], opt: FillOpts): FillPoint[] {
   const angle = (opt.angle || 0) * (Math.PI / 180);
   const ca = Math.cos(angle),
@@ -185,11 +282,11 @@ export function generateFill(rings: [number, number][][], opt: FillOpts): FillPo
     if (dFirst < dLast) order = rows.slice().reverse();
   }
 
-  const out: { p: [number, number]; jump: boolean }[] = [];
+  const out: { p: [number, number]; jump: boolean; trim?: boolean }[] = [];
   let cur: [number, number] | null = null;
 
-  function push(x: number, y: number, jump: boolean) {
-    out.push({ p: [x, y], jump });
+  function push(x: number, y: number, jump: boolean, trim = false) {
+    out.push({ p: [x, y], jump, ...(trim ? { trim: true } : {}) });
     cur = [x, y];
   }
 
@@ -210,24 +307,53 @@ export function generateFill(rings: [number, number][][], opt: FillOpts): FillPo
     if (!cur) return;
     const d = Math.hypot(to[0] - cur[0], to[1] - cur[1]);
     if (d < 0.05) return;
-    if (!opt.safeConnect && d <= spacing * 3 + 0.6) {
-      sewLine(to);
-      return;
-    }
-    let allIn = d <= 12;
-    if (allIn) {
-      const n = Math.max(2, Math.ceil(d / 1.5));
-      for (let k = 1; k < n; k++) {
-        const mx = cur[0] + ((to[0] - cur[0]) * k) / n;
-        const my = cur[1] + ((to[1] - cur[1]) * k) / n;
-        if (!evenOddInside(R, mx, my)) {
-          allIn = false;
-          break;
+    const from: [number, number] = [cur[0], cur[1]];
+    const policy = opt.connectorPolicy ?? 'legacy';
+    let action: FillConnectorAction;
+    let contained: boolean | undefined;
+
+    if (policy === 'legacy') {
+      if (!opt.safeConnect && d <= spacing * 3 + 0.6) {
+        action = 'sew';
+      } else {
+        contained = d <= 12;
+        if (contained) {
+          const n = Math.max(2, Math.ceil(d / 1.5));
+          for (let k = 1; k < n; k++) {
+            const mx = cur[0] + ((to[0] - cur[0]) * k) / n;
+            const my = cur[1] + ((to[1] - cur[1]) * k) / n;
+            if (!evenOddInside(R, mx, my)) {
+              contained = false;
+              break;
+            }
+          }
         }
+        action = contained ? 'sew' : 'jump';
       }
+    } else {
+      if (policy === 'inside') {
+        contained = segmentInsideCompoundRegion(R, from, to);
+        action = contained ? 'sew' : 'jump';
+      } else if (policy === 'jump') action = 'jump';
+      else
+        action =
+          d >= (opt.connectorTrimThresholdMM ?? FILL_CONNECT_TRIM_DEFAULT_MM)
+            ? 'trim-jump'
+            : 'jump';
     }
-    if (allIn) sewLine(to);
-    else push(to[0], to[1], true);
+
+    const recordPoint = (point: [number, number]) => unrot(point);
+    opt.onConnector?.({
+      policy,
+      action,
+      from: recordPoint(from),
+      to: recordPoint(to),
+      distanceMM: d,
+      ...(contained === undefined ? {} : { contained }),
+      edgeMarginMM: FILL_CONNECT_EDGE_MARGIN_MM,
+    });
+    if (action === 'sew') sewLine(to);
+    else push(to[0], to[1], true, action === 'trim-jump');
   }
 
   function sewSegment(seg: Seg, reverse: boolean) {
@@ -286,6 +412,6 @@ export function generateFill(rings: [number, number][][], opt: FillOpts): FillPo
 
   return out.map((o) => {
     const p = unrot(o.p);
-    return { x: p[0], y: p[1], jump: o.jump };
+    return { x: p[0], y: p[1], jump: o.jump, ...(o.trim ? { trim: true } : {}) };
   });
 }

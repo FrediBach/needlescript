@@ -391,10 +391,10 @@ stitchscope [
 ```
 
 The scope snapshots and restores running-stitch numeric/list/reporter forms and list progress; bean
-and E-stitch modes; satin width/reporter, density, and alternating side; fill angle, spacing, length
-forms, and pending programmable/custom fill arm; plus lock, pull compensation, satin/fill underlay,
-double underlay, short-stitch, auto-trim, and max-density settings. `fabric` changes those same
-construction fields and is therefore scoped.
+and E-stitch modes; satin width/reporter, density, and alternating side; fill angle, spacing,
+connector/stagger policies, length forms, and pending programmable/custom fill arm; plus lock, pull
+compensation, satin/fill underlay, double underlay, short-stitch, auto-trim, and max-density settings.
+`fabric` changes those same construction fields and is therefore scoped.
 
 It does **not** restore turtle position/heading/pen or the `push`/`pop` stack; variables; events,
 warnings, history, or budgets; color/palette; seed/RNG/noise; transforms/effects/declump; hoop,
@@ -453,6 +453,7 @@ endfill
 | `fillinset mm`                            | inset the complete compound fill region by 0–10 physical mm (default **0**) to reserve border overlap. Outer boundaries shrink, holes expand, and split components are joined only by jumps. Topping and fill underlay use the inset region; collapsed/split results warn with a source line and preview location |
 | `fillstagger 'mode'`                      | topping penetration phase: `'legacy'` (existing output), `'brick'` (alternating), `'progressive'` (four-row cycle), or `'random'` (stable geometry hash; zero RNG draws). See §16.3                                                                                                                               |
 | `fillstaggeramount fraction`              | wrapped 0–1 phase amount for non-legacy staggering (default **0.65**). With fixed fill length this is a fraction of that length; list/reporter forms use each row's first effective length                                                                                                                        |
+| `fillconnect 'mode'`                      | topping travel between rows/fragments: `'legacy'` (existing routing), `'inside'` (complete connector stays inside with edge clearance), `'jump'` (always jump), or `'trim'` (jump and cut at the active auto-trim threshold; 7 mm if auto-trim is off)                                                            |
 | `filllen mm`                              | fill stitch length, 1–7 mm; default follows `stitchlen`; `filllen 0` = follow again. Rows are brick-offset. Same three forms as `stitchlen`: numeric · `[list]` rhythm per row · `@fn` reporter (t/s/i reset per row). `filllen 0` propagates whichever form `stitchlen` uses                                     |
 | `fill dir @field` / `fill shape @texture` | arms a **programmable fill** for the next `beginfill…endfill` — §16.2                                                                                                                                                                                                                                             |
 
@@ -964,6 +965,7 @@ Applies pull comp, underlay policy, satin density floor, and coverage limit in o
 | `fillinset mm`           | sticky 0–10 mm inset for the complete fill construction region. Applied after authored transforms in hoop space. Underlay follows the inset region. `fillinset 0` is the byte-identical compatibility path                                                                                                                          |
 | `fillstagger 'mode'`     | sticky topping-row phase policy: `'legacy'`, `'brick'`, `'progressive'`, or `'random'`. Underlay retains its resolved legacy phase behavior                                                                                                                                                                                         |
 | `fillstaggeramount n`    | sticky 0–1 wrapped phase fraction for non-legacy policies, default 0.65. Both values are included in `stitchscope`                                                                                                                                                                                                                  |
+| `fillconnect 'mode'`     | sticky topping connector policy: `'legacy'`, `'inside'`, `'jump'`, or `'trim'`. `inside` requires compound-region containment with 0.1 mm edge clearance; `jump` never adds connector coverage; `trim` jumps and cuts at active `autotrim`, falling back to 7 mm when automatic trimming is off. Included in `stitchscope`          |
 | `shortstitch 0/1`        | on by default: on tight satin curves, alternate inner-edge stitches pull in to 60% width. Column wider than the curve radius warns (can't sew cleanly at any setting)                                                                                                                                                               |
 | `maxdensity n`           | coverage warning threshold in layers (default 3.5; `maxdensity 0` silences). Coverage = thread layers on a 1 mm grid (1 layer ≈ one clean satin/fill pass); hotspots warn with coordinates and source lines; ≥ 5 penetrations within 0.15 mm flagged separately. Past ~2.5–3.5 layers fabric fails — raise the limit only knowingly |
 | `autotrim mm`            | travels ≥ this length (default 7, configurable 3–30, `autotrim 0` off) get an automatic `trim` before the jump; never inserted when nothing was sewn since the last cut                                                                                                                                                             |
@@ -1011,6 +1013,18 @@ jumps rather than sewn connectors across the resulting fabric gaps. Empty, parti
 and split results warn with the `endfill` source line and a hoop-space preview location. The command
 is deterministic and consumes zero RNG draws. At the default `fillinset 0`, the geometry operation
 is skipped entirely, preserving existing events and warnings byte-for-byte.
+
+`fillconnect` controls only topping travel between generated rows or clipped custom-path fragments;
+fill underlay keeps its resolved legacy routing. The default `'legacy'` path is byte-identical.
+`'inside'` classifies the straight connector after authored transforms in physical hoop space: its
+open interior must remain within the complete even-odd construction region, may not cross or touch
+a hole or concave edge, and must keep 0.1 mm clearance except for short ramps from row endpoints on
+the boundary. `'jump'` preserves row penetrations but replaces every connector with jump travel.
+`'trim'` also jumps every connector and emits an explicit cut first when its physical length reaches
+active `autotrim`, or 7 mm when `autotrim 0` disables the general pass. Custom paths retain their
+returned and clipped order; the policy neither sorts nor reverses them. Sewn connectors alone enter
+coverage/history, while jump and trim travel remains non-sewing. These ordinary jump/trim events
+remain accurate boundaries for travel planning, automatic trimming, locks, preview, and exporters.
 
 ### Stitch-history queries (pure reporters, call-syntax, shadowable)
 

@@ -117,6 +117,7 @@ export function registerNeedlescriptTokenizer(monaco: Monaco): void {
       'fillinset',
       'fillstagger',
       'fillstaggeramount',
+      'fillconnect',
       'filllen',
       'lock',
       'pullcomp',
