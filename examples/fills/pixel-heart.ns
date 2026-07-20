@@ -1,0 +1,51 @@
+// ============================================================
+//  PIXEL HEART — BITMAP MASK AS ONE COMPOUND TATAMI FILL
+//  Each active pixel contributes a square ring to one beginfill…endfill
+//  region. Keeping the pixels in a single fill avoids sewing shared edges
+//  twice, while the custom row texture and fixed lattice preserve the
+//  aligned pixel-grid pattern.
+// ============================================================
+
+plan 'reversing-nearest'
+hoop 'round100'
+seed 3
+palette ['#e94560']
+
+let cell = 6 // [2:0.5:8] — pixel size in mm
+
+let px = [ // 1 = stitched pixel
+  [0,1,1,0,0,1,1,0],
+  [1,1,1,1,1,1,1,1],
+  [1,1,0,1,1,0,1,1],
+  [1,1,1,1,1,1,1,1],
+  [0,1,1,1,1,1,1,0],
+  [0,0,1,1,1,1,0,0],
+  [0,0,0,1,1,0,0,0],
+  [0,0,0,0,0,0,0,0],
+]
+
+def gridrow(p, row, v) [
+  return tatamirow(0.4, 0.4)
+]
+
+fillangle 90
+color '#e94560'
+
+snaptogrid 0.2 0.2 [
+  let n = len(px)
+  let x0 = 0 - n * cell / 2
+  let y0 = n * cell / 2
+
+  fill shape @gridrow
+  beginfill
+    for r = 0 to n - 1 [
+      for c = 0 to len(px[r]) - 1 [
+        if px[r][c] = 1 [
+          moveto(x0 + c * cell, y0 - r * cell)
+          seth 90
+          repeat 4 [ fd cell rt 90 ]
+        ]
+      ]
+    ]
+  endfill
+]

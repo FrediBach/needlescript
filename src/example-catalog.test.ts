@@ -17,7 +17,7 @@ describe('example catalogue', () => {
     const catalogIds = EXAMPLE_CATALOG.map(({ id }) => id);
     const bundledIds = ALL_EXAMPLES.map(({ id }) => id);
 
-    expect(EXAMPLE_CATALOG).toHaveLength(108);
+    expect(EXAMPLE_CATALOG).toHaveLength(109);
     expect(new Set(catalogIds).size).toBe(catalogIds.length);
     expect(bundledIds.toSorted()).toEqual(catalogIds.toSorted());
     expect(Object.keys(EXAMPLES).toSorted()).toEqual(catalogIds.toSorted());

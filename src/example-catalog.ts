@@ -424,6 +424,13 @@ const catalogByCategory = {
       tags: ['tatami', 'satin-border', 'knit', 'underlay'],
     },
     {
+      id: 'pixel-heart',
+      title: 'Pixel heart fill',
+      summary: 'Turn a bitmap mask into one compound region with a grid-aligned tatami texture.',
+      kind: 'recipe',
+      tags: ['bitmap', 'compound-region', 'tatami', 'snap-to-grid'],
+    },
+    {
       id: 'spiral-fill-paths',
       title: 'Spiral fill paths',
       summary: 'Generate a custom spiral path set for the fill-path interface.',
