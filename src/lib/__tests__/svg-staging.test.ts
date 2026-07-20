@@ -776,15 +776,17 @@ describe('parseSvgToModel', () => {
     expect(code).toContain('satin ');
   });
 
-  it('resolves inherited paint, nested group paths, and physical stroke width', () => {
+  it('resolves inherited paint, nested group paths, and fitted physical stroke width', () => {
     const { doc } = parseSvgToModel(nestedGroupsFixture, {
       palette: PALETTE,
       fitMM: 60,
     });
     expect(doc.operations.map((operation) => operation.role)).toEqual(['fill', 'stroke']);
     expect(doc.operations[0].groupPath).toEqual(['logo', 'details']);
-    expect(doc.operations[1].sourceStrokeWidth).toBeCloseTo(6, 4);
-    expect(doc.operations[1].strategy.kind).toBe('satinBorder');
+    const stroke = doc.operations[1];
+    expect(stroke.sourceStrokeWidth).toBeCloseTo(60 / 11, 4);
+    expect(stroke.strategy.kind).toBe('satinBorder');
+    expect(stroke.bbox.maxX - stroke.bbox.minX + stroke.sourceStrokeWidth!).toBeCloseTo(60, 4);
   });
 
   it('retains physical dash, cap, join, and offset metadata', () => {
@@ -840,6 +842,27 @@ describe('parseSvgToModel', () => {
     });
     expect(doc.operations[0].flags.outsideHoop).toBeUndefined();
     expect(doc.operations[0].bbox.maxY - doc.operations[0].bbox.minY).toBeLessThanOrEqual(69.01);
+  });
+
+  it('includes an auto-suggested satin outline width in the fit envelope', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40">
+      <rect x="0" y="0" width="100" height="40" fill="none" stroke="#2b2b2b"
+        stroke-width="8"/>
+    </svg>`;
+    const { doc } = parseSvgToModel(svg, {
+      palette: PALETTE,
+      fitMM: 90,
+      field: { shape: 'rectangle', widthMM: 94, heightMM: 94 },
+    });
+    const operation = doc.operations[0];
+    expect(operation.strategy.kind).toBe('satinBorder');
+    const satinWidth = operation.sourceStrokeWidth!;
+    expect(operation.bbox.maxX - operation.bbox.minX + satinWidth).toBeCloseTo(90, 4);
+
+    const stitches = run(emit(doc, { date: '2026-01-01' }).code).events.filter(
+      (event) => event.t === 'stitch',
+    );
+    expect(Math.max(...stitches.map((event) => Math.abs(event.x)))).toBeLessThan(47);
   });
 
   it('reports unsupported paints instead of silently substituting gray', () => {

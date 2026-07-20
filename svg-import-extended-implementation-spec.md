@@ -177,7 +177,9 @@ that need physical samples.
 The element transform contributes to parsed `strokeWidth`, but the later global fit-to-hoop scale is
 not applied before it seeds a satin width.
 
-Required result: store physical hoop-space millimetres after every source and import transform.
+Required result: store physical hoop-space millimetres after every source and import transform. The
+global fit must include the half-width envelope of strokes that will be emitted as satin, so fitting
+and centering describe the stitched column rather than only its SVG centerline.
 
 #### Hoop validation assumes the default round field
 

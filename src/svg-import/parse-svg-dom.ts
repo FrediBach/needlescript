@@ -677,6 +677,49 @@ function operationGeomType(
   return 'closedPath';
 }
 
+function fitEnvelopePoints(objects: RawObject[], satinObjectIds: ReadonlySet<string>): Point[] {
+  const points: Point[] = [];
+  for (const object of objects) {
+    const satinRadius = satinObjectIds.has(object.id)
+      ? ((object.paint.strokeWidth ?? 0) * object.sourceScale) / 2
+      : 0;
+    for (const path of object.paths) {
+      for (const point of path) {
+        points.push(point);
+        if (satinRadius <= 0) continue;
+        // Satin is centered on the SVG path. Sampling its circular half-width
+        // envelope also handles non-axis-aligned paths in oval/circular fields.
+        for (let direction = 0; direction < 16; direction++) {
+          const angle = (direction * Math.PI * 2) / 16;
+          points.push([
+            point[0] + Math.cos(angle) * satinRadius,
+            point[1] + Math.sin(angle) * satinRadius,
+          ]);
+        }
+      }
+    }
+  }
+  return points;
+}
+
+function autoSatinObjectIds(objects: RawObject[], physicalScale: number): Set<string> {
+  const ids = new Set<string>();
+  for (const object of objects) {
+    if (!object.paint.visible || object.paint.stroke === null || object.paint.strokeWidth === null)
+      continue;
+    const pathIndices = object.paths.map((_, index) => index);
+    const strategy = autoSuggest(
+      operationGeomType(object.tag as SourceGeometryKind, object.closed, pathIndices),
+      object.paths,
+      null,
+      object.paint.stroke,
+      object.paint.strokeWidth * object.sourceScale * physicalScale,
+    );
+    if (strategy.kind === 'satinBorder') ids.add(object.id);
+  }
+  return ids;
+}
+
 function scaleForField(paths: Point[][], field: ImportField): number {
   let scale = 1;
   const halfWidth = field.widthMM / 2;
@@ -801,29 +844,42 @@ export function parseSvgToModel(svgText: string, options: ParseOptions): ParseRe
     };
   }
 
-  const allPoints = drawable.flatMap((object) => object.paths.flat());
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
-  for (const [x, y] of allPoints) {
-    minX = Math.min(minX, x);
-    maxX = Math.max(maxX, x);
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y);
-  }
-  const center: Point = [(minX + maxX) / 2, (minY + maxY) / 2];
-  const sourceSpan = Math.max(maxX - minX, maxY - minY);
-  const initialScale = sourceSpan > 1e-9 ? fitMM / sourceSpan : 1;
-  const initiallyScaled = drawable.flatMap((object) =>
+  const geometryBounds = bboxOf(drawable.flatMap((object) => object.paths));
+  const geometryCenter: Point = [
+    (geometryBounds.minX + geometryBounds.maxX) / 2,
+    (geometryBounds.minY + geometryBounds.maxY) / 2,
+  ];
+  const geometrySpan = Math.max(
+    geometryBounds.maxX - geometryBounds.minX,
+    geometryBounds.maxY - geometryBounds.minY,
+  );
+  const geometryScale = geometrySpan > 1e-9 ? fitMM / geometrySpan : 1;
+  const provisionallyScaled = drawable.flatMap((object) =>
     object.paths.map((path) =>
       path.map(
         (point) =>
-          [(point[0] - center[0]) * initialScale, -(point[1] - center[1]) * initialScale] as Point,
+          [
+            (point[0] - geometryCenter[0]) * geometryScale,
+            -(point[1] - geometryCenter[1]) * geometryScale,
+          ] as Point,
       ),
     ),
   );
-  const fieldScale = scaleForField(initiallyScaled, activeField);
+  const provisionalScale = geometryScale * scaleForField(provisionallyScaled, activeField);
+  const satinObjectIds = autoSatinObjectIds(drawable, provisionalScale);
+  const fitPoints = fitEnvelopePoints(drawable, satinObjectIds);
+  const fitBounds = bboxOf([fitPoints]);
+  const center: Point = [
+    (fitBounds.minX + fitBounds.maxX) / 2,
+    (fitBounds.minY + fitBounds.maxY) / 2,
+  ];
+  const sourceSpan = Math.max(fitBounds.maxX - fitBounds.minX, fitBounds.maxY - fitBounds.minY);
+  const initialScale = sourceSpan > 1e-9 ? fitMM / sourceSpan : 1;
+  const initiallyScaled = fitPoints.map(
+    (point) =>
+      [(point[0] - center[0]) * initialScale, -(point[1] - center[1]) * initialScale] as Point,
+  );
+  const fieldScale = scaleForField([initiallyScaled], activeField);
   const finalScale = initialScale * fieldScale;
 
   const sourceObjects: SourceObject[] = [];
