@@ -23,13 +23,15 @@ import type {
   PreflightIssue,
   PreflightResult,
   ResolvedMachineProfile,
+  MaterialIntent,
 } from './lib/engine.ts';
+import { DEFAULT_MATERIAL_INTENT } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
 import { toDST } from './lib/formats/dst.ts';
 import { toPES } from './lib/formats/pes.ts';
 import { toEXP } from './lib/formats/exp.ts';
 import { toSVG } from './lib/formats/svg.ts';
-import { EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, HOOPS, MACHINES } from './data.ts';
+import { EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, HOOPS, MACHINES, THREADS } from './data.ts';
 import type { HoopConfig, MachineHoop, MachinePreset } from './data.ts';
 import { getFallbackHoopFitWarning } from './hoop-fit-warning.ts';
 import type { ExportFormat } from './components/Header.tsx';
@@ -92,6 +94,7 @@ const EditorPane = lazy(() => import('./components/MonacoEditorPane.tsx'));
 const ReferenceDialog = lazy(() => import('./components/ReferenceDialog.tsx'));
 const StagingDialog = lazy(() => import('./components/svg-staging/StagingDialog.tsx'));
 import HoopDialog from './components/HoopDialog.tsx';
+import type { HoopDialogSettings } from './components/HoopDialog.tsx';
 import { Toaster } from '@/components/ui/sonner.tsx';
 import ImportChooser from './components/svg-staging/ImportChooser.tsx';
 const BitmapImportDialog = lazy(() => import('./components/BitmapImportDialog.tsx'));
@@ -108,6 +111,7 @@ import {
 } from './machineBlock.ts';
 import { toast } from 'sonner';
 import { applyHoopDirective } from './hoopSource.ts';
+import { applyHoopSetupPatch } from './hoopSetupSource.ts';
 
 export interface LineSegment {
   line: number;
@@ -149,6 +153,7 @@ export interface DesignState {
   referenceVars: ReferenceDataVar[];
   colorTable: ColorTableEntry[];
   background: string;
+  material: MaterialIntent;
 }
 
 export interface ConsoleMessage {
@@ -182,6 +187,7 @@ const INITIAL_DESIGN: DesignState = {
   referenceVars: [],
   colorTable: [],
   background: '#f5efe4',
+  material: { ...DEFAULT_MATERIAL_INTENT },
   name: 'bloom',
   ok: false,
 };
@@ -538,6 +544,7 @@ export default function App() {
         referenceVars: result.referenceVars ?? [],
         colorTable: result.colorTable,
         background: result.background,
+        material: result.material,
       };
       setErrorMarkers([]);
       lastErrorRef.current = null;
@@ -834,14 +841,56 @@ export default function App() {
     [runProgram, clearActiveSnippet],
   );
 
-  const handleHoopSelect = useCallback(
-    (hoop: HoopConfig) => {
-      const next = applyHoopDirective(sourceRef.current, hoop);
-      setSelectedHoop(hoop);
+  const dialogPalette = useMemo(() => {
+    const hasAuthoredColors = design.colorTable.some(
+      ({ source: colorSource }) => colorSource === 'palette' || colorSource === 'auto',
+    );
+    return hasAuthoredColors ? design.colorTable.map(({ hex }) => hex) : [...THREADS];
+  }, [design.colorTable]);
+
+  const handleHoopSetupApply = useCallback(
+    (settings: HoopDialogSettings) => {
+      let next = sourceRef.current;
+      let changed = false;
+      const hoopChanged =
+        settings.hoop.shape !== effectiveHoop.shape ||
+        settings.hoop.widthMM !== effectiveHoop.widthMM ||
+        settings.hoop.heightMM !== effectiveHoop.heightMM;
+      if (hoopChanged) {
+        next = applyHoopDirective(next, settings.hoop);
+        changed = true;
+      }
+
+      const backgroundChanged = settings.background !== design.background;
+      const paletteChanged =
+        settings.palette.length !== dialogPalette.length ||
+        settings.palette.some((color, index) => color !== dialogPalette[index]);
+      const materialChanged =
+        settings.material.fabricPreset !== design.material.fabricPreset ||
+        settings.material.grainHeading !== design.material.grainHeading ||
+        settings.material.stretchAlong !== design.material.stretchAlong ||
+        settings.material.stretchAcross !== design.material.stretchAcross ||
+        settings.material.threadProfile !== design.material.threadProfile ||
+        settings.material.threadWidthMM !== design.material.threadWidthMM ||
+        settings.material.needleSize !== design.material.needleSize ||
+        settings.material.stabilizer !== design.material.stabilizer ||
+        settings.material.topping !== design.material.topping;
+
+      if (backgroundChanged || paletteChanged || materialChanged) {
+        next = applyHoopSetupPatch(next, {
+          ...(backgroundChanged ? { background: settings.background } : {}),
+          ...(paletteChanged ? { palette: settings.palette } : {}),
+          ...(materialChanged ? { material: settings.material } : {}),
+        });
+        changed = true;
+      }
+
+      if (hoopChanged) setSelectedHoop(settings.hoop);
+      if (!changed) return;
       setSource(next);
       runProgram(next, design.name);
     },
-    [design.name, runProgram],
+    [design.background, design.material, design.name, dialogPalette, effectiveHoop, runProgram],
   );
 
   const applyMachinePreset = useCallback(
@@ -1166,9 +1215,13 @@ export default function App() {
       </Suspense>
 
       <HoopDialog
+        key={showHoopDialog ? 'hoop-dialog-open' : 'hoop-dialog-closed'}
         open={showHoopDialog}
-        current={effectiveHoop}
-        onSelect={handleHoopSelect}
+        currentHoop={effectiveHoop}
+        currentBackground={design.background}
+        currentPalette={dialogPalette}
+        currentMaterial={design.material}
+        onApply={handleHoopSetupApply}
         onClose={() => setShowHoopDialog(false)}
         isSetByCode={!!design.activeHoop}
       />

@@ -8,6 +8,7 @@
  */
 import { useMemo } from 'react';
 import type { StitchEvent, RunResult, DesignStats } from '../../lib/core/types.ts';
+import { DEFAULT_MATERIAL_INTENT } from '../../lib/engine.ts';
 import type { DesignState, DebugMark } from '../../App.tsx';
 import StageCanvas from '../../components/StageCanvas.tsx';
 import { DEFAULT_HOOP } from '../../data.ts';
@@ -33,6 +34,7 @@ const EMPTY_DESIGN: DesignState = {
   referenceVars: [],
   colorTable: [],
   background: '#f5efe4',
+  material: { ...DEFAULT_MATERIAL_INTENT },
   name: '',
   ok: false,
 };
@@ -61,6 +63,7 @@ function buildDesign(result: RunResult, stats: DesignStats): DesignState {
     referenceVars: result.referenceVars ?? [],
     colorTable: result.colorTable,
     background: result.background,
+    material: result.material,
   };
 }
 

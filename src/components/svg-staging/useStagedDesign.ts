@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { DesignState, DebugMark } from '@/App';
 import type { StitchEvent } from '@/lib/engine';
-import { emit, emitAppend } from '@/lib/engine';
+import { DEFAULT_MATERIAL_INTENT, emit, emitAppend } from '@/lib/engine';
 import type { EmitResult, StagedDocument } from '@/lib/engine';
 import { useCompiler } from '@/hooks/useCompiler';
 
@@ -24,6 +24,7 @@ const EMPTY_DESIGN: DesignState = {
   referenceVars: [],
   colorTable: [],
   background: '#f5efe4',
+  material: { ...DEFAULT_MATERIAL_INTENT },
   name: 'import',
   ok: false,
 };
@@ -135,6 +136,7 @@ export function useStagedDesign(
         referenceVars: result.referenceVars ?? [],
         colorTable: result.colorTable,
         background: result.background,
+        material: result.material,
       });
       setSewSpans(spans);
     }, DEBOUNCE_MS);
