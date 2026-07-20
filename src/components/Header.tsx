@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import { EXAMPLE_TIERS } from '../data.ts';
 import type { HoopConfig, MachineHoop, MachinePreset } from '../data.ts';
+import { ExampleBrowser } from './ExampleBrowser.tsx';
 import { MachineMenu } from './MachineMenu.tsx';
 import type { ActiveMachine } from './MachineMenu.tsx';
 import { HoopIcon } from './HoopDialog.tsx';
@@ -14,22 +14,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuGroup,
   DropdownMenuLabel,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu.tsx';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-  SelectGroup,
-  SelectLabel,
-  SelectSeparator,
-} from '@/components/ui/select.tsx';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip.tsx';
-import { MenuIcon, ChevronDownIcon, DownloadIcon, Share2Icon, UploadIcon } from 'lucide-react';
+import {
+  MenuIcon,
+  ChevronDownIcon,
+  DownloadIcon,
+  SearchIcon,
+  Share2Icon,
+  UploadIcon,
+} from 'lucide-react';
 import { cn } from '@/utils.ts';
 
 export type ExportFormat = 'dst' | 'pes' | 'exp' | 'svg';
@@ -137,41 +131,6 @@ const blueBtn = cn(
   'disabled:pointer-events-none disabled:opacity-50',
 );
 
-// ── Examples select — reused in header ────────────────────────────────────────
-function ExamplesSelect({ onExampleSelect }: { onExampleSelect: (key: string) => void }) {
-  return (
-    <Select
-      onValueChange={(val: string | null) => {
-        if (val) onExampleSelect(val);
-      }}
-    >
-      <SelectTrigger
-        aria-label="Example programs"
-        className="h-[30px] font-mono cursor-pointer flex-shrink-0 w-[180px] bg-warm-btn border-warm-btn-edge text-gold hover:border-warm-btn-edge-hi hover:text-gold-light gap-1"
-      >
-        <SelectValue placeholder="Examples" className="text-gold" />
-      </SelectTrigger>
-      <SelectContent className="font-mono text-ui">
-        {EXAMPLE_TIERS.map((tier, i) => (
-          <>
-            {i > 0 && <SelectSeparator key={`sep-${tier.label}`} />}
-            <SelectGroup key={tier.label}>
-              <SelectLabel className="text-label tracking-[0.13em] uppercase text-faint">
-                {tier.label}
-              </SelectLabel>
-              {tier.examples.map((example) => (
-                <SelectItem key={example.id} value={example.id}>
-                  {example.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
 // ── Export dropdown (visible at lg+, also in hamburger) ───────────────────────
 function ExportDropdown({
   onDownload,
@@ -254,7 +213,7 @@ function ShareButton({ onShare }: { onShare: () => Promise<void> }) {
 interface HamburgerProps {
   hoop: HoopConfig;
   onOpenHoopDialog: () => void;
-  onExampleSelect: (key: string) => void;
+  onOpenExamples: () => void;
   onSVGImport: (mode: 'quick' | 'options') => void;
   onBitmapImport: () => void;
   onDownload: (fmt: ExportFormat) => void;
@@ -264,7 +223,7 @@ interface HamburgerProps {
 function HamburgerMenu({
   hoop,
   onOpenHoopDialog,
-  onExampleSelect,
+  onOpenExamples,
   onSVGImport,
   onBitmapImport,
   onDownload,
@@ -299,27 +258,10 @@ function HamburgerMenu({
             <span className="ml-auto text-[10.5px] text-muted-foreground">{hoop.label}</span>
           </DropdownMenuItem>
 
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>Examples</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="min-w-[172px] max-h-[320px] overflow-y-auto font-mono text-ui">
-              {EXAMPLE_TIERS.map((tier, i) => (
-                <>
-                  {i > 0 && <DropdownMenuSeparator key={`sep-${tier.label}`} />}
-                  <DropdownMenuLabel
-                    key={`lbl-${tier.label}`}
-                    className="text-label tracking-[0.13em] uppercase text-faint"
-                  >
-                    {tier.label}
-                  </DropdownMenuLabel>
-                  {tier.examples.map((example) => (
-                    <DropdownMenuItem key={example.id} onClick={() => onExampleSelect(example.id)}>
-                      {example.label}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+          <DropdownMenuItem onClick={onOpenExamples}>
+            <SearchIcon className="size-3.5 opacity-55" />
+            Browse examples…
+          </DropdownMenuItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator className="md:hidden" />
@@ -395,6 +337,8 @@ export default function Header({
   onRemoveMachine,
   defaultExportFormat,
 }: Props) {
+  const [examplesOpen, setExamplesOpen] = useState(false);
+
   return (
     <header className={styles.header}>
       {/* ══ BRAND ════════════════════════════════════════════════════════════ */}
@@ -421,7 +365,15 @@ export default function Header({
           <TooltipContent side="bottom">Change hoop size and shape</TooltipContent>
         </Tooltip>
 
-        <ExamplesSelect onExampleSelect={onExampleSelect} />
+        <button
+          type="button"
+          onClick={() => setExamplesOpen(true)}
+          aria-label="Browse example programs"
+          className={cn(blueBtn, 'w-[180px] justify-between')}
+        >
+          <span>Examples</span>
+          <SearchIcon className="size-3.5 opacity-65" />
+        </button>
         {/* Kept mounted in code for an easy return, but hidden while the compact
             header is prioritised. Machine settings remain available on right-click. */}
         <div className="hidden">
@@ -498,11 +450,16 @@ export default function Header({
       <HamburgerMenu
         hoop={hoop}
         onOpenHoopDialog={onOpenHoopDialog}
-        onExampleSelect={onExampleSelect}
+        onOpenExamples={() => setExamplesOpen(true)}
         onSVGImport={onSVGImport}
         onBitmapImport={onBitmapImport}
         onDownload={onDownload}
         onShare={onShare}
+      />
+      <ExampleBrowser
+        open={examplesOpen}
+        onOpenChange={setExamplesOpen}
+        onExampleSelect={onExampleSelect}
       />
     </header>
   );

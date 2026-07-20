@@ -1,6 +1,12 @@
 // Shared constants for the NeedleScript playground UI
 
 import { DEFAULT_PALETTE } from './lib/core/colormath.ts';
+import {
+  EXAMPLE_CATALOG,
+  EXAMPLE_CATEGORY_DEFINITIONS,
+  START_HERE_EXAMPLE_IDS,
+} from './example-catalog.ts';
+import type { ExampleCategoryId, ExampleKind } from './example-catalog.ts';
 
 export const THREADS: string[] = [...DEFAULT_PALETTE];
 
@@ -402,53 +408,84 @@ export const SEW_TIME_COLOR_CHANGE_PENALTY_SECONDS = 25;
 
 export interface Example {
   id: string;
-  label: string;
+  title: string;
+  summary: string;
   source: string;
-  tier: string;
+  category: ExampleCategoryId;
+  kind: ExampleKind;
+  tags: readonly string[];
+  lineCount: number;
 }
 
-export interface ExampleTier {
+export interface ExampleCategory {
+  id: ExampleCategoryId;
   label: string;
+  description: string;
   examples: Example[];
 }
 
-const exampleFiles = import.meta.glob('../examples/*/*.ns', {
+const exampleFiles = import.meta.glob('../examples/**/*.ns', {
   eager: true,
   query: '?raw',
   import: 'default',
 }) as Record<string, string>;
 
-function labelForExample(id: string): string {
-  return id
-    .replaceAll('-', ' ')
-    .replace(/([a-z])(\d)/g, '$1 $2')
-    .replace(/(\d)([a-z])/g, '$1 $2');
+const catalogById = new Map(EXAMPLE_CATALOG.map((entry) => [entry.id, entry]));
+if (catalogById.size !== EXAMPLE_CATALOG.length) {
+  throw new Error('Example catalogue contains duplicate IDs');
 }
 
+const seenExampleIds = new Set<string>();
 const examples = Object.entries(exampleFiles)
   .map(([path, source]): Example => {
     const match = path.match(/^\.\.\/examples\/([^/]+)\/([^/]+)\.ns$/);
     if (!match) throw new Error(`Invalid example path: ${path}`);
 
-    const [, tier, id] = match;
-    return { id, label: labelForExample(id), source, tier };
-  })
-  .sort((a, b) => a.tier.localeCompare(b.tier) || a.label.localeCompare(b.label));
+    const [, directory, id] = match;
+    if (seenExampleIds.has(id)) throw new Error(`Duplicate example ID: ${id}`);
+    seenExampleIds.add(id);
 
-// IDs are filename slugs. Adding a .ns file to a tier directory registers it automatically.
+    const metadata = catalogById.get(id);
+    if (!metadata) throw new Error(`Example is missing catalogue metadata: ${id}`);
+    if (metadata.category !== directory) {
+      throw new Error(
+        `Example "${id}" is catalogued as ${metadata.category} but stored in ${directory}`,
+      );
+    }
+
+    const lineCount = source.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
+    return { ...metadata, source, lineCount };
+  })
+  .sort((a, b) => a.title.localeCompare(b.title));
+
+const missingExampleFiles = EXAMPLE_CATALOG.filter((entry) => !seenExampleIds.has(entry.id));
+if (missingExampleFiles.length > 0) {
+  throw new Error(
+    `Catalogue entries have no example file: ${missingExampleFiles.map(({ id }) => id).join(', ')}`,
+  );
+}
+
+// IDs remain filename slugs, independent of their topic directory.
 export const EXAMPLES: Record<string, string> = Object.fromEntries(
   examples.map(({ id, source }) => [id, source]),
 );
 
-const examplesByTier = examples.reduce<Record<string, Example[]>>((tiers, example) => {
-  (tiers[example.tier] ??= []).push(example);
-  return tiers;
-}, {});
+export const EXAMPLE_CATEGORIES: ExampleCategory[] = EXAMPLE_CATEGORY_DEFINITIONS.map(
+  ({ id, label, description }) => ({
+    id,
+    label,
+    description,
+    examples: examples.filter((example) => example.category === id),
+  }),
+);
 
-const EXAMPLE_TIER_ORDER = ['intro', 'intermediate', 'advanced'];
+export const ALL_EXAMPLES: readonly Example[] = examples;
 
-export const EXAMPLE_TIERS: ExampleTier[] = Object.entries(examplesByTier)
-  .map(([label, tierExamples]) => ({ label, examples: tierExamples }))
-  .sort((a, b) => EXAMPLE_TIER_ORDER.indexOf(a.label) - EXAMPLE_TIER_ORDER.indexOf(b.label));
+const examplesById = new Map(examples.map((example) => [example.id, example]));
+export const START_HERE_EXAMPLES: readonly Example[] = START_HERE_EXAMPLE_IDS.map((id) => {
+  const example = examplesById.get(id);
+  if (!example) throw new Error(`Start-here example does not exist: ${id}`);
+  return example;
+});
 
 export const DEFAULT_EXAMPLE_ID = 'bloom';

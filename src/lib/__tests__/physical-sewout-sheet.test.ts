@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import source from '../../../examples/advanced/physical-sewout-validation-v1.ns?raw';
+import source from '../../../examples/production/physical-sewout-validation-v1.ns?raw';
 import { run, toDST, toEXP, toPES } from '../engine.ts';
 
 const TARGETS = [

@@ -28,18 +28,18 @@ has sewn successfully on a particular material or machine.
 Keep authored scale and orientation. Equivalent unbranded materials may be substituted only when
 the actual construction, weight, thread, needle point, stabilizer layers, and topping are recorded.
 
-| ID  | Example source                                           | Intended observation                                    | Source assumptions                                       | State   |
-| --- | -------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------- | ------- |
-| G02 | `examples/advanced/gradientfill.ns`                      | two colors share one density-neutral candidate field    | woven / tearaway / polyester 40 wt / NM 75 / no topping  | pending |
-| G03 | `examples/advanced/gradientfill-n.ns`                    | three colors retain constant aggregate row pitch        | woven / tearaway / polyester 40 wt / NM 75 / no topping  | pending |
-| K01 | `examples/advanced/knockdown-fleece.ns`                  | pile stays down beneath the smaller bordered patch      | fleece / cutaway / polyester 40 wt / NM 75 / topping     | pending |
-| B01 | `examples/advanced/fill-and-border.ns`                   | inset fill overlaps the satin border without a gap      | woven / tearaway / polyester 40 wt / NM 75 / no topping  | pending |
-| C01 | `examples/advanced/satin-cap-corner-sampler.ns`          | cap and sharp-join shapes remain distinct and stable    | woven / tearaway / polyester 40 wt / NM 75 / no topping  | pending |
-| W01 | `examples/advanced/wide-column-split-sampler.ns`         | shared seams interlock without a fixed dense ridge      | canvas / tearaway / polyester 40 wt / NM 90 / no topping | pending |
-| T01 | `examples/advanced/constrained-travel-plan.ns`           | planned order respects atomics, barrier, and color      | woven / tearaway / polyester 40 wt / NM 75 / no topping  | pending |
-| A01 | `examples/advanced/anisotropic-material-compensation.ns` | legacy/directional orientation pairs differ predictably | stretch / cutaway / polyester 40 wt / NM 75 / no topping | pending |
+| ID  | Example source                                             | Intended observation                                    | Source assumptions                                       | State   |
+| --- | ---------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------- | ------- |
+| G02 | `examples/fills/gradientfill.ns`                           | two colors share one density-neutral candidate field    | woven / tearaway / polyester 40 wt / NM 75 / no topping  | pending |
+| G03 | `examples/fills/gradientfill-n.ns`                         | three colors retain constant aggregate row pitch        | woven / tearaway / polyester 40 wt / NM 75 / no topping  | pending |
+| K01 | `examples/production/knockdown-fleece.ns`                  | pile stays down beneath the smaller bordered patch      | fleece / cutaway / polyester 40 wt / NM 75 / topping     | pending |
+| B01 | `examples/fills/fill-and-border.ns`                        | inset fill overlaps the satin border without a gap      | woven / tearaway / polyester 40 wt / NM 75 / no topping  | pending |
+| C01 | `examples/satin/satin-cap-corner-sampler.ns`               | cap and sharp-join shapes remain distinct and stable    | woven / tearaway / polyester 40 wt / NM 75 / no topping  | pending |
+| W01 | `examples/satin/wide-column-split-sampler.ns`              | shared seams interlock without a fixed dense ridge      | canvas / tearaway / polyester 40 wt / NM 90 / no topping | pending |
+| T01 | `examples/production/constrained-travel-plan.ns`           | planned order respects atomics, barrier, and color      | woven / tearaway / polyester 40 wt / NM 75 / no topping  | pending |
+| A01 | `examples/production/anisotropic-material-compensation.ns` | legacy/directional orientation pairs differ predictably | stretch / cutaway / polyester 40 wt / NM 75 / no topping | pending |
 
-`examples/advanced/preflight-issue-sampler.ns` is excluded from this matrix by design. It contains
+`examples/production/preflight-issue-sampler.ns` is excluded from this matrix by design. It contains
 an unreachable penetration and is intentionally **not export-ready**. Its automated fixture must
 continue to report an error-severity `hoop.unreachable` issue alongside advisory diagnostics.
 

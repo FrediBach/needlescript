@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import source from '../examples/advanced/physical-sewout-validation-v1.ns?raw';
+import source from '../examples/production/physical-sewout-validation-v1.ns?raw';
 import { DEFAULT_HOOP } from './data.ts';
 import { getFallbackHoopFitWarning } from './hoop-fit-warning.ts';
 import { designStats, run } from './lib/engine.ts';

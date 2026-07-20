@@ -4,7 +4,7 @@ import path from 'node:path';
 import { run, toDST, toEXP, toPES } from '../src/lib/engine.ts';
 
 const SHEET_ID = 'physical-sewout-validation-v1';
-const SOURCE_PATH = 'examples/advanced/physical-sewout-validation-v1.ns';
+const SOURCE_PATH = 'examples/production/physical-sewout-validation-v1.ns';
 const DEFAULT_OUT_DIR = 'sewout-output/physical-sewout-v1';
 
 const SPECIMENS = [

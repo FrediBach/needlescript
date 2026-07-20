@@ -1487,14 +1487,14 @@ a tangent on a smooth anchor keeps the opposite tangent collinear; Alt-drag brea
 12. Prefer modern syntax with glued-paren calls for anything nested: `setxy(random(60) - 30, random(60) - 30)`.
 13. Feedback loops on `coverat` etc. need a hard iteration cap.
 
-The advanced example catalog includes focused 4 × 4 production samplers for density-neutral
+The production example catalog includes focused 4 × 4 samplers for density-neutral
 gradients, fleece knockdown with a topping-aware patch, inset fill-and-border construction, satin
 caps/corners, split wide columns, constrained travel planning, and anisotropic compensation. Each
 source declares its fabric, thread, needle, stabilizer, and topping assumptions. The corresponding
 physical protocol and blank observation record are in `embroidery-example-sewout-suite-v1.md`;
 software/export checks are not physical sew-out evidence.
 
-`examples/advanced/preflight-issue-sampler.ns` is intentionally not export-ready. It uses
+`examples/production/preflight-issue-sampler.ns` is intentionally not export-ready. It uses
 `preflight 'warn'` so its advisory and error findings remain inspectable together, including an
 unreachable penetration. Do not send that diagnostic fixture to a machine.
 

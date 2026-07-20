@@ -3,7 +3,7 @@
 Status: **awaiting physical measurements**. This document is a versioned protocol and result record;
 blank measured fields are intentional and must not be interpreted as evidence.
 
-Source: `examples/advanced/physical-sewout-validation-v1.ns`
+Source: `examples/production/physical-sewout-validation-v1.ns`
 
 This sheet evaluates the candidate directional compensation behavior introduced in Sessions 7.3–7.5.
 It does not establish automatic material recommendations by itself. Do not change `FABRIC_PROFILES`,

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import anisotropicSource from '../../../examples/advanced/anisotropic-material-compensation.ns?raw';
-import travelSource from '../../../examples/advanced/constrained-travel-plan.ns?raw';
-import borderSource from '../../../examples/advanced/fill-and-border.ns?raw';
-import gradientNSource from '../../../examples/advanced/gradientfill-n.ns?raw';
-import gradientSource from '../../../examples/advanced/gradientfill.ns?raw';
-import fleeceSource from '../../../examples/advanced/knockdown-fleece.ns?raw';
-import preflightSource from '../../../examples/advanced/preflight-issue-sampler.ns?raw';
-import capCornerSource from '../../../examples/advanced/satin-cap-corner-sampler.ns?raw';
-import wideSource from '../../../examples/advanced/wide-column-split-sampler.ns?raw';
+import anisotropicSource from '../../../examples/production/anisotropic-material-compensation.ns?raw';
+import travelSource from '../../../examples/production/constrained-travel-plan.ns?raw';
+import borderSource from '../../../examples/fills/fill-and-border.ns?raw';
+import gradientNSource from '../../../examples/fills/gradientfill-n.ns?raw';
+import gradientSource from '../../../examples/fills/gradientfill.ns?raw';
+import fleeceSource from '../../../examples/production/knockdown-fleece.ns?raw';
+import preflightSource from '../../../examples/production/preflight-issue-sampler.ns?raw';
+import capCornerSource from '../../../examples/satin/satin-cap-corner-sampler.ns?raw';
+import wideSource from '../../../examples/satin/wide-column-split-sampler.ns?raw';
 import { run, toDST, toEXP, toPES } from '../engine.ts';
 
 const PRODUCTION_EXAMPLES = [

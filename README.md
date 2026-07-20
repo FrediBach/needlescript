@@ -1472,7 +1472,7 @@ Four pure Library-tier helpers make common generators concise and can also be us
 
 Region-taking helpers accept either one ring or a list of rings with holes. `fill paths @rows` using `fillrows` is byte-identical to the corresponding built-in tatami fill, including pull compensation and programmable fill-length modes.
 
-See the bundled [`contour fill paths`](examples/intermediate/contour-fill-paths.ns) and [`spiral fill paths`](examples/intermediate/spiral-fill-paths.ns) examples.
+See the bundled [`contour fill paths`](examples/fills/contour-fill-paths.ns) and [`spiral fill paths`](examples/fills/spiral-fill-paths.ns) examples.
 
 ### Programmable stitch splitting — `stitchlen @fn` and `stitchlen [list]`
 

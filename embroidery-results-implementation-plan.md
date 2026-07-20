@@ -447,7 +447,7 @@ without changing machine semantics.
 
 Status: complete (2026-07-19)
 
-Purpose: turn the technique in `examples/advanced/gradientfill.ns` into a reusable primitive.
+Purpose: turn the technique in `examples/fills/gradientfill.ns` into a reusable primitive.
 
 Design requirements:
 
@@ -475,7 +475,7 @@ Tasks:
 - Decide how compound regions are represented; use a separate export if the current standard-library
   region convention only accepts a simple ring.
 - Add standard-library reference documentation and a concise example.
-- Replace or supplement the advanced example with a version that demonstrates the helper while
+- Replace or supplement the fill example with a version that demonstrates the helper while
   retaining a manual example if it teaches the algorithm.
 - Pin aggregate row count, per-color distribution, deterministic assignment, and no doubled density.
 
@@ -490,7 +490,7 @@ Implementation note: `std.stitchcraft.gradientrows` clips one constant-pitch can
 simple or compound even-odd region and assigns every row exactly once using deterministic error
 diffusion. The reporter receives normalized seeding-axis position, empty groups remain valid, and
 the helper draws no RNG values. Standard-library fixtures pin 50/50 interleaving, endpoints,
-concave/holed clipping, determinism, validation, and aggregate row-count invariance; the advanced
+concave/holed clipping, determinism, validation, and aggregate row-count invariance; the fill
 two-color example uses the export directly.
 
 ### Session 1.2 — N-color gradients and routing
@@ -525,7 +525,7 @@ to two through eight fixed channels using normalized multichannel error diffusio
 non-lists, changing lengths, non-numeric/negative/all-zero weights with row-attributed diagnostics.
 `serpentinerows` provides caller-controlled routing and reversal without changing assignment. Tests
 pin distribution bounds, density invariance, compound clipping, malformed rows, and zero RNG draws;
-the advanced three-color example demonstrates the routed result.
+the multi-color fill example demonstrates the routed result.
 
 ### Session 1.3 — Knockdown and fill-with-border recipes
 
@@ -1550,7 +1550,7 @@ document, not as undocumented constants in code.
 
 Only promote profile recommendations to `auto` after this evidence exists.
 
-Implementation note: `examples/advanced/physical-sewout-validation-v1.ns` is the immutable v1
+Implementation note: `examples/production/physical-sewout-validation-v1.ns` is the immutable v1
 geometry sheet. It contains target IDs for three satin headings at 1.5/3/6 mm, one- and two-corner
 columns, four fill-row headings, and two fill-plus-border registration targets. Its editable setup
 header records fabric, thread profile, needle, stabilizer, and topping intent while the geometry,
@@ -1873,7 +1873,7 @@ and successful execution through the real interpreter.
 
 Status: complete (2026-07-19)
 
-Add focused advanced examples rather than one kitchen-sink design:
+Add focused production and construction examples rather than one kitchen-sink design:
 
 - density-neutral two- and multi-color gradient;
 - fleece knockdown and topping-aware patch;
@@ -1887,7 +1887,7 @@ Add focused advanced examples rather than one kitchen-sink design:
 Each production example should state recommended fabric/stabilizer/thread assumptions and remain
 within a common hoop preset.
 
-Implementation note: the advanced catalog now has separate 4 × 4 examples for the two- and
+Implementation note: the topic catalog now has separate 4 × 4 examples for the two- and
 three-color density-neutral gradients, a complete topping-aware fleece patch over sparse knockdown,
 an inset fill with satin border, cap/corner policies, explicitly split wide columns, constrained
 route groups with atomics and a barrier, and legacy-versus-directional anisotropic compensation.
