@@ -3,7 +3,7 @@
   "description": "Logo inspired programming language for generative embroidery",
   "private": true,
   "author": "Fredi Bach",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "license": "MIT",
   "type": "module",
   "scripts": {
