@@ -110,7 +110,11 @@ export default function ReferenceDialog({ open, onClose }: ReferenceDialogProps)
               <Input
                 ref={inputRef}
                 type="text"
-                placeholder={tab === 'glossary' ? 'filter terms…' : 'search language reference…'}
+                placeholder={
+                  tab === 'glossary'
+                    ? 'filter terms…'
+                    : 'search… tag:seeded, category:movement, module:std.shapes'
+                }
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 spellCheck={false}

@@ -1,5 +1,6 @@
 import { NS_ITEM_MAP } from './catalog.ts';
 import { STANDARD_LIBRARY_PROCEDURES } from '../../language/standard-library/index.ts';
+import { LANGUAGE_REFERENCE_STANDARD_LIBRARY_PROCEDURE_MAP } from '../../language/reference.ts';
 
 const STANDARD_LIBRARY_PROCEDURE_MAP = new Map(
   STANDARD_LIBRARY_PROCEDURES.map((procedure) => [
@@ -126,13 +127,16 @@ export function extractUserSymbols(text: string): UserSymbol[] {
 
     const alias = m[3].toLowerCase();
     const params = [...procedure.params];
+    const reference = LANGUAGE_REFERENCE_STANDARD_LIBRARY_PROCEDURE_MAP.get(importPath);
     add({
       label: alias,
       kindName: 'function',
       detail: `imported ${procedure.name}(${params.join(', ')})`,
       params,
       line: offsetToLine(text, m.index),
-      documentation: `Imported from \`${importPath}\`.`,
+      documentation: reference
+        ? `${reference.documentation}\n\nImported from \`${importPath}\`.`
+        : `Imported from \`${importPath}\`.`,
     });
   }
 

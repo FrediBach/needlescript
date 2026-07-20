@@ -44,12 +44,38 @@ Other scripts:
 | `npm run examples:previews`       | regenerate square thumbnails for all bundled examples         |
 | `npm run examples:previews:watch` | watch `.ns` examples and update their thumbnails              |
 | `npm run examples:previews:check` | verify that committed example thumbnails are current          |
+| `npm run reference:generate`      | regenerate language and standard-library references           |
+| `npm run reference:check`         | verify that generated language references are current         |
 | `npm test`                        | run the test suite once (Vitest)                              |
 | `npm run test:watch`              | run tests in watch mode                                       |
 | `npm run test:coverage`           | run tests with V8 coverage                                    |
 | `npm run lint`                    | ESLint over the whole project                                 |
 
 The app is a React 19 + TypeScript + Vite single-page app. The language engine itself (`src/lib/`) has **no DOM dependencies** and can be used as a standalone library (see [Using the engine as a library](#using-the-engine-as-a-library)).
+
+### Language reference workflow
+
+[`needlescript-language-reference.json`](./needlescript-language-reference.json) is the authored
+source of truth for language documentation and editor metadata. It contains tagged narrative
+sections plus categorized feature records with summaries, aliases, examples, signatures, hover
+documentation, completion templates, and all bundled standard-library modules/procedures. The
+generator produces:
+
+- [`needlescript-language-reference.md`](./needlescript-language-reference.md) — explanatory human
+  guide used by the playground dialog.
+- [`needlescript-language-reference.llm.md`](./needlescript-language-reference.llm.md) — compact rules
+  plus builtin and standard-library catalogs for model context.
+- [`needlescript-standard-library-reference.md`](./needlescript-standard-library-reference.md) —
+  extended module, procedure, RNG, geometry, and sewing documentation.
+
+Edit the JSON, then run `npm run reference:generate`. `npm test` runs `reference:check` first so stale
+generated files fail CI. The generator also writes an internal, narrative-free feature payload so
+the application does not bundle the explanatory sections with Monaco. Monaco consumes those same
+feature records through
+`src/lib/editor/monaco/catalog.ts`; completion choices for registered modes are resolved from the
+runtime mode registries rather than repeated in JSON. In the playground reference search,
+`tag:seeded`, `category:movement`, `module:std.shapes`, and combinations such as `tag:pure satin`
+filter structured builtin and standard-library metadata.
 
 ### Project structure
 

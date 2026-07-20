@@ -9,6 +9,7 @@ import {
 } from './symbols.ts';
 import type { UserSymbol } from './symbols.ts';
 import { STANDARD_LIBRARY_PROCEDURES } from '../../language/standard-library/index.ts';
+import { LANGUAGE_REFERENCE_STANDARD_LIBRARY_PROCEDURE_MAP } from '../../language/reference.ts';
 
 type IPos = { readonly lineNumber: number; readonly column: number };
 
@@ -76,14 +77,17 @@ export function registerNeedlescriptProviders(monaco: Monaco): void {
           if (!importPath.startsWith(importContext.partialPath)) return [];
 
           const signature = `${procedure.name}(${procedure.params.join(', ')})`;
+          const reference = LANGUAGE_REFERENCE_STANDARD_LIBRARY_PROCEDURE_MAP.get(importPath);
           return [
             {
               label: importPath,
               kind: CIK.Module,
               detail: signature,
               documentation: {
-                value: `Import \`${signature}\` from \`${procedure.moduleId}\`.`,
-                isTrusted: false,
+                value:
+                  reference?.documentation ??
+                  `Import \`${signature}\` from \`${procedure.moduleId}\`.`,
+                isTrusted: Boolean(reference),
               } as IMarkdownString,
               filterText: importPath,
               insertText: `${importPath} as ${procedure.name}`,

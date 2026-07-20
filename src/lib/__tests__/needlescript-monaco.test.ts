@@ -192,7 +192,7 @@ star(5, 10, 4)`),
         detail: 'imported starpath(n, rout, rin)',
         params: ['n', 'rout', 'rin'],
         line: 1,
-        documentation: 'Imported from `std.shapes.starpath`.',
+        documentation: expect.stringContaining('Imported from `std.shapes.starpath`.'),
       },
       {
         label: 'easing',
@@ -200,7 +200,7 @@ star(5, 10, 4)`),
         detail: 'imported easepow(power)',
         params: ['power'],
         line: 2,
-        documentation: 'Imported from `std.mathx.easepow`.',
+        documentation: expect.stringContaining('Imported from `std.mathx.easepow`.'),
       },
     ]);
   });
