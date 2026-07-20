@@ -7,15 +7,15 @@ The repo contains two build targets: a Vite-based playground app and a publishab
 
 The language pipeline in `src/lib/` is documented in detail. Read the relevant document before making non-trivial changes to these areas — each explains the module layout, data flow, and design rationale, with `file:line` references.
 
-| Document                                     | Covers                                                                                                                             |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `needlescript-language-reference.json`       | Authored language-reference source, feature taxonomy, and editor metadata                                                          |
-| `needlescript-language-reference.md`         | Generated explanatory reference for humans                                                                                         |
-| `needlescript-language-reference.llm.md`     | Generated compact reference for agents and LLM context                                                                             |
-| `needlescript-standard-library-reference.md` | Generated reference for bundled `std.*` modules and procedures                                                                     |
-| `needlescript-parser-architecture.md`        | Front-end: tokenizer, pre-scan, recursive-descent parser, AST (`language/tokenizer.ts`, `language/prescan.ts`, `language/parser/`) |
-| `needlescript-interpreter-architecture.md`   | Evaluation: tree-walking interpreter, value model, budgets, reporters (`runtime/`, `runtime/list.ts`)                              |
-| `needlescript-machine-architecture.md`       | Stitch machine: turtle, transform stacks, satin/fill generation, coverage, output (`embroidery/machine/`)                          |
+| Document                                          | Covers                                                                                                                             |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/needlescript-language-reference.json`       | Authored language-reference source, feature taxonomy, and editor metadata                                                          |
+| `docs/needlescript-language-reference.md`         | Generated explanatory reference for humans                                                                                         |
+| `docs/needlescript-language-reference.llm.md`     | Generated compact reference for agents and LLM context                                                                             |
+| `docs/needlescript-standard-library-reference.md` | Generated reference for bundled `std.*` modules and procedures                                                                     |
+| `docs/needlescript-parser-architecture.md`        | Front-end: tokenizer, pre-scan, recursive-descent parser, AST (`language/tokenizer.ts`, `language/prescan.ts`, `language/parser/`) |
+| `docs/needlescript-interpreter-architecture.md`   | Evaluation: tree-walking interpreter, value model, budgets, reporters (`runtime/`, `runtime/list.ts`)                              |
+| `docs/needlescript-machine-architecture.md`       | Stitch machine: turtle, transform stacks, satin/fill generation, coverage, output (`embroidery/machine/`)                          |
 
 The end-to-end flow is: source → `tokenize` → `parse` → `run` (interpreter drives the `Machine`) → `RunResult` → exporters. Keep these docs updated when you change the corresponding modules.
 
@@ -113,7 +113,7 @@ Before considering a user-visible command or mode complete:
 - Add a Monaco catalog item with completion text, hover documentation, and `params` signature
   metadata. Catalog coverage tests intentionally fail when any Core command omits one of these.
 - Document syntax, units, bounds, defaults, output semantics, warnings, transform space, and RNG
-  draw behavior in `needlescript-language-reference.md` and the relevant architecture document.
+  draw behavior in `docs/needlescript-language-reference.md` and the relevant architecture document.
 - Add parser/runtime tests, compatibility fixtures for changed generators, and tests that every
   registered mode appears in editor documentation.
 

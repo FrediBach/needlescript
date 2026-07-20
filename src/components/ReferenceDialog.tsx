@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import tutorial from '../../needlescript-tutorial.md?raw';
+import tutorial from '../../docs/needlescript-tutorial.md?raw';
 import { AboutContent } from './reference-dialog/AboutContent';
 import { GlossaryContent } from './reference-dialog/GlossaryContent';
 import { LanguageReferenceContent } from './reference-dialog/LanguageReferenceContent';

@@ -14,7 +14,7 @@ export default defineConfig({
     // MDX must come before @vitejs/plugin-react so JSX is already transformed.
     // enforce: 'pre' ensures rolldown runs MDX before its built-in TS transform.
     // include: '**/*.mdx' — restrict to .mdx only so that plain .md files
-    // imported with ?raw (e.g. needlescript-tutorial.md) stay as raw strings.
+    // imported with ?raw (e.g. docs/needlescript-tutorial.md) stay as raw strings.
     {
       ...mdx({
         include: '**/*.mdx',

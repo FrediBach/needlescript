@@ -1,4 +1,4 @@
-import languageReference from '../../../needlescript-language-reference.md?raw';
+import languageReference from '../../../docs/needlescript-language-reference.md?raw';
 import {
   LANGUAGE_REFERENCE_CATEGORIES,
   filterLanguageReferenceFeatures,

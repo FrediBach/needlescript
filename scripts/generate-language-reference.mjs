@@ -12,7 +12,8 @@ import {
 import { STANDARD_LIBRARY_PROCEDURES } from '../src/lib/language/standard-library/index.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const sourcePath = resolve(root, 'needlescript-language-reference.json');
+const docsRoot = resolve(root, 'docs');
+const sourcePath = resolve(docsRoot, 'needlescript-language-reference.json');
 const modeSources = {
   ...QWORD_BUILTINS,
   plan: PLAN_MODES,
@@ -355,7 +356,7 @@ async function main() {
   ];
   const stale = [];
   for (const [relativePath, content] of outputs) {
-    const path = resolve(root, relativePath);
+    const path = resolve(docsRoot, relativePath);
     if (check) {
       const existing = await readFile(path, 'utf8').catch(() => '');
       if (existing !== content) stale.push(relativePath);

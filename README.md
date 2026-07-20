@@ -29,15 +29,17 @@ repeat 14 [
 
 ## Documentation
 
-- [NeedleScript language reference](./needlescript-language-reference.md) — explanatory guide for
+- [NeedleScript language reference](./docs/needlescript-language-reference.md) — explanatory guide for
   people and the playground reference dialog.
-- [Standard library reference](./needlescript-standard-library-reference.md) — modules,
+- [Standard library reference](./docs/needlescript-standard-library-reference.md) — modules,
   procedures, geometry, RNG behavior, and sewing notes.
-- [Compact language reference](./needlescript-language-reference.llm.md) — condensed context for
+- [Compact language reference](./docs/needlescript-language-reference.llm.md) — condensed context for
   language models and other tooling.
+- [Documentation directory](./docs/) — tutorial, architecture notes, implementation specifications,
+  and physical sew-out protocols.
 
 All three references are generated from
-[`needlescript-language-reference.json`](./needlescript-language-reference.json). Edit that source
+[`needlescript-language-reference.json`](./docs/needlescript-language-reference.json). Edit that source
 and run `npm run reference:generate`; use `npm run reference:check` to detect stale generated files.
 
 ## Setup
@@ -96,8 +98,10 @@ The language pipeline is:
 source → tokenize → parse → run → RunResult → exporters
 ```
 
-See the parser, interpreter, and machine architecture documents in the repository for detailed
-module design and data flow.
+See the [parser](./docs/needlescript-parser-architecture.md),
+[interpreter](./docs/needlescript-interpreter-architecture.md), and
+[machine](./docs/needlescript-machine-architecture.md) architecture documents for detailed module
+design and data flow.
 
 ## Playground
 
@@ -108,7 +112,7 @@ module design and data flow.
 - **Examples** — search bundled programs by technique, language feature, or purpose.
 - **Customizer** — expose sliders, toggles, text inputs, paths, curves, point handles, and presets
   with source annotations documented in the
-  [language reference](./needlescript-language-reference.md#22-customizer-annotations-comment-level-invisible-to-the-interpreter).
+  [language reference](./docs/needlescript-language-reference.md#22-customizer-annotations-comment-level-invisible-to-the-interpreter).
 - **Import SVG** — convert supported vector structure into editable NeedleScript source.
 - **Export** — download designs as Tajima `.DST` files.
 

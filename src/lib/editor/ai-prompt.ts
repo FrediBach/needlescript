@@ -3,7 +3,7 @@
  * Exported functions are browser-safe (no DOM, no Node APIs).
  */
 
-import rawSystemPrompt from '../../../ai-system-prompt.md?raw';
+import rawSystemPrompt from '../../../docs/ai-system-prompt.md?raw';
 
 export type AiCommandType = 'create' | 'improve' | 'fix' | 'explain' | 'default';
 

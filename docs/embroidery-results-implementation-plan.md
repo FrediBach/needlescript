@@ -435,7 +435,7 @@ Acceptance criteria:
 Implementation note: focused registries now own embroidery, underlay, fill, satin, plan, and
 preflight choices and use shared case-insensitive resolution/did-you-mean helpers from
 `mode-registry.ts`. Monaco coverage helpers fail on missing completion, hover, signature, example,
-or registered-mode documentation. The contributor checklist in `AGENTS.md` requires command,
+or registered-mode documentation. The contributor checklist in `../AGENTS.md` requires command,
 registry, editor, documentation, compatibility, and RNG coverage for later language additions.
 
 ## 9. Phase 1: standard-library quick wins

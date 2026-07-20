@@ -1,6 +1,6 @@
 // PHYSICAL SEW-OUT VALIDATION — VERSION 1
 // Reproduce this source without geometry edits. Change only the five setup
-// values below for each specimen listed in physical-sewout-validation-v1.md.
+// values below for each specimen listed in docs/physical-sewout-validation-v1.md.
 
 hoop [130, 180]
 seed 7601

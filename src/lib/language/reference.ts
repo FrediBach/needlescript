@@ -1,4 +1,4 @@
-import rawReference from '../../../needlescript-language-features.generated.json';
+import rawReference from '../../../docs/needlescript-language-features.generated.json';
 
 export type LanguageFeatureKind = 'keyword' | 'function' | 'variable' | 'constant';
 
