@@ -19,7 +19,7 @@
 //    8  basket-weave, varying block count
 // ============================================================
 
-// --- layout ---
+// layout:
 let GRID   = 9         // 9 x 9
 let margin = 0.96      // shrink so the square grid clears the round hoop
 let inset  = 0.12      // blank border inside each cell (fraction of cell)
@@ -30,18 +30,14 @@ seed 7
 stitchlen stitch
 
 
-// ------------------------------------------------------------
 //  fit: the square grid's corner must sit inside radius ~44.
 //  half-diagonal = (GRID * cell / 2) * sqrt(2)  <=  44
-// ------------------------------------------------------------
 let cell = (44 * 2) / (GRID * 1.4142) * margin
 let g0 = -cell * GRID / 2     // bottom-left corner of the whole grid, mm
 
 
-// ------------------------------------------------------------
 //  one straight stitched segment between two absolute points.
 //  Needle up to travel, down to sew.
-// ------------------------------------------------------------
 def seg(ax, ay, bx, by) [
   up
   setpos([ax, ay])
@@ -60,7 +56,7 @@ def seg(ax, ay, bx, by) [
 //  where the interior origin is offset by `pad` on each axis.
 // ============================================================
 
-// --- parallel hatching at a given angle (degrees) ---
+// parallel hatching at a given angle (degrees):
 def pat_hatch(px, py, s, pad, angle, gap) [
   // step a sweep line across the cell; for each, clip to the square.
   // Implement by walking offsets and drawing the chord where it crosses.
@@ -119,13 +115,13 @@ def drawclip(ox, oy, s, lx, ly, dx, dy) [
   ]
 ]
 
-// --- cross-hatch: two perpendicular hatch families ---
+// cross-hatch: two perpendicular hatch families:
 def pat_cross(px, py, s, pad, angle, gap) [
   pat_hatch(px, py, s, pad, angle, gap)
   pat_hatch(px, py, s, pad, angle + 90, gap)
 ]
 
-// --- concentric squares: n nested rings ---
+// concentric squares: n nested rings:
 def pat_concentric(px, py, s, pad, n) [
   let ox = px + pad
   let oy = py + pad
@@ -141,7 +137,7 @@ def pat_concentric(px, py, s, pad, n) [
   ]
 ]
 
-// --- spiral: an Archimedean spiral of `turns` revolutions ---
+// spiral: an Archimedean spiral of `turns` revolutions:
 def pat_spiral(px, py, s, pad, turns) [
   let ox = px + pad
   let oy = py + pad
@@ -160,7 +156,7 @@ def pat_spiral(px, py, s, pad, turns) [
   ]
 ]
 
-// --- zigzag: `rows` horizontal zigzag lines ---
+// zigzag: `rows` horizontal zigzag lines:
 def pat_zigzag(px, py, s, pad, rows) [
   let ox = px + pad
   let oy = py + pad
@@ -180,7 +176,7 @@ def pat_zigzag(px, py, s, pad, rows) [
   ]
 ]
 
-// --- cross-dots: an n x n grid of little plus marks ---
+// cross-dots: an n x n grid of little plus marks:
 def pat_dots(px, py, s, pad, n) [
   let ox = px + pad
   let oy = py + pad
@@ -195,7 +191,7 @@ def pat_dots(px, py, s, pad, n) [
   ]
 ]
 
-// --- sine waves: `rows` wavy lines with `cycles` periods ---
+// sine waves: `rows` wavy lines with `cycles` periods:
 def pat_wave(px, py, s, pad, rows, cycles) [
   let ox = px + pad
   let oy = py + pad
@@ -214,7 +210,7 @@ def pat_wave(px, py, s, pad, rows, cycles) [
   ]
 ]
 
-// --- diamonds: n nested diamonds (rotated squares) ---
+// diamonds: n nested diamonds (rotated squares):
 def pat_diamond(px, py, s, pad, n) [
   let ox = px + pad
   let oy = py + pad
@@ -229,7 +225,7 @@ def pat_diamond(px, py, s, pad, n) [
   ]
 ]
 
-// --- radial burst: n spokes from the centre ---
+// radial burst: n spokes from the centre:
 def pat_radial(px, py, s, pad, n) [
   let ox = px + pad
   let oy = py + pad
@@ -242,7 +238,7 @@ def pat_radial(px, py, s, pad, n) [
   ]
 ]
 
-// --- basket-weave: alternating blocks of horizontal / vertical lines ---
+// basket-weave: alternating blocks of horizontal / vertical lines:
 def pat_basket(px, py, s, pad, n) [
   let ox = px + pad
   let oy = py + pad

@@ -30,10 +30,8 @@ seed 7
 stitchlen stitch
 
 
-// ------------------------------------------------------------
 //  gcd by Euclid's algorithm, on the (rounded) radii. The curve
 //  closes after  rollR / gcd(bigR, rollR)  revolutions.
-// ------------------------------------------------------------
 def gcd(a, b) [
   let x = a
   let y = b
@@ -52,14 +50,12 @@ let g = gcd(Ri, rit)
 let revs = rit / g                  // revolutions of the drive angle to close
 
 
-// ------------------------------------------------------------
 //  the curve point at drive angle t (degrees).
 //
 //  Hypotrochoid (inside):
 //    x = (R - r) cos t + d cos(((R - r)/r) t)
 //    y = (R - r) sin t - d sin(((R - r)/r) t)
 //  Epitrochoid (outside): R + r, and the inner term flips sign.
-// ------------------------------------------------------------
 def spiro_x(t) [
   // base radius and inner-term ratio depend on inside/outside
   let base = bigR - rollR
@@ -86,10 +82,8 @@ def spiro_y(t) [
 ]
 
 
-// ------------------------------------------------------------
 //  work out the scale so the curve fills the hoop. The extent
 //  (max distance from centre) is (R ∓ r) + d, so scale to `fit`.
-// ------------------------------------------------------------
 let reach = bigR - rollR + pen           // hypotrochoid extent
 if inside == 0 [ reach = bigR + rollR + pen ]   // epitrochoid extent
 let fitscale = fit / reach

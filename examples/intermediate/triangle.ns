@@ -1,4 +1,4 @@
-// --- Hidden-triangle spiral art ---------------------------------
+// Hidden-triangle spiral art:
 // One continuous spiral fills a disc; the line fattens (wider satin)
 // wherever it passes through an invisible triangle in the centre.
 

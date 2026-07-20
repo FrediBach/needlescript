@@ -21,7 +21,7 @@ let ey = eye[1]
 let e2x = eye2[0]
 let e2y = eye2[1]
 
-// --- Ring around each handle ---
+// Ring around each handle:
 
 // Small ring at anchor
 color 1
@@ -38,7 +38,7 @@ color 3
 let r3 = 5
 up setxy(e2x, e2y - r3) seth 0 down arc 360 r3
 
-// --- Lines connecting handles ---
+// Lines connecting handles:
 
 // Anchor → eye
 color 1

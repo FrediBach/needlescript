@@ -15,7 +15,7 @@
 //    a point is [x, y], a path is a list of points  -> resample / sew
 // =====================================================================
 
-// --- build a Lissajous curve as a path of [x, y] points -------------
+// build a Lissajous curve as a path of [x, y] points:
 def lissa_path(fx, fy, phase, ampx, ampy, samples) [
   let pts = []
   // sweep t over one full period; sin takes degrees, so 360 deg = 1 cycle

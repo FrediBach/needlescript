@@ -13,7 +13,7 @@ autotrim 6
 
 let debug = 0            // [switch:no,yes] show pins + console output
 
-// ---- helper reporters ----------------------------------------
+// helper reporters:
 
 def clamp(v, lo, hi) [
   return min(hi, max(lo, v))
@@ -27,7 +27,7 @@ def inside(x, y) [       // call parens end the old "trailing operator
   return len2(x, y) < 31 // gets absorbed" footgun
 ]
 
-// ---- procedures ------------------------------------------------
+// procedures:
 
 // recursive grass sprig — bare `return` is `exit`
 def sprig(depth, seg) [  // nb: "step" is reserved, hence "seg"
@@ -71,7 +71,7 @@ def bloom(size, kind) [
   ]
 ]
 
-// ---- ground ----------------------------------------------------
+// ground:
 
 color 1
 fillangle 20
@@ -90,7 +90,7 @@ for gx = -20 to 20 step 10 [             // keyword for, explicit step
   trim
 ]
 
-// ---- flowers ---------------------------------------------------
+// flowers:
 
 for i = 1 to 7 [                         // default step = 1
   // rejection-sample a position inside the meadow
@@ -113,7 +113,7 @@ for i = 1 to 7 [                         // default step = 1
   trim
 ]
 
-// ---- border ----------------------------------------------------
+// border:
 
 color 5
 satin 2.2

@@ -32,19 +32,15 @@ maxdensity 0             // the poles are convergence points by design — every
                          //   high. Silence the heatmap warning for this piece.
 
 
-// ------------------------------------------------------------
 //  helper: the point on the circle at a given angle (degrees).
 //  Turtle convention — 0 = north, clockwise — so this maps
 //  0 -> top, 90 -> right (E), 180 -> bottom, 270 -> left.
-// ------------------------------------------------------------
 def circlept(deg) [
   return [ R * sin(deg), R * cos(deg) ]
 ]
 
-// ------------------------------------------------------------
 //  helper: sew one straight thread between two circle points,
 //  given as angles. Needle up to travel, down to stitch across.
-// ------------------------------------------------------------
 def thread(deg_a, deg_b) [
   let a = circlept(deg_a)
   let b = circlept(deg_b)
@@ -54,13 +50,11 @@ def thread(deg_a, deg_b) [
   setpos(b)              // stitch straight across to the second
 ]
 
-// ------------------------------------------------------------
 //  helper: a FAN of threads from one pole.
 //    pole   — the apex angle (where all threads of this fan meet)
 //    target — the centre of the arc they sweep on the far side
 //    span   — how wide that arc is, degrees
 //    n      — number of threads
-// ------------------------------------------------------------
 def fan(pole, target, span, n) [
   for i = 1 to n [
     let f = (i - 1) / (n - 1)          // 0 .. 1 across the fan
@@ -88,7 +82,7 @@ fan(270, 90,  hspan, hcount)     // left pole (270°) -> right arc
 fan(90,  270, hspan, hcount)     // right pole(90°)  -> left arc
 trim
 
-// --- the enclosing circle, drawn last as one clean ring ---
+// the enclosing circle, drawn last as one clean ring:
 up
 setpos(circlept(0))
 down

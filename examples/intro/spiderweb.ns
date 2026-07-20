@@ -13,7 +13,7 @@ let spokes = 12          // [5:1:20] radial spokes
 let span   = 360 / spokes        // degrees between adjacent spokes
 let reach  = 42                  // [20:1:46] outer radius, mm
 
-// ---- precompute spoke tip directions & this run's jittered length ----
+// precompute spoke tip directions & this run's jittered length:
 let tips = []
 for i = 0 to spokes - 1 [
   let ang = i * span
@@ -21,7 +21,7 @@ for i = 0 to spokes - 1 [
   append(tips, vfromheading(ang, r))
 ]
 
-// ---- the spokes: out to each tip, snap back to the hub ----
+// the spokes: out to each tip, snap back to the hub:
 color 4
 for i = 0 to spokes - 1 [
   push                           // remember the hub

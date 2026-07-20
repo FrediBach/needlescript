@@ -15,9 +15,7 @@ let speckle_gap = 4    // [2:0.5:8] spacing between shell speckles, mm
 stitchlen 2
 fabric "woven          // free underlay + pull compensation, sews as previewed
 
-// ---------------------------------------------------------------------
 //  helpers
-// ---------------------------------------------------------------------
 
 // an oval as a closed region (path of points), centred at (cx, cy),
 // half-width rx, half-height ry. steps points around the ellipse.
@@ -43,9 +41,7 @@ def scute(size) [
   satin 0
 ]
 
-// ---------------------------------------------------------------------
 //  1. the body  —  a broad tatami-filled oval underneath everything
-// ---------------------------------------------------------------------
 
 color 1
 fillangle 30
@@ -57,9 +53,7 @@ beginfill
 endfill
 trim
 
-// ---------------------------------------------------------------------
 //  2. the four paddle-legs  —  satin ovals at the four diagonals
-// ---------------------------------------------------------------------
 
 color 2
 
@@ -85,9 +79,7 @@ leg( 15,  12,  35)     // front-right
 leg(-15, -16, -145)    // back-left
 leg( 15, -16,  145)    // back-right
 
-// ---------------------------------------------------------------------
 //  3. the head  —  a satin oval poking out the front, with two eyes
-// ---------------------------------------------------------------------
 
 color 2
 satin 2.6
@@ -107,9 +99,7 @@ up setxy( 2.6, 30) down  fd 0.4
 trim
 bean 1
 
-// ---------------------------------------------------------------------
 //  4. the carapace  —  a domed satin rim plus a field of scutes
-// ---------------------------------------------------------------------
 
 color 3
 
@@ -142,10 +132,8 @@ for sy in sideY [
   trim
 ]
 
-// ---------------------------------------------------------------------
 //  5. seeded speckle  —  stipple dots scattered across the shell,
 //     kept inside the rim region so the markings never stray off-shell
-// ---------------------------------------------------------------------
 
 color 4
 let dots = scatter(speckle_gap, rim) // Poisson-disc points, clipped to the shell

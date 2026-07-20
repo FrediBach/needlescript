@@ -36,7 +36,7 @@ def next() [
   ox += cw + gap
 ]
 
-// ---------- glyphs (draw only — no cursor movement) ----------
+// glyphs (draw only — no cursor movement):
 
 def g_N() [
   go(0, 0)
@@ -120,7 +120,7 @@ def g_T() [
   to_(cw / 2, 0)        // stem down
 ]
 
-// ---------- the writer ----------
+// the writer:
 
 // dispatch one character to its glyph
 def glyph(c) [
@@ -170,7 +170,7 @@ def write(s) [
   ]
 ]
 
-// ---------- the piece ----------
+// the piece:
 
 fabric 'woven'
 stitchlen 2

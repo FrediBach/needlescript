@@ -34,7 +34,6 @@ seed 7
 stitchlen stitch
 
 
-// ------------------------------------------------------------
 //  the wave packet's vertical displacement at offset dx from the
 //  packet centre. A raised-cosine envelope * sine: a burst of
 //  waves that fades smoothly to nothing at the packet edges.
@@ -44,7 +43,6 @@ stitchlen stitch
 //  (raised cosine instead of a Gaussian: it reaches exactly zero
 //   at the edge, so the lines beyond the packet are truly flat,
 //   and it needs only the built-in cos.)
-// ------------------------------------------------------------
 def packet(dx) [
   let ax = abs(dx)
   if ax >= packetW [ return 0 ]                 // outside the burst: flat

@@ -18,7 +18,7 @@
 //  hoop whatever arms you choose.
 // ============================================================
 
-// --- the arms (parallel lists: radius, frequency, phase°) ---
+// the arms (parallel lists: radius, frequency, phase°):
 //   Arm 0 is the big slow carrier; later arms are smaller and
 //   faster. Mixing positive and negative frequencies (opposite
 //   spins) is what makes petals and cusps. Try editing these.
@@ -45,10 +45,8 @@ maxdensity 5       // the layers overlap toward the centre (~4 layers of thread)
                    //   you want it lighter for fine fabric.
 
 
-// ------------------------------------------------------------
 //  the raw epicycle point at parameter t (degrees), summing all
 //  arms. Returned pre-scale, pre-rotation, as [x, y].
-// ------------------------------------------------------------
 def epi(t) [
   let x = 0
   let y = 0
@@ -64,10 +62,8 @@ def epi(t) [
 ]
 
 
-// ------------------------------------------------------------
 //  auto-scale: find the curve's maximum radius over one turn so
 //  we can scale it to `fit`. (One coarse pass is plenty.)
-// ------------------------------------------------------------
 let rmax = 0.0001
 let probe = 0
 while probe < 360 [
@@ -79,12 +75,10 @@ while probe < 360 [
 let fitscale = fit / rmax
 
 
-// ------------------------------------------------------------
 //  one layer: the whole curve, scaled, and rotated by `rot`°.
 //  Rotation is applied to the output point:
 //     x' = x cosR - y sinR
 //     y' = x sinR + y cosR
-// ------------------------------------------------------------
 def draw_layer(rot) [
   let cr = cos(rot)
   let sr = sin(rot)

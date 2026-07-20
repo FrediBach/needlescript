@@ -21,7 +21,7 @@ let weftcol   = 6        // [1:8] horizontal-yarn thread
                          //   crossings of these two read as the blend
 let inset     = 0.4      // breathing room around each square
 
-// ---- derived ----
+// derived:
 let span = cells * csize
 let half = span / 2
 let lines = floor((csize - inset * 2) / hatchgap)   // hatch lines per square
@@ -55,7 +55,7 @@ fabric "woven
 seed 7
 stitchlen 2.4
 
-// ---- PASS 1: the weft yarn (horizontal lines) ----
+// PASS 1: the weft yarn (horizontal lines):
 // Every square in a band-ROW gets horizontal lines.
 color weftcol
 for row = 0 to cells - 1 [
@@ -67,7 +67,7 @@ for row = 0 to cells - 1 [
   ]
 ]
 
-// ---- PASS 2: the warp yarn (vertical lines) ----
+// PASS 2: the warp yarn (vertical lines):
 // Every square in a band-COLUMN gets vertical lines.
 // Where this lands on a band-row square, the two yarns interleave
 // in the SAME square -> the blended third tone.

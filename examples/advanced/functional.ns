@@ -27,9 +27,7 @@ let colstep = 24       // [18:1:30] spacing between columns, mm
 let rowy = 22          // [14:1:30] top-row height, mm
 let rowstep = 28       // [20:1:34] spacing between rows, mm
 
-// ---------------------------------------------------------------------
 //  helper: jump to a station centre without sewing a connector thread
-// ---------------------------------------------------------------------
 def goto(x, y) [
   up
   setxy(x, y)
@@ -47,7 +45,6 @@ def goto(x, y) [
 //
 //  Real bartacks are sewn in two passes — a looser anchoring pass,
 //  then a dense covering pass over the top. We do exactly that.
-// ---------------------------------------------------------------------
 def bartack(length, width) [
   // pass 1 — anchoring pass, open spacing, tacks the fabric down
   density 0.8
@@ -76,7 +73,6 @@ def bartack(length, width) [
 //
 //  We bean-stitch the whole figure so every leg is sewn three times:
 //  triple the thread, triple the hold.
-// ---------------------------------------------------------------------
 def boxtack(size) [
   let h = size / 2
   bean 3               // every line sewn 3x — bold and strong
@@ -106,7 +102,6 @@ def boxtack(size) [
 //  packed thread stops the fabric from running.
 //
 //  Two concentric satin rings make a heavier, grommet-like edge.
-// ---------------------------------------------------------------------
 def eyelet(radius) [
   density 0.35
   // outer ring
@@ -134,7 +129,6 @@ def eyelet(radius) [
 //  running crosswise to stop the ends from splitting.
 //
 //  `gap` is the slit width (where you'd cut); `length` is the slot.
-// ---------------------------------------------------------------------
 def buttonhole(length, gap) [
   let half = gap / 2
   density 0.3          // buttonholes are always tightly packed
@@ -176,7 +170,6 @@ def buttonhole(length, gap) [
 //  down and the prongs wrap the rim.
 //
 //  Here we finish the rim of a small disc to show the bound edge.
-// ---------------------------------------------------------------------
 def blanketedge(radius) [
   goto(xcor + radius, ycor)
   seth 0               // start tangent so prongs point outward along the rim
@@ -194,7 +187,6 @@ def blanketedge(radius) [
 //  line — far stronger than a single running stitch — and `lock` ties
 //  the ends so nothing can pull free. This is your go-to topstitch for
 //  load-bearing seams.
-// ---------------------------------------------------------------------
 def reinforcedseam(length) [
   lock 1.2             // beefy tie-in / tie-off at the ends of the run
   bean 3               // each stitch sewn 3x — a strong, bold seam line
@@ -209,7 +201,7 @@ def reinforcedseam(length) [
 //  THE SAMPLER  —  sew all six stations on the grid
 // =====================================================================
 
-// ---- top row -------------------------------------------------------
+// top row:
 color 1
 
 goto(colx, rowy)
@@ -224,7 +216,7 @@ goto(colx + colstep * 2, rowy)
 eyelet(5)                              // station 3: eyelet
 trim
 
-// ---- bottom row ----------------------------------------------------
+// bottom row:
 color 2
 
 goto(colx, rowy - rowstep)
@@ -239,11 +231,9 @@ goto(colx + colstep * 2, rowy - rowstep)
 reinforcedseam(18)                     // station 6: reinforced seam
 trim
 
-// ---------------------------------------------------------------------
 //  Try next:
 //   - bump `density` lower (0.25) on the bartack pass-2 for even more
 //     thread — watch the heatmap go red where the strength lives.
 //   - chain bartacks along a line to reinforce a long pocket mouth.
 //   - wrap any station in `scale 1.4 [ ... ]` to resize it; the satin
 //     spacing stays physical, so the reinforcement density is preserved.
-// ---------------------------------------------------------------------

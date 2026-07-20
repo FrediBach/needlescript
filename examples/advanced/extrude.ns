@@ -34,7 +34,7 @@ maxdensity 4.5           ; stacked walls run a touch hot near the edges — allo
 seed 1
 stitchlen 2
 
-; --- the body: far copies (up-right) first, near copy last on top ---
+; the body: far copies (up-right) first, near copy last on top:
 color 1
 let k = 0
 repeat layers [
@@ -45,7 +45,7 @@ repeat layers [
   ]
 ]
 
-; --- the lit front face: a solid fill, sewn over the near copy ---
+; the lit front face: a solid fill, sewn over the near copy:
 color 2
 fillangle 90
 fillspacing 0.45
@@ -54,7 +54,7 @@ beginfill
   lshape()
 endfill
 
-; --- crisp the near silhouette with one light pass ---
+; crisp the near silhouette with one light pass:
 up gotoc0() down
 lshape()
 trim

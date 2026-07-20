@@ -11,7 +11,7 @@ let radius = 6         // [6:14]
 let spacing = 14       // [14:24]   horizontal gap between copies
 let cellstep = 0.8     // [0:0.5:2.5]  grid grows by this much per copy
 
-// --- one ring of the motif, drawn in plain local space ---
+// one ring of the motif, drawn in plain local space:
 def ring(r) [
   repeat 72 [ fd r * 0.0873 rt 5 ]   // ~2*pi*r/72 per step, 72 * 5 = 360
 ]

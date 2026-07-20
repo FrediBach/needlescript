@@ -39,12 +39,10 @@ stitchlen stitch
 let span = RF * 2
 
 
-// ------------------------------------------------------------
 //  sample the noise field once into a flat list, F[j*G + i].
 //  fbm2 = fractal Brownian motion (summed octaves of simplex
 //  noise), in roughly -1..1. We divide grid coordinates so the
 //  whole grid covers `freq` units of noise space.
-// ------------------------------------------------------------
 let F = filled(G * G, 0)
 for j = 0 to G - 1 [
   for i = 0 to G - 1 [
@@ -65,9 +63,7 @@ def gy(j) [ return 0 - RF + (j / (G - 1)) * span ]
 def in_disc(x, y) [ return (x * x + y * y) <= (RF - 1) * (RF - 1) ]
 
 
-// ------------------------------------------------------------
 //  sew one straight segment, SOLID.
-// ------------------------------------------------------------
 def seg_solid(ax, ay, bx, by) [
   // skip any segment that pokes outside the hoop
   if in_disc(ax, ay) == 0 [ return ]
@@ -78,12 +74,10 @@ def seg_solid(ax, ay, bx, by) [
   setpos([bx, by])
 ]
 
-// ------------------------------------------------------------
 //  sew one straight segment, DASHED (used for minor contours).
 //  We march along the segment laying dashes of `dashlen` with
 //  `gaplen` gaps. (Each contour segment restarts the dash phase;
 //  the segments are short, so this still reads as a dashed line.)
-// ------------------------------------------------------------
 def seg_dashed(ax, ay, bx, by) [
   if in_disc(ax, ay) == 0 [ return ]
   if in_disc(bx, by) == 0 [ return ]
@@ -107,11 +101,9 @@ def emit(ax, ay, bx, by, major) [
 ]
 
 
-// ------------------------------------------------------------
 //  linear interpolation of the crossing point on an edge between
 //  two grid nodes whose values straddle `lev`.
 //  Returns the crossing as [x, y] in mm.
-// ------------------------------------------------------------
 def crossing(xa, ya, va, xb, yb, vb, lev) [
   let denom = vb - va
   let t = 0.5

@@ -1,4 +1,3 @@
-// ----------------------------------------------------------------------
 // Billiard fill — one continuous thread bouncing inside a rectangle,
 // like the old bouncing-ball screensaver. Runs until the measured
 // thread coverage reaches a target, then trims.
@@ -7,7 +6,6 @@
 // slope * (W/H) is rational. We pick slope = (H/W) * phi, so that
 // product is the golden ratio — maximally irrational — and every new
 // pass lands as far from the existing lines as possible.
-// ----------------------------------------------------------------------
 
 fabric 'woven'
 stitchlen 2.5
@@ -17,18 +15,18 @@ autotrim 7                    // cut any long travels automatically
 let hw = 32                   // [16:1:38] rectangle half-width, mm
 let hh = 20                   // [10:1:30] rectangle half-height, mm
 
-// ---- outline ----
+// outline:
 bean 3
 up moveto(-hw, -hh) down
 setxy(hw, -hh)  setxy(hw, hh)  setxy(-hw, hh)  setxy(-hw, -hh)
 bean 1
 trim
 
-// ---- bounce walls sit 1.2 mm inside the outline ----
+// bounce walls sit 1.2 mm inside the outline:
 let bw = hw - 1.2
 let bh = hh - 1.2
 
-// ---- launch direction (unit vector, golden-ratio slope) ----
+// launch direction (unit vector, golden-ratio slope):
 let phi = 1.6180339
 let slope = (bh / bw) * phi   // => slope * (W/H) = phi, never periodic
 let hyp = sqrt(1 + slope * slope)

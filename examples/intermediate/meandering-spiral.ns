@@ -20,12 +20,11 @@ let wobblefreq = 7       // [1:20] noise frequency — higher = tighter wiggles
 let rampexp    = 2.4     // [0.5:0.1:5] chaos ramp: 1 = linear, >1 = wild edge
 let tangle     = 1       // [switch:off,on] also wobble the heading sideways
 
-// --- stitch quality ---
+// stitch quality:
 seed 7
 stitchlen 1.8
 
 
-// ------------------------------------------------------------
 //  Archimedean spiral: radius r = b * theta, where one full
 //  turn (360°) adds exactly `spacing` to r.  So b = spacing/360.
 //  The number of turns needed to reach maxradius falls out of
@@ -35,7 +34,6 @@ stitchlen 1.8
 //  We advance by arc-length `stepdist` each step and convert it
 //  to an angle increment dtheta = stepdist / r, keeping the
 //  stitch length roughly constant as the radius grows.
-// ------------------------------------------------------------
 
 let b = spacing / 360            // mm of radius per degree of sweep
 let theta = 0                    // sweep angle, degrees

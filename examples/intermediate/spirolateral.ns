@@ -1,4 +1,4 @@
-// ---------------------------- Spirolateral engine ----------------------------
+// Spirolateral engine:
 // segments 1,2,...,n (x unit), turn a fixed angle after each, repeat to close.
 // reverse the turn at chosen segment indices for the classic "reverse" figures.
 
@@ -83,7 +83,7 @@ def spiroraw(n, angle, unit, reps, reversals) [
   ]
 ]
 
-// ----------------------------------- scene -----------------------------------
+// scene:
 fabric "woven        // free underlay + pull compensation
 seed 7
 stitchlen 2
@@ -96,7 +96,7 @@ let turn = 144      // [30:6:180] turn angle, degrees
 spiro(sides, turn)
 trim
 
-// -- gallery: swap the call above for any of these (all vetted to close) --
+// gallery: swap the call above for any of these (all vetted to close):
 // spiro(3, 90)              4-fold, 12 segments
 // spiro(5, 90)              4-fold, 20 segments
 // spiro(7, 60)              6-fold, 42 segments

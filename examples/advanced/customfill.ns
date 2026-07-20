@@ -71,10 +71,8 @@ def taper(p, row, v) [
 ]
 
 
-// ------------------------------------------------------------
 //  trace one square cell, centred at the LOCAL origin, then fill it.
 //  `fill …` must be armed just before the beginfill it applies to.
-// ------------------------------------------------------------
 def cell() [
   up setxy(0 - H, 0 - H) down
   beginfill

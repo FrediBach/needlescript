@@ -21,7 +21,7 @@ def hilbert(order, sign, side) [
   rt sign * 90
 ]
 
-// --- the scene ---
+// the scene:
 seed 42
 stitchlen 2
 

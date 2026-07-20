@@ -36,18 +36,14 @@ seed 7
 stitchlen stitch
 
 
-// ------------------------------------------------------------
 //  vertical position of line number i: evenly spaced across the
 //  diameter, from near the bottom to near the top.
-// ------------------------------------------------------------
 def line_y(i) [
   return 0 - RF + (i + 0.5) / nlines * (RF * 2)
 ]
 
-// ------------------------------------------------------------
 //  the displaced y of a point (x, baseY) on a line: base height
 //  plus noise, scaled by how deep inside the break zone it is.
-// ------------------------------------------------------------
 def disturb(x, baseY) [
   // distance from the break centre, normalised to the zone radius
   let dxb = x - breakX

@@ -1,4 +1,4 @@
-// --- Crowded-line circle, full cap -------------------------------
+// Crowded-line circle, full cap:
 // Base grid is independent of the circle. The dense disc is swept
 // on its own, from the true top (+radius) to the bottom (-radius),
 // so no cap is ever clipped.

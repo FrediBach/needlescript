@@ -28,10 +28,8 @@ stitchlen stitch
 let dy = (ytop * 2) / (rows - 1)
 
 
-// ------------------------------------------------------------
 //  one straight stitched segment (used by the path builders).
 //  Respects the current stitch mode (running / bean / satin…).
-// ------------------------------------------------------------
 def seg(ax, ay, bx, by) [
   up
   setpos([ax, ay])
@@ -45,9 +43,7 @@ def seg(ax, ay, bx, by) [
 // start, drops it, then steps along.
 
 
-// ------------------------------------------------------------
 //  STRAIGHT line on baseline y
-// ------------------------------------------------------------
 def line_straight(y) [
   up
   setpos([-HW, y])
@@ -55,9 +51,7 @@ def line_straight(y) [
   setpos([HW, y])
 ]
 
-// ------------------------------------------------------------
 //  SINE wave: amplitude `amp`, `cycles` full periods
-// ------------------------------------------------------------
 def line_sine(y, amp, cycles) [
   let n = 48
   up
@@ -70,9 +64,7 @@ def line_sine(y, amp, cycles) [
   ]
 ]
 
-// ------------------------------------------------------------
 //  ZIGZAG: `teeth` up-down peaks of amplitude `amp`
-// ------------------------------------------------------------
 def line_zigzag(y, amp, teeth) [
   let pts = teeth * 2
   up
@@ -86,9 +78,7 @@ def line_zigzag(y, amp, teeth) [
   ]
 ]
 
-// ------------------------------------------------------------
 //  SPIKES: sawtooth — up to a point, straight back down to baseline
-// ------------------------------------------------------------
 def line_spikes(y, amp, count) [
   up
   setpos([-HW, y])
@@ -101,9 +91,7 @@ def line_spikes(y, amp, count) [
   ]
 ]
 
-// ------------------------------------------------------------
 //  LOOP-DE-LOOP: a curtate cycloid that curls into loops
-// ------------------------------------------------------------
 def line_loops(y, r, count) [
   let n = 120
   up
@@ -117,9 +105,7 @@ def line_loops(y, r, count) [
   ]
 ]
 
-// ------------------------------------------------------------
 //  FIGURE-8 BRAID: two sine strands a half-cycle out of phase
-// ------------------------------------------------------------
 def line_braid(y, amp, cycles) [
   let n = 48
   // strand A
@@ -140,9 +126,7 @@ def line_braid(y, amp, cycles) [
   ]
 ]
 
-// ------------------------------------------------------------
 //  SCALLOPS: a row of half-circle arcs sitting on the baseline
-// ------------------------------------------------------------
 def line_scallops(y, count) [
   let rr = HW / count
   for k = 0 to count - 1 [
@@ -159,9 +143,7 @@ def line_scallops(y, count) [
   ]
 ]
 
-// ------------------------------------------------------------
 //  DASHED: short stitched dashes with gaps (pen up between)
-// ------------------------------------------------------------
 def line_dashed(y, dashlen, gaplen) [
   let x = -HW
   while x < HW [
@@ -175,10 +157,8 @@ def line_dashed(y, dashlen, gaplen) [
   ]
 ]
 
-// ------------------------------------------------------------
 //  TAPERED SATIN: a straight line whose satin width grows then
 //  shrinks, sewn as short segments each at its own width.
-// ------------------------------------------------------------
 def line_satin_taper(y, wmin, wmax) [
   let n = 16
   for i = 0 to n - 1 [

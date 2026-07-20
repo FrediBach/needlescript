@@ -26,7 +26,7 @@ def next() [
   ox += cw + gap
 ]
 
-// ---------- glyphs (each starts with its own go, ends sewn) ----------
+// glyphs (each starts with its own go, ends sewn):
 
 def g_N() [
   go(0, 0)
@@ -120,7 +120,7 @@ def g_T() [
   next()
 ]
 
-// ---------- the word ----------
+// the word:
 
 fabric "woven
 stitchlen 2

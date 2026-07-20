@@ -37,9 +37,7 @@ let CX = [ off * cos(90), off * cos(210), off * cos(330) ]
 let CY = [ off * sin(90), off * sin(210), off * sin(330) ]
 
 
-// ------------------------------------------------------------
 //  one straight stitched segment.
-// ------------------------------------------------------------
 def seg(ax, ay, bx, by) [
   up
   setpos([ax, ay])
@@ -47,14 +45,12 @@ def seg(ax, ay, bx, by) [
   setpos([bx, by])
 ]
 
-// ------------------------------------------------------------
 //  hatch the whole of circle `ci` with parallel lines at `angle`.
 //  For each swept line we find where it enters and exits the
 //  circle (a quadratic) and sew just that chord. Lines that miss
 //  the circle contribute nothing. Three of these, at different
 //  angles, give the whole Venn — the overlaps take care of
 //  themselves.
-// ------------------------------------------------------------
 def hatch_circle(ci, angle) [
   let cx = CX[ci]
   let cy = CY[ci]

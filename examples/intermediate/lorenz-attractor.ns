@@ -41,9 +41,7 @@ stitchlen 1.8
 // add `bean 3` — but raise the density limit, the crossing runs hot.
 
 
-// ------------------------------------------------------------
 //  1. INTEGRATE  — Euler's method, collecting projected points
-// ------------------------------------------------------------
 let x = x0
 let y = y0
 let z = z0
@@ -70,10 +68,8 @@ for i = 1 to steps [
 ]
 
 
-// ------------------------------------------------------------
 //  2. AUTO-FIT  — centre on the bounding box, then scale so the
 //     single farthest point lands exactly on `fitradius`.
-// ------------------------------------------------------------
 let box = bbox(raw)
 let cx  = (box[0] + box[2]) / 2
 let cy  = (box[1] + box[3]) / 2
@@ -93,9 +89,7 @@ for p in raw [
 ]
 
 
-// ------------------------------------------------------------
 //  3. SEW  — resample to even stitch spacing and lay the thread
-// ------------------------------------------------------------
 let pathline = resample(fit, stitch)
 
 color 1

@@ -19,23 +19,19 @@ let branchtaper = 1      // [switch:no,yes] 1 = branches shrink toward the tip
 let tipsize     = 3.5    // [0:0.5:8] little V at the very end of each arm, mm (0 = none)
 let centersize  = 5      // [0:0.5:12] hexagon/polygon at the centre, mm (0 = none)
 
-// --- stitch quality ---
+// stitch quality:
 seed 7
 stitchlen 1.8
 bean 3                   // bold, hand-drawn line — each stitch sewn 3x
 
 
-// ------------------------------------------------------------
 //  one branch: a straight spur of a given length
-// ------------------------------------------------------------
 def branch(blen) [
   fd blen
   bk blen                // sew back out to the spine
 ]
 
-// ------------------------------------------------------------
 //  one arm: spine + symmetric branch pairs + a tip
-// ------------------------------------------------------------
 def arm() [
   // walk the spine in `complexity` steps, dropping a branch pair at each
   let seg = armlen / complexity

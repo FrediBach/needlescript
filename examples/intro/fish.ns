@@ -30,7 +30,7 @@ seed 7
 stitchlen 2
 color 4
 
-// --- the two mirrored sine outlines ---
+// the two mirrored sine outlines:
 def outline(sign) [
   up setxy(-span / 2, sign * gap(-span / 2)) down
   let x = -span / 2
@@ -40,7 +40,7 @@ def outline(sign) [
   ]
 ]
 
-// --- vertical hatch, spacing driven by stride(x) ---
+// vertical hatch, spacing driven by stride(x):
 let x = -span / 2 + 1
 while x <= span / 2 - 1 [
   let g = gap(x)

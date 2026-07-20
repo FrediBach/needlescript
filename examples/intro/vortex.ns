@@ -10,7 +10,7 @@ let disc_r = 42                        // [20:1:46] circle radius, mm
 let twist = 12                         // [0:1:40] outward tilt, degrees
 let row_gap = 1.2                      // [0.6:0.1:2.4] tatami row gap, mm
 
-// --- direction channel: rounded swirl grain ---
+// direction channel: rounded swirl grain:
 // tangent-to-circles heading, tipped 25 deg outward so each row
 // spirals gently instead of closing on itself
 def swirl(p) [
@@ -18,7 +18,7 @@ def swirl(p) [
   return vheading(vrot(p, 90)) + twist
 ]
 
-// --- shape channel: big-gap tatami rows ---
+// shape channel: big-gap tatami rows:
 def airy(p, row, v) [
   return tatamirow(row_gap, 2)          // open decorative rows
   // graded alternative — gaps widen toward one side:
@@ -35,7 +35,7 @@ beginfill
 endfill
 trim
 
-// --- outline ring for a crisp edge ---
+// outline ring for a crisp edge:
 bean 2
 up moveto 0 disc_r down
 seth 90

@@ -1,4 +1,4 @@
-// --- Hidden-circle line art -------------------------------------
+// Hidden-circle line art:
 // Parallel horizontal lines crossing a square; each line fattens
 // (wider satin) wherever it crosses an invisible circle in the centre.
 

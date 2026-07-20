@@ -1,4 +1,4 @@
-// --- A sprinter's silhouette, walked as a dashed path ---
+// A sprinter's silhouette, walked as a dashed path:
 // Same leaning, curved figure as before, but instead of solid `fd` moves
 // we step along it in `cell`-sized units, sewing only the first `ink`
 // fraction of each cell and jumping the rest. Raise `gapratio` and the
@@ -40,7 +40,7 @@ bean 3
 color 5
 home
 
-// --- Repeat horizontally, each copy dashier than the last ---
+// Repeat horizontally, each copy dashier than the last:
 // --- runner field ---
 let count = 20            // [6:1:24] number of runners
 let startx = -38
