@@ -20,7 +20,12 @@ import {
   THREAD_PROFILES,
 } from '../embroidery/embroidery-registry.ts';
 import type { FabricMode, FabricPreset } from '../embroidery/embroidery-registry.ts';
-import { lookupHoopPreset, HOOP_PRESET_NAMES, buildHoopInfo } from '../embroidery/hoop-presets.ts';
+import {
+  lookupHoopPreset,
+  HOOP_PRESET_NAMES,
+  HOOP_SHAPES,
+  buildHoopInfo,
+} from '../embroidery/hoop-presets.ts';
 import type { HoopInfo } from '../core/types.ts';
 import { makeRNG, makeNoise } from '../core/prng.ts';
 import { createNoise2D, createNoise3D } from 'simplex-noise';
@@ -731,7 +736,7 @@ export function initExecCmdHandler(
             st.line,
           );
         info = buildHoopInfo(arg, arg, 'circle');
-      } else if (isList(arg) && arg.items.length === 2) {
+      } else if (isList(arg) && (arg.items.length === 2 || arg.items.length === 3)) {
         const w = num(arg.items[0], 'hoop', st.line);
         const h = num(arg.items[1], 'hoop', st.line);
         if (!isFinite(w) || !isFinite(h) || w <= 0 || h <= 0)
@@ -744,10 +749,31 @@ export function initExecCmdHandler(
             `hoop [${formatNum(w)}, ${formatNum(h)}] — each dimension must be 20–400 mm`,
             st.line,
           );
-        info = buildHoopInfo(w, h, 'rectangle');
+        let shape: HoopInfo['shape'] = 'rectangle';
+        if (arg.items.length === 3) {
+          const rawShape = arg.items[2];
+          if (!isString(rawShape))
+            throw new NeedlescriptError(
+              `hoop shape must be a string — expected ${HOOP_SHAPES.map((item) => `'${item}'`).join(', ')}`,
+              st.line,
+            );
+          const resolved = resolveMode(rawShape, HOOP_SHAPES);
+          if (!resolved)
+            throw new NeedlescriptError(
+              unknownModeMessage('hoop shape', rawShape, HOOP_SHAPES),
+              st.line,
+            );
+          shape = resolved;
+        }
+        if (shape === 'circle' && Math.abs(w - h) > 1e-9)
+          throw new NeedlescriptError(
+            `hoop [${formatNum(w)}, ${formatNum(h)}, 'circle'] — circle width and height must match`,
+            st.line,
+          );
+        info = buildHoopInfo(w, h, shape);
       } else {
         throw new NeedlescriptError(
-          `hoop expects a preset name (e.g. hoop '5x7'), a diameter (e.g. hoop 130), or [width, height] (e.g. hoop [130, 180])`,
+          `hoop expects a preset name (e.g. hoop '5x7'), a diameter (e.g. hoop 130), [width, height], or [width, height, shape] (e.g. hoop [120, 75, 'oval'])`,
           st.line,
         );
       }

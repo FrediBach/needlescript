@@ -127,7 +127,7 @@ export interface PreflightResult {
 
 /** Physical hoop and derived sewable field, as configured by the `hoop` command. */
 export interface HoopInfo {
-  shape: 'circle' | 'rectangle';
+  shape: 'circle' | 'oval' | 'rectangle';
   /** Hoop outer dimension in mm. For circles this is the diameter. */
   widthMM: number;
   /** Hoop outer dimension in mm. For circles this equals widthMM. */

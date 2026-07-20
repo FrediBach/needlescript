@@ -60,7 +60,7 @@ interface Props {
   current: HoopConfig;
   onSelect: (hoop: HoopConfig) => void;
   onClose: () => void;
-  /** When true, the `hoop` language directive is active — show a "set by code" banner. */
+  /** When true, the `hoop` language directive is active. */
   isSetByCode?: boolean;
 }
 
@@ -104,7 +104,7 @@ export default function HoopDialog({ open, current, onSelect, onClose, isSetByCo
             <span className="font-mono text-[10px] text-[var(--gold)] leading-[1.5]">
               hoop set by{' '}
               <code className="bg-[rgba(0,0,0,0.06)] px-[3px] rounded text-inherit">hoop</code>{' '}
-              directive in the source — selection below is for the visual fallback only.
+              directive in the source — choosing below updates that directive.
             </span>
           </div>
         )}

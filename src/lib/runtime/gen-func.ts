@@ -19,7 +19,7 @@ import {
 } from '../geometry/affine.ts';
 import { humanizeMap, snapMapFromSpec } from '../embroidery/effects.ts';
 import { makeDeclumpState, declumpFoldPoint } from '../embroidery/declump.ts';
-import { hoopFieldDomain, hoopFieldPolygon } from '../embroidery/hoop-presets.ts';
+import { hoopFieldDomain, hoopFieldPolygon, inHoopField } from '../embroidery/hoop-presets.ts';
 import { GEN_QWORD_ARG } from '../language/commands.ts';
 import { didYouMean } from '../core/suggestions.ts';
 import { closePath, contourPaths, fillRows, spiralPaths } from '../geometry/fill-paths.ts';
@@ -685,14 +685,7 @@ export function initGenFunc(ctx: RunContext): void {
         // Map point through the CTM (local → hoop space) then test against field.
         const p = gm.toPoint(args[0], 'infield', line);
         const [hx, hy] = apply(ctx.m.ctm, p[0], p[1]);
-        return ctx.m.hoopInfo.shape === 'circle'
-          ? hx * hx + hy * hy <= (ctx.m.hoopInfo.fieldWidthMM / 2) ** 2
-            ? 1
-            : 0
-          : Math.abs(hx) <= ctx.m.hoopInfo.fieldWidthMM / 2 &&
-              Math.abs(hy) <= ctx.m.hoopInfo.fieldHeightMM / 2
-            ? 1
-            : 0;
+        return inHoopField(ctx.m.hoopInfo, hx, hy) ? 1 : 0;
       }
       case 'fieldbounds': {
         // Bounding box of the sewable field: [minX, minY, maxX, maxY] (hoop space).

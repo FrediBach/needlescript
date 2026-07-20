@@ -29,7 +29,7 @@ import { toDST } from './lib/formats/dst.ts';
 import { toPES } from './lib/formats/pes.ts';
 import { toEXP } from './lib/formats/exp.ts';
 import { toSVG } from './lib/formats/svg.ts';
-import { EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, MACHINES } from './data.ts';
+import { EXAMPLES, DEFAULT_EXAMPLE_ID, DEFAULT_HOOP, HOOPS, MACHINES } from './data.ts';
 import type { HoopConfig, MachineHoop, MachinePreset } from './data.ts';
 import { getFallbackHoopFitWarning } from './hoop-fit-warning.ts';
 import type { ExportFormat } from './components/Header.tsx';
@@ -107,6 +107,7 @@ import {
   removeBlock,
 } from './machineBlock.ts';
 import { toast } from 'sonner';
+import { applyHoopDirective } from './hoopSource.ts';
 
 export interface LineSegment {
   line: number;
@@ -318,6 +319,27 @@ export default function App() {
     scrubPos: 0,
   });
   const { design, messages, scrubPos } = program;
+  const effectiveHoop = useMemo((): HoopConfig => {
+    const active = design.activeHoop;
+    if (!active) return selectedHoop;
+    return (
+      HOOPS.find(
+        (hoop) =>
+          hoop.shape === active.shape &&
+          hoop.widthMM === active.widthMM &&
+          hoop.heightMM === active.heightMM,
+      ) ?? {
+        id: 'source-hoop',
+        label:
+          active.shape === 'circle'
+            ? `${active.widthMM} mm round`
+            : `${active.widthMM}×${active.heightMM} mm${active.shape === 'oval' ? ' oval' : ''}`,
+        widthMM: active.widthMM,
+        heightMM: active.heightMM,
+        shape: active.shape,
+      }
+    );
+  }, [design.activeHoop, selectedHoop]);
 
   // ── Lock state (shared between ParametersPanel and StageCanvas) ──────────
   const [lockedParams, setLockedParams] = useState<Set<string>>(() => new Set());
@@ -415,7 +437,7 @@ export default function App() {
   }, [leftWidth, isMobile]);
 
   // SVG import size derived from current hoop (fits within the sewable area)
-  const fitMM = Math.min(selectedHoop.widthMM, selectedHoop.heightMM) - 10;
+  const fitMM = Math.min(effectiveHoop.widthMM, effectiveHoop.heightMM) - 10;
 
   const addMsg = useCallback(
     (text: string, type: ConsoleMessage['type'] = 'info', loc?: WarningLocation) => {
@@ -712,9 +734,9 @@ export default function App() {
   } = useSvgImport({
     fitMM,
     field: {
-      shape: selectedHoop.shape,
-      widthMM: selectedHoop.widthMM - 6,
-      heightMM: selectedHoop.heightMM - 6,
+      shape: effectiveHoop.shape,
+      widthMM: effectiveHoop.widthMM - 6,
+      heightMM: effectiveHoop.heightMM - 6,
     },
     runProgram,
     setSource,
@@ -810,6 +832,16 @@ export default function App() {
       clearActiveSnippet();
     },
     [runProgram, clearActiveSnippet],
+  );
+
+  const handleHoopSelect = useCallback(
+    (hoop: HoopConfig) => {
+      const next = applyHoopDirective(sourceRef.current, hoop);
+      setSelectedHoop(hoop);
+      setSource(next);
+      runProgram(next, design.name);
+    },
+    [design.name, runProgram],
   );
 
   const applyMachinePreset = useCallback(
@@ -1016,7 +1048,7 @@ export default function App() {
       onDrop={handleDrop}
     >
       <Header
-        hoop={selectedHoop}
+        hoop={effectiveHoop}
         onOpenHoopDialog={() => setShowHoopDialog(true)}
         onSVGImport={requestImport}
         onBitmapImport={requestBitmapImport}
@@ -1080,7 +1112,7 @@ export default function App() {
         )}
         <StagePane
           design={displayDesign}
-          hoop={selectedHoop}
+          hoop={effectiveHoop}
           scrubPos={scrubPos}
           onScrubChange={(pos) => dispatch({ type: 'scrub', pos })}
           activeLine={activeLine}
@@ -1135,8 +1167,8 @@ export default function App() {
 
       <HoopDialog
         open={showHoopDialog}
-        current={selectedHoop}
-        onSelect={setSelectedHoop}
+        current={effectiveHoop}
+        onSelect={handleHoopSelect}
         onClose={() => setShowHoopDialog(false)}
         isSetByCode={!!design.activeHoop}
       />
@@ -1170,7 +1202,7 @@ export default function App() {
             }}
             initialDoc={stagingDoc}
             baseSource={source}
-            hoop={selectedHoop}
+            hoop={effectiveHoop}
             onCommit={handleStagingCommit}
           />
         )}

@@ -304,7 +304,9 @@ and turtle commands:
 - **Program directives** `hoop` and `override` (`exec-cmd.ts:171`, `249`) — guarded to
   the top level: not inside a loop/if/procedure (`structuralDepth > 0 || depth > 0`),
   not inside `trace`, and before the first stitch. `override` mutates
-  `ctx.m.effectiveLimits[budgetKey]` within `OVERRIDE_FLOORS`/`OVERRIDE_CEILINGS`.
+  `ctx.m.effectiveLimits[budgetKey]` within `OVERRIDE_FLOORS`/`OVERRIDE_CEILINGS`. `hoop`
+  accepts presets, a circular diameter, rectangular dimensions, or dimensions plus an explicit
+  `circle`/`oval`/`rectangle` shape; shape names use the shared case-insensitive mode resolver.
 - **`mark`** — records a labelled position marker.
 - **`chalk`** — validates point/path/group data through `chalk.ts`, snapshots and
   affine-maps it without touching machine output, RNG, turtle, satin, or history.

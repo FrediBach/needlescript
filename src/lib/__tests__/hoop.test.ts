@@ -102,6 +102,27 @@ describe('hoop numeric and list forms', () => {
     expect(r.activeHoop?.fieldHeightMM).toBe(124);
   });
 
+  it('shaped list form creates an oval hoop', () => {
+    const r = run("hoop [120, 75, 'oval']\nfd 10");
+    expect(r.activeHoop).toMatchObject({
+      shape: 'oval',
+      widthMM: 120,
+      heightMM: 75,
+      fieldWidthMM: 114,
+      fieldHeightMM: 69,
+    });
+  });
+
+  it('oval field reporters use ellipse geometry', () => {
+    const r = run(
+      "hoop [120, 75, 'oval']\nprint infield([50, 0])\nprint infield([0, 36])\nprint infield([50, 30])",
+    );
+    expect(r.printed).toEqual(['1', '0', '0']);
+    expect(run("hoop [120, 75, 'oval']\nlet p = fieldpath()\nprint len(p)").printed[0]).not.toBe(
+      '4',
+    );
+  });
+
   it('hoop(pick(sizes)) expression form works', () => {
     expect(() => run('let sizes = [100, 150, 200]\nhoop pick(sizes)')).not.toThrow();
   });
@@ -127,7 +148,12 @@ describe('hoop validation errors', () => {
   });
 
   it('list with wrong length is an error', () => {
-    expect(() => run('hoop [100, 200, 300]')).toThrow(/preset.*diameter.*\[width, height\]/i);
+    expect(() => run('hoop [100, 200, 300]')).toThrow(/hoop shape must be a string/i);
+  });
+
+  it('validates a shaped list mode and circular dimensions', () => {
+    expect(() => run("hoop [120, 75, 'ovla']")).toThrow(/Unknown hoop shape.*did you mean.*oval/i);
+    expect(() => run("hoop [120, 75, 'circle']")).toThrow(/width and height must match/i);
   });
 
   it('unknown preset name errors with did-you-mean', () => {

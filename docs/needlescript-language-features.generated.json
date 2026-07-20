@@ -1726,10 +1726,10 @@
       "editor": {
         "kind": "function",
         "detail": "set the physical hoop and sewable field",
-        "documentation": "Configure the physical hoop for this design. The sewable field is the hoop inset by 3 mm on every side.\n\n**Named presets:**\n- `'round100'` — ⌀100 mm round (default)\n- `'4x4'` — 100 × 100 mm\n- `'5x7'` — 130 × 180 mm  \n- `'6x10'` — 160 × 260 mm\n- `'8x8'` — 200 × 200 mm\n- `'8x12'` — 200 × 300 mm\n\n**Numeric (round hoop):** `hoop 150` → ⌀150 mm\n**List (rectangular):** `hoop [130, 180]` → 130 × 180 mm\n\nMust be at the top of the program, before any stitches. At most one per program.\n\n```\nhoop '5x7'\nseed 42\nlet pts = scatter(8)  // fills the 124 × 174 mm field\n```",
+        "documentation": "Configure the physical hoop for this design. The sewable field is the hoop inset by 3 mm on every side.\n\n**Named presets:**\n- `'round100'` — ⌀100 mm round (default)\n- `'4x4'` — 100 × 100 mm\n- `'5x7'` — 130 × 180 mm  \n- `'6x10'` — 160 × 260 mm\n- `'8x8'` — 200 × 200 mm\n- `'8x12'` — 200 × 300 mm\n\n**Numeric (round hoop):** `hoop 150` → ⌀150 mm\n**List (rectangular):** `hoop [130, 180]` → 130 × 180 mm\n**Shaped list:** `hoop [120, 75, 'oval']` → 120 × 75 mm oval. Shape choices are `'circle'`, `'oval'`, and `'rectangle'`; circular dimensions must match.\n\nMust be at the top of the program, before any stitches. At most one per program.\n\n```\nhoop '5x7'\nseed 42\nlet pts = scatter(8)  // fills the 124 × 174 mm field\n```",
         "completion": { "kind": "text", "text": "hoop '${1|round100,4x4,5x7,6x10,8x8,8x12|}'" },
         "isSnippet": true,
-        "signatures": [["preset"], ["diameter"], ["dimensions"]]
+        "signatures": [["preset"], ["diameter"], ["dimensions"], ["shapedDimensions"]]
       }
     },
     {

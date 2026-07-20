@@ -962,17 +962,18 @@ hoop 'round100'     // default — ⌀100 mm round, ⌀94 mm field
 hoop '5x7'          // 130 × 180 mm portrait, 124 × 174 mm field
 hoop 150            // custom round ⌀150 mm
 hoop [180, 130]     // custom rectangle (landscape)
+hoop [120, 75, 'oval'] // custom oval
 ```
 
-Presets (case-insensitive): `'round100'` (default), `'4x4'` 100×100, `'5x7'` 130×180, `'6x10'` 160×260, `'8x8'` 200×200, `'8x12'` 200×300 mm. Rectangular presets are portrait; use the list form for landscape.
+Presets (case-insensitive): `'round100'` (default), `'4x4'` 100×100, `'5x7'` 130×180, `'6x10'` 160×260, `'8x8'` 200×200, `'8x12'` 200×300 mm. Rectangular presets are portrait; use the list form for landscape. A shaped list appends case-insensitive `'circle'`, `'oval'`, or `'rectangle'`; circle width and height must match.
 
 ### Field reporters (Library tier, call-syntax, zero draws)
 
-| Call            | Returns                                                                                                                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `infield(p)`    | `1`/`0` — p inside the sewable field (maps through the current transform). Idiom: `if infield(pos()) [ … ]`                    |
-| `fieldbounds()` | `[minX, minY, maxX, maxY]`                                                                                                     |
-| `fieldpath()`   | field boundary as a closed CCW region (round fields polygonised at ≤ 2 mm chords) — feed to `clippaths`/`offsetpath`/`scatter` |
+| Call            | Returns                                                                                                                             |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `infield(p)`    | `1`/`0` — p inside the sewable field (maps through the current transform). Idiom: `if infield(pos()) [ … ]`                         |
+| `fieldbounds()` | `[minX, minY, maxX, maxY]`                                                                                                          |
+| `fieldpath()`   | field boundary as a closed CCW region (round/oval fields polygonised at ≤ 2 mm chords) — feed to `clippaths`/`offsetpath`/`scatter` |
 
 Hoop-agnostic margin idiom: `let margin = first(offsetpath(fieldpath(), -6))`.
 

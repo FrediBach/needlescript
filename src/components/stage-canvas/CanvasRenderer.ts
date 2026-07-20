@@ -980,11 +980,7 @@ function drawHoop(
   // Use activeHoop dimensions if a `hoop` directive is in effect.
   const hoopW = activeHoop ? activeHoop.widthMM : hoop.widthMM;
   const hoopH = activeHoop ? activeHoop.heightMM : hoop.heightMM;
-  const hoopShape: 'circle' | 'rectangle' = activeHoop
-    ? activeHoop.shape
-    : hoop.shape === 'oval'
-      ? 'circle'
-      : hoop.shape;
+  const hoopShape: HoopConfig['shape'] = activeHoop ? activeHoop.shape : hoop.shape;
 
   const rx = (hoopW / 2) * scale;
   const ry = (hoopH / 2) * scale;
@@ -1029,7 +1025,7 @@ function drawHoop(
 /** Draw a hoop path from shape + half-dimensions (for activeHoop support). */
 function addHoopPathFromDims(
   ctx: CanvasRenderingContext2D,
-  shape: 'circle' | 'rectangle',
+  shape: HoopConfig['shape'],
   rx: number,
   ry: number,
   cx: number,
@@ -1038,6 +1034,8 @@ function addHoopPathFromDims(
 ) {
   if (shape === 'circle') {
     ctx.arc(cx, cy, rx, 0, Math.PI * 2);
+  } else if (shape === 'oval') {
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   } else {
     const r = Math.min(5 * scale, rx * 0.12, ry * 0.12);
     const x = cx - rx,

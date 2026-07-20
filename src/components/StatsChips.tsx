@@ -14,7 +14,10 @@ interface Props {
 function formatHoopChip(design: DesignState): string | null {
   const h = design.activeHoop;
   if (!h) return null;
-  const hoopStr = h.shape === 'circle' ? `hoop ⌀${h.widthMM}` : `hoop ${h.widthMM}×${h.heightMM}`;
+  const hoopStr =
+    h.shape === 'circle'
+      ? `hoop ⌀${h.widthMM}`
+      : `hoop ${h.widthMM}×${h.heightMM}${h.shape === 'oval' ? ' oval' : ''}`;
   const fieldStr =
     h.shape === 'circle'
       ? `field ⌀${h.fieldWidthMM}`

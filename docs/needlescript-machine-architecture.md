@@ -564,6 +564,11 @@ field (`inHoopField`) and the physical hoop (`inHoopOuter`), collecting the firs
 unreachable). The interpreter turns these into overflow warnings with spatial
 `WarningLocation` data at the end of the run.
 
+Circle and oval containment use their physical radii and rectangular containment uses axis-aligned
+half-extents. Field polygons approximate both circular and oval boundaries at a bounded chord
+length; implicit generator domains retain exact disc/ellipse containment while exposing a stable
+polygon to Voronoi clipping and path reporters.
+
 `fieldLocked` is set when a generator (`scatter`/`voronoi`/`relax`) consumes the implicit
 field domain, so a later `hoop` call errors clearly instead of silently using the wrong
 field.
