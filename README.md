@@ -36,15 +36,18 @@ npm run dev        # start the playground at http://localhost:5173
 
 Other scripts:
 
-| Command                 | What it does                                                  |
-| ----------------------- | ------------------------------------------------------------- |
-| `npm run build`         | typecheck + production build into `dist/`                     |
-| `npm run build:lib`     | build the publishable `needlescript` library into `dist-lib/` |
-| `npm run preview`       | serve the production build locally                            |
-| `npm test`              | run the test suite once (Vitest)                              |
-| `npm run test:watch`    | run tests in watch mode                                       |
-| `npm run test:coverage` | run tests with V8 coverage                                    |
-| `npm run lint`          | ESLint over the whole project                                 |
+| Command                           | What it does                                                  |
+| --------------------------------- | ------------------------------------------------------------- |
+| `npm run build`                   | typecheck + production build into `dist/`                     |
+| `npm run build:lib`               | build the publishable `needlescript` library into `dist-lib/` |
+| `npm run preview`                 | serve the production build locally                            |
+| `npm run examples:previews`       | regenerate square thumbnails for all bundled examples         |
+| `npm run examples:previews:watch` | watch `.ns` examples and update their thumbnails              |
+| `npm run examples:previews:check` | verify that committed example thumbnails are current          |
+| `npm test`                        | run the test suite once (Vitest)                              |
+| `npm run test:watch`              | run tests in watch mode                                       |
+| `npm run test:coverage`           | run tests with V8 coverage                                    |
+| `npm run lint`                    | ESLint over the whole project                                 |
 
 The app is a React 19 + TypeScript + Vite single-page app. The language engine itself (`src/lib/`) has **no DOM dependencies** and can be used as a standalone library (see [Using the engine as a library](#using-the-engine-as-a-library)).
 
@@ -81,7 +84,7 @@ src/
 - **Console** — run results, warnings, `print` output, and errors with line numbers.
 - **Stage** — a 100 mm virtual hoop rendered on canvas: thread per colour, underlay drawn thinner and lighter, dashed jump lines, needle penetration points when zoomed, hoop-overflow and density warnings as chips, plus a **density heatmap toggle** (thread coverage in layers) and a **handles toggle** for draggable point handles (see [Point handles](#point-handles) below).
 - **Playback** — play (~7 s) or scrub the stitch sequence stitch by stitch. While scrubbed, the **source line currently sewing is highlighted in the editor** and shown next to the counter — the fastest way to answer "which line made this stitch?"
-- **Examples** — bundled programs in the header dropdown (bloom, wreath, wander, star, badge, sampler, waves, tree, fern, flow, shell, patch, meadow, echo, shatter).
+- **Examples** — search bundled programs by topic, coding concept, command, or purpose. Result cards include generated stitch previews, concise descriptions, and tags.
 - **Parameters** — annotate any variable declaration with a comment to expose it as a live control in the Parameters panel below the editor: `// [min:max]` for sliders, `// [switch]` for toggles, or `// [xy]` on a two-element list literal for a **draggable point handle** rendered directly on the stage. Drag sliders or handles, lock individual parameters, randomize unlocked ones with the shuffle button, and pick named presets — all without editing the source. See [Customizer](#customizer) below.
 - **Download .DST** — export the current design as a Tajima stitch file.
 - **Import SVG** — convert SVG vector structure into _editable_ NeedleScript code. Quick import and “Import with options” share one parser, operation model, and emitter. A shape with both fill and stroke becomes two independently configurable operations that reference one named geometry; `evenodd`/`nonzero` topology, nested groups, inherited presentation attributes, transforms, physical stroke widths, and the active round/oval/rectangular field are preserved. Supported geometry is `<path>` (M L H V C S Q T A Z), rect/circle/ellipse/line/polyline/polygon. Opaque 2–8 stop `<linearGradient>` fills retain their stop colors, offsets, coordinate units, inheritance, and transforms, then emit density-neutral `gradientrowsn` recipes with adjustable row pitch and stitch length. Radial, repeating, transparent, and stroke gradients remain explicit findings instead of being misrepresented as linear embroidery. Unknown paints, text, images, `<use>`, masks, filters, and other deferred SVG features are likewise reported instead of silently approximated. Curve output can use editable `// [curve]` specs with `curveflat`. Replace and Append preview the exact source they commit. In the options workspace, select two single-path operations and use **Create relationship** to pair two open paths as authored satin rails or repeat the second path as a motif along the first. The generated program keeps both source bindings and uses `satinbetween` or `std.layout.alongpath`; it never infers nearby rails or expands the result into baked stitches.

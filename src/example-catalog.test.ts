@@ -6,6 +6,12 @@ import {
 } from './example-catalog.ts';
 import { ALL_EXAMPLES, EXAMPLES, EXAMPLE_CATEGORIES, START_HERE_EXAMPLES } from './data.ts';
 
+const examplePreviews = import.meta.glob('../public/example-previews/*.svg', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+}) as Record<string, string>;
+
 describe('example catalogue', () => {
   it('catalogues every bundled example exactly once', () => {
     const catalogIds = EXAMPLE_CATALOG.map(({ id }) => id);
@@ -42,5 +48,27 @@ describe('example catalogue', () => {
   it('keeps the start-here collection deliberate and ordered', () => {
     expect(new Set(START_HERE_EXAMPLE_IDS).size).toBe(START_HERE_EXAMPLE_IDS.length);
     expect(START_HERE_EXAMPLES.map(({ id }) => id)).toEqual(START_HERE_EXAMPLE_IDS);
+  });
+
+  it('has one square generated preview per example', () => {
+    const previewIds = Object.keys(examplePreviews)
+      .map(
+        (filename) =>
+          filename
+            .split('/')
+            .at(-1)
+            ?.replace(/\.svg$/, '') ?? '',
+      )
+      .toSorted();
+    const exampleIds = EXAMPLE_CATALOG.map(({ id }) => id).toSorted();
+
+    expect(previewIds).toEqual(exampleIds);
+    for (const id of previewIds) {
+      const svg = examplePreviews[`../public/example-previews/${id}.svg`];
+      const viewBox = svg.match(/viewBox="([^ ]+) ([^ ]+) ([^ ]+) ([^"]+)"/);
+      expect(viewBox, `${id} viewBox`).not.toBeNull();
+      expect(Number(viewBox?.[3]), `${id} square width`).toBeCloseTo(Number(viewBox?.[4]), 5);
+      expect(svg, `${id} preview dimensions`).toContain('width="256" height="256"');
+    }
   });
 });

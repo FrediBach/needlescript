@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 2" width="256" height="256">
+  <title>stipple</title>
+  <rect x="0" y="0" width="2" height="2" fill="#f5efe4"/>
+  <path fill="none" stroke="#31604f" stroke-width="0.4" stroke-linecap="round" stroke-linejoin="round" d="M1.000,1.000 L1.000,1.000"/>
+</svg>

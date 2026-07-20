@@ -30,3 +30,26 @@ Kinds describe the example's purpose instead of its subjective difficulty:
 
 Catalogue integrity is checked at startup and by tests. Missing files, missing metadata, duplicate
 IDs, and a mismatch between the catalogue category and directory all fail loudly.
+
+## Preview thumbnails
+
+The example browser loads square SVG thumbnails from `public/example-previews/`. Generate all
+previews after adding, removing, or moving examples:
+
+```bash
+npm run examples:previews
+```
+
+During example authoring, start the watcher in another terminal. It runs the real interpreter and
+updates only the preview whose `.ns` source changed:
+
+```bash
+npm run examples:previews:watch
+```
+
+Generated SVGs are committed so production builds do not need to execute NeedleScript. CI or local
+validation can detect missing, stale, or orphaned assets without rewriting them:
+
+```bash
+npm run examples:previews:check
+```

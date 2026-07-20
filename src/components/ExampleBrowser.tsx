@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog.tsx';
 import { Input } from '@/components/ui/input.tsx';
 import { cn } from '@/utils.ts';
-import { SearchIcon, SparklesIcon, XIcon } from 'lucide-react';
+import { ImageIcon, SearchIcon, SparklesIcon, XIcon } from 'lucide-react';
 
 type ExampleView = 'all' | 'start-here' | ExampleCategoryId;
 type KindFilter = 'all' | ExampleKind;
@@ -29,6 +29,7 @@ interface Props {
 
 const categoryById = new Map(EXAMPLE_CATEGORIES.map((category) => [category.id, category]));
 const kindFilters: readonly KindFilter[] = ['all', 'recipe', 'sampler', 'design', 'validation'];
+const examplePreviewRoot = `${import.meta.env.BASE_URL}example-previews`;
 
 function normalizedSearchText(example: Example): string {
   return [
@@ -63,9 +64,10 @@ export function ExampleBrowser({ open, onOpenChange, onExampleSelect }: Props) {
     const candidates =
       view === 'start-here'
         ? START_HERE_EXAMPLES
-        : indexedExamples
-            .map(({ example }) => example)
-            .filter((example) => view === 'all' || example.category === view);
+        : indexedExamples.reduce<Example[]>((matching, { example }) => {
+            if (view === 'all' || example.category === view) matching.push(example);
+            return matching;
+          }, []);
     const searchTextById = new Map(
       indexedExamples.map(({ example, searchText }) => [example.id, searchText]),
     );
@@ -176,30 +178,48 @@ export function ExampleBrowser({ open, onOpenChange, onExampleSelect }: Props) {
                   key={example.id}
                   type="button"
                   onClick={() => selectExample(example.id)}
-                  className="group cursor-pointer rounded-lg border border-foreground/10 bg-background p-3 text-left transition-colors hover:border-gold/45 hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="group flex cursor-pointer gap-3 rounded-lg border border-foreground/10 bg-background p-2.5 text-left transition-colors hover:border-gold/45 hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="font-mono text-[13px] font-semibold text-foreground group-hover:text-gold">
-                      {example.title}
-                    </span>
-                    <Badge variant="outline" className="h-4 px-1.5 font-mono text-[9px] uppercase">
-                      {EXAMPLE_KIND_LABELS[example.kind]}
-                    </Badge>
+                  <div className="relative size-[74px] shrink-0 overflow-hidden rounded-md border border-foreground/10 bg-muted/55">
+                    <ImageIcon className="absolute top-1/2 left-1/2 size-4 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/35" />
+                    <img
+                      src={`${examplePreviewRoot}/${example.id}.svg`}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="absolute inset-0 size-full object-cover"
+                      onError={(event) => {
+                        event.currentTarget.hidden = true;
+                      }}
+                    />
                   </div>
-                  <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                    {example.summary}
-                  </p>
-                  <div className="mt-2 flex items-center gap-1.5 overflow-hidden">
-                    <span className="shrink-0 font-mono text-[9px] tracking-[0.08em] text-gold/80 uppercase">
-                      {categoryById.get(example.category)?.label}
-                    </span>
-                    <span className="text-foreground/20">·</span>
-                    <span className="truncate font-mono text-[9px] text-muted-foreground">
-                      {example.tags.slice(0, 4).join(' · ')}
-                    </span>
-                    <span className="ml-auto shrink-0 font-mono text-[9px] text-muted-foreground">
-                      {example.lineCount} lines
-                    </span>
+                  <div className="min-w-0 flex-1 py-0.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="font-mono text-[13px] font-semibold text-foreground group-hover:text-gold">
+                        {example.title}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="h-4 px-1.5 font-mono text-[9px] uppercase"
+                      >
+                        {EXAMPLE_KIND_LABELS[example.kind]}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                      {example.summary}
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-1.5 overflow-hidden">
+                      <span className="shrink-0 font-mono text-[9px] tracking-[0.08em] text-gold/80 uppercase">
+                        {categoryById.get(example.category)?.label}
+                      </span>
+                      <span className="text-foreground/20">·</span>
+                      <span className="truncate font-mono text-[9px] text-muted-foreground">
+                        {example.tags.slice(0, 4).join(' · ')}
+                      </span>
+                      <span className="ml-auto shrink-0 font-mono text-[9px] text-muted-foreground">
+                        {example.lineCount} lines
+                      </span>
+                    </div>
                   </div>
                 </button>
               ))}
