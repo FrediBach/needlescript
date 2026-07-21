@@ -1414,6 +1414,16 @@ Contract: zero RNG draws, zero emission — branching on them keeps determinism.
 
 ---
 
+## 20.1 PhysicsIntellisense diagnostics
+
+Full caller-selected physics analysis adds bounded, construction-aware checks for missing or unsuitable underlay on wide satin and large fills; sparse geometric coverage; per-construction short-stitch ratios; accumulated jump travel per uninterrupted color run; and experimental directional-compensation mismatch. Findings carry semantic geometry, source attribution, playback ranges, measured values and thresholds, evidence classification, remediation guidance, methodology, limitations, and an explicit performance cap.
+
+The generic gates are 4 mm satin width or 100 mm² fill area for underlay review, more than 20% uncovered construction samples for a coverage gap, more than 25% short topping segments for a construction short-stitch ratio, and total untrimmed color-run jumps above the selected machine profile's preferred jump length. Coverage sampling uses the declared thread width. Machine-profile movement and travel thresholds remain local run options, not portable source policy.
+
+Declared fabric, thread width/profile, needle, stabilizer, and topping are retained as report context. Needle, stabilizer, topping, and fabric presets do not create material-specific warnings or alter thresholds pending physical sew-out evidence. Directional mismatch is an informational experimental model only and never fails strict preflight. Every expansion detector examines at most the documented construction/event caps, emits at most three findings, and never changes events, warnings, RNG state, or exports.
+
+---
+
 ## 21. Debugging commands
 
 | Command                        | Effect                                                                                   |
@@ -1513,7 +1523,7 @@ unreachable penetration. Do not send that diagnostic fixture to a machine.
 
 ---
 
-## 25. Structured feature index
+## 26. Structured feature index
 
 This index is generated from the same categorized feature records used by Monaco and the compact LLM edition. Use the dialog's `tag:…` and `category:…` search forms for metadata filtering.
 
@@ -1969,7 +1979,7 @@ Live coverage and prior-penetration queries.
 
 ---
 
-## 26. Standard library index
+## 27. Standard library index
 
 Imports use `import std.module.procedure as alias`. The dedicated [standard-library reference](./needlescript-standard-library-reference.md) contains extended examples and construction notes.
 

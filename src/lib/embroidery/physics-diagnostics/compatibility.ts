@@ -40,6 +40,53 @@ function assumptionsFor(input: PhysicsReportCompatibilityInput): PhysicsAssumpti
       source: 'default',
       effect: 'Material-sensitive findings use generic rather than fabric-specific evidence.',
     });
+  else
+    assumptions.push({
+      key: 'fabric-profile',
+      label: 'Declared fabric',
+      value: input.material.fabricPreset,
+      source: 'program',
+      effect:
+        'Carries source-declared material context into the report; no fabric-specific failure rule is applied without physical evidence.',
+    });
+  if (
+    input.material.threadProfile !== 'polyester-40wt' ||
+    Math.abs(input.material.threadWidthMM - 0.4) > 1e-9
+  )
+    assumptions.push({
+      key: 'thread-profile',
+      label: 'Thread profile',
+      value: `${input.material.threadProfile} (${input.material.threadWidthMM.toFixed(2)} mm modeled width)`,
+      source: 'program',
+      effect: 'The modeled width contributes to geometric coverage measurements.',
+    });
+  if (input.material.needleSize !== undefined)
+    assumptions.push({
+      key: 'needle-size',
+      label: 'Needle',
+      value: `NM ${input.material.needleSize}`,
+      source: 'program',
+      effect:
+        'Recorded for sew-out context only; it does not change warning thresholds without physical evidence.',
+    });
+  if (input.material.stabilizer && input.material.stabilizer !== 'none')
+    assumptions.push({
+      key: 'stabilizer',
+      label: 'Stabilizer',
+      value: input.material.stabilizer,
+      source: 'program',
+      effect:
+        'Recorded for sew-out context only; it does not change warning thresholds without physical evidence.',
+    });
+  if (input.material.topping)
+    assumptions.push({
+      key: 'topping',
+      label: 'Topping',
+      value: 'Declared',
+      source: 'program',
+      effect:
+        'Recorded for sew-out context only; it does not change warning thresholds without physical evidence.',
+    });
   return assumptions;
 }
 
@@ -83,6 +130,9 @@ function diagnosticDraft(
     evidence: catalog.evidence,
     title: catalog.title,
     explanation: catalog.explanation,
+    ...(catalog.methodology ? { methodology: catalog.methodology } : {}),
+    ...(catalog.limitations ? { limitations: [...catalog.limitations] } : {}),
+    ...(catalog.performanceCap ? { performanceCap: catalog.performanceCap } : {}),
     sourceLocations,
     ...(!sourceLocations.length
       ? {
@@ -95,6 +145,9 @@ function diagnosticDraft(
       : {}),
     geometry,
     playbackRanges,
+    ...(issue.measurements?.length
+      ? { measurements: issue.measurements.map((measurement) => ({ ...measurement })) }
+      : {}),
     ...(constructionIds?.length ? { constructionIds } : {}),
     remedies: catalog.remedies.map((remedy) => ({ ...remedy })),
     documentationId: catalog.documentationId,

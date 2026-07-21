@@ -475,6 +475,10 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     );
 
   const analysisStartedAt = performance.now();
+  const compensation = directionalCompensationPreview(m.materialIntent, m.pullComp, {
+    mode: m.compensationMode,
+    pullCompExplicit: m.pullCompExplicit,
+  });
   const preflightInput = {
     events: preflightEvents,
     warnings: m.warnings,
@@ -484,6 +488,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     profile: machineProfile,
     mode: ctx.preflightMode,
     constructionRecords,
+    material: m.materialIntent,
+    compensation,
   };
   const preflight = buildPreflightResult(preflightInput);
   if (ctx.preflightMode === 'strict') {
@@ -516,10 +522,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     locks,
     density,
     material: { ...m.materialIntent },
-    compensation: directionalCompensationPreview(m.materialIntent, m.pullComp, {
-      mode: m.compensationMode,
-      pullCompExplicit: m.pullCompExplicit,
-    }),
+    compensation,
     machineProfile,
     activeHoop,
     activeOverrides,

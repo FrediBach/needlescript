@@ -14,6 +14,9 @@ export interface PhysicsDiagnosticCatalogEntry {
   geometryRole: DiagnosticGeometryRole;
   title: string;
   explanation: string;
+  methodology?: string;
+  limitations?: readonly string[];
+  performanceCap?: string;
   remedies: readonly PhysicsRemedy[];
   documentationId: string;
 }
@@ -336,6 +339,150 @@ export const PHYSICS_DIAGNOSTIC_CATALOG = Object.freeze([
     documentationId: 'physics.path.direction-change-cluster',
   },
   {
+    code: 'underlay.missing-wide-construction',
+    category: 'underlay',
+    defaultSeverity: 'warning',
+    evidence: 'heuristic',
+    geometryRole: 'envelope',
+    title: 'Wide construction has no underlay',
+    explanation:
+      'An explicit wide satin column or large fill has no generated foundation stitches beneath its topping.',
+    methodology:
+      'Checks explicit construction sidecars for underlay events once realized satin width or fill area exceeds the generic threshold.',
+    limitations: [
+      'The rule does not model fabric, stabilizer, topping, or external preparation; a physical sew-out may support a different choice.',
+    ],
+    performanceCap: 'The first 64 constructions; at most three findings.',
+    remedies: [
+      guidance(
+        'underlay.missing-wide-construction',
+        'Add a foundation pass',
+        "Use underlay 'auto' for satin or fillunderlay 'auto' for fills, then verify the sew-out.",
+      ),
+    ],
+    documentationId: 'physics.underlay.missing-wide-construction',
+  },
+  {
+    code: 'underlay.unsuitable-wide-construction',
+    category: 'underlay',
+    defaultSeverity: 'warning',
+    evidence: 'heuristic',
+    geometryRole: 'envelope',
+    title: 'Underlay may not support the construction width',
+    explanation:
+      'The selected underlay is present but does not distribute foundation stitches across this wide construction.',
+    methodology:
+      'Flags center-only satin underlay at or above 4 mm and edge-only fill underlay above 100 mm², matching the generic auto-underlay transition points.',
+    limitations: [
+      'Specialty materials and externally prepared grounds can make a simpler underlay intentional.',
+    ],
+    performanceCap: 'The first 64 constructions; at most three findings.',
+    remedies: [
+      guidance(
+        'underlay.unsuitable-wide-construction',
+        'Use width-distributing underlay',
+        'Use an auto, zigzag, or multi-pass satin foundation; for a large fill, add a tatami foundation pass.',
+      ),
+    ],
+    documentationId: 'physics.underlay.unsuitable-wide-construction',
+  },
+  {
+    code: 'coverage.construction-gap',
+    category: 'coverage',
+    defaultSeverity: 'warning',
+    evidence: 'heuristic',
+    geometryRole: 'hotspot',
+    title: 'Construction has sparse coverage gaps',
+    explanation:
+      'A meaningful portion of an explicit satin or fill envelope lies farther from topping thread than the generic coverage radius.',
+    methodology:
+      'Samples the explicit envelope on a bounded grid and measures each sample against capped topping segments using the declared thread width.',
+    limitations: [
+      'Decorative open fills and deliberately sparse satin are valid styles; the model measures geometric coverage, not visual opacity.',
+    ],
+    performanceCap:
+      'The first 64 constructions, with 512 envelope samples and 1,024 topping segments per construction; three findings.',
+    remedies: [
+      guidance(
+        'coverage.construction-gap',
+        'Close the topping spacing',
+        'Reduce density/fill spacing, simplify the boundary, or add a deliberate border where coverage must meet an edge.',
+      ),
+    ],
+    documentationId: 'physics.coverage.construction-gap',
+  },
+  {
+    code: 'stitch.construction-short-ratio',
+    category: 'stitch',
+    defaultSeverity: 'warning',
+    evidence: 'machine-profile',
+    geometryRole: 'hotspot',
+    title: 'Construction contains too many short stitches',
+    explanation:
+      'A large share of one explicit construction falls below the selected machine profile’s reliable movement threshold.',
+    methodology:
+      'Measures consecutive topping stitch segments within one construction and compares the short-segment ratio with a 25 percent generic limit.',
+    limitations: [
+      'Intentional cornering and small lettering can require short stitches; inspect the highlighted construction and test sew-out.',
+    ],
+    performanceCap:
+      'The first 64 constructions and 8,192 topping segments per construction; three findings.',
+    remedies: [
+      guidance(
+        'stitch.construction-short-ratio',
+        'Simplify the construction path',
+        'Open tight corners, increase useful stitch length, or enlarge the construction.',
+      ),
+    ],
+    documentationId: 'physics.stitch.construction-short-ratio',
+  },
+  {
+    code: 'travel.color-run-jump-burden',
+    category: 'travel',
+    defaultSeverity: 'warning',
+    evidence: 'machine-profile',
+    geometryRole: 'travel',
+    title: 'Color run accumulates excessive jump travel',
+    explanation:
+      'One uninterrupted color run accumulates several untrimmed jumps whose total exceeds the selected machine profile’s preferred travel.',
+    methodology:
+      'Groups jumps between trim/color boundaries, totals physical jump distance per color run, and requires at least two jump segments.',
+    limitations: ['A machine or operator may trim connectors outside the generated event stream.'],
+    performanceCap: 'One linear event-stream pass and at most three findings.',
+    remedies: [
+      guidance(
+        'travel.color-run-jump-burden',
+        'Shorten or cut the travel',
+        'Reorder motifs within the color run or add trims between disconnected groups.',
+      ),
+    ],
+    documentationId: 'physics.travel.color-run-jump-burden',
+  },
+  {
+    code: 'material.directional-compensation-mismatch',
+    category: 'material',
+    defaultSeverity: 'info',
+    evidence: 'experimental',
+    geometryRole: 'envelope',
+    title: 'Directional material intent uses scalar compensation',
+    explanation:
+      'The declared grain-axis stretch differs enough to produce direction-dependent compensation, while this construction uses legacy scalar compensation.',
+    methodology:
+      'Compares declared along-grain and cross-grain stretch, then reports the largest modelled directional pull delta above 0.05 mm.',
+    limitations: [
+      'This is an experimental geometry model, not fabric-specific evidence; it is informational and never fails strict preflight.',
+    ],
+    performanceCap: 'The first 64 constructions and at most three findings.',
+    remedies: [
+      guidance(
+        'material.directional-compensation-mismatch',
+        'Compare directional compensation',
+        "Preview compensation 'directional' and confirm the choice with a physical sew-out.",
+      ),
+    ],
+    documentationId: 'physics.material.directional-compensation-mismatch',
+  },
+  {
     code: 'construction.underlay-outside-topping',
     category: 'underlay',
     defaultSeverity: 'warning',
@@ -603,6 +750,9 @@ const ENTRY_KEYS = new Set([
   'geometryRole',
   'title',
   'explanation',
+  'methodology',
+  'limitations',
+  'performanceCap',
   'remedies',
   'documentationId',
 ]);
@@ -630,6 +780,12 @@ export function validatePhysicsDiagnosticCatalog(
     codes.add(entry.code);
     requireText(entry.title, `${entry.code} title`);
     requireText(entry.explanation, `${entry.code} explanation`);
+    if (entry.methodology !== undefined)
+      requireText(entry.methodology, `${entry.code} methodology`);
+    if (entry.performanceCap !== undefined)
+      requireText(entry.performanceCap, `${entry.code} performanceCap`);
+    for (const [index, limitation] of (entry.limitations ?? []).entries())
+      requireText(limitation, `${entry.code} limitations[${index}]`);
     requireText(entry.documentationId, `${entry.code} documentationId`);
     if (!entry.remedies.length)
       throw new Error(`Physics diagnostic catalog ${entry.code} must provide at least one remedy.`);

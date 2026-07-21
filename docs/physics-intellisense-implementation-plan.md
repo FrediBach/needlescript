@@ -1,24 +1,26 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-8 complete; PI-7 product review remains open** (2026-07-21) — guided remedies and
-literal-only quick fixes now preview, apply as one editor transaction, recompile, and compare
-findings. PI-7 remains open until representative visual iteration, product-owner approval, and the
-five-participant usability protocol are complete.
+Status: **PI-9 complete; PI-7 product review remains open** (2026-07-21) — full analysis now adds
+bounded construction coverage, underlay, short-stitch ratio, color-run travel, declared material
+context, experimental directional-compensation, and machine-profile-aware findings. PI-7 remains
+open until representative visual iteration, product-owner approval, and the five-participant
+usability protocol are complete.
 
 Last updated: 2026-07-21
 
-| Session | Status      | Exit gate                                                                 |
-| ------- | ----------- | ------------------------------------------------------------------------- |
-| PI-0    | Complete    | Product owner approved the contract and prototype concept on 2026-07-21   |
-| PI-1    | Complete    | Unified catalog/types shipped without freezing overlay presentation       |
-| PI-2    | Complete    | Editor analysis is independent from source-selected preflight policy      |
-| PI-3    | Complete    | Rich source, geometry, construction, and playback attribution shipped     |
-| PI-4    | Complete    | Revision lifecycle, background analysis, and priority queue shipped       |
-| PI-5    | Complete    | Responsive, keyboard-operable Physics panel shipped                       |
-| PI-6    | Complete    | Independent markers, linked selection, rich hover, and navigation shipped |
-| PI-7    | In review   | Visual/product iteration and five-participant protocol remain             |
-| PI-8    | Complete    | Previewed literal edits recompile and compare findings                    |
-| PI-9–11 | Not started | Follow the dependency and acceptance gates documented below               |
+| Session  | Status      | Exit gate                                                                 |
+| -------- | ----------- | ------------------------------------------------------------------------- |
+| PI-0     | Complete    | Product owner approved the contract and prototype concept on 2026-07-21   |
+| PI-1     | Complete    | Unified catalog/types shipped without freezing overlay presentation       |
+| PI-2     | Complete    | Editor analysis is independent from source-selected preflight policy      |
+| PI-3     | Complete    | Rich source, geometry, construction, and playback attribution shipped     |
+| PI-4     | Complete    | Revision lifecycle, background analysis, and priority queue shipped       |
+| PI-5     | Complete    | Responsive, keyboard-operable Physics panel shipped                       |
+| PI-6     | Complete    | Independent markers, linked selection, rich hover, and navigation shipped |
+| PI-7     | In review   | Visual/product iteration and five-participant protocol remain             |
+| PI-8     | Complete    | Previewed literal edits recompile and compare findings                    |
+| PI-9     | Complete    | Bounded expansion detectors, paired fixtures, evidence, and remedies ship |
+| PI-10–11 | Not started | Follow the dependency and acceptance gates documented below               |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
 playback—not a renamed or enlarged preflight panel.
@@ -1004,6 +1006,41 @@ Each detector requires:
 - At least one remediation recipe.
 
 Do not add fabric/needle-specific warnings until physical evidence supports them.
+
+Implementation progress:
+
+- [x] Added generic wide-construction underlay checks at 4 mm satin width and 100 mm² fill area,
+      including missing foundation and center-only satin/edge-only fill suitability findings.
+      Explicit customized pass lists are captured so a replacement multi-pass profile is not
+      misclassified from its earlier mode name.
+- [x] Added bounded construction-envelope coverage sampling using declared thread width, with a
+      20% uncovered-sample threshold and semantic region/cell geometry.
+- [x] Added per-construction short-stitch ratios against the selected machine profile's reliable
+      movement threshold, with a 25% ratio gate and capped segment inspection.
+- [x] Added accumulated jump burden per uninterrupted color/run. It requires at least two jump
+      segments and compares their total with the selected machine profile's preferred jump length.
+- [x] Retained declared fabric, thread/profile width, needle, stabilizer, and topping in report
+      context. No fabric- or needle-specific warning or threshold modifier was added without
+      physical evidence.
+- [x] Added info-only, experimental directional-compensation mismatch feedback for declared
+      anisotropic stretch while explicit constructions remain in scalar mode.
+- [x] Added structured measurements, methodology, known false-positive limitations, explicit
+      performance caps, spatial/source/playback attribution, and at least one construction-oriented
+      remedy for every expansion detector. Expanded Physics details display that evidence context.
+- [x] Added trigger and adjacent-safe fixtures for underlay width, construction coverage,
+      construction short ratios, color-run jump burden, and directional mode; catalog and material
+      evidence-boundary tests cover the remaining contract.
+
+Validation record (2026-07-21):
+
+- `npm test`: 83 files and 2,113 tests passed; generated language references are current.
+- `npm run lint`, `npm run build`, `npm run build:lib`, and `npm run check:lib` passed. The app build
+  retained its pre-existing large-chunk advisory; publint and the package type check found no
+  problems.
+- React Doctor's final changed-file scan scored 89/100. Its five remaining findings are pre-existing
+  barrel/chained-iteration/property-access observations in files touched for metadata capture; the
+  PI-9 numeric conditional and repeated array lookups were corrected.
+- Prettier formatting and `git diff --check` passed.
 
 ### PI-10 — Acknowledgments and intentional exceptions
 

@@ -1,4 +1,9 @@
-import type { PreflightIssue, ResolvedMachineProfile, StitchEvent } from '../core/types.ts';
+import type {
+  PhysicsMeasurement,
+  PreflightIssue,
+  ResolvedMachineProfile,
+  StitchEvent,
+} from '../core/types.ts';
 import {
   getPhysicsDiagnosticCatalogEntry,
   preflightCatalogMetadata,
@@ -55,6 +60,7 @@ function issue(
   code: PhysicsDiagnosticCode,
   message: string,
   points: readonly AttributedEvent[],
+  measurements?: PhysicsMeasurement[],
 ): PreflightIssue {
   const selected = points.slice(0, EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue);
   const geometryPoints = selected.map(({ x, y }) => ({ x, y }));
@@ -81,6 +87,7 @@ function issue(
           },
     ],
     eventIndices: points.map(({ index }) => index),
+    ...(measurements?.length ? { measurements } : {}),
   };
 }
 
@@ -126,6 +133,22 @@ function shortStitchClusters(
             'stitch.short-cluster',
             `${index - start - 1} consecutive stitches are shorter than ${maximumLength.toFixed(2)} mm`,
             points,
+            [
+              {
+                label: 'Consecutive short stitches',
+                value: index - start - 1,
+                unit: 'stitches',
+                threshold: EVENT_STREAM_PREFLIGHT_THRESHOLDS.shortClusterSegments,
+                comparison: 'above',
+              },
+              {
+                label: 'Short-stitch length',
+                value: maximumLength,
+                unit: 'mm',
+                threshold: maximumLength,
+                comparison: 'below',
+              },
+            ],
           ),
         );
         if (issues.length >= EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumIssuesPerCode) return issues;
@@ -251,6 +274,15 @@ function longSewnFloats(
             'stitch.long-sewn-float',
             `a sewn stitch spans ${length.toFixed(2)} mm (preferred maximum ${profile.maximumPreferredSewnStitchMM.toFixed(2)} mm)`,
             [previous, event],
+            [
+              {
+                label: 'Sewn span',
+                value: length,
+                unit: 'mm',
+                threshold: profile.maximumPreferredSewnStitchMM,
+                comparison: 'above',
+              },
+            ],
           ),
         );
         if (issues.length >= EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumIssuesPerCode) return issues;
@@ -279,6 +311,15 @@ function longUntrimmedJumpChains(
           'travel.long-untrimmed-jump',
           `an untrimmed jump chain spans ${chain.length.toFixed(2)} mm (preferred maximum ${profile.maximumPreferredJumpMM.toFixed(2)} mm)`,
           points,
+          [
+            {
+              label: 'Jump-chain length',
+              value: chain.length,
+              unit: 'mm',
+              threshold: profile.maximumPreferredJumpMM,
+              comparison: 'above',
+            },
+          ],
         ),
       );
     }
@@ -327,6 +368,15 @@ function excessiveContinuousRuns(
           'machine.continuous-stitch-run',
           `more than ${profile.maximumConsecutiveStitches.toLocaleString('en-US')} consecutive stitches occur without a trim or color boundary`,
           current,
+          [
+            {
+              label: 'Continuous stitches',
+              value: count,
+              unit: 'stitches',
+              threshold: profile.maximumConsecutiveStitches,
+              comparison: 'above',
+            },
+          ],
         ),
       );
       reported = true;
@@ -334,6 +384,72 @@ function excessiveContinuousRuns(
     }
   }
   return issues;
+}
+
+function colorRunJumpBurden(
+  events: readonly AttributedEvent[],
+  profile: ResolvedMachineProfile,
+): PreflightIssue[] {
+  const issues: PreflightIssue[] = [];
+  let runNumber = 1;
+  let hasSewn = false;
+  let jumpDistance = 0;
+  let jumpSegments = 0;
+  let previous: AttributedEvent | undefined;
+  let points: AttributedEvent[] = [];
+
+  const flush = () => {
+    if (
+      hasSewn &&
+      jumpSegments >= 2 &&
+      jumpDistance > profile.maximumPreferredJumpMM &&
+      points.length
+    ) {
+      const color = points[0].c + 1;
+      issues.push(
+        issue(
+          'travel.color-run-jump-burden',
+          `color ${color}, run ${runNumber} accumulates ${jumpDistance.toFixed(2)} mm across ${jumpSegments} untrimmed jumps (preferred maximum ${profile.maximumPreferredJumpMM.toFixed(2)} mm)`,
+          points,
+          [
+            {
+              label: 'Accumulated jump travel',
+              value: jumpDistance,
+              unit: 'mm',
+              threshold: profile.maximumPreferredJumpMM,
+              comparison: 'above',
+            },
+            { label: 'Jump segments', value: jumpSegments, unit: 'jumps' },
+          ],
+        ),
+      );
+    }
+    hasSewn = false;
+    jumpDistance = 0;
+    jumpSegments = 0;
+    points = [];
+  };
+
+  for (const event of events) {
+    if (event.t === 'mark') continue;
+    if (event.t === 'trim' || event.t === 'color') {
+      flush();
+      runNumber++;
+      previous = event;
+      if (issues.length >= EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumIssuesPerCode) return issues;
+      continue;
+    }
+    if (event.t === 'stitch') hasSewn = true;
+    if (event.t === 'jump' && hasSewn && previous) {
+      jumpDistance += distance(previous, event);
+      jumpSegments++;
+      if (!points.length) points.push(previous);
+      points.push(event);
+    }
+    previous = event;
+  }
+  flush();
+  return issues.slice(0, EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumIssuesPerCode);
 }
 
 function directionChangeClusters(runs: readonly AttributedEvent[][]): PreflightIssue[] {
@@ -372,6 +488,7 @@ export function analyzeEventStreamPreflight(
     ...nearHoleClusters(attributed),
     ...longSewnFloats(attributed, profile),
     ...longUntrimmedJumpChains(attributed, profile),
+    ...colorRunJumpBurden(attributed, profile),
     ...excessiveContinuousRuns(attributed, profile),
     ...directionChangeClusters(runs),
   ];

@@ -66,6 +66,8 @@ export interface PreflightIssue {
   geometry?: DiagnosticGeometry[];
   /** Indices into the pre-lock analysis event stream. Internal attribution sidecar. */
   eventIndices?: number[];
+  /** Structured measurements shown by PhysicsIntellisense. */
+  measurements?: PhysicsMeasurement[];
 }
 
 /**
@@ -201,7 +203,8 @@ export type PhysicsDiagnosticCategory =
 export type PhysicsEvidence =
   'hard-limit' | 'machine-profile' | 'engine-derived' | 'heuristic' | 'experimental';
 
-export type PhysicsMeasurementUnit = 'mm' | 'layers' | 'penetrations' | 'stitches' | 'degrees';
+export type PhysicsMeasurementUnit =
+  'mm' | 'mm²' | 'layers' | 'penetrations' | 'stitches' | 'jumps' | 'degrees' | 'percent';
 
 export interface PhysicsMeasurement {
   label: string;
@@ -255,6 +258,12 @@ export interface PhysicsDiagnostic {
   evidence: PhysicsEvidence;
   title: string;
   explanation: string;
+  /** Calculation and threshold provenance for expanded diagnostic details. */
+  methodology?: string;
+  /** Known reasons the modeled finding may not predict a physical failure. */
+  limitations?: string[];
+  /** Explicit upper bound on work performed by this detector. */
+  performanceCap?: string;
   measurements?: PhysicsMeasurement[];
   sourceLocations: PhysicsSourceLocation[];
   /** Present only when no source location can honestly be assigned. */

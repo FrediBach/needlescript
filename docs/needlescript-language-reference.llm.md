@@ -92,6 +92,10 @@
 
 - Fabric, thread, needle, stabilizer, topping, compensation, underlay, density, and history features form the opt-in professional layer. Physical units are resolved in hoop space and defaults preserve legacy output.
 
+### 20.1 PhysicsIntellisense diagnostics
+
+- Full physics analysis adds bounded underlay, construction-coverage, per-construction short-stitch, per-color-run jump, and experimental directional-compensation findings. Material declarations remain context unless backed by physical evidence.
+
 ### 21. Debugging commands
 
 - `print`, `printloc`, `mark`, `chalk`, and `assert` provide diagnostics. Chalk/marks are preview-only. Structured preflight issues never rewrite stitches.

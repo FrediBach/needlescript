@@ -685,8 +685,9 @@ directive or `preflight 'off'`, these compatibility diagnostics are the complete
 Static code metadata no longer lives in detector switch statements. The focused
 `embroidery/physics-diagnostics/` module owns the catalog entry for every emitted code: category,
 default severity, evidence class, semantic geometry role, title, explanation, remedies, and a
-documentation ID. Catalog validation rejects duplicate code/remedy identities, missing copy or
-documentation, and fields outside the renderer-independent schema.
+documentation ID. PI-9 expansion entries additionally carry methodology, known limitations, and a
+human-readable performance cap. Catalog validation rejects duplicate code/remedy identities,
+missing copy or documentation, and fields outside the renderer-independent schema.
 
 Source preflight policy and caller-selected physics analysis now choose their issue lists
 independently. `RunResult.preflight` remains source-controlled and is the only input to strict
@@ -719,32 +720,41 @@ thresholds.
 `preflight 'warn'` and `'strict'` additionally run `embroidery/preflight-event-stream.ts` over the final
 planned/autotrimmed stream captured immediately before locks. Its bounded, fixed-order checks cover
 short-stitch runs, local reversals, moving-window
-near-hole penetrations, long sewn spans, untrimmed jump chains, profile-limited continuous stitch
-runs, and tight sharp-turn clusters. The default metrics are: eight consecutive segments shorter
+near-hole penetrations, long sewn spans, untrimmed jump chains, accumulated untrimmed jump distance
+within a color run, profile-limited continuous stitch runs, and tight sharp-turn clusters. The
+default metrics are: eight consecutive segments shorter
 than 1.5 × the 0.4 mm reliable movement; four reversals of at least 150° within 1 mm; eight
 penetrations within 0.3 mm among the latest twenty; sewn spans above 8 mm; jump chains above 12 mm;
 20,000 stitches without trim/color; and six 75°–150° turns on at-most-1 mm segments within 2 mm.
-Each check yields at most three issues with at most sixteen points. These are conservative
+The color-run check requires at least two jump segments and compares their total with the resolved
+profile's preferred jump length. Each check yields at most three issues with at most sixteen points. These are conservative
 engineering defaults and deliberately have no fabric/thread multiplier pending physical sew-out
 evidence; resolved thread width already influences the separate coverage metric.
 
 `embroidery/construction-metadata.ts` is the internal identity layer for construction-aware analysis. Every
 generated fill and satin receives one globally unique ID plus its resolved hoop-space compound
-region or paired-rail topping envelope. Event object identities are tagged as underlay, edge run,
+region or paired-rail topping envelope and the active underlay/compensation mode. Event object identities are tagged as underlay, edge run,
 topping, or travel; split satin also tags its lane, and fills retain their connector sidecars. These
 objects remain private machine state and are never copied into `StitchEvent` or exports. The travel
 planner reorders the same event objects, so finalization can compare planned positions with authored
 layer identities without guessing from stitch shape.
 
-`embroidery/preflight-construction.ts` consumes only those explicit records. In fixed order it checks underlay
-containment; 0.4–1.25 mm fill/border overlap; edge-run/satin stacking; cross-lane split hotspots of
+`embroidery/preflight-construction.ts` consumes only those explicit records. In fixed order it first
+checks generic underlay suitability at 4 mm satin width or 100 mm² fill area, bounded geometric
+coverage gaps above 20% of envelope samples, per-construction short-stitch ratios above 25%, and an
+experimental info-level directional-compensation mismatch. It then checks underlay containment;
+0.4–1.25 mm fill/border overlap; edge-run/satin stacking; cross-lane split hotspots of
 four penetrations within 0.3 mm; sewn connector containment; and underlay-before-topping order after
 planning. A satin border is associated only when its center samples lie within 0.75 mm of the
 authored fill boundary. Each check emits at most three structured issues with at most sixteen points.
-Fill/border analysis is bounded to 4,096 construction pairs and 2,048 satin samples per construction;
-split hotspots use a 0.3 mm spatial grid. The thresholds live in exported
+PI-9 checks inspect at most 64 constructions: coverage uses at most 512 samples and 1,024 topping
+segments per construction, and short-ratio analysis uses at most 8,192 topping segments. Fill/border
+analysis is bounded to 4,096 construction pairs and 2,048 satin samples per construction; split
+hotspots use a 0.3 mm spatial grid. The thresholds live in exported
 `CONSTRUCTION_PREFLIGHT_THRESHOLDS`; no arbitrary running stitch is classified as fill, border,
-underlay, or split satin. The `warn` and `strict` modes produce the same issue list. After the pure
+underlay, or split satin. Declared thread width changes only the geometric coverage radius. Fabric,
+needle, stabilizer, and topping are recorded as context but do not create material-specific warnings
+without physical sew-out evidence. The `warn` and `strict` modes produce the same issue list. After the pure
 analyzers return, strict finalization fails only when an issue is already classified as severity
 `error`; warning/info recommendations never become fatal merely because strict mode was requested.
 No preflight mode rewrites, reorders, inserts, or removes an event.

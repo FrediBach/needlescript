@@ -15,10 +15,14 @@ interface ConstructionRecordBase {
   readonly id: number;
   readonly line?: number;
   readonly events: ConstructionEventRecord[];
+  /** Construction policy captured when generation began. */
+  readonly compensationMode?: 'legacy' | 'directional';
 }
 
 export interface FillConstructionRecord extends ConstructionRecordBase {
   readonly kind: 'fill';
+  readonly underlayMode?: 'off' | 'auto' | 'tatami' | 'edge';
+  readonly underlayPasses?: readonly ('tatami' | 'edge')[];
   /** Complete resolved topping/underlay construction region in hoop space. */
   readonly region: [number, number][][];
   /** Pre-fillinset authored boundary used to associate an explicit satin border. */
@@ -35,6 +39,8 @@ export interface SatinEnvelopeSection {
 
 export interface SatinConstructionRecord extends ConstructionRecordBase {
   readonly kind: 'satin';
+  readonly underlayMode?: 'off' | 'auto' | 'center' | 'edge' | 'zigzag';
+  readonly underlayPasses?: readonly ('center' | 'edge' | 'zigzag')[];
   /** Ordered topping rails in hoop space; together they form the topping envelope. */
   readonly sections: SatinEnvelopeSection[];
   splitColumnCount?: number;

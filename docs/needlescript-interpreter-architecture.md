@@ -607,8 +607,13 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    warnings, short/reversal/near-hole and sharp-turn clusters, long sewn/jump spans, and continuous
    runs participate. Spatial fill/satin sidecars must name a catalog code, so a new physical warning
    cannot be silently excluded. Construction analysis additionally consumes internal
-   fill/satin IDs, boundaries, layer event identities, connector records, and split lanes to check
-   containment, fill/border registration and stacking, split overlap, and post-plan layer order. It
+   fill/satin IDs, boundaries, captured underlay/compensation policy, layer event identities,
+   connector records, and split lanes. Besides containment, fill/border registration and stacking,
+   split overlap, and post-plan layer order, full analysis measures wide-construction underlay,
+   bounded envelope coverage, and per-construction short-stitch ratios. The event analyzer also
+   totals jump burden per uninterrupted color run. Declared thread width contributes to coverage;
+   fabric, needle, stabilizer, and topping remain report context rather than warning modifiers until
+   physical evidence exists. Directional mismatch is info-level experimental feedback. Analysis
    never infers construction roles from ordinary running stitches. `preflight 'strict'` rejects
    finalization only when this completed list contains severity `error`; warning/info
    recommendations are never fatal. The check reads the completed stream and does not mutate it.
@@ -625,6 +630,8 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
       source carry an explicit generated-source explanation. Fingerprints use code, canonical source
       locations, sorted construction IDs, and semantic geometry quantized to 0.01 mm. Diagnostic copy,
       severity, evidence explanations, remedies, and playback ranges do not participate in identity.
+      Measurements are copied from detector output. Expansion catalog entries also expose their
+      methodology, false-positive limitations, and analysis cap in expanded UI details.
 9. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
    `warningLocations`, optional `preflight` and `physics`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `machineProfile`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional
@@ -664,7 +671,7 @@ older producers, but every successful in-process `run()` now populates it. Absen
 producer does not support PhysicsIntellisense; it is not an empty report. Its `policy` always mirrors
 `preflight.mode`, while its diagnostic breadth comes from `RunOptions.physicsAnalysis`. Source
 `preflight 'strict'` gates only its own policy result, never extra caller-requested editor findings.
-The report also records the resolved machine profile, material intent, default-context assumptions,
+The report also records the resolved machine profile, material intent, default and declared context,
 severity summary, semantic hoop-space geometry, exact playback ranges, source roles/reasons, and
 deterministic IDs. UI lifecycle state and presentation styling are not part of the core contract.
 

@@ -73,6 +73,11 @@ export class SatinMachine extends MachineCore {
     return this._beginConstruction({
       kind: 'satin',
       line: this.currentLine,
+      underlayMode: this.underlayMode,
+      ...(this.satinUnderlayCustomization?.passKinds
+        ? { underlayPasses: [...this.satinUnderlayCustomization.passKinds] }
+        : {}),
+      compensationMode: this.compensationMode,
       sections: sections.map(({ a, b }) => ({
         a: [a[0], a[1]] as const,
         b: [b[0], b[1]] as const,

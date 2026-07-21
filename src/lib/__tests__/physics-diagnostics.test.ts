@@ -20,6 +20,7 @@ import type {
 const EMITTED_CODES = [
   'construction.layer-order',
   'construction.underlay-outside-topping',
+  'coverage.construction-gap',
   'coverage.density-hotspot',
   'fill.border-overlap-dense',
   'fill.border-overlap-too-small',
@@ -39,6 +40,7 @@ const EMITTED_CODES = [
   'machine.continuous-stitch-run',
   'machine.trim-manual',
   'machine.trim-unsupported',
+  'material.directional-compensation-mismatch',
   'path.direction-change-cluster',
   'path.reversal-cluster',
   'penetration.near-hole-cluster',
@@ -46,9 +48,13 @@ const EMITTED_CODES = [
   'satin.snag-risk',
   'satin.split-overlap-hotspot',
   'stitch.below-reliable-movement',
+  'stitch.construction-short-ratio',
   'stitch.long-sewn-float',
   'stitch.short-cluster',
+  'travel.color-run-jump-burden',
   'travel.long-untrimmed-jump',
+  'underlay.missing-wide-construction',
+  'underlay.unsuitable-wide-construction',
 ] as const;
 
 function catalogEntry(overrides: Partial<PhysicsDiagnosticCatalogEntry> = {}) {
@@ -72,6 +78,23 @@ describe('physics diagnostic catalog', () => {
       expect(entry.remedies.length).toBeGreaterThan(0);
       expect(entry.documentationId).toMatch(/^physics\./);
       expect(getPhysicsDiagnosticCatalogEntry(entry.code)).toBe(entry);
+    }
+
+    for (const code of EMITTED_CODES.filter((code) =>
+      [
+        'underlay.missing-wide-construction',
+        'underlay.unsuitable-wide-construction',
+        'coverage.construction-gap',
+        'stitch.construction-short-ratio',
+        'travel.color-run-jump-burden',
+        'material.directional-compensation-mismatch',
+      ].includes(code),
+    )) {
+      expect(getPhysicsDiagnosticCatalogEntry(code)).toMatchObject({
+        methodology: expect.any(String),
+        limitations: expect.arrayContaining([expect.any(String)]),
+        performanceCap: expect.any(String),
+      });
     }
   });
 
@@ -264,6 +287,28 @@ describe('preflight compatibility adapter', () => {
       'machine-profile',
       'fabric-profile',
     ]);
+  });
+
+  it('retains declared material context without inventing material-specific warnings', () => {
+    const result = run(
+      "fabric 'woven' threadprofile 'rayon-60wt' needle 75 stabilizer 'cutaway' topping 1 fd 2",
+      { physicsAnalysis: 'full' },
+    );
+
+    expect(result.physics?.assumptions.map(({ key }) => key)).toEqual([
+      'machine-profile',
+      'fabric-profile',
+      'thread-profile',
+      'needle-size',
+      'stabilizer',
+      'topping',
+    ]);
+    expect(
+      result.physics?.diagnostics.some(
+        ({ category, code }) =>
+          category === 'material' && code !== 'material.directional-compensation-mismatch',
+      ),
+    ).toBe(false);
   });
 
   it('catalogs locatable fill warnings with their affected region', () => {

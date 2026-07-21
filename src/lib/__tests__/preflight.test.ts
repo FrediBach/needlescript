@@ -237,6 +237,19 @@ describe('event-stream preflight checks', () => {
     expect(hasCode(trimmed, 'travel.long-untrimmed-jump')).toBe(false);
   });
 
+  it('totals multiple jump segments within each color run and accepts the adjacent limit', () => {
+    const trigger = [stitch(0, 0), jump(7, 0), stitch(8, 0), jump(15, 0)];
+    const safe = [stitch(0, 0), jump(6, 0), stitch(7, 0), jump(13, 0)];
+    const issue = streamIssues(trigger).find(({ code }) => code === 'travel.color-run-jump-burden');
+
+    expect(issue).toMatchObject({
+      measurements: expect.arrayContaining([
+        expect.objectContaining({ value: 14, threshold: 12, unit: 'mm' }),
+      ]),
+    });
+    expect(hasCode(safe, 'travel.color-run-jump-burden')).toBe(false);
+  });
+
   it('detects profile-limited continuous stitch runs and accepts the exact ceiling', () => {
     const profile = { ...DEFAULT_PROFILE, maximumConsecutiveStitches: 4 };
     const trigger = Array.from({ length: 5 }, (_, index) => stitch(index, 0, 10));

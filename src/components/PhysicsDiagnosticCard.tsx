@@ -144,6 +144,21 @@ export default function PhysicsDiagnosticCard({
       {expanded && (
         <div id={`physics-details-${diagnostic.id}`} className={styles.cardDetails}>
           <p>{diagnostic.explanation}</p>
+          {diagnostic.methodology && (
+            <p>
+              <strong>Method:</strong> {diagnostic.methodology}
+            </p>
+          )}
+          {diagnostic.limitations && diagnostic.limitations.length > 0 && (
+            <p>
+              <strong>Limitations:</strong> {diagnostic.limitations.join(' ')}
+            </p>
+          )}
+          {diagnostic.performanceCap && (
+            <p>
+              <strong>Analysis cap:</strong> {diagnostic.performanceCap}
+            </p>
+          )}
           {diagnostic.measurements && diagnostic.measurements.length > 1 && (
             <ul>
               {diagnostic.measurements.slice(1).map((measurement) => (

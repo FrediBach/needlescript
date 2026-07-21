@@ -7,7 +7,13 @@ import type {
 } from './construction-metadata.ts';
 import { evenOddInside } from './machine/fill.ts';
 import { segdist } from '../geometry/genmath.ts';
-import type { PreflightIssue, StitchEvent } from '../core/types.ts';
+import type {
+  DirectionalCompensationPreview,
+  MaterialIntent,
+  PreflightIssue,
+  ResolvedMachineProfile,
+  StitchEvent,
+} from '../core/types.ts';
 import { preflightCatalogMetadata } from './physics-diagnostics/catalog.ts';
 import { eventIndicesFor } from './physics-diagnostics/attribution.ts';
 
@@ -20,9 +26,27 @@ export const CONSTRUCTION_PREFLIGHT_THRESHOLDS = Object.freeze({
   splitHotspotPenetrations: 4,
   maximumRelationshipComparisons: 4096,
   maximumBoundarySamplesPerConstruction: 2048,
+  wideSatinUnderlayWidthMM: 4,
+  largeFillUnderlayAreaMM2: 100,
+  maximumConstructionsPerExpansionCheck: 64,
+  maximumCoverageSamplesPerConstruction: 512,
+  maximumCoverageSegmentsPerConstruction: 1024,
+  coverageGapRatio: 0.2,
+  maximumShortSegmentsPerConstruction: 8192,
+  minimumSegmentsForShortRatio: 12,
+  maximumShortStitchRatio: 0.25,
+  shortStitchMultiplier: 1.5,
+  directionalStretchDelta: 0.1,
+  directionalCompensationDeltaMM: 0.05,
   maximumIssuesPerCheck: 3,
   maximumPointsPerIssue: 16,
 });
+
+export interface ConstructionPreflightContext {
+  profile?: ResolvedMachineProfile;
+  material?: MaterialIntent;
+  compensation?: DirectionalCompensationPreview;
+}
 
 const point = (value: readonly [number, number]) => ({ x: value[0], y: value[1] });
 
@@ -490,14 +514,420 @@ function orderIssues(
   return issues;
 }
 
+function constructionRegion(record: ConstructionRecord): [number, number][][] {
+  return record.kind === 'fill' ? record.region : satinEnvelope(record);
+}
+
+function signedRingArea(ring: readonly (readonly [number, number])[]): number {
+  let twiceArea = 0;
+  for (let index = 0; index < ring.length; index++) {
+    const current = ring[index];
+    const next = ring[(index + 1) % ring.length];
+    twiceArea += current[0] * next[1] - next[0] * current[1];
+  }
+  return twiceArea / 2;
+}
+
+function regionAreaMM2(rings: readonly (readonly (readonly [number, number])[])[]): number {
+  return Math.abs(rings.reduce((total, ring) => total + signedRingArea(ring), 0));
+}
+
+function maximumSatinWidth(record: SatinConstructionRecord): number {
+  return record.sections.reduce(
+    (maximum, section) =>
+      Math.max(maximum, Math.hypot(section.a[0] - section.b[0], section.a[1] - section.b[1])),
+    0,
+  );
+}
+
+function constructionEvents(
+  record: ConstructionRecord,
+  layers: readonly ConstructionEventRecord['layer'][],
+): ConstructionEventRecord[] {
+  const selectedLayers = new Set(layers);
+  return record.events.filter(
+    ({ event, layer }) => event.t === 'stitch' && selectedLayers.has(layer),
+  );
+}
+
+function wideConstructionUnderlayIssues(
+  records: readonly ConstructionRecord[],
+  finalEvents: readonly StitchEvent[],
+): PreflightIssue[] {
+  const missing: PreflightIssue[] = [];
+  const unsuitable: PreflightIssue[] = [];
+  for (const record of records.slice(
+    0,
+    CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumConstructionsPerExpansionCheck,
+  )) {
+    const region = constructionRegion(record);
+    if (!region.length) continue;
+    const width = record.kind === 'satin' ? maximumSatinWidth(record) : undefined;
+    const area = record.kind === 'fill' ? regionAreaMM2(record.region) : undefined;
+    const qualifies =
+      (width !== undefined &&
+        width >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.wideSatinUnderlayWidthMM) ||
+      (area !== undefined && area >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.largeFillUnderlayAreaMM2);
+    if (!qualifies) continue;
+    const underlay = constructionEvents(record, ['underlay']);
+    const base = {
+      points: [],
+      lines: record.line === undefined ? [] : [record.line],
+      sourceLocations: sourceLocations(record.line),
+      geometry: [regionGeometry(region)],
+      eventIndices: eventIndicesFor(
+        finalEvents,
+        constructionEvents(record, ['topping', 'edge-run'])
+          .slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue)
+          .map(({ event }) => event),
+      ),
+      constructionIds: [record.id],
+      measurements: [
+        width !== undefined
+          ? {
+              label: 'Maximum satin width',
+              value: width,
+              unit: 'mm' as const,
+              threshold: CONSTRUCTION_PREFLIGHT_THRESHOLDS.wideSatinUnderlayWidthMM,
+              comparison: 'above' as const,
+            }
+          : {
+              label: 'Fill area',
+              value: area!,
+              unit: 'mm²' as const,
+              threshold: CONSTRUCTION_PREFLIGHT_THRESHOLDS.largeFillUnderlayAreaMM2,
+              comparison: 'above' as const,
+            },
+      ],
+    };
+    if (!underlay.length) {
+      missing.push({
+        ...preflightCatalogMetadata('underlay.missing-wide-construction'),
+        ...base,
+        code: 'underlay.missing-wide-construction',
+        message: `Construction ${record.id} has no underlay beneath its ${record.kind === 'satin' ? `${width!.toFixed(2)} mm satin width` : `${area!.toFixed(1)} mm² fill area`}.`,
+      });
+    } else {
+      const unsuitableMode =
+        (record.kind === 'satin' &&
+          (record.underlayPasses?.length
+            ? record.underlayPasses.every((pass) => pass === 'center')
+            : record.underlayMode === 'center')) ||
+        (record.kind === 'fill' &&
+          (record.underlayPasses?.length
+            ? record.underlayPasses.every((pass) => pass === 'edge')
+            : record.underlayMode === 'edge'));
+      if (unsuitableMode)
+        unsuitable.push({
+          ...preflightCatalogMetadata('underlay.unsuitable-wide-construction'),
+          ...base,
+          code: 'underlay.unsuitable-wide-construction',
+          message: `Construction ${record.id} uses ${record.underlayMode}-only underlay across its ${record.kind === 'satin' ? `${width!.toFixed(2)} mm satin width` : `${area!.toFixed(1)} mm² fill area`}.`,
+        });
+    }
+    if (
+      missing.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck &&
+      unsuitable.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck
+    )
+      break;
+  }
+  return [
+    ...missing.slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck),
+    ...unsuitable.slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck),
+  ];
+}
+
+interface ConstructionSegment {
+  from: ConstructionEventRecord;
+  to: ConstructionEventRecord;
+}
+
+function toppingSegments(
+  record: ConstructionRecord,
+  maximumSegments: number = CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumCoverageSegmentsPerConstruction,
+): ConstructionSegment[] {
+  const segments: ConstructionSegment[] = [];
+  let previous: ConstructionEventRecord | undefined;
+  for (const entry of record.events) {
+    if (entry.event.t !== 'stitch' || (entry.layer !== 'topping' && entry.layer !== 'edge-run')) {
+      previous = undefined;
+      continue;
+    }
+    if (
+      previous &&
+      (previous.layer !== entry.layer || (previous.lane ?? -1) !== (entry.lane ?? -1))
+    ) {
+      previous = entry;
+      continue;
+    }
+    if (previous) segments.push({ from: previous, to: entry });
+    previous = entry;
+    if (segments.length >= maximumSegments) break;
+  }
+  return segments;
+}
+
+function distanceToSegment(pointValue: readonly [number, number], segment: ConstructionSegment) {
+  return segdist(
+    [pointValue[0], pointValue[1]],
+    [segment.from.event.x, segment.from.event.y],
+    [segment.to.event.x, segment.to.event.y],
+  );
+}
+
+function constructionCoverageGapIssues(
+  records: readonly ConstructionRecord[],
+  finalEvents: readonly StitchEvent[],
+  threadWidthMM: number,
+): PreflightIssue[] {
+  const issues: PreflightIssue[] = [];
+  const coverageRadiusMM = Math.max(0.45, threadWidthMM * 1.5);
+  for (const record of records.slice(
+    0,
+    CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumConstructionsPerExpansionCheck,
+  )) {
+    const region = constructionRegion(record);
+    const points = region.flat();
+    const segments = toppingSegments(record);
+    if (points.length < 3 || segments.length < 2) continue;
+    const minX = Math.min(...points.map(([x]) => x));
+    const maxX = Math.max(...points.map(([x]) => x));
+    const minY = Math.min(...points.map(([, y]) => y));
+    const maxY = Math.max(...points.map(([, y]) => y));
+    const width = Math.max(coverageRadiusMM, maxX - minX);
+    const height = Math.max(coverageRadiusMM, maxY - minY);
+    const minimumStep = Math.max(0.5, coverageRadiusMM);
+    let columns = Math.max(1, Math.ceil(width / minimumStep));
+    let rows = Math.max(1, Math.ceil(height / minimumStep));
+    if (columns * rows > CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumCoverageSamplesPerConstruction) {
+      const scale = Math.sqrt(
+        (columns * rows) / CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumCoverageSamplesPerConstruction,
+      );
+      columns = Math.max(1, Math.floor(columns / scale));
+      rows = Math.max(1, Math.floor(rows / scale));
+      while (
+        columns * rows >
+        CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumCoverageSamplesPerConstruction
+      ) {
+        if (columns >= rows) columns--;
+        else rows--;
+      }
+    }
+    const stepX = width / columns;
+    const stepY = height / rows;
+    let sampled = 0;
+    let gaps = 0;
+    let firstGap: [number, number] | undefined;
+    for (let column = 0; column < columns; column++) {
+      const x = minX + stepX * (column + 0.5);
+      for (let row = 0; row < rows; row++) {
+        const y = minY + stepY * (row + 0.5);
+        if (!insideOrOnBoundary(region, [x, y])) continue;
+        sampled++;
+        let nearest = Infinity;
+        for (const segment of segments) {
+          nearest = Math.min(nearest, distanceToSegment([x, y], segment));
+          if (nearest <= coverageRadiusMM) break;
+        }
+        if (nearest > coverageRadiusMM) {
+          gaps++;
+          firstGap ??= [x, y];
+        }
+      }
+    }
+    const gapRatio = sampled ? gaps / sampled : 0;
+    if (!firstGap || gapRatio <= CONSTRUCTION_PREFLIGHT_THRESHOLDS.coverageGapRatio) continue;
+    const nearby = segments
+      .flatMap(({ from, to }) => [from.event, to.event])
+      .toSorted(
+        (a, b) =>
+          Math.hypot(a.x - firstGap[0], a.y - firstGap[1]) -
+          Math.hypot(b.x - firstGap[0], b.y - firstGap[1]),
+      )
+      .slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue);
+    const nearbySet = new Set(nearby);
+    issues.push({
+      ...preflightCatalogMetadata('coverage.construction-gap'),
+      code: 'coverage.construction-gap',
+      message: `${(gapRatio * 100).toFixed(1)}% of sampled coverage in construction ${record.id} is farther than ${coverageRadiusMM.toFixed(2)} mm from topping thread.`,
+      points: [{ x: firstGap[0], y: firstGap[1] }],
+      lines: linesOf(
+        record.events.filter(({ event }) => nearbySet.has(event)),
+        record.line,
+      ),
+      sourceLocations: sourceLocations(
+        record.line,
+        nearby.map(({ line }) => line),
+      ),
+      geometry: [
+        regionGeometry(region),
+        {
+          kind: 'cell',
+          role: 'hotspot',
+          x: firstGap[0] - stepX / 2,
+          y: firstGap[1] - stepY / 2,
+          width: stepX,
+          height: stepY,
+        },
+      ],
+      eventIndices: eventIndicesFor(finalEvents, nearby),
+      constructionIds: [record.id],
+      measurements: [
+        {
+          label: 'Uncovered samples',
+          value: gapRatio * 100,
+          unit: 'percent',
+          threshold: CONSTRUCTION_PREFLIGHT_THRESHOLDS.coverageGapRatio * 100,
+          comparison: 'above',
+        },
+        {
+          label: 'Coverage radius',
+          value: coverageRadiusMM,
+          unit: 'mm',
+        },
+      ],
+    });
+    if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck) break;
+  }
+  return issues;
+}
+
+function constructionShortRatioIssues(
+  records: readonly ConstructionRecord[],
+  finalEvents: readonly StitchEvent[],
+  profile: ResolvedMachineProfile,
+): PreflightIssue[] {
+  const issues: PreflightIssue[] = [];
+  const shortLengthMM =
+    profile.minimumReliableMovementMM * CONSTRUCTION_PREFLIGHT_THRESHOLDS.shortStitchMultiplier;
+  for (const record of records.slice(
+    0,
+    CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumConstructionsPerExpansionCheck,
+  )) {
+    const segments = toppingSegments(
+      record,
+      CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumShortSegmentsPerConstruction,
+    );
+    if (segments.length < CONSTRUCTION_PREFLIGHT_THRESHOLDS.minimumSegmentsForShortRatio) continue;
+    const short = segments.filter(({ from, to }) => {
+      const fromEvent = from.event;
+      const toEvent = to.event;
+      return Math.hypot(toEvent.x - fromEvent.x, toEvent.y - fromEvent.y) < shortLengthMM;
+    });
+    const ratio = short.length / segments.length;
+    if (ratio <= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumShortStitchRatio) continue;
+    const selected = short.slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue);
+    const selectedEvents = selected.flatMap(({ from, to }) => [from.event, to.event]);
+    issues.push({
+      ...preflightCatalogMetadata('stitch.construction-short-ratio'),
+      code: 'stitch.construction-short-ratio',
+      message: `${(ratio * 100).toFixed(1)}% of construction ${record.id}'s topping segments are shorter than ${shortLengthMM.toFixed(2)} mm.`,
+      points: selected.map(({ to }) => ({ x: to.event.x, y: to.event.y })),
+      lines: linesOf(
+        selected.flatMap(({ from, to }) => [from, to]),
+        record.line,
+      ),
+      sourceLocations: sourceLocations(
+        record.line,
+        selectedEvents.map(({ line }) => line),
+      ),
+      geometry: [
+        regionGeometry(constructionRegion(record)),
+        {
+          kind: 'points',
+          role: 'hotspot',
+          points: selected.map(({ to }) => ({ x: to.event.x, y: to.event.y })),
+        },
+      ],
+      eventIndices: eventIndicesFor(finalEvents, selectedEvents),
+      constructionIds: [record.id],
+      measurements: [
+        {
+          label: 'Short-stitch ratio',
+          value: ratio * 100,
+          unit: 'percent',
+          threshold: CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumShortStitchRatio * 100,
+          comparison: 'above',
+        },
+        {
+          label: 'Reliable movement threshold',
+          value: shortLengthMM,
+          unit: 'mm',
+        },
+      ],
+    });
+    if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck) break;
+  }
+  return issues;
+}
+
+function directionalCompensationIssues(
+  records: readonly ConstructionRecord[],
+  context: ConstructionPreflightContext,
+): PreflightIssue[] {
+  const { compensation, material } = context;
+  if (!compensation || !material || compensation.appliedMode !== 'legacy-scalar') return [];
+  if (
+    Math.abs(material.stretchAlong - material.stretchAcross) <
+    CONSTRUCTION_PREFLIGHT_THRESHOLDS.directionalStretchDelta
+  )
+    return [];
+  const maximumDeltaMM = compensation.samples.reduce(
+    (maximum, sample) =>
+      Math.max(
+        maximum,
+        Math.abs(sample.pullDeltaAlongStitchMM),
+        Math.abs(sample.pullDeltaAcrossStitchMM),
+      ),
+    0,
+  );
+  if (maximumDeltaMM <= CONSTRUCTION_PREFLIGHT_THRESHOLDS.directionalCompensationDeltaMM) return [];
+  return records
+    .slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumConstructionsPerExpansionCheck)
+    .filter((record) => record.compensationMode !== 'directional')
+    .slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck)
+    .map((record) => ({
+      ...preflightCatalogMetadata('material.directional-compensation-mismatch'),
+      code: 'material.directional-compensation-mismatch',
+      message: `Construction ${record.id} uses scalar compensation while declared directional stretch produces up to ${maximumDeltaMM.toFixed(2)} mm of modeled pull difference.`,
+      points: [],
+      lines: record.line === undefined ? [] : [record.line],
+      sourceLocations: sourceLocations(record.line),
+      geometry: [regionGeometry(constructionRegion(record))],
+      eventIndices: [],
+      constructionIds: [record.id],
+      measurements: [
+        {
+          label: 'Directional pull difference',
+          value: maximumDeltaMM,
+          unit: 'mm' as const,
+          threshold: CONSTRUCTION_PREFLIGHT_THRESHOLDS.directionalCompensationDeltaMM,
+          comparison: 'above' as const,
+        },
+        {
+          label: 'Stretch-axis difference',
+          value: Math.abs(material.stretchAlong - material.stretchAcross) * 100,
+          unit: 'percent' as const,
+          threshold: CONSTRUCTION_PREFLIGHT_THRESHOLDS.directionalStretchDelta * 100,
+          comparison: 'above' as const,
+        },
+      ],
+    }));
+}
+
 /** Pure, fixed-order analysis over explicit construction sidecars only. */
 export function analyzeConstructionPreflight(
   records: readonly ConstructionRecord[],
   finalEvents: readonly StitchEvent[],
+  context: ConstructionPreflightContext = {},
 ): PreflightIssue[] {
   if (!records.length) return [];
   const counts = new Map<string, number>();
   return [
+    ...wideConstructionUnderlayIssues(records, finalEvents),
+    ...constructionCoverageGapIssues(records, finalEvents, context.material?.threadWidthMM ?? 0.4),
+    ...(context.profile ? constructionShortRatioIssues(records, finalEvents, context.profile) : []),
+    ...directionalCompensationIssues(records, context),
     ...underlayEnvelopeIssues(records, finalEvents),
     ...fillBorderIssues(records, finalEvents),
     ...splitOverlapIssues(records, finalEvents),

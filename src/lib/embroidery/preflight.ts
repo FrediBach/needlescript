@@ -10,6 +10,8 @@ import {
 } from './physics-diagnostics/catalog.ts';
 import type {
   HoopInfo,
+  DirectionalCompensationPreview,
+  MaterialIntent,
   PreflightIssue,
   PreflightMode,
   PreflightResult,
@@ -30,6 +32,8 @@ export interface PreflightInput {
   profile?: ResolvedMachineProfile;
   mode?: PreflightMode;
   constructionRecords?: readonly ConstructionRecord[];
+  material?: MaterialIntent;
+  compensation?: DirectionalCompensationPreview;
 }
 
 function overflowCode(location: WarningLocation, hoop: HoopInfo): PhysicsDiagnosticCode {
@@ -184,7 +188,11 @@ function buildResult(input: PreflightInput, includeExtended: boolean): Preflight
   const extendedIssues = includeExtended
     ? [
         ...analyzeEventStreamPreflight(input.events, profile),
-        ...analyzeConstructionPreflight(input.constructionRecords ?? [], input.events),
+        ...analyzeConstructionPreflight(input.constructionRecords ?? [], input.events, {
+          profile,
+          material: input.material,
+          compensation: input.compensation,
+        }),
       ]
     : [];
   const issues = [...legacyIssues, ...capabilityIssues, ...extendedIssues];

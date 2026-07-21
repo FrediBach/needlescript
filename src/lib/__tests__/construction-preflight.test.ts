@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CONSTRUCTION_PREFLIGHT_THRESHOLDS, run } from '../engine.ts';
+import { CONSTRUCTION_PREFLIGHT_THRESHOLDS, resolveMachineProfile, run } from '../engine.ts';
 import { analyzeConstructionPreflight } from '../embroidery/preflight-construction.ts';
 import type {
+  ConstructionEventRecord,
   ConstructionRecord,
   FillConstructionRecord,
   SatinConstructionRecord,
@@ -58,6 +59,17 @@ function satinRecord(overrides: Partial<SatinConstructionRecord> = {}): SatinCon
 const codes = (records: readonly ConstructionRecord[], events: readonly StitchEvent[] = []) =>
   analyzeConstructionPreflight(records, events).map(({ code }) => code);
 
+function fillRows(xs: readonly number[]) {
+  const entries: ConstructionEventRecord[] = [];
+  for (const x of xs) {
+    if (entries.length)
+      entries.push({ event: { t: 'jump', x, y: -5, c: 0, line: 4 }, layer: 'travel' });
+    entries.push({ event: stitch(x, -5, 4), layer: 'topping' });
+    entries.push({ event: stitch(x, 5, 4), layer: 'topping' });
+  }
+  return entries;
+}
+
 describe('construction-aware preflight', () => {
   it('checks underlay against an explicit envelope and ignores an adjacent safe point', () => {
     const outside = stitch(5.2, 0, 4, true);
@@ -79,6 +91,126 @@ describe('construction-aware preflight', () => {
     expect(narrowed.preflight?.issues).toContainEqual(
       expect.objectContaining({ code: 'construction.underlay-outside-topping' }),
     );
+  });
+
+  it('reports missing and unsuitable underlay only after a construction crosses the width gate', () => {
+    const topping = stitch(2, 4, 8);
+    const foundation = stitch(0, 4, 8, true);
+    const wide = satinRecord({
+      underlayMode: 'off',
+      sections: [
+        { a: [-2, 0], b: [2, 0] },
+        { a: [-2, 8], b: [2, 8] },
+      ],
+      events: [{ event: topping, layer: 'topping' }],
+    });
+    const narrow = satinRecord({
+      underlayMode: 'off',
+      sections: [
+        { a: [-1.95, 0], b: [1.95, 0] },
+        { a: [-1.95, 8], b: [1.95, 8] },
+      ],
+      events: [{ event: topping, layer: 'topping' }],
+    });
+    const centerOnly = satinRecord({
+      ...wide,
+      underlayMode: 'center',
+      events: [
+        { event: foundation, layer: 'underlay' },
+        { event: topping, layer: 'topping' },
+      ],
+    });
+    const supported = satinRecord({ ...centerOnly, underlayMode: 'zigzag' });
+
+    const missing = analyzeConstructionPreflight([wide], [topping]).find(
+      ({ code }) => code === 'underlay.missing-wide-construction',
+    );
+    expect(missing).toMatchObject({
+      constructionIds: [2],
+      measurements: [expect.objectContaining({ value: 4, threshold: 4, unit: 'mm' })],
+    });
+    expect(codes([narrow], [topping])).not.toContain('underlay.missing-wide-construction');
+    expect(codes([centerOnly], [foundation, topping])).toContain(
+      'underlay.unsuitable-wide-construction',
+    );
+    expect(codes([supported], [foundation, topping])).not.toContain(
+      'underlay.unsuitable-wide-construction',
+    );
+    expect(
+      run("underlay 'center' underlaypasses ['zigzag'] satin 4 fd 8 satin 0", {
+        physicsAnalysis: 'full',
+      }).physics?.diagnostics.some(({ code }) => code === 'underlay.unsuitable-wide-construction'),
+    ).toBe(false);
+  });
+
+  it('measures construction-level coverage gaps with a bounded spatial sample', () => {
+    const sparseEvents = fillRows([-4.5, 4.5]);
+    const coveredEvents = fillRows(Array.from({ length: 10 }, (_, index) => -4.5 + index));
+    const sparse = fillRecord({ events: sparseEvents });
+    const covered = fillRecord({ events: coveredEvents });
+    const issue = analyzeConstructionPreflight(
+      [sparse],
+      sparseEvents.map(({ event }) => event),
+      { material: { ...run('').material, threadWidthMM: 0.4 } },
+    ).find(({ code }) => code === 'coverage.construction-gap');
+
+    expect(issue).toMatchObject({
+      constructionIds: [1],
+      measurements: expect.arrayContaining([
+        expect.objectContaining({ unit: 'percent', threshold: 20 }),
+      ]),
+      geometry: expect.arrayContaining([expect.objectContaining({ kind: 'cell' })]),
+    });
+    expect(
+      analyzeConstructionPreflight(
+        [covered],
+        coveredEvents.map(({ event }) => event),
+        { material: run('').material },
+      ).some(({ code }) => code === 'coverage.construction-gap'),
+    ).toBe(false);
+  });
+
+  it('measures excessive short-stitch ratios per explicit construction', () => {
+    const events = Array.from({ length: 14 }, (_, index) => stitch(0, index * 0.2, 8));
+    const safeEvents = Array.from({ length: 14 }, (_, index) => stitch(0, index, 8));
+    const context = { profile: resolveMachineProfile(3.5) };
+    const issue = analyzeConstructionPreflight(
+      [satinRecord({ events: events.map((event) => ({ event, layer: 'topping' })) })],
+      events,
+      context,
+    ).find(({ code }) => code === 'stitch.construction-short-ratio');
+
+    expect(issue).toMatchObject({
+      sourceLocations: expect.arrayContaining([expect.objectContaining({ line: 8 })]),
+      measurements: expect.arrayContaining([
+        expect.objectContaining({ value: 100, threshold: 25, unit: 'percent' }),
+      ]),
+    });
+    expect(
+      analyzeConstructionPreflight(
+        [satinRecord({ events: safeEvents.map((event) => ({ event, layer: 'topping' })) })],
+        safeEvents,
+        context,
+      ).some(({ code }) => code === 'stitch.construction-short-ratio'),
+    ).toBe(false);
+  });
+
+  it('keeps directional mismatch informational and accepts directional construction mode', () => {
+    const source = "fabric 'woven' fabricstretch 0 1 underlay 'auto' satin 4 fd 8 satin 0";
+    const mismatch = run(source, { physicsAnalysis: 'full' }).physics?.diagnostics.find(
+      ({ code }) => code === 'material.directional-compensation-mismatch',
+    );
+    const directional = run(`compensation 'directional' ${source}`, {
+      physicsAnalysis: 'full',
+    });
+
+    expect(mismatch).toMatchObject({ severity: 'info', evidence: 'experimental' });
+    expect(mismatch?.measurements?.[0]).toMatchObject({ unit: 'mm', threshold: 0.05 });
+    expect(
+      directional.physics?.diagnostics.some(
+        ({ code }) => code === 'material.directional-compensation-mismatch',
+      ),
+    ).toBe(false);
   });
 
   it('reports small and dense explicit fill-to-satin-border overlap', () => {

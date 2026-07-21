@@ -1486,6 +1486,11 @@ export class FillMachine extends SatinMachine {
     const construction = this._beginConstruction({
       kind: 'fill',
       line: this.currentLine,
+      underlayMode: this.fillUnderlayMode,
+      ...(this.fillUnderlayCustomization?.passKinds
+        ? { underlayPasses: [...this.fillUnderlayCustomization.passKinds] }
+        : {}),
+      compensationMode: this.compensationMode,
       region: cloneRegion(rings),
       authoredRegion: cloneRegion(this._directionalFillAuthoredRings),
       fillInsetMM: this.fillInset,
