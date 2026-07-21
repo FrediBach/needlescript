@@ -1,0 +1,1532 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeedleScript PhysicsIntellisense PI-0 Prototype</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --app: #1b2030;
+        --panel: #252b41;
+        --panel-raised: #2d3450;
+        --warm: #2e2128;
+        --warm-deep: #1e1118;
+        --fabric: #efe8d8;
+        --fabric-dark: #e5dcc7;
+        --text: #ede7da;
+        --muted: #9ba1bd;
+        --faint: #6e7494;
+        --canvas-text: #4a3f2c;
+        --gold: #cba16d;
+        --gold-hi: #ebc18d;
+        --run: #c8472f;
+        --error: #e98a77;
+        --ok: #9dc08b;
+        --info: #98b8de;
+        --border: rgba(237, 231, 218, 0.15);
+        --font: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        padding: 20px;
+        color: var(--text);
+        background: radial-gradient(circle at top, #303852, var(--app) 55%), var(--app);
+        font-family: var(--font);
+        font-size: 13px;
+      }
+
+      button,
+      select {
+        color: inherit;
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .prototype-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        width: min(1320px, 100%);
+        margin: 0 auto 14px;
+      }
+
+      .prototype-header h1 {
+        margin: 0 0 4px;
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .prototype-header p {
+        max-width: 720px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .prototype-label {
+        padding: 4px 8px;
+        border: 1px solid var(--gold);
+        border-radius: 999px;
+        color: var(--gold-hi);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        white-space: nowrap;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 7px;
+        width: min(1320px, 100%);
+        margin: 0 auto 14px;
+        padding: 9px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: rgba(37, 43, 65, 0.75);
+      }
+
+      .controls-label {
+        margin-right: 2px;
+        color: var(--faint);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .controls button {
+        min-height: 30px;
+        padding: 5px 9px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        color: var(--muted);
+        background: var(--panel-raised);
+        font-size: 11px;
+      }
+
+      .controls button:hover,
+      .controls button:focus-visible,
+      .controls button[aria-pressed='true'] {
+        border-color: var(--gold);
+        color: var(--text);
+        outline: none;
+      }
+
+      .controls button[aria-pressed='true'] {
+        background: rgba(203, 161, 109, 0.17);
+      }
+
+      .control-spacer {
+        flex: 1;
+      }
+
+      .prototype-shell {
+        position: relative;
+        width: min(1320px, 100%);
+        height: min(780px, calc(100vh - 145px));
+        min-height: 620px;
+        margin: auto;
+        overflow: hidden;
+        border: 1px solid rgba(203, 161, 109, 0.4);
+        border-radius: 9px;
+        background: var(--app);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+        transition:
+          width 180ms ease,
+          height 180ms ease;
+      }
+
+      .app-header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        height: 46px;
+        padding: 0 14px;
+        border-bottom: 1px solid #5a3a30;
+        background: var(--warm);
+      }
+
+      .wordmark {
+        color: var(--gold-hi);
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .design-name {
+        color: #b0a090;
+        font-size: 10px;
+      }
+
+      .app-header .context {
+        margin-left: auto;
+        color: #d0c5b2;
+        font-size: 10px;
+      }
+
+      .run-button {
+        padding: 6px 12px;
+        border: 1px solid #a33823;
+        border-radius: 5px;
+        color: #fff4ea;
+        background: var(--run);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(360px, 48%) 1fr;
+        height: calc(100% - 46px);
+      }
+
+      .editor-pane,
+      .stage-pane {
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .editor-pane {
+        display: grid;
+        grid-template-rows: minmax(245px, 1fr) 286px;
+        border-right: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .editor {
+        position: relative;
+        min-height: 0;
+        overflow: hidden;
+        background: #20263a;
+      }
+
+      .editor-title,
+      .stage-title {
+        position: absolute;
+        z-index: 2;
+        top: 9px;
+        left: 13px;
+        color: var(--faint);
+        font-size: 9px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .code {
+        height: 100%;
+        margin: 0;
+        padding: 34px 18px 18px 0;
+        overflow: auto;
+        counter-reset: line;
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .code-line {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        min-height: 20px;
+        padding-right: 12px;
+        color: #d9dce9;
+        white-space: pre;
+      }
+
+      .line-number {
+        padding-right: 12px;
+        color: var(--faint);
+        text-align: right;
+        user-select: none;
+      }
+
+      .code-line.primary {
+        background: rgba(203, 161, 109, 0.12);
+      }
+
+      .code-line.contributor {
+        background: rgba(203, 161, 109, 0.06);
+      }
+
+      .code-line.error-line {
+        background: rgba(233, 138, 119, 0.12);
+      }
+
+      .code-line button {
+        width: fit-content;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        color: inherit;
+        background: transparent;
+        text-align: left;
+      }
+
+      .physics-squiggle {
+        text-decoration-line: underline;
+        text-decoration-style: wavy;
+        text-decoration-color: var(--gold);
+        text-underline-offset: 4px;
+      }
+
+      .error-squiggle {
+        text-decoration-line: underline;
+        text-decoration-style: wavy;
+        text-decoration-color: var(--error);
+        text-underline-offset: 4px;
+      }
+
+      .monaco-hover {
+        position: absolute;
+        z-index: 5;
+        top: 112px;
+        left: 140px;
+        width: min(360px, calc(100% - 160px));
+        padding: 10px 11px;
+        border: 1px solid rgba(203, 161, 109, 0.55);
+        border-radius: 5px;
+        background: #171c2b;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .monaco-hover[hidden] {
+        display: none;
+      }
+
+      .hover-title {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        margin-bottom: 5px;
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .hover-body,
+      .hover-action {
+        color: var(--muted);
+      }
+
+      .hover-action {
+        margin-top: 7px;
+        color: var(--gold-hi);
+      }
+
+      .lower-panel {
+        min-height: 0;
+        border-top: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .panel-tabs {
+        display: flex;
+        align-items: center;
+        height: 36px;
+        padding: 0 10px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .panel-tabs button {
+        height: 100%;
+        padding: 0 9px;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        color: var(--muted);
+        background: transparent;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .panel-tabs button[aria-selected='true'] {
+        border-color: var(--gold);
+        color: var(--text);
+      }
+
+      .tab-count {
+        margin-left: 5px;
+        padding: 1px 5px;
+        border-radius: 999px;
+        color: #1c2131;
+        background: var(--gold);
+        font-size: 9px;
+      }
+
+      .panel-status {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .status-symbol {
+        margin-right: 4px;
+        color: var(--gold);
+      }
+
+      .panel-content {
+        height: calc(100% - 36px);
+        overflow: auto;
+      }
+
+      .console-content {
+        padding: 11px 14px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.7;
+      }
+
+      .physics-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px 7px;
+      }
+
+      .summary {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .summary .blocker-count {
+        color: var(--error);
+      }
+
+      .summary .risk-count {
+        color: var(--gold-hi);
+      }
+
+      .filter-row {
+        display: flex;
+        gap: 5px;
+        margin-left: auto;
+      }
+
+      .filter-row button {
+        padding: 3px 6px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--muted);
+        background: transparent;
+        font-size: 9px;
+      }
+
+      .filter-row button[aria-pressed='true'] {
+        border-color: var(--gold);
+        color: var(--text);
+      }
+
+      .assumptions {
+        margin: 0 12px 8px;
+        padding: 6px 8px;
+        border-left: 2px solid var(--info);
+        color: var(--muted);
+        background: rgba(152, 184, 222, 0.07);
+        font-size: 10px;
+        line-height: 1.4;
+      }
+
+      .findings {
+        display: grid;
+        gap: 7px;
+        padding: 0 12px 12px;
+      }
+
+      .finding {
+        display: grid;
+        grid-template-columns: 17px 1fr;
+        gap: 7px;
+        padding: 8px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: rgba(45, 52, 80, 0.54);
+      }
+
+      .finding.selected {
+        border-color: var(--gold);
+        background: rgba(203, 161, 109, 0.1);
+      }
+
+      .severity-icon {
+        display: grid;
+        place-items: center;
+        width: 16px;
+        height: 16px;
+        margin-top: 1px;
+        color: #1e2435;
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      .severity-icon.warning {
+        clip-path: polygon(50% 0, 100% 100%, 0 100%);
+        padding-top: 4px;
+        background: var(--gold);
+      }
+
+      .severity-icon.error {
+        border-radius: 50%;
+        color: #fff;
+        background: var(--run);
+      }
+
+      .severity-icon.info {
+        border-radius: 3px;
+        background: var(--info);
+      }
+
+      .finding-main {
+        min-width: 0;
+      }
+
+      .finding-select {
+        display: block;
+        width: 100%;
+        padding: 0;
+        border: 0;
+        color: inherit;
+        background: transparent;
+        text-align: left;
+      }
+
+      .finding-title {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .finding-measure {
+        margin-left: 6px;
+        color: var(--gold-hi);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .finding-explanation {
+        margin: 4px 0;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.4;
+      }
+
+      .finding-meta {
+        color: var(--faint);
+        font-size: 9px;
+      }
+
+      .evidence {
+        margin-left: 5px;
+        padding: 1px 4px;
+        border: 1px solid rgba(152, 184, 222, 0.35);
+        border-radius: 3px;
+        color: var(--info);
+      }
+
+      .finding-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 7px;
+      }
+
+      .finding-actions button {
+        padding: 3px 6px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--text);
+        background: transparent;
+        font-size: 9px;
+      }
+
+      .finding-actions button:first-child {
+        border-color: rgba(203, 161, 109, 0.55);
+        color: var(--gold-hi);
+      }
+
+      details {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 9px;
+      }
+
+      details summary {
+        color: var(--faint);
+        cursor: pointer;
+      }
+
+      .empty-state,
+      .blocked-state {
+        margin: 12px;
+        padding: 17px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .empty-state strong {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--ok);
+      }
+
+      .blocked-state strong {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--error);
+      }
+
+      .stale-banner {
+        margin: 8px 12px 0;
+        padding: 6px 8px;
+        border: 1px solid rgba(203, 161, 109, 0.45);
+        border-radius: 4px;
+        color: var(--gold-hi);
+        background: rgba(203, 161, 109, 0.08);
+        font-size: 10px;
+      }
+
+      .stage-pane {
+        display: grid;
+        grid-template-rows: 1fr 58px;
+        color: var(--canvas-text);
+        background: var(--fabric);
+      }
+
+      .stage {
+        position: relative;
+        min-height: 0;
+        overflow: hidden;
+        background:
+          repeating-linear-gradient(0deg, rgba(74, 63, 44, 0.025) 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, rgba(74, 63, 44, 0.025) 0 1px, transparent 1px 3px),
+          var(--fabric);
+      }
+
+      .stage-title {
+        color: rgba(74, 63, 44, 0.55);
+      }
+
+      .stage svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      .stage-status {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 4px 7px;
+        border: 1px solid rgba(74, 63, 44, 0.24);
+        border-radius: 999px;
+        background: rgba(255, 253, 247, 0.76);
+        font-size: 9px;
+      }
+
+      .stage-legend {
+        position: absolute;
+        right: 10px;
+        bottom: 10px;
+        max-width: 220px;
+        padding: 6px 8px;
+        border: 1px solid rgba(74, 63, 44, 0.24);
+        border-radius: 4px;
+        background: rgba(255, 253, 247, 0.88);
+        font-size: 9px;
+        line-height: 1.4;
+      }
+
+      .playback {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-top: 1px dashed rgba(74, 63, 44, 0.45);
+        background: var(--fabric-dark);
+        font-size: 10px;
+      }
+
+      .play-button {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 28px;
+        border: 1px solid rgba(74, 63, 44, 0.45);
+        border-radius: 4px;
+        color: var(--canvas-text);
+        background: #fffdf7;
+      }
+
+      .timeline {
+        position: relative;
+        flex: 1;
+        height: 9px;
+        overflow: hidden;
+        border-radius: 3px;
+        background:
+          linear-gradient(90deg, rgba(74, 63, 44, 0.18) 0 18%, transparent 18% 21%),
+          linear-gradient(90deg, transparent 0 42%, rgba(74, 63, 44, 0.24) 42% 69%, transparent 69%);
+      }
+
+      .timeline-highlight {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 43%;
+        width: 11%;
+        background: var(--run);
+      }
+
+      .timeline-highlight[hidden] {
+        display: none;
+      }
+
+      .mobile-sheet-grabber,
+      .mobile-sheet-actions {
+        display: none;
+      }
+
+      .prototype-shell[data-viewport='mobile'] {
+        width: 390px;
+        height: min(800px, calc(100vh - 145px));
+        min-height: 650px;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .app-header {
+        padding: 0 9px;
+        gap: 8px;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .design-name,
+      .prototype-shell[data-viewport='mobile'] .app-header .context {
+        display: none;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .run-button {
+        margin-left: auto;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .workspace {
+        display: block;
+        height: calc(100% - 46px);
+      }
+
+      .prototype-shell[data-viewport='mobile'] .editor-pane {
+        display: block;
+        height: 45%;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .prototype-shell[data-viewport='mobile'] .editor {
+        height: 100%;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .code {
+        font-size: 10px;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .code-line {
+        grid-template-columns: 35px 1fr;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .monaco-hover {
+        top: 92px;
+        left: 45px;
+        width: calc(100% - 60px);
+      }
+
+      .prototype-shell[data-viewport='mobile'] .stage-pane {
+        height: 55%;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .lower-panel {
+        position: absolute;
+        z-index: 20;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 330px;
+        border-top: 1px solid var(--gold);
+        border-radius: 9px 9px 0 0;
+        box-shadow: 0 -14px 30px rgba(0, 0, 0, 0.4);
+        transition: height 160ms ease;
+      }
+
+      .prototype-shell[data-viewport='mobile'][data-sheet='collapsed'] .lower-panel {
+        height: 52px;
+      }
+
+      .prototype-shell[data-viewport='mobile'][data-sheet='full'] .lower-panel {
+        height: calc(100% - 56px);
+      }
+
+      .prototype-shell[data-viewport='mobile'] .mobile-sheet-grabber {
+        display: block;
+        width: 36px;
+        height: 3px;
+        margin: 5px auto -2px;
+        border-radius: 999px;
+        background: var(--faint);
+      }
+
+      .prototype-shell[data-viewport='mobile'] .panel-tabs {
+        height: 44px;
+        padding-top: 5px;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .panel-content {
+        height: calc(100% - 49px);
+      }
+
+      .prototype-shell[data-viewport='mobile'] .mobile-sheet-actions {
+        display: flex;
+        gap: 4px;
+        margin-left: auto;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .mobile-sheet-actions button {
+        width: 26px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--muted);
+      }
+
+      .prototype-shell[data-viewport='mobile'] .panel-status {
+        display: none;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .physics-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .filter-row {
+        margin-left: 0;
+      }
+
+      .prototype-shell[data-viewport='mobile'] .stage-legend {
+        bottom: 58px;
+      }
+
+      @media (max-width: 700px) {
+        body {
+          padding: 10px;
+        }
+
+        .prototype-header {
+          display: block;
+        }
+
+        .prototype-label {
+          display: inline-block;
+          margin-top: 8px;
+        }
+
+        .prototype-shell {
+          height: 740px;
+          min-height: 620px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="prototype-header">
+      <div>
+        <h1>PhysicsIntellisense PI-0 coded prototype</h1>
+        <p>
+          Mock data only. Use the scenario and viewport controls during moderated testing. This
+          prototype validates language, hierarchy, linked selection, and disclosure; it does not
+          execute NeedleScript or define the PI-1 API.
+        </p>
+      </div>
+      <span class="prototype-label">prototype · not production</span>
+    </header>
+
+    <nav class="controls" aria-label="Prototype controls">
+      <span class="controls-label">Workflow</span>
+      <button type="button" data-scenario="density" aria-pressed="true">Density hotspot</button>
+      <button type="button" data-scenario="construction" aria-pressed="false">
+        Fill + underlay
+      </button>
+      <button type="button" data-scenario="jump" aria-pressed="false">Long jump</button>
+      <button type="button" data-scenario="blocker" aria-pressed="false">New blocker</button>
+      <button type="button" data-scenario="stale" aria-pressed="false">Stale result</button>
+      <button type="button" data-scenario="blocked" aria-pressed="false">Invalid source</button>
+      <button type="button" data-scenario="clean" aria-pressed="false">Clean state</button>
+      <span class="control-spacer"></span>
+      <span class="controls-label">Viewport</span>
+      <button type="button" data-viewport="desktop" aria-pressed="true">Desktop</button>
+      <button type="button" data-viewport="mobile" aria-pressed="false">Mobile</button>
+    </nav>
+
+    <main
+      id="prototype"
+      class="prototype-shell"
+      data-viewport="desktop"
+      data-sheet="half"
+      aria-label="NeedleScript PhysicsIntellisense prototype"
+    >
+      <header class="app-header">
+        <span class="wordmark">NeedleScript</span>
+        <span class="design-name">physics_sampler.ns</span>
+        <span id="app-context" class="context">woven · rayon 40 wt · default machine</span>
+        <button class="run-button" type="button">Run</button>
+      </header>
+
+      <div class="workspace">
+        <section class="editor-pane" aria-label="Editor and diagnostics">
+          <div class="editor">
+            <span class="editor-title">Editor</span>
+            <div id="code" class="code" aria-label="Prototype NeedleScript source"></div>
+            <aside id="monaco-hover" class="monaco-hover" aria-live="polite"></aside>
+          </div>
+
+          <section class="lower-panel" aria-label="Console and Physics">
+            <div class="mobile-sheet-grabber" aria-hidden="true"></div>
+            <div class="panel-tabs" role="tablist" aria-label="Output panels">
+              <button
+                id="console-tab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="console-panel"
+              >
+                Console
+              </button>
+              <button
+                id="physics-tab"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="physics-panel"
+              >
+                Physics <span id="tab-count" class="tab-count">2</span>
+              </button>
+              <span id="panel-status" class="panel-status"></span>
+              <span class="mobile-sheet-actions" aria-label="Physics sheet size">
+                <button type="button" data-sheet="collapsed" aria-label="Collapse Physics">
+                  —
+                </button>
+                <button type="button" data-sheet="half" aria-label="Use half-height Physics">
+                  ▰
+                </button>
+                <button type="button" data-sheet="full" aria-label="Expand Physics">□</button>
+              </span>
+            </div>
+            <div id="console-panel" class="panel-content console-content" role="tabpanel" hidden>
+              <div>10:42:18</div>
+              <div>sewed 4,286 stitches in 87 ms</div>
+              <div>
+                Physical construction findings are collected in Physics; runtime output remains
+                here.
+              </div>
+            </div>
+            <div id="physics-panel" class="panel-content" role="tabpanel"></div>
+          </section>
+        </section>
+
+        <section class="stage-pane" aria-label="Embroidery stage">
+          <div class="stage">
+            <span class="stage-title">Stage</span>
+            <span id="stage-status" class="stage-status"></span>
+            <svg
+              id="stage-svg"
+              viewBox="0 0 600 520"
+              role="img"
+              aria-labelledby="stage-description"
+            >
+              <title id="stage-description">Selected physics finding on embroidery preview</title>
+              <ellipse
+                cx="300"
+                cy="260"
+                rx="224"
+                ry="224"
+                fill="none"
+                stroke="#b98b4e"
+                stroke-width="16"
+                opacity="0.85"
+              />
+              <ellipse
+                cx="300"
+                cy="260"
+                rx="205"
+                ry="205"
+                fill="none"
+                stroke="#7e5c2e"
+                stroke-width="2"
+                stroke-dasharray="5 5"
+                opacity="0.6"
+              />
+              <g id="stage-design"></g>
+              <g id="stage-overlay"></g>
+            </svg>
+            <div id="stage-legend" class="stage-legend"></div>
+          </div>
+          <div class="playback">
+            <button class="play-button" type="button" aria-label="Play stitch sequence">▶</button>
+            <div class="timeline" aria-label="Stitch sequence timeline">
+              <span id="timeline-highlight" class="timeline-highlight"></span>
+            </div>
+            <span id="playback-count">4,286 stitches</span>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const scenarios = {
+        density: {
+          context: 'woven · rayon 40 wt · default machine',
+          state: 'current',
+          code: [
+            "fabric 'woven'",
+            "threadprofile 'rayon-40wt'",
+            'lock 0',
+            'fillspacing 0.45',
+            'repeat 2 [',
+            '  beginfill repeat 36 [ fd 32 rt 10 ] endfill',
+            ']',
+          ],
+          primaryLines: [6],
+          contributorLines: [4, 5],
+          summary: { blocker: 0, risk: 2, note: 1 },
+          assumptions: 'Default machine profile · thread width resolved to 0.4 mm',
+          findings: [
+            {
+              severity: 'warning',
+              title: 'Thread coverage is concentrated here',
+              measurement: '4.8 layers · limit 3.5',
+              explanation:
+                'Two fill passes overlap in the highlighted cells. Dense thread can pucker the fabric or increase needle load.',
+              line: 'line 6 · contributor lines 4–5',
+              evidence: 'Engine-derived',
+              remedy: 'Reduce overlapping passes or increase local fill spacing.',
+              method:
+                'Coverage uses final pre-lock stitch length × resolved thread width on the 1 mm coverage grid.',
+            },
+            {
+              severity: 'warning',
+              title: 'Repeated penetrations share a needle hole',
+              measurement: '7 penetrations · limit 5',
+              explanation:
+                'The center repeats through nearly the same point and may weaken or cut the fabric.',
+              line: 'line 6',
+              evidence: 'Engine-derived',
+              remedy: 'Offset the repeated center or alter the phase between passes.',
+              method: "Penetrations are clustered within the engine's same-hole radius.",
+            },
+            {
+              severity: 'info',
+              title: 'Generic machine movement limits are in use',
+              measurement: '',
+              explanation:
+                'Select a local machine profile to evaluate its preferred stitch and jump limits.',
+              line: 'run context',
+              evidence: 'Assumption',
+              remedy: 'Choose a machine only when you want machine-specific advice.',
+              method: 'The source remains portable; local machine context is caller-owned.',
+            },
+          ],
+          design:
+            '<path d="M205 260 C205 190 395 190 395 260 C395 330 205 330 205 260Z" fill="none" stroke="#ad3852" stroke-width="4"/><path d="M215 242 C250 195 350 195 385 242 M215 260 C250 215 350 215 385 260 M215 278 C250 325 350 325 385 278" fill="none" stroke="#ad3852" stroke-width="2" opacity=".75"/>',
+          overlay:
+            '<rect x="278" y="236" width="44" height="44" rx="4" fill="#c8472f" opacity=".3" stroke="#a33823" stroke-width="3"/><circle cx="300" cy="258" r="13" fill="none" stroke="#a33823" stroke-width="3"/><circle cx="300" cy="258" r="4" fill="#a33823"/><text x="326" y="232" fill="#4a3f2c" font-size="13">4.8 layers</text>',
+          legend: 'Outlined cell: selected coverage hotspot · rings: repeated needle hole',
+          hoverTitle: 'Risk · Thread coverage is concentrated here',
+          hoverBody: '4.8 layers exceeds the configured 3.5-layer limit.',
+          hoverAction: 'Open Physics (F8) · Locate on stage',
+          playback: '4,286 stitches',
+        },
+        construction: {
+          context: 'knit · polyester 40 wt · default machine',
+          state: 'current',
+          code: [
+            "fabric 'knit'",
+            "fillunderlay 'edge'",
+            'fillinset 0',
+            'beginfill repeat 4 [ fd 28 rt 90 ] endfill',
+            "underlay 'edge'",
+            'satin 4 repeat 4 [ fd 28 rt 90 ] satin 0',
+          ],
+          primaryLines: [3, 4],
+          contributorLines: [5, 6],
+          summary: { blocker: 0, risk: 2, note: 0 },
+          assumptions: 'Knit preset · polyester 40 wt · generic movement limits',
+          findings: [
+            {
+              severity: 'warning',
+              title: 'Fill extends too far beneath the satin border',
+              measurement: '1.72 mm overlap · preferred ≤ 1.25 mm',
+              explanation:
+                'The fill and border stack thread across a wide band, increasing bulk around the edge.',
+              line: 'primary lines 3–4 · related line 6',
+              evidence: 'Engine-derived',
+              remedy: 'Increase fillinset so only a narrow registration overlap remains.',
+              method:
+                'The analyzer associates an explicit satin envelope with the authored fill boundary and samples their signed overlap.',
+            },
+            {
+              severity: 'warning',
+              title: 'Underlay protrudes beyond its topping',
+              measurement: '0.42 mm outside',
+              explanation:
+                'Part of the foundation stitch is visible outside the finished satin envelope.',
+              line: 'primary lines 5–6',
+              evidence: 'Engine-derived',
+              remedy: 'Increase underlay inset or widen the topping envelope.',
+              method:
+                'Layer-tagged underlay events are checked against the explicit satin topping envelope.',
+            },
+          ],
+          design:
+            '<rect x="210" y="170" width="180" height="180" fill="#b85868" opacity=".34"/><rect x="200" y="160" width="200" height="200" fill="none" stroke="#ad3852" stroke-width="15"/>',
+          overlay:
+            '<path d="M210 170 H390 V350 H210Z" fill="none" stroke="#c8472f" stroke-width="13" opacity=".7"/><path d="M196 156 H404 V364 H196Z" fill="none" stroke="#5d77a4" stroke-width="3" stroke-dasharray="7 4"/><text x="240" y="145" fill="#4a3f2c" font-size="13">1.72 mm overlap</text>',
+          legend: 'Red band: dense fill/border overlap · blue dashed line: underlay envelope',
+          hoverTitle: 'Risk · Fill extends too far beneath the satin border',
+          hoverBody: 'Measured overlap is 1.72 mm; the generic preferred maximum is 1.25 mm.',
+          hoverAction: 'Try: increase fillinset · Preview edit later in PI-8',
+          playback: '3,912 stitches',
+        },
+        jump: {
+          context: 'Brother PE800 · woven · rayon 40 wt',
+          state: 'current',
+          code: ["fabric 'woven'", 'autotrim 0', 'fd 12', 'up moveto 24 20', 'down fd 12'],
+          primaryLines: [4],
+          contributorLines: [2],
+          summary: { blocker: 0, risk: 1, note: 0 },
+          assumptions: 'Brother PE800 profile · automatic trim supported',
+          findings: [
+            {
+              severity: 'warning',
+              title: 'This untrimmed jump is long for the selected machine',
+              measurement: '31.2 mm · preferred maximum 12 mm',
+              explanation:
+                'A long carried thread can snag or require manual cleanup even though the machine can reach both points.',
+              line: 'primary line 4 · policy line 2',
+              evidence: 'Machine profile',
+              remedy:
+                'Enable an appropriate autotrim threshold or insert a trim before this travel.',
+              method:
+                'The final jump chain is measured after planning and compared with the caller-selected machine profile.',
+            },
+          ],
+          design:
+            '<path d="M190 310 L190 220" fill="none" stroke="#ad3852" stroke-width="4"/><path d="M405 175 L405 265" fill="none" stroke="#ad3852" stroke-width="4"/><path d="M190 220 L405 175" fill="none" stroke="#6f6a61" stroke-width="2" stroke-dasharray="7 6"/>',
+          overlay:
+            '<path d="M190 220 L405 175" fill="none" stroke="#c8472f" stroke-width="5"/><circle cx="190" cy="220" r="7" fill="#fffdf7" stroke="#a33823" stroke-width="3"/><circle cx="405" cy="175" r="7" fill="#fffdf7" stroke="#a33823" stroke-width="3"/><text x="260" y="176" fill="#4a3f2c" font-size="13">31.2 mm jump</text>',
+          legend: 'Red segment: selected jump chain · endpoints remain inside the sewable field',
+          hoverTitle: 'Risk · Long untrimmed jump',
+          hoverBody: "31.2 mm exceeds Brother PE800's 12 mm preferred jump length.",
+          hoverAction: 'Inspect sew order · Review autotrim',
+          playback: '218 stitches',
+        },
+        blocker: {
+          context: '5 × 7 hoop · default machine',
+          state: 'current',
+          autoOpened: true,
+          code: ["hoop '5x7'", 'moveto 70 0', 'down fd 8'],
+          primaryLines: [2, 3],
+          contributorLines: [],
+          summary: { blocker: 1, risk: 0, note: 0 },
+          assumptions: '5 × 7 physical hoop · identity machine calibration',
+          findings: [
+            {
+              severity: 'error',
+              title: 'The machine cannot reach these stitches',
+              measurement: '8 stitches outside the physical hoop',
+              explanation:
+                'These coordinates lie beyond the selected hoop, so the machine cannot sew the design as generated.',
+              line: 'primary lines 2–3',
+              evidence: 'Hard limit',
+              remedy: 'Move or scale the design inside the physical hoop.',
+              method:
+                'Final calibrated penetration coordinates are tested against the physical hoop boundary.',
+            },
+          ],
+          design: '<path d="M430 250 L515 250" fill="none" stroke="#ad3852" stroke-width="4"/>',
+          overlay:
+            '<path d="M482 250 L515 250" fill="none" stroke="#c8472f" stroke-width="7"/><line x1="515" y1="250" x2="495" y2="210" stroke="#a33823" stroke-width="2"/><circle cx="515" cy="250" r="9" fill="#c8472f"/><text x="418" y="200" fill="#4a3f2c" font-size="13">outside hoop</text>',
+          legend: 'Red endpoint: physically unreachable · line points back toward the hoop edge',
+          hoverTitle: 'Blocker · The machine cannot reach these stitches',
+          hoverBody: '8 final penetrations are outside the selected physical hoop.',
+          hoverAction: 'Locate all points · Strict export is blocked',
+          playback: '94 stitches',
+        },
+        stale: {
+          clone: 'density',
+          state: 'stale',
+        },
+        blocked: {
+          context: 'Analysis unavailable',
+          state: 'blocked',
+          code: ["fabric 'woven'", 'repeat 4 [', '  fd 12', '  rt'],
+          primaryLines: [4],
+          contributorLines: [],
+          summary: { blocker: 0, risk: 0, note: 0 },
+          assumptions: '',
+          findings: [],
+          design:
+            '<path d="M225 315 C260 210 340 210 375 315" fill="none" stroke="#ad3852" stroke-width="4" opacity=".3"/>',
+          overlay: '',
+          legend: 'Last valid preview retained and dimmed',
+          hoverTitle: 'Compiler error · Expected one argument for rt',
+          hoverBody: 'PhysicsIntellisense waits until the source can produce a complete design.',
+          hoverAction: 'Fix the compiler error on line 4',
+          playback: 'Previous run · 812 stitches',
+        },
+        clean: {
+          context: 'woven · rayon 40 wt · default machine',
+          state: 'clean',
+          code: [
+            "fabric 'woven'",
+            "threadprofile 'rayon-40wt'",
+            'lock 1.2',
+            'repeat 8 [ fd 12 rt 45 ]',
+          ],
+          primaryLines: [],
+          contributorLines: [],
+          summary: { blocker: 0, risk: 0, note: 0 },
+          assumptions: 'Default machine profile · thread width resolved to 0.4 mm',
+          findings: [],
+          design:
+            '<path d="M300 170 L365 195 L390 260 L365 325 L300 350 L235 325 L210 260 L235 195 Z" fill="none" stroke="#ad3852" stroke-width="4"/>',
+          overlay: '',
+          legend: 'No diagnostic overlay is active',
+          hoverTitle: '',
+          hoverBody: '',
+          hoverAction: '',
+          playback: '126 stitches',
+        },
+      };
+
+      const prototype = document.getElementById('prototype');
+      const code = document.getElementById('code');
+      const physicsPanel = document.getElementById('physics-panel');
+      const monacoHover = document.getElementById('monaco-hover');
+      const stageDesign = document.getElementById('stage-design');
+      const stageOverlay = document.getElementById('stage-overlay');
+      const stageLegend = document.getElementById('stage-legend');
+      const stageStatus = document.getElementById('stage-status');
+      const timelineHighlight = document.getElementById('timeline-highlight');
+      const panelStatus = document.getElementById('panel-status');
+      const tabCount = document.getElementById('tab-count');
+      const playbackCount = document.getElementById('playback-count');
+      const appContext = document.getElementById('app-context');
+      const physicsTab = document.getElementById('physics-tab');
+      const consoleTab = document.getElementById('console-tab');
+      const consolePanel = document.getElementById('console-panel');
+      let activeScenario = 'density';
+      let selectedFinding = 0;
+      let activeFilter = 'all';
+      let hoverVisible = true;
+      const autoOpenedBlockers = new Set();
+
+      function resolvedScenario(name) {
+        const scenario = scenarios[name];
+        if (!scenario.clone) return scenario;
+        return { ...scenarios[scenario.clone], ...scenario };
+      }
+
+      function severityLabel(severity) {
+        if (severity === 'error') return 'Blocker';
+        if (severity === 'warning') return 'Risk';
+        return 'Note';
+      }
+
+      function severitySymbol(severity) {
+        if (severity === 'error') return '×';
+        if (severity === 'warning') return '!';
+        return 'i';
+      }
+
+      function renderCode(scenario) {
+        code.innerHTML = '';
+        scenario.code.forEach((sourceLine, index) => {
+          const line = index + 1;
+          const row = document.createElement('div');
+          row.className = 'code-line';
+          if (scenario.primaryLines.includes(line)) row.classList.add('primary');
+          if (scenario.contributorLines.includes(line)) row.classList.add('contributor');
+          if (scenario.state === 'blocked' && scenario.primaryLines.includes(line)) {
+            row.classList.add('error-line');
+          }
+
+          const lineNumber = document.createElement('span');
+          lineNumber.className = 'line-number';
+          lineNumber.textContent = line;
+
+          const source = document.createElement('button');
+          source.type = 'button';
+          source.textContent = sourceLine || ' ';
+          source.setAttribute('aria-label', 'Source line ' + line + ': ' + sourceLine);
+          if (scenario.primaryLines.includes(line)) {
+            source.className = scenario.state === 'blocked' ? 'error-squiggle' : 'physics-squiggle';
+            source.addEventListener('click', () => {
+              hoverVisible = !hoverVisible;
+              renderHover(scenario);
+            });
+          }
+          row.append(lineNumber, source);
+          code.append(row);
+        });
+      }
+
+      function renderHover(scenario) {
+        if (!scenario.hoverTitle || !hoverVisible) {
+          monacoHover.hidden = true;
+          return;
+        }
+        monacoHover.hidden = false;
+        monacoHover.innerHTML =
+          '<div class="hover-title"><span>' +
+          (scenario.state === 'blocked' ? '●' : '▲') +
+          '</span><span>' +
+          scenario.hoverTitle +
+          '</span></div><div class="hover-body">' +
+          scenario.hoverBody +
+          '</div><div class="hover-action">' +
+          scenario.hoverAction +
+          '</div>';
+      }
+
+      function summaryMarkup(summary) {
+        const parts = [];
+        if (summary.blocker) {
+          parts.push(
+            '<span class="blocker-count">' +
+              summary.blocker +
+              ' blocker' +
+              (summary.blocker === 1 ? '' : 's') +
+              '</span>',
+          );
+        }
+        if (summary.risk) {
+          parts.push(
+            '<span class="risk-count">' +
+              summary.risk +
+              ' risk' +
+              (summary.risk === 1 ? '' : 's') +
+              '</span>',
+          );
+        }
+        if (summary.note) {
+          parts.push(summary.note + ' note' + (summary.note === 1 ? '' : 's'));
+        }
+        return parts.length ? parts.join(' · ') : 'No current findings';
+      }
+
+      function findingMatches(finding) {
+        if (activeFilter === 'all') return true;
+        if (activeFilter === 'blockers') return finding.severity === 'error';
+        return finding.severity === 'warning';
+      }
+
+      function renderPhysics(scenario) {
+        if (scenario.state === 'blocked') {
+          physicsPanel.innerHTML =
+            '<div class="blocked-state" role="status"><strong>Waiting for a valid design</strong>Fix the compiler error on line 4. The dimmed stage is from the previous successful run and is not a current Physics result.</div>';
+          return;
+        }
+
+        if (scenario.state === 'clean') {
+          physicsPanel.innerHTML =
+            '<div class="physics-header"><span class="summary">No current findings</span></div>' +
+            '<div class="assumptions">' +
+            scenario.assumptions +
+            '</div>' +
+            '<div class="empty-state" role="status"><strong>Physics checks complete — no modeled risks found.</strong>Results apply to the selected material and machine assumptions. A physical test sew-out is still recommended.</div>';
+          return;
+        }
+
+        let markup =
+          '<div class="physics-header"><span class="summary">' +
+          summaryMarkup(scenario.summary) +
+          '</span><span class="filter-row" aria-label="Finding filters">' +
+          '<button type="button" data-filter="all" aria-pressed="' +
+          (activeFilter === 'all') +
+          '">All</button>' +
+          '<button type="button" data-filter="blockers" aria-pressed="' +
+          (activeFilter === 'blockers') +
+          '">Blockers</button>' +
+          '<button type="button" data-filter="risks" aria-pressed="' +
+          (activeFilter === 'risks') +
+          '">Risks</button></span></div>';
+
+        if (scenario.state === 'stale') {
+          markup +=
+            '<div class="stale-banner" role="status">Source changed · showing findings from the previous successful run while Physics checks again.</div>';
+        }
+        markup += '<div class="assumptions">Assumptions · ' + scenario.assumptions + '</div>';
+        markup += '<div class="findings">';
+
+        scenario.findings.forEach((finding, index) => {
+          if (!findingMatches(finding)) return;
+          markup +=
+            '<article class="finding ' +
+            (selectedFinding === index ? 'selected' : '') +
+            '" data-finding="' +
+            index +
+            '">' +
+            '<span class="severity-icon ' +
+            finding.severity +
+            '" aria-hidden="true">' +
+            severitySymbol(finding.severity) +
+            '</span>' +
+            '<div class="finding-main"><button type="button" class="finding-select" data-select="' +
+            index +
+            '">' +
+            '<span class="finding-title">' +
+            finding.title +
+            '</span>' +
+            (finding.measurement
+              ? '<span class="finding-measure">' + finding.measurement + '</span>'
+              : '') +
+            '<span class="finding-explanation">' +
+            finding.explanation +
+            '</span>' +
+            '<span class="finding-meta">' +
+            severityLabel(finding.severity) +
+            ' · ' +
+            finding.line +
+            '<span class="evidence">' +
+            finding.evidence +
+            '</span></span></button>' +
+            '<div class="finding-actions"><button type="button" data-locate="' +
+            index +
+            '">Locate</button><button type="button" data-inspect="' +
+            index +
+            '">Inspect sew order</button><button type="button">Learn more</button></div>' +
+            '<details><summary>Evidence and remedy</summary><p>' +
+            finding.method +
+            '</p><p><strong>Try:</strong> ' +
+            finding.remedy +
+            '</p></details></div></article>';
+        });
+        markup += '</div>';
+        physicsPanel.innerHTML = markup;
+
+        physicsPanel.querySelectorAll('[data-filter]').forEach((button) => {
+          button.addEventListener('click', () => {
+            activeFilter = button.dataset.filter;
+            renderPhysics(scenario);
+          });
+        });
+        physicsPanel.querySelectorAll('[data-select], [data-locate]').forEach((button) => {
+          button.addEventListener('click', () => {
+            selectedFinding = Number(button.dataset.select ?? button.dataset.locate);
+            hoverVisible = true;
+            renderScenario();
+          });
+        });
+        physicsPanel.querySelectorAll('[data-inspect]').forEach((button) => {
+          button.addEventListener('click', () => {
+            selectedFinding = Number(button.dataset.inspect);
+            timelineHighlight.hidden = false;
+            timelineHighlight.scrollIntoView({ block: 'nearest' });
+          });
+        });
+      }
+
+      function renderScenario() {
+        const scenario = resolvedScenario(activeScenario);
+        if (selectedFinding >= scenario.findings.length) selectedFinding = 0;
+        renderCode(scenario);
+        renderHover(scenario);
+        renderPhysics(scenario);
+        stageDesign.innerHTML = scenario.design;
+        stageOverlay.innerHTML = scenario.overlay;
+        stageOverlay.style.opacity = scenario.state === 'stale' ? '0.45' : '1';
+        stageDesign.style.opacity = scenario.state === 'blocked' ? '0.3' : '1';
+        stageLegend.textContent = scenario.legend;
+        stageStatus.textContent =
+          scenario.state === 'stale'
+            ? 'Previous run · checking…'
+            : scenario.state === 'blocked'
+              ? 'Previous valid preview'
+              : scenario.state === 'clean'
+                ? 'Physics current'
+                : 'Finding selected';
+        panelStatus.innerHTML =
+          scenario.state === 'stale'
+            ? '<span class="status-symbol">◔</span>checking'
+            : scenario.state === 'blocked'
+              ? '<span class="status-symbol">×</span>blocked'
+              : '<span class="status-symbol">●</span>current';
+        const count = scenario.findings.length;
+        tabCount.textContent = count;
+        tabCount.hidden = count === 0;
+        playbackCount.textContent = scenario.playback;
+        appContext.textContent = scenario.context;
+        timelineHighlight.hidden = count === 0 || scenario.state === 'blocked';
+      }
+
+      document.querySelectorAll('[data-scenario]').forEach((button) => {
+        button.addEventListener('click', () => {
+          activeScenario = button.dataset.scenario;
+          selectedFinding = 0;
+          activeFilter = 'all';
+          hoverVisible = activeScenario !== 'clean';
+          document.querySelectorAll('[data-scenario]').forEach((candidate) => {
+            candidate.setAttribute('aria-pressed', candidate === button ? 'true' : 'false');
+          });
+          const scenario = resolvedScenario(activeScenario);
+          if (scenario.autoOpened && !autoOpenedBlockers.has(activeScenario)) {
+            autoOpenedBlockers.add(activeScenario);
+            selectTab('physics');
+            if (prototype.dataset.viewport === 'mobile') prototype.dataset.sheet = 'half';
+          }
+          renderScenario();
+        });
+      });
+
+      document.querySelectorAll('[data-viewport]').forEach((button) => {
+        button.addEventListener('click', () => {
+          prototype.dataset.viewport = button.dataset.viewport;
+          document.querySelectorAll('[data-viewport]').forEach((candidate) => {
+            candidate.setAttribute('aria-pressed', candidate === button ? 'true' : 'false');
+          });
+        });
+      });
+
+      document.querySelectorAll('[data-sheet]').forEach((button) => {
+        button.addEventListener('click', () => {
+          prototype.dataset.sheet = button.dataset.sheet;
+        });
+      });
+
+      function selectTab(name) {
+        const physics = name === 'physics';
+        physicsTab.setAttribute('aria-selected', String(physics));
+        consoleTab.setAttribute('aria-selected', String(!physics));
+        physicsPanel.hidden = !physics;
+        consolePanel.hidden = physics;
+      }
+
+      physicsTab.addEventListener('click', () => selectTab('physics'));
+      consoleTab.addEventListener('click', () => selectTab('console'));
+
+      renderScenario();
+    </script>
+  </body>
+</html>
