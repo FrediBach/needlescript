@@ -688,8 +688,8 @@ Deliverables:
 - Debounce background checks around 400–600 ms.
 - Coalesce queued work and prioritize manual runs.
 - Suspend idle background analysis while parameter/path handles are being actively dragged. Keep
-  parameter-slider previews live with bounded, coalesced compilation and guarantee the latest
-  revision at drag end.
+  parameter-slider and preview-handle updates live with bounded, coalesced compilation and guarantee
+  the latest revision at drag end.
 - Persist only display preferences, never stale diagnostics.
 
 Acceptance:
@@ -716,9 +716,10 @@ Implementation progress:
 - [x] Separated foreground and background staleness generations so a background request cannot
       supersede a manual run. Source-revision guards also prevent an in-flight result from applying
       after a newer edit but before its debounce fires.
-- [x] Suspended idle background analysis during stage point/path dragging. Parameter sliders retain
-      leading-and-trailing preview compilation at most once every 250 ms; the compiler queue drops
-      obsolete queued generations, and pointer commit guarantees the latest source is compiled.
+- [x] Suspended idle background analysis during stage point/path dragging. Parameter sliders and
+      preview point/path handles retain leading-and-trailing preview compilation at most once every
+      250 ms; the compiler queue drops obsolete queued generations, and pointer commit guarantees
+      the latest source is compiled.
 - [x] Added no Physics persistence: diagnostics, reports, and revision state are never written to
       local storage. Only future Physics display preferences are eligible for persistence.
 - [x] Added focused lifecycle and queue coverage for immediate stale state, obsolete-result

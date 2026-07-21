@@ -405,8 +405,7 @@ export default function EditorPane({
         return;
       }
 
-      if (customizerRunTimerRef.current !== null)
-        clearTimeout(customizerRunTimerRef.current);
+      if (customizerRunTimerRef.current !== null) clearTimeout(customizerRunTimerRef.current);
       customizerRunTimerRef.current = setTimeout(() => {
         runCustomizerPreview(sourceRef.current);
       }, CUSTOMIZER_PREVIEW_THROTTLE_MS - elapsed);
@@ -416,8 +415,7 @@ export default function EditorPane({
 
   useEffect(
     () => () => {
-      if (customizerRunTimerRef.current !== null)
-        clearTimeout(customizerRunTimerRef.current);
+      if (customizerRunTimerRef.current !== null) clearTimeout(customizerRunTimerRef.current);
     },
     [],
   );

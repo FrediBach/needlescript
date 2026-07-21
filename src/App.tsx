@@ -124,6 +124,8 @@ import {
 } from './physics-analysis-state.ts';
 import { consoleWarningsWithoutStructuredDuplicates } from './components/physics-panel-model.ts';
 
+const STAGE_PREVIEW_THROTTLE_MS = 250;
+
 export interface LineSegment {
   line: number;
   start: number; // 0-based index into pts[] where this line's stitches begin
@@ -592,6 +594,60 @@ export default function App() {
     designNameRef.current = design.name;
   }, [design.name]);
 
+  // Leading + trailing throttle for stage handle drags. Source and handle
+  // geometry update on every pointer event, while compiled stitch previews run
+  // at a bounded cadence and obsolete queued generations are discarded.
+  const lastStagePreviewRunTimeRef = useRef(0);
+  const lastStagePreviewRunSourceRef = useRef<string | null>(null);
+  const stagePreviewRunTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runStagePreview = useCallback(
+    (nextSource: string) => {
+      if (stagePreviewRunTimerRef.current !== null) {
+        clearTimeout(stagePreviewRunTimerRef.current);
+        stagePreviewRunTimerRef.current = null;
+      }
+      lastStagePreviewRunTimeRef.current = Date.now();
+      lastStagePreviewRunSourceRef.current = nextSource;
+      runProgram(nextSource, designNameRef.current);
+    },
+    [runProgram],
+  );
+
+  const scheduleStagePreview = useCallback(
+    (nextSource: string) => {
+      const elapsed = Date.now() - lastStagePreviewRunTimeRef.current;
+      if (elapsed >= STAGE_PREVIEW_THROTTLE_MS) {
+        runStagePreview(nextSource);
+        return;
+      }
+
+      if (stagePreviewRunTimerRef.current !== null) clearTimeout(stagePreviewRunTimerRef.current);
+      stagePreviewRunTimerRef.current = setTimeout(() => {
+        runStagePreview(sourceRef.current);
+      }, STAGE_PREVIEW_THROTTLE_MS - elapsed);
+    },
+    [runStagePreview],
+  );
+
+  const commitStagePreview = useCallback(
+    (nextSource: string) => {
+      if (stagePreviewRunTimerRef.current !== null) {
+        clearTimeout(stagePreviewRunTimerRef.current);
+        stagePreviewRunTimerRef.current = null;
+      }
+      if (lastStagePreviewRunSourceRef.current !== nextSource) runStagePreview(nextSource);
+    },
+    [runStagePreview],
+  );
+
+  useEffect(
+    () => () => {
+      if (stagePreviewRunTimerRef.current !== null) clearTimeout(stagePreviewRunTimerRef.current);
+    },
+    [],
+  );
+
   // Source edits stale the report synchronously. Once typing has been idle for
   // 500 ms, compile the latest revision without adding console noise.
   useEffect(() => {
@@ -636,8 +692,8 @@ export default function App() {
   }, [compileAnalysis, source, updatePhysicsReportState]);
 
   // ── XY handle drag callbacks ──────────────────────────────────────────────
-  // Dragging updates source and stale state, but compilation resumes only once
-  // at commit so pointer movement never competes with the worker.
+  // Dragging updates source and stale state continuously. Compiled previews use
+  // the bounded stage throttle above, with the final value guaranteed at commit.
   const xySourceRef = useRef<string | null>(null);
 
   const updateStageHandle = useCallback(
@@ -705,8 +761,9 @@ export default function App() {
       const updated = updateStageHandle(base, name, line, x, y, options);
       xySourceRef.current = updated;
       setSource(updated);
+      scheduleStagePreview(updated);
     },
-    [setSource, updateStageHandle],
+    [scheduleStagePreview, setSource, updateStageHandle],
   );
 
   const handleXYHandleCommit = useCallback(
@@ -716,9 +773,9 @@ export default function App() {
       xySourceRef.current = null; // reset pending source after final commit
       setSource(updated);
       backgroundAnalysisSuspendedRef.current = false;
-      runProgram(updated, design.name);
+      commitStagePreview(updated);
     },
-    [design.name, runProgram, setSource, updateStageHandle],
+    [commitStagePreview, setSource, updateStageHandle],
   );
 
   const commitPathValue = useCallback(
@@ -777,10 +834,12 @@ export default function App() {
       if (commit) {
         pathTranslateRef.current = null;
         backgroundAnalysisSuspendedRef.current = false;
-        runProgram(updated, design.name);
+        commitStagePreview(updated);
+      } else {
+        scheduleStagePreview(updated);
       }
     },
-    [design.name, runProgram, setSource],
+    [commitStagePreview, scheduleStagePreview, setSource],
   );
 
   // When the source changes from outside (editor, example, share), clear the
