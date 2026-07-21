@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import type {
   PhysicsDiagnostic,
   PhysicsDiagnosticCategory,
-  PhysicsEvidence,
-  PhysicsMeasurement,
   PhysicsReport,
   PreflightSeverity,
 } from '../lib/engine.ts';
@@ -13,6 +11,8 @@ import {
   groupPhysicsDiagnostics,
   serializePhysicsDiagnosticReport,
 } from './physics-panel-model.ts';
+import type { PhysicsQuickFix, PhysicsQuickFixOutcome } from './physics-remedies-model.ts';
+import PhysicsDiagnosticCard from './PhysicsDiagnosticCard.tsx';
 import styles from './PhysicsPanel.module.css';
 
 interface Props {
@@ -21,6 +21,13 @@ interface Props {
   selectedDiagnosticId: string | null;
   onDiagnosticSelect: (diagnostic: PhysicsDiagnostic) => void;
   onDiagnosticHover: (diagnostic: PhysicsDiagnostic | null) => void;
+  quickFixes: ReadonlyMap<string, PhysicsQuickFix>;
+  quickFixPreview: PhysicsQuickFix | null;
+  quickFixOutcome: PhysicsQuickFixOutcome | null;
+  onQuickFixPreview: (fix: PhysicsQuickFix) => void;
+  onQuickFixCancel: () => void;
+  onQuickFixApply: (fix: PhysicsQuickFix) => void;
+  onQuickFixOutcomeDismiss: () => void;
 }
 
 const INFO_PREFERENCE_KEY = 'ns.physics.showInfo:v1';
@@ -43,13 +50,6 @@ const SEVERITY_LABELS: Record<PreflightSeverity, string> = {
   warning: 'Risk',
   info: 'Note',
 };
-const EVIDENCE_LABELS: Record<PhysicsEvidence, string> = {
-  'hard-limit': 'Hard limit',
-  'machine-profile': 'Machine profile',
-  'engine-derived': 'Engine-derived',
-  heuristic: 'Generic heuristic',
-  experimental: 'Experimental model',
-};
 
 function readShowInfoPreference(): boolean {
   try {
@@ -69,18 +69,6 @@ function formatSummary(report: PhysicsReport): string {
     plural(report.summary.warning, 'risk'),
     plural(report.summary.info, 'note'),
   ].join(', ');
-}
-
-function formatMeasurement(measurement: PhysicsMeasurement): string {
-  const value = `${measurement.value.toLocaleString()} ${measurement.unit}`;
-  if (measurement.threshold === undefined) return `${measurement.label}: ${value}`;
-  const comparison =
-    measurement.comparison === 'below'
-      ? 'minimum'
-      : measurement.comparison === 'outside'
-        ? 'range limit'
-        : 'limit';
-  return `${measurement.label}: ${value}; ${comparison} ${measurement.threshold.toLocaleString()} ${measurement.unit}`;
 }
 
 async function copyText(text: string): Promise<void> {
@@ -104,6 +92,13 @@ export default function PhysicsPanel({
   selectedDiagnosticId,
   onDiagnosticSelect,
   onDiagnosticHover,
+  quickFixes,
+  quickFixPreview,
+  quickFixOutcome,
+  onQuickFixPreview,
+  onQuickFixCancel,
+  onQuickFixApply,
+  onQuickFixOutcomeDismiss,
 }: Props) {
   const [showInfo, setShowInfo] = useState(readShowInfoPreference);
   const [enabledSeverities, setEnabledSeverities] = useState<Set<PreflightSeverity>>(
@@ -199,6 +194,43 @@ export default function PhysicsPanel({
         </button>
       </div>
 
+      {quickFixOutcome && (
+        <div
+          className={styles.quickFixOutcome}
+          data-status={quickFixOutcome.status}
+          role={
+            quickFixOutcome.status === 'error' || quickFixOutcome.status === 'warning'
+              ? 'alert'
+              : 'status'
+          }
+        >
+          <div>
+            <strong>
+              {quickFixOutcome.status === 'checking'
+                ? 'Checking change'
+                : quickFixOutcome.status === 'success'
+                  ? 'Change checked'
+                  : quickFixOutcome.status === 'error'
+                    ? 'Change needs attention'
+                    : 'Review comparison'}
+            </strong>
+            <span>{quickFixOutcome.message}</span>
+            {quickFixOutcome.introduced.length > 0 && (
+              <ul>
+                {quickFixOutcome.introduced.map((finding) => (
+                  <li key={finding}>{finding}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {quickFixOutcome.status !== 'checking' && (
+            <button type="button" onClick={onQuickFixOutcomeDismiss}>
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
+
       {report && report.assumptions.length > 0 && (
         <div className={styles.assumptions} aria-label="Analysis assumptions">
           <span>Assumptions:</span>
@@ -278,87 +310,22 @@ export default function PhysicsPanel({
             <h3>
               {CATEGORY_LABELS[groupCategory]} <span>{diagnostics.length}</span>
             </h3>
-            {diagnostics.map((diagnostic) => {
-              const selected = diagnostic.id === selectedDiagnosticId;
-              const expanded = expandedIds.has(diagnostic.id);
-              const primaryLine = diagnostic.sourceLocations.find(
-                ({ role }) => role === 'primary',
-              )?.line;
-              return (
-                <article
-                  key={diagnostic.id}
-                  className={styles.card}
-                  data-severity={diagnostic.severity}
-                  data-selected={selected || undefined}
-                  onMouseEnter={() => onDiagnosticHover(diagnostic)}
-                  onMouseLeave={() => onDiagnosticHover(null)}
-                >
-                  <div className={styles.cardHeader}>
-                    <button
-                      type="button"
-                      className={styles.selectCard}
-                      aria-pressed={selected}
-                      onFocus={() => onDiagnosticHover(diagnostic)}
-                      onBlur={() => onDiagnosticHover(null)}
-                      onClick={() => onDiagnosticSelect(diagnostic)}
-                    >
-                      <span className={styles.severity}>
-                        {diagnostic.severity === 'error'
-                          ? '◆'
-                          : diagnostic.severity === 'warning'
-                            ? '▲'
-                            : '●'}{' '}
-                        {SEVERITY_LABELS[diagnostic.severity]}
-                      </span>
-                      <strong>{diagnostic.title}</strong>
-                      <span className={styles.cardMeta}>
-                        {EVIDENCE_LABELS[diagnostic.evidence]}
-                        {primaryLine !== undefined ? ` · line ${primaryLine}` : ' · generated'}
-                      </span>
-                      {diagnostic.measurements?.slice(0, 1).map((measurement) => (
-                        <span key={measurement.label} className={styles.measurement}>
-                          {formatMeasurement(measurement)}
-                        </span>
-                      ))}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.expandButton}
-                      aria-expanded={expanded}
-                      aria-controls={`physics-details-${diagnostic.id}`}
-                      onClick={() => toggleExpanded(diagnostic.id)}
-                    >
-                      {expanded ? 'Hide details' : 'Show details'}
-                    </button>
-                  </div>
-                  {expanded && (
-                    <div id={`physics-details-${diagnostic.id}`} className={styles.cardDetails}>
-                      <p>{diagnostic.explanation}</p>
-                      {diagnostic.measurements && diagnostic.measurements.length > 1 && (
-                        <ul>
-                          {diagnostic.measurements.slice(1).map((measurement) => (
-                            <li key={measurement.label}>{formatMeasurement(measurement)}</li>
-                          ))}
-                        </ul>
-                      )}
-                      {diagnostic.remedies.length > 0 && (
-                        <div className={styles.remedies}>
-                          <strong>Try</strong>
-                          <ul>
-                            {diagnostic.remedies.slice(0, 2).map((remedy) => (
-                              <li key={remedy.id}>
-                                <span>{remedy.title}</span> — {remedy.description}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      <code>{diagnostic.code}</code>
-                    </div>
-                  )}
-                </article>
-              );
-            })}
+            {diagnostics.map((diagnostic) => (
+              <PhysicsDiagnosticCard
+                key={diagnostic.id}
+                diagnostic={diagnostic}
+                selected={diagnostic.id === selectedDiagnosticId}
+                expanded={expandedIds.has(diagnostic.id)}
+                quickFix={quickFixes.get(diagnostic.id)}
+                quickFixPreview={quickFixPreview}
+                onSelect={onDiagnosticSelect}
+                onHover={onDiagnosticHover}
+                onToggleExpanded={toggleExpanded}
+                onQuickFixPreview={onQuickFixPreview}
+                onQuickFixCancel={onQuickFixCancel}
+                onQuickFixApply={onQuickFixApply}
+              />
+            ))}
           </section>
         ))}
       </div>

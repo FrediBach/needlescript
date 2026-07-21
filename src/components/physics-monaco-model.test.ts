@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PhysicsDiagnostic } from '../lib/engine.ts';
+import { run, type PhysicsDiagnostic } from '../lib/engine.ts';
 import {
   adjacentPhysicsDiagnostic,
   buildPhysicsMonacoMarkers,
@@ -86,7 +86,19 @@ describe('Physics Monaco model', () => {
     expect(adjacentPhysicsDiagnostic([lineSix, lineTwo], 'risk-1', 1)?.id).toBe('risk-2');
   });
 
-  it('keeps source edits disabled until PI-8 supplies a safe resolver', () => {
-    expect(physicsCodeActions()).toEqual([]);
+  it('does not offer source edits without a current physics report', () => {
+    expect(physicsCodeActions('', undefined, 1)).toEqual([]);
+  });
+
+  it('exposes a proven source edit through Monaco only at the attributed location', () => {
+    const source = 'fillspacing 0.4\nbeginfill fd 10 endfill';
+    const finding = diagnostic({ sourceLocations: [{ line: 2, role: 'primary' }] });
+    const base = run('fd 1', { physicsAnalysis: 'full' }).physics!;
+    const report = { ...base, diagnostics: [finding] };
+
+    expect(physicsCodeActions(source, report, 2)).toEqual([
+      expect.objectContaining({ diagnosticId: finding.id, title: 'Increase literal fillspacing' }),
+    ]);
+    expect(physicsCodeActions(source, report, 1)).toEqual([]);
   });
 });

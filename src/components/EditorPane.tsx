@@ -1,4 +1,12 @@
-import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import {
+  useRef,
+  useState,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+} from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { editor, IDisposable } from 'monaco-editor';
@@ -38,6 +46,12 @@ import {
   physicsDiagnosticMarkerMessage,
   physicsDiagnosticsAtPosition,
 } from './physics-monaco-model.ts';
+import {
+  comparePhysicsQuickFix,
+  physicsQuickFixForDiagnostic,
+  type PhysicsQuickFix,
+  type PhysicsQuickFixOutcome,
+} from './physics-remedies-model.ts';
 
 interface Props {
   source: string;
@@ -113,6 +127,53 @@ const ACTIVE_LINE_CLASS = 'ns-playback-line';
 const PHYSICS_PRIMARY_LINE_CLASS = 'ns-physics-selected-primary';
 const PHYSICS_CONTRIBUTOR_LINE_CLASS = 'ns-physics-selected-contributor';
 const PHYSICS_RELATED_LINE_CLASS = 'ns-physics-selected-related';
+const PHYSICS_PREVIEW_FIX_ACTION = 'needlescript.physics.previewQuickFix';
+
+interface PendingPhysicsQuickFix {
+  beforeSource: string;
+  expectedSource: string;
+  baseline: PhysicsReport;
+  diagnostic: PhysicsDiagnostic;
+}
+
+interface PhysicsQuickFixUiState {
+  preview: PhysicsQuickFix | null;
+  outcome: PhysicsQuickFixOutcome | null;
+  pending: PendingPhysicsQuickFix | null;
+}
+
+type PhysicsQuickFixUiAction =
+  | { type: 'preview'; fix: PhysicsQuickFix }
+  | { type: 'cancel-preview' }
+  | { type: 'apply-started'; pending: PendingPhysicsQuickFix }
+  | { type: 'apply-failed'; outcome: PhysicsQuickFixOutcome }
+  | { type: 'dismiss-outcome' };
+
+function physicsQuickFixUiReducer(
+  state: PhysicsQuickFixUiState,
+  action: PhysicsQuickFixUiAction,
+): PhysicsQuickFixUiState {
+  switch (action.type) {
+    case 'preview':
+      return { preview: action.fix, outcome: null, pending: null };
+    case 'cancel-preview':
+      return { ...state, preview: null };
+    case 'apply-started':
+      return {
+        preview: null,
+        outcome: {
+          status: 'checking',
+          message: 'Change applied as one editor transaction. Recompiling and comparing findings…',
+          introduced: [],
+        },
+        pending: action.pending,
+      };
+    case 'apply-failed':
+      return { preview: null, outcome: action.outcome, pending: null };
+    case 'dismiss-outcome':
+      return { ...state, outcome: null, pending: null };
+  }
+}
 
 // Prefix that triggers AI command mode in the REPL.
 const AI_TRIGGER = '/ai';
@@ -183,6 +244,11 @@ export default function EditorPane({
     () => new Set(),
   );
   const [lastAutoOpenReport, setLastAutoOpenReport] = useState<PhysicsReport | undefined>();
+  const [quickFixUi, dispatchQuickFixUi] = useReducer(physicsQuickFixUiReducer, {
+    preview: null,
+    outcome: null,
+    pending: null,
+  });
 
   const handleConsoleDrag = useCallback((delta: number) => {
     // Positive delta = dragging the handle down = Monaco grows, console shrinks.
@@ -208,8 +274,8 @@ export default function EditorPane({
   const onDiagnosticHoverRef = useRef(onDiagnosticHover);
   const onDiagnosticSelectRef = useRef(onDiagnosticSelect);
   const physicsRef = useRef(physics);
+  const physicsReportStateRef = useRef(physicsReportState);
   const selectedDiagnosticIdRef = useRef(selectedDiagnosticId);
-
   // Stable ref to source so the parameter-change handler never captures a
   // stale closure value.
   const sourceRef = useRef(source);
@@ -226,6 +292,7 @@ export default function EditorPane({
     onDiagnosticHoverRef.current = onDiagnosticHover;
     onDiagnosticSelectRef.current = onDiagnosticSelect;
     physicsRef.current = physics;
+    physicsReportStateRef.current = physicsReportState;
     selectedDiagnosticIdRef.current = selectedDiagnosticId;
     sourceRef.current = source;
     lineStitchMapRef.current = lineStitchMap;
@@ -241,9 +308,62 @@ export default function EditorPane({
     onMachineContextMenu,
     onRun,
     physics,
+    physicsReportState,
     selectedDiagnosticId,
     source,
   ]);
+
+  const quickFixes = useMemo(() => {
+    const fixes = new Map<string, PhysicsQuickFix>();
+    if (!physics || physicsReportState.status !== 'current') return fixes;
+    for (const diagnostic of physics.diagnostics) {
+      const fix = physicsQuickFixForDiagnostic(source, diagnostic, physics.profile);
+      if (fix) fixes.set(diagnostic.id, fix);
+    }
+    return fixes;
+  }, [physics, physicsReportState.status, source]);
+
+  const completedQuickFixOutcome = (() => {
+    const pending = quickFixUi.pending;
+    if (!pending || source === pending.beforeSource) return null;
+    if (source !== pending.expectedSource) {
+      return {
+        status: 'error',
+        message:
+          'The source changed before the comparison completed. Run Physics again to review it.',
+        introduced: [],
+      } satisfies PhysicsQuickFixOutcome;
+    }
+    if (physicsReportState.status === 'blocked') {
+      return {
+        status: 'error',
+        message: 'The edited source did not compile. Undo the change or revise it before sewing.',
+        introduced: [],
+      } satisfies PhysicsQuickFixOutcome;
+    }
+    if (
+      physicsReportState.status !== 'current' ||
+      physicsReportState.reportRevision !== physicsReportState.sourceRevision ||
+      !physics
+    )
+      return null;
+    const comparison = comparePhysicsQuickFix(pending.baseline, physics, pending.diagnostic);
+    const targetMessage = comparison.targetResolved
+      ? `${pending.diagnostic.title} is no longer reported.`
+      : `${pending.diagnostic.title} is still reported after recompiling.`;
+    const introduced = comparison.newEqualOrHigher.map(
+      ({ title, severity, count }) =>
+        `${count > 1 ? `${count}× ` : ''}${title} (${severity === 'error' ? 'blocker' : severity === 'warning' ? 'risk' : 'note'})`,
+    );
+    return {
+      status: introduced.length > 0 ? 'warning' : comparison.targetResolved ? 'success' : 'warning',
+      message:
+        introduced.length > 0
+          ? `${targetMessage} The change introduced new findings of equal or higher severity.`
+          : `${targetMessage} No new findings of equal or higher severity were introduced.`,
+      introduced,
+    } satisfies PhysicsQuickFixOutcome;
+  })();
 
   // Disposables created in handleMount — cleaned up on unmount.
   const stitchHoverProviderRef = useRef<IDisposable | null>(null);
@@ -447,8 +567,27 @@ export default function EditorPane({
     physicsCodeActionProviderRef.current = monaco.languages.registerCodeActionProvider(
       'needlescript',
       {
-        provideCodeActions() {
-          return { actions: [...physicsCodeActions()], dispose() {} };
+        provideCodeActions(_model, range) {
+          if (physicsReportStateRef.current.status !== 'current')
+            return { actions: [], dispose() {} };
+          const fixes = physicsCodeActions(
+            sourceRef.current,
+            physicsRef.current,
+            range.startLineNumber,
+            range.startColumn,
+          );
+          return {
+            actions: fixes.map((fix) => ({
+              title: `Preview: ${fix.title}`,
+              kind: 'quickfix',
+              command: {
+                id: PHYSICS_PREVIEW_FIX_ACTION,
+                title: `Preview: ${fix.title}`,
+                arguments: [fix.id],
+              },
+            })),
+            dispose() {},
+          };
         },
       },
     );
@@ -528,6 +667,31 @@ export default function EditorPane({
     };
     physicsActionRefs.current = [
       ed.addAction({
+        id: PHYSICS_PREVIEW_FIX_ACTION,
+        label: 'Preview Physics Quick Fix',
+        run: (_editor, ...args: unknown[]) => {
+          if (physicsReportStateRef.current.status !== 'current') return;
+          const position = ed.getPosition();
+          if (!position) return;
+          const fixes = physicsCodeActions(
+            sourceRef.current,
+            physicsRef.current,
+            position.lineNumber,
+            position.column,
+          );
+          const requestedId = typeof args[0] === 'string' ? args[0] : undefined;
+          const fix = fixes.find(({ id }) => id === requestedId) ?? fixes[0];
+          if (!fix) return;
+          const diagnostic = physicsRef.current?.diagnostics.find(
+            ({ id }) => id === fix.diagnosticId,
+          );
+          if (diagnostic) onDiagnosticSelectRef.current(diagnostic);
+          dispatchQuickFixUi({ type: 'preview', fix });
+          setActiveBottomTab('physics');
+          setConsoleHeight((height) => Math.max(height, 280));
+        },
+      }),
+      ed.addAction({
         id: 'needlescript.physics.next',
         label: 'Next Physics Finding',
         keybindings: [monaco.KeyCode.F8],
@@ -559,6 +723,69 @@ export default function EditorPane({
       });
     });
   }, []);
+
+  const applyQuickFix = useCallback(
+    (fix: PhysicsQuickFix) => {
+      const ed = editorRef.current;
+      const model = ed?.getModel();
+      const baseline = physicsRef.current;
+      const diagnostic = baseline?.diagnostics.find(({ id }) => id === fix.diagnosticId);
+      if (!ed || !model || !baseline || !diagnostic || sourceRef.current !== fix.beforeSource) {
+        dispatchQuickFixUi({
+          type: 'apply-failed',
+          outcome: {
+            status: 'error',
+            message:
+              'The source changed after this preview. Preview the remedy again before applying.',
+            introduced: [],
+          },
+        });
+        return;
+      }
+      const start = model.getPositionAt(fix.edit.start);
+      const end = model.getPositionAt(fix.edit.end);
+      ed.pushUndoStop();
+      const applied = ed.executeEdits('needlescript.physics.quickFix', [
+        {
+          range: {
+            startLineNumber: start.lineNumber,
+            startColumn: start.column,
+            endLineNumber: end.lineNumber,
+            endColumn: end.column,
+          },
+          text: fix.edit.text,
+          forceMoveMarkers: true,
+        },
+      ]);
+      ed.pushUndoStop();
+      if (!applied) {
+        dispatchQuickFixUi({
+          type: 'apply-failed',
+          outcome: {
+            status: 'error',
+            message: 'Monaco could not apply this edit. The source was not changed.',
+            introduced: [],
+          },
+        });
+        return;
+      }
+      const updated = model.getValue();
+      sourceRef.current = updated;
+      dispatchQuickFixUi({
+        type: 'apply-started',
+        pending: {
+          beforeSource: fix.beforeSource,
+          expectedSource: updated,
+          baseline,
+          diagnostic,
+        },
+      });
+      onSourceChange(updated);
+      onRunRef.current(updated);
+      ed.focus();
+    },
+    [onSourceChange],
+  );
 
   // Dispose Monaco listeners when the editor pane unmounts.
   useEffect(() => {
@@ -948,7 +1175,10 @@ export default function EditorPane({
           beforeMount={handleBeforeMount}
           onMount={handleMount}
           onChange={(value) => {
-            if (value !== undefined) onSourceChange(value);
+            if (value !== undefined) {
+              sourceRef.current = value;
+              onSourceChange(value);
+            }
           }}
           height="100%"
           width="100%"
@@ -1110,6 +1340,17 @@ export default function EditorPane({
             selectedDiagnosticId={selectedDiagnosticId}
             onDiagnosticHover={onDiagnosticHover}
             onDiagnosticSelect={selectPhysicsDiagnostic}
+            quickFixes={quickFixes}
+            quickFixPreview={quickFixUi.preview}
+            quickFixOutcome={completedQuickFixOutcome ?? quickFixUi.outcome}
+            onQuickFixPreview={(fix) => {
+              dispatchQuickFixUi({ type: 'preview', fix });
+              const diagnostic = physics?.diagnostics.find(({ id }) => id === fix.diagnosticId);
+              if (diagnostic) onDiagnosticSelect(diagnostic);
+            }}
+            onQuickFixCancel={() => dispatchQuickFixUi({ type: 'cancel-preview' })}
+            onQuickFixApply={applyQuickFix}
+            onQuickFixOutcomeDismiss={() => dispatchQuickFixUi({ type: 'dismiss-outcome' })}
           />
         </div>
       </div>

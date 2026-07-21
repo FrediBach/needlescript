@@ -1,9 +1,11 @@
 import type {
   PhysicsDiagnostic,
   PhysicsMeasurement,
+  PhysicsReport,
   PhysicsSourceLocation,
   PreflightSeverity,
 } from '../lib/engine.ts';
+import { physicsQuickFixForDiagnostic, type PhysicsQuickFix } from './physics-remedies-model.ts';
 
 export const COMPILER_MARKER_OWNER = 'needlescript.compiler';
 export const PHYSICS_MARKER_OWNER = 'needlescript.physics';
@@ -166,10 +168,16 @@ export function adjacentPhysicsDiagnostic(
   return ordered[(selectedIndex + direction + ordered.length) % ordered.length];
 }
 
-/**
- * PI-6 registers Monaco's code-action channel, but deliberately exposes no
- * edits. PI-8 will add a resolver that can prove and preview safe source edits.
- */
-export function physicsCodeActions(): readonly never[] {
-  return [];
+/** Resolve only previewable source edits at the requested Monaco position. */
+export function physicsCodeActions(
+  source: string,
+  report: PhysicsReport | undefined,
+  line: number,
+  column?: number,
+): PhysicsQuickFix[] {
+  if (!report) return [];
+  return physicsDiagnosticsAtPosition(report.diagnostics, line, column).flatMap((diagnostic) => {
+    const fix = physicsQuickFixForDiagnostic(source, diagnostic, report.profile);
+    return fix ? [fix] : [];
+  });
 }

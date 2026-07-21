@@ -1,8 +1,8 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-7 implementation ready for product review** (2026-07-21) — semantic stage overlays,
-overlap-aware hit-testing, temporary inspection controls, and exact playback ranges are integrated.
-PI-7 remains open until representative visual iteration, product-owner approval, and the
+Status: **PI-8 complete; PI-7 product review remains open** (2026-07-21) — guided remedies and
+literal-only quick fixes now preview, apply as one editor transaction, recompile, and compare
+findings. PI-7 remains open until representative visual iteration, product-owner approval, and the
 five-participant usability protocol are complete.
 
 Last updated: 2026-07-21
@@ -17,7 +17,8 @@ Last updated: 2026-07-21
 | PI-5    | Complete    | Responsive, keyboard-operable Physics panel shipped                       |
 | PI-6    | Complete    | Independent markers, linked selection, rich hover, and navigation shipped |
 | PI-7    | In review   | Visual/product iteration and five-participant protocol remain             |
-| PI-8–11 | Not started | Follow the dependency and acceptance gates documented below               |
+| PI-8    | Complete    | Previewed literal edits recompile and compare findings                    |
+| PI-9–11 | Not started | Follow the dependency and acceptance gates documented below               |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
 playback—not a renamed or enlarged preflight panel.
@@ -914,6 +915,8 @@ Validation record (2026-07-21):
 
 ### PI-8 — Guided remedies and safe quick fixes
 
+Status: **complete** (2026-07-21)
+
 Begin with explanation-only remedy recipes. Then add source edits for narrow cases:
 
 - Insert or adjust `autotrim` for a long jump.
@@ -935,6 +938,47 @@ Acceptance:
 - Applying a fix is one undoable editor transaction.
 - Unsafe or ambiguous findings show guidance only.
 - A fix that introduces new equal-or-higher-severity findings is called out explicitly.
+
+Implementation progress:
+
+- [x] Kept the catalog's explanation-first guidance visible for every finding and added a
+      playground-only resolver for source-aware edits. The engine report remains semantic,
+      platform-neutral, and stitch-inert.
+- [x] Added literal-only adjustments for `fillinset`, `underlayinset`, `density`, `fillspacing`,
+      and `satinsplitoverlap`, plus insert/adjust handling for `autotrim` at the active generic
+      machine-profile jump limit.
+- [x] Added `satinwide 'split'` only for a top-level, straight, open numeric satin construction.
+      Reporter columns, curved/scoped constructions, expressions, non-literal overrides, and
+      ambiguous density attribution remain guidance-only.
+- [x] Excluded machine/fabric/thread/needle/hoop context, `maxdensity`, preflight policy, and every
+      suppression threshold from the source-edit resolver. No “Fix all” action exists.
+- [x] Connected Monaco lightbulbs and Physics-card actions to one inline source-diff preview. A
+      code action opens the preview; neither route can apply an edit without the explicit Apply
+      action.
+- [x] Applied each accepted remedy with one `executeEdits` call between undo stops, then launched a
+      foreground compile immediately. Compiler failures, a persisting target, and successful
+      removal receive distinct feedback.
+- [x] Compared before/after occurrences by stable diagnostic fingerprint and summarized additions
+      by code and severity. Any new finding at the original finding's severity or higher is listed
+      explicitly in the comparison result.
+- [x] Added focused coverage for diff construction, literal bounds, autotrim insertion/adjustment,
+      proven split-satin topology, reporter/expression/scope rejection, guidance-only ambiguity,
+      and equal-or-higher-severity regression reporting.
+
+Validation record (2026-07-21):
+
+- `npm test`: 83 files and 2,107 tests passed; generated references are current.
+- `npm run lint`, `npm run build`, `npm run build:lib`, and `npm run check:lib` passed. The app build
+  retained its pre-existing large-chunk advisory; publint and the package type check found no
+  problems.
+- React Doctor's final changed-file scan scored 88/100. Its remaining four findings are the
+  pre-existing EditorPane eager-loading, component-size, REPL-option focus, and Monaco navigation
+  iteration findings; the PI-8 coordinated-state and PhysicsPanel-size findings were corrected.
+- Targeted Prettier validation and `git diff --check` passed.
+- The in-app browser runtime reported no available browser surface, so live visual interaction
+  could not be exercised in this session. Strict TypeScript/build validation and focused model
+  tests cover the diff, resolver, and comparison paths; interactive visual review is still
+  recommended when a browser surface is available.
 
 ### PI-9 — Physics coverage expansion
 
