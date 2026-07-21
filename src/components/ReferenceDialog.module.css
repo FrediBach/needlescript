@@ -148,6 +148,20 @@
   letter-spacing: 0.01em;
 }
 
+.glossCommands {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.glossCommandsLabel {
+  color: var(--text-muted);
+  font-size: var(--fs-ui);
+  margin-right: 2px;
+}
+
 /* ── Shared inline code style ── */
 
 .inlineCode {
