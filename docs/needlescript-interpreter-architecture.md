@@ -405,9 +405,13 @@ the enclosing trace snapshot remains the final authority on machine state.
   It checks the procedure exists and that `depth < maxCallDepth`, evaluates arguments
   into a fresh `Object.create(null)` environment bound to the parameters, and runs the
   body via `execBlock` at `depth + 1`. A `ReturnSignal` yields the return value;
-  reaching the end yields `undefined` (meaning "no value"). Notably, it passes the
-  **call-site line** as `contextLine` so stitches produced inside the procedure are
-  stamped with the caller's source line.
+  reaching the end yields `undefined` (meaning "no value"). It builds an execution-source
+  context containing the procedure's origin plus the addressable main-source call path. Machine
+  commands in a local procedure therefore retain their precise body statement as primary source
+  while keeping the outer and nested call sites as related context. Bundled `std.*` procedures
+  project to the nearest editable main-source call because their module-local line numbers do not
+  belong to the active editor model. The legacy `StitchEvent.line` call-site projection remains
+  unchanged; the additive `StitchEvent.source` trace drives the scrubber and PhysicsIntellisense.
 - **`callProcVals`** (`proc-call.ts:52`) — same, but from already-evaluated values.
   Used by the reporter machinery (once per point/stitch).
 - **`scalarBuiltin`** (`proc-call.ts:82`) — evaluates the `FUNC_ARITY`/`ZERO_FUNCS`

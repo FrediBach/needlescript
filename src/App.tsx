@@ -27,7 +27,7 @@ import type {
   MaterialIntent,
   RunResult,
 } from './lib/engine.ts';
-import { DEFAULT_MATERIAL_INTENT } from './lib/engine.ts';
+import { DEFAULT_MATERIAL_INTENT, eventSourceLine } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
 import { toDST } from './lib/formats/dst.ts';
 import { toPES } from './lib/formats/pes.ts';
@@ -1188,7 +1188,7 @@ export default function App() {
   // Source line currently sewing (only meaningful while scrubbed back / playing)
   const activeLine =
     design.ok && scrubPos > 0 && scrubPos < design.pts.length
-      ? (design.pts[Math.min(scrubPos, design.pts.length) - 1].line ?? null)
+      ? (eventSourceLine(design.pts[Math.min(scrubPos, design.pts.length) - 1]) ?? null)
       : null;
 
   // Compact list of source-line runs: one entry per consecutive block of stitches
@@ -1197,7 +1197,7 @@ export default function App() {
     const segs: LineSegment[] = [];
     let currentLine: number | undefined = undefined;
     for (let i = 0; i < design.pts.length; i++) {
-      const ln = design.pts[i].line;
+      const ln = eventSourceLine(design.pts[i]);
       if (ln !== currentLine) {
         segs.push({ line: ln ?? 0, start: i });
         currentLine = ln;
@@ -1212,10 +1212,11 @@ export default function App() {
   const lineStitchMap = useMemo((): Map<number, LineStitchBounds> => {
     const map = new Map<number, LineStitchBounds>();
     for (const p of design.pts) {
-      if (p.t !== 'stitch' || p.line === undefined) continue;
-      const b = map.get(p.line);
+      const line = eventSourceLine(p);
+      if (p.t !== 'stitch' || line === undefined) continue;
+      const b = map.get(line);
       if (!b) {
-        map.set(p.line, { minX: p.x, maxX: p.x, minY: p.y, maxY: p.y, count: 1 });
+        map.set(line, { minX: p.x, maxX: p.x, minY: p.y, maxY: p.y, count: 1 });
       } else {
         if (p.x < b.minX) b.minX = p.x;
         if (p.x > b.maxX) b.maxX = p.x;

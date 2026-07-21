@@ -307,7 +307,10 @@ export function linkStandardModules(rootTokens: Token[], notes?: string[]): ASTN
       );
     const localNames = new Map(importedNames);
     for (const stmt of ast) {
-      if (stmt.k === 'to') localNames.set(stmt.name, `${moduleId}.${stmt.name}`);
+      if (stmt.k === 'to') {
+        stmt.sourceId = moduleId;
+        localNames.set(stmt.name, `${moduleId}.${stmt.name}`);
+      }
     }
     rewriteStatements(ast, localNames);
 

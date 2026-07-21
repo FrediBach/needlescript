@@ -14,6 +14,7 @@ import type {
   ResolvedMachineProfile,
   StitchEvent,
 } from '../core/types.ts';
+import { eventSourceLine } from '../core/source-trace.ts';
 import { preflightCatalogMetadata } from './physics-diagnostics/catalog.ts';
 import { eventIndicesFor } from './physics-diagnostics/attribution.ts';
 
@@ -83,7 +84,7 @@ function sourceLocations(
 
 function linesOf(events: readonly ConstructionEventRecord[], fallback?: number): number[] {
   const lines = events
-    .map(({ event }) => event.line)
+    .map(({ event }) => eventSourceLine(event))
     .filter((line): line is number => line !== undefined);
   if (fallback !== undefined) lines.push(fallback);
   return [...new Set(lines)];
@@ -152,7 +153,7 @@ function underlayEnvelopeIssues(
       lines: linesOf(outside, record.line),
       sourceLocations: sourceLocations(
         record.line,
-        outside.map(({ event }) => event.line),
+        outside.map(({ event }) => eventSourceLine(event)),
       ),
       geometry: [
         regionGeometry(region),
@@ -304,7 +305,11 @@ function fillBorderIssues(
           lines: stackedLines.concat(
             satin.line === undefined || stackedLineSet.has(satin.line) ? [] : [satin.line],
           ),
-          sourceLocations: sourceLocations(fill.line, [stacked.event.line], [satin.line]),
+          sourceLocations: sourceLocations(
+            fill.line,
+            [eventSourceLine(stacked.event)],
+            [satin.line],
+          ),
           geometry: [
             regionGeometry(fill.region),
             regionGeometry(envelope),
@@ -372,7 +377,7 @@ function splitOverlapIssues(
       lines: linesOf(hotspot, record.line),
       sourceLocations: sourceLocations(
         record.line,
-        hotspot.map(({ event }) => event.line),
+        hotspot.map(({ event }) => eventSourceLine(event)),
       ),
       geometry: [
         regionGeometry(satinEnvelope(record)),
@@ -416,7 +421,7 @@ function connectorIssues(
       for (const { event, layer } of record.events)
         if (
           layer === 'travel' &&
-          (connector.line === undefined || event.line === connector.line) &&
+          (connector.line === undefined || eventSourceLine(event) === connector.line) &&
           (Math.hypot(event.x - connector.from[0], event.y - connector.from[1]) < 0.05 ||
             Math.hypot(event.x - connector.to[0], event.y - connector.to[1]) < 0.05)
         )
@@ -489,8 +494,8 @@ function orderIssues(
         ],
         lines: linesOf([firstDecorative, lastUnderlay], record.line),
         sourceLocations: sourceLocations(record.line, [
-          firstDecorative.event.line,
-          lastUnderlay.event.line,
+          eventSourceLine(firstDecorative.event),
+          eventSourceLine(lastUnderlay.event),
         ]),
         geometry: [
           record.kind === 'fill'

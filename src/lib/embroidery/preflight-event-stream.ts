@@ -9,6 +9,7 @@ import {
   preflightCatalogMetadata,
   type PhysicsDiagnosticCode,
 } from './physics-diagnostics/catalog.ts';
+import { sourceLocationsForEvents } from '../core/source-trace.ts';
 
 /**
  * Conservative event-stream metrics. These are engineering defaults, not
@@ -36,7 +37,6 @@ export const EVENT_STREAM_PREFLIGHT_THRESHOLDS = Object.freeze({
 interface Point {
   x: number;
   y: number;
-  line?: number;
 }
 
 interface AttributedEvent extends StitchEvent {
@@ -46,14 +46,6 @@ interface AttributedEvent extends StitchEvent {
 
 function distance(a: Point, b: Point): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function uniqueLines(points: readonly Point[]): number[] {
-  return [
-    ...new Set(
-      points.map((point) => point.line).filter((line): line is number => line !== undefined),
-    ),
-  ];
 }
 
 function issue(
@@ -66,17 +58,17 @@ function issue(
   const geometryPoints = selected.map(({ x, y }) => ({ x, y }));
   const role = preflightCatalogMetadata(code);
   const geometryRole = getPhysicsDiagnosticCatalogEntry(code).geometryRole;
-  const lines = uniqueLines(points);
+  const sourceLocations = sourceLocationsForEvents(points.map(({ event }) => event));
+  const lines: number[] = [];
+  for (const location of sourceLocations)
+    if (location.role !== 'related') lines.push(location.line);
   return {
     ...role,
     code,
     message,
     points: geometryPoints,
     lines,
-    sourceLocations: lines.map((line, index) => ({
-      line,
-      role: index === 0 ? 'primary' : 'contributor',
-    })),
+    sourceLocations,
     geometry: [
       code.startsWith('penetration.')
         ? { kind: 'points', role: geometryRole, points: geometryPoints }

@@ -211,7 +211,9 @@ The linker parses each module as its own source unit. `parse()` accepts an optio
 known imported procedure signatures so imported aliases participate in arity checking and
 forward resolution during pre-scan. It then rewrites local and imported procedure symbols
 to stable module-qualified names, prepends each module once in dependency order, and runs
-the reporter-path check over the combined AST. The interpreter consequently receives the
+the reporter-path check over the combined AST. Linked module procedure nodes retain an internal
+`sourceId` so runtime provenance never mistakes a module-local line for a line in the active user
+source. The interpreter consequently receives the
 same ordinary `to`/call AST it has always executed; import/export have no runtime nodes,
 side effects, or RNG behavior.
 

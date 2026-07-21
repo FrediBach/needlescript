@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { run, designStats, makeNoise, suggest, NeedlescriptError } from '../engine.ts';
+import {
+  run,
+  designStats,
+  eventSourceLine,
+  makeNoise,
+  suggest,
+  NeedlescriptError,
+} from '../engine.ts';
 import { toDST } from '../formats/dst.ts';
 import { EXAMPLES } from '../../data.ts';
 
@@ -318,9 +325,37 @@ describe('source line tagging', () => {
     expect(out.events.every((e) => e.line !== undefined)).toBe(true);
   });
 
-  it('stitches sewn inside a procedure report the call site, not the line of the fd', () => {
+  it('keeps the procedure call site as the compatibility line and exposes the body line', () => {
     const out = run('lock 0\nto f\nfd 5\nend\nf');
     expect(out.events.every((e) => e.line === 5)).toBe(true);
+    expect(out.events.every((e) => eventSourceLine(e) === 3)).toBe(true);
+    expect(out.events.every((e) => e.source?.callLines?.[0] === 5)).toBe(true);
+  });
+
+  it('retains nested editable call sites while choosing the leaf statement as primary', () => {
+    const out = run('lock 0\ndef inner() [ fd 2 ]\ndef outer() [ inner() ]\nouter()');
+    expect(out.events.every((event) => eventSourceLine(event) === 2)).toBe(true);
+    expect(out.events.every((event) => event.source?.callLines?.join(',') === '4,3')).toBe(true);
+  });
+
+  it('projects bundled standard-library procedure bodies to the editable call site', () => {
+    const out = run('import std.stitchcraft.eyelet as eyelet\neyelet(2)');
+    expect(out.events.length).toBeGreaterThan(0);
+    expect(out.events.every((event) => eventSourceLine(event) === 2)).toBe(true);
+  });
+
+  it('retains statement provenance through reporter-buffered running stretches', () => {
+    const out = run(
+      'lock 0\ndef advance(t, s, i, p) [ return 1 ]\nstitchlen @advance\ndef draw() [\nfd 2\nrt 90\nfd 2\n]\ndraw()',
+    );
+    expect(new Set(out.events.map(eventSourceLine))).toEqual(new Set([5, 7]));
+    expect(new Set(out.events.map(({ line }) => line))).toEqual(new Set([9]));
+  });
+
+  it('maps buffered satin output back to the nearest authored spine statement', () => {
+    const out = run('lock 0\nsatin 3\ndef draw() [\nfd 5\nrt 90\nfd 5\n]\ndraw()');
+    expect(new Set(out.events.map(eventSourceLine))).toEqual(new Set([4, 6]));
+    expect(new Set(out.events.map(({ line }) => line))).toEqual(new Set([8]));
   });
 
   it('lock stitches inherit a neighbouring line', () => {

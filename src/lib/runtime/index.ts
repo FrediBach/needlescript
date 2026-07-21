@@ -49,6 +49,7 @@ import {
   isIdentityMachineCalibration,
   resolveMachineProfile,
 } from '../embroidery/machine-profile.ts';
+import { eventSourceLine, sourceLocationsForTraces } from '../core/source-trace.ts';
 
 export function run(source: string, opts: RunOptions = {}): RunResult {
   const startedAt = performance.now();
@@ -110,6 +111,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     backgroundSetLine: undefined,
     colorOrStopLine: undefined,
     usedColorIndices: new Set<number>([0]),
+    executionSource: undefined,
     m,
   } as RunContext;
 
@@ -178,6 +180,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         index: m.warnings.length,
         points: spots.map((s) => ({ x: s.x, y: s.y })),
         lines,
+        sourceLocations: sourceLocationsForTraces(spots.map(({ source }) => source)),
         kind: 'tiny',
       });
     }
@@ -320,7 +323,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         .map((event) => ({
           x: event.x,
           y: event.y,
-          line: event.line,
+          line: eventSourceLine(event),
+          source: event.source,
           kind: inHoopOuter(m.hoopInfo, event.x, event.y) ? ('field' as const) : ('hoop' as const),
         }))
     : m.fieldOverflows;
@@ -336,6 +340,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         index: m.warnings.length,
         points: pts.map((o) => ({ x: o.x, y: o.y })),
         lines,
+        sourceLocations: sourceLocationsForTraces(pts.map(({ source }) => source)),
         kind: 'overflow',
         code: 'hoop.field-overflow',
       });
@@ -356,6 +361,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         index: m.warnings.length,
         points: pts.map((o) => ({ x: o.x, y: o.y })),
         lines,
+        sourceLocations: sourceLocationsForTraces(pts.map(({ source }) => source)),
         kind: 'overflow',
         code: 'hoop.unreachable',
       });

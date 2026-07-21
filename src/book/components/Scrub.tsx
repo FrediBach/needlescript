@@ -14,6 +14,7 @@ import Editor from '@monaco-editor/react';
 import type { BeforeMount, OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import type { RunResult, DesignStats, StitchEvent } from '../../lib/core/types.ts';
+import { eventSourceLine } from '../../lib/core/source-trace.ts';
 import { useCompiler } from '../../hooks/useCompiler.ts';
 import { registerNeedlescript, scheduleNeedlescriptProviders } from '../../lib/editor/monaco.ts';
 import BookCanvas from './BookCanvas.tsx';
@@ -34,7 +35,8 @@ function extractCode(children: ReactNode): string {
 /** Determine the source line for a given stitch index by scanning backwards. */
 function lineAtStitchIndex(pts: StitchEvent[], idx: number): number | null {
   for (let i = Math.min(idx - 1, pts.length - 1); i >= 0; i--) {
-    if (pts[i].line !== undefined) return pts[i].line ?? null;
+    const line = eventSourceLine(pts[i]);
+    if (line !== undefined) return line;
   }
   return null;
 }

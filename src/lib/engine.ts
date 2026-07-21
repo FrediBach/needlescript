@@ -13,6 +13,7 @@ export type {
   TokenType,
   Token,
   EventType,
+  SourceTrace,
   StitchEvent,
   RunResult,
   WarningLocation,
@@ -120,6 +121,7 @@ export {
   colorDist,
 } from './core/colormath.ts';
 export { NeedlescriptError } from './core/errors.ts';
+export { eventSourceLine, sourceLocationsForEvents } from './core/source-trace.ts';
 export { makeRNG, makeNoise, fork, gauss } from './core/prng.ts';
 export {
   ALIASES,

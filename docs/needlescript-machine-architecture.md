@@ -90,14 +90,18 @@ interface StitchEvent {
   y: number; // hoop-space coordinates (mm)
   c: number; // color index
   line?: number; // source line that produced it (debugging/preview)
+  source?: { line: number; callLines?: readonly number[] }; // precise additive provenance
   u?: 1; // underlay stitch (drawn lighter in previews)
   label?: string; // mark events only
 }
 ```
 
 Every event is in **hoop space** — the machine maps local turtle coordinates through
-the transform/warp stack _before_ pushing. `line` carries the source line (or the
-caller's line, when inside a procedure) so previews can highlight the responsible code.
+the transform/warp stack _before_ pushing. `line` retains the original call-site projection for
+library compatibility. `source.line` is the most precise addressable user statement and
+`source.callLines` retains its editable invocation path, outermost first. Playback and physics use
+the precise trace with `line` as fallback. Top-level events omit `source` because both projections
+are identical. Bundled standard-library internals project to their nearest user call site.
 
 Planner constraints do not extend this public shape. During finalization the travel planner wraps
 each authored event in a private `{ event, tags }` record, performs routing on those records, and
@@ -298,6 +302,13 @@ explicit flush). `flushSatin` first flushes any running-stitch buffer, then disp
 - `_flushSatinPlain` — the exact, byte-identical path when no transform/warp is active;
 - `_flushSatinTransformed` — maps the centerline to hoop space (warp deforms the spine;
   width stays affine).
+
+Buffered centerline vertices retain their source trace. Non-warped satin output resolves each
+generated penetration to the nearest affine-mapped authored spine vertex, so multi-statement local
+procedures remain scrubbable through generated underlay and topping. Reporter-buffered running
+stretches use their cumulative arc segment directly. Warped satin keeps the column's last
+addressable movement trace because probing a user warp again solely for attribution could consume
+RNG or otherwise change program semantics.
 
 Before emission, the legacy mode, realized physical width, running-stitch length, generator variant,
 and doubled flag lower to an ordered `SatinUnderlayPass[]`. Pass data carries kind, running length,

@@ -13,6 +13,25 @@ import { ReturnSignal, LoopSignal } from './signals.ts';
 import type { RunContext, Env } from './context.ts';
 import type { ExprNode } from '../core/types.ts';
 
+function procedureSourceContext(
+  ctx: RunContext,
+  proc: Extract<RunContext['procs'][string], { k: 'to' }>,
+  line?: number,
+) {
+  const caller = ctx.executionSource;
+  const addressableCallLine =
+    line !== undefined && (!caller || caller.sourceId === 'main') ? line : undefined;
+  const callLines =
+    addressableCallLine === undefined
+      ? (caller?.callLines ?? [])
+      : [...(caller?.callLines ?? []), addressableCallLine];
+  return {
+    sourceId: proc.sourceId ?? 'main',
+    legacyLine: caller?.legacyLine ?? addressableCallLine ?? line,
+    callLines,
+  };
+}
+
 export function initProcCall(ctx: RunContext): void {
   ctx.effectiveRefSignature = (ref: FuncRef) => ({
     min: Math.max(0, ref.signature.min - ref.bound.length),
@@ -66,10 +85,13 @@ export function initProcCall(ctx: RunContext): void {
       newEnv[p] = ctx.evalExpr(argNodes[i], env, repcount, depth);
     });
     try {
-      // Pass the call-site line as contextLine so that machine commands
-      // inside the procedure stamp the caller's source line onto stitches
-      // rather than their own internal line number within the proc body.
-      ctx.execBlock(proc.body, newEnv, repcount, depth + 1, line);
+      ctx.execBlock(
+        proc.body,
+        newEnv,
+        repcount,
+        depth + 1,
+        procedureSourceContext(ctx, proc, line),
+      );
     } catch (e) {
       if (e instanceof ReturnSignal) return e.value;
       if (e instanceof LoopSignal)
@@ -99,7 +121,7 @@ export function initProcCall(ctx: RunContext): void {
       newEnv[p] = argVals[i];
     });
     try {
-      ctx.execBlock(proc.body, newEnv, 0, depth + 1, line);
+      ctx.execBlock(proc.body, newEnv, 0, depth + 1, procedureSourceContext(ctx, proc, line));
     } catch (e) {
       if (e instanceof ReturnSignal) return e.value;
       if (e instanceof LoopSignal)

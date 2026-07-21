@@ -19,12 +19,27 @@ export interface Token {
 
 export type EventType = 'stitch' | 'jump' | 'color' | 'trim' | 'mark';
 
+/**
+ * Addressable source provenance for generated machine events.
+ *
+ * `line` is the most precise line in the user's source. `callLines` retains
+ * the user-visible invocation path (outermost first) when the event was
+ * produced inside one or more procedures. The object is intentionally
+ * shareable between many events from the same statement.
+ */
+export interface SourceTrace {
+  line: number;
+  callLines?: readonly number[];
+}
+
 export interface StitchEvent {
   t: EventType;
   x: number;
   y: number;
   c: number; // color index
   line?: number; // source line that produced this event (debugging)
+  /** Precise additive provenance; `line` remains the compatibility projection. */
+  source?: SourceTrace;
   u?: 1; // underlay stitch (drawn lighter in previews; identical in exports)
   label?: string; // mark events only: optional preview label
 }
@@ -39,6 +54,8 @@ export interface WarningLocation {
   index: number; // index into RunResult.warnings
   points: { x: number; y: number }[]; // hoop-space coordinates (mm)
   lines: number[]; // source lines that contributed to the hotspot
+  /** Precise source roles when richer provenance survived generation. */
+  sourceLocations?: PhysicsSourceLocation[];
   kind: 'density' | 'stack' | 'tiny' | 'overflow' | 'fill' | 'satin';
   /** Stable diagnostic code when the warning has a structured physics counterpart. */
   code?: string;
@@ -546,7 +563,15 @@ export interface DesignStats {
 // ---------- AST node types ----------
 
 export type ASTNode =
-  | { k: 'to'; name: string; params: string[]; body: ASTNode[]; line: number }
+  | {
+      k: 'to';
+      name: string;
+      params: string[];
+      body: ASTNode[];
+      line: number;
+      /** Internal module origin. Omitted for procedures authored in the main source. */
+      sourceId?: string;
+    }
   | { k: 'repeat'; count: ExprNode; body: ASTNode[]; line: number }
   | { k: 'while'; cond: ExprNode; body: ASTNode[]; line: number }
   | {

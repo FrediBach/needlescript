@@ -661,6 +661,10 @@ Implementation progress:
 - [x] Diagnostics without an attributable source expose an explicit generated-source explanation;
       whole-line attribution remains the fallback because current statement AST nodes do not retain
       token columns.
+- [x] Procedure-generated events retain additive statement/call-path provenance: local procedure
+      body lines are primary, editable call sites are related, bundled-module internals project to
+      the user call, and buffered running/satin output preserves statement-level attribution without
+      changing the legacy event-line projection.
 - [x] Every locatable fill/satin warning has a catalog code and structured counterpart. Analysis now
       fails explicitly if a future spatial fill/satin warning omits its code.
 - [x] Removed the playground's stitches-per-bounding-box-area warning; the locatable core coverage

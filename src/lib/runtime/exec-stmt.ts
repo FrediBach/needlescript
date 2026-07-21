@@ -19,10 +19,34 @@ import * as gm from '../geometry/genmath.ts';
 import type { Pt } from '../geometry/genmath.ts';
 import { ReturnSignal, LoopSignal } from './signals.ts';
 import { initExecCmdHandler } from './exec-cmd.ts';
-import type { RunContext, Env } from './context.ts';
+import type { ExecutionSourceContext, RunContext, Env } from './context.ts';
 
 export function initExecStmt(ctx: RunContext): void {
   const execCmd = initExecCmdHandler(ctx);
+  const sourceTraceCache = new Map<string, NonNullable<RunContext['m']['currentSource']>>();
+
+  const setMachineSource = (line: number, sourceContext = ctx.executionSource) => {
+    if (!sourceContext) {
+      ctx.m.currentLine = line;
+      ctx.m.currentLegacyLine = line;
+      ctx.m.currentSource = undefined;
+      return;
+    }
+    const preciseLine =
+      sourceContext.sourceId === 'main'
+        ? line
+        : (sourceContext.callLines.at(-1) ?? sourceContext.legacyLine ?? line);
+    const callLines = sourceContext.callLines.filter((callLine) => callLine !== preciseLine);
+    const key = `${preciseLine}|${callLines.join(',')}`;
+    let source = sourceTraceCache.get(key);
+    if (!source) {
+      source = { line: preciseLine, ...(callLines.length ? { callLines } : {}) };
+      sourceTraceCache.set(key, source);
+    }
+    ctx.m.currentLine = preciseLine;
+    ctx.m.currentLegacyLine = sourceContext.legacyLine ?? line;
+    ctx.m.currentSource = source;
+  };
 
   const validateFillPaths = (
     value: Val | undefined,
@@ -73,9 +97,15 @@ export function initExecStmt(ctx: RunContext): void {
     env: Env,
     repcount: number,
     depth: number,
-    contextLine?: number,
+    sourceContext?: ExecutionSourceContext,
   ) => {
-    for (const st of stmts) ctx.execStmt(st, env, repcount, depth, contextLine);
+    const previousSource = ctx.executionSource;
+    ctx.executionSource = sourceContext;
+    try {
+      for (const st of stmts) ctx.execStmt(st, env, repcount, depth, sourceContext);
+    } finally {
+      ctx.executionSource = previousSource;
+    }
   };
 
   /**
@@ -87,10 +117,10 @@ export function initExecStmt(ctx: RunContext): void {
     env: Env,
     repcount: number,
     depth: number,
-    contextLine?: number,
+    sourceContext?: ExecutionSourceContext,
   ): boolean => {
     try {
-      ctx.execBlock(body, env, repcount, depth, contextLine);
+      ctx.execBlock(body, env, repcount, depth, sourceContext);
     } catch (e) {
       if (e instanceof LoopSignal) return e.kind !== 'break';
       throw e;
@@ -98,7 +128,13 @@ export function initExecStmt(ctx: RunContext): void {
     return true;
   };
 
-  ctx.execStmt = (st: ASTNode, env: Env, repcount: number, depth: number, contextLine?: number) => {
+  ctx.execStmt = (
+    st: ASTNode,
+    env: Env,
+    repcount: number,
+    depth: number,
+    sourceContext?: ExecutionSourceContext,
+  ) => {
     ctx.tick(st.line);
     switch (st.k) {
       case 'to':
@@ -201,7 +237,7 @@ export function initExecStmt(ctx: RunContext): void {
           );
         ctx.structuralDepth++;
         for (let i = 1; i <= n; i++)
-          if (!ctx.runLoopBody(st.body, env, i, depth, contextLine)) break;
+          if (!ctx.runLoopBody(st.body, env, i, depth, sourceContext)) break;
         ctx.structuralDepth--;
         return;
       }
@@ -209,7 +245,7 @@ export function initExecStmt(ctx: RunContext): void {
         ctx.structuralDepth++;
         while (ctx.truthy(ctx.evalExpr(st.cond, env, repcount, depth), 'while', st.line) !== 0) {
           ctx.tick(st.line); // ops budget catches endless loops
-          if (!ctx.runLoopBody(st.body, env, repcount, depth, contextLine)) break;
+          if (!ctx.runLoopBody(st.body, env, repcount, depth, sourceContext)) break;
         }
         ctx.structuralDepth--;
         return;
@@ -231,7 +267,7 @@ export function initExecStmt(ctx: RunContext): void {
         for (let v = from; step > 0 ? v <= to + 1e-9 : v >= to - 1e-9; v += step) {
           ctx.tick(st.line);
           scope[st.varName] = v;
-          if (!ctx.runLoopBody(st.body, env, repcount, depth, contextLine)) break;
+          if (!ctx.runLoopBody(st.body, env, repcount, depth, sourceContext)) break;
         }
         ctx.structuralDepth--;
         if (had) scope[st.varName] = prev;
@@ -249,7 +285,7 @@ export function initExecStmt(ctx: RunContext): void {
           for (const ch of v) {
             ctx.tick(st.line);
             scope[st.varName] = ch;
-            if (!ctx.runLoopBody(st.body, env, repcount, depth, contextLine)) break;
+            if (!ctx.runLoopBody(st.body, env, repcount, depth, sourceContext)) break;
           }
           ctx.structuralDepth--;
           if (had) scope[st.varName] = prev;
@@ -269,7 +305,7 @@ export function initExecStmt(ctx: RunContext): void {
         for (let i = 0; i < n; i++) {
           ctx.tick(st.line);
           scope[st.varName] = v.items[i];
-          if (!ctx.runLoopBody(st.body, env, repcount, depth, contextLine)) break;
+          if (!ctx.runLoopBody(st.body, env, repcount, depth, sourceContext)) break;
         }
         ctx.structuralDepth--;
         if (had) scope[st.varName] = prev;
@@ -279,17 +315,17 @@ export function initExecStmt(ctx: RunContext): void {
       case 'if': {
         ctx.structuralDepth++;
         if (ctx.truthy(ctx.evalExpr(st.cond, env, repcount, depth), 'if', st.line) !== 0)
-          ctx.execBlock(st.body, env, repcount, depth, contextLine);
-        else if (st.elseBody) ctx.execBlock(st.elseBody, env, repcount, depth, contextLine);
+          ctx.execBlock(st.body, env, repcount, depth, sourceContext);
+        else if (st.elseBody) ctx.execBlock(st.elseBody, env, repcount, depth, sourceContext);
         ctx.structuralDepth--;
         return;
       }
       case 'stitchscope': {
-        ctx.m.currentLine = contextLine ?? st.line;
+        setMachineSource(st.line, sourceContext);
         const snapshot = ctx.m.snapshotConstructionConfig();
         ctx.structuralDepth++;
         try {
-          ctx.execBlock(st.body, env, repcount, depth, contextLine);
+          ctx.execBlock(st.body, env, repcount, depth, sourceContext);
         } finally {
           ctx.structuralDepth--;
           ctx.m.restoreConstructionConfig(snapshot);
@@ -316,7 +352,7 @@ export function initExecStmt(ctx: RunContext): void {
         let bodyError: unknown;
         let bodyThrew = false;
         try {
-          ctx.execBlock(st.body, env, repcount, depth, contextLine);
+          ctx.execBlock(st.body, env, repcount, depth, sourceContext);
         } catch (error) {
           bodyError = error;
           bodyThrew = true;
@@ -361,7 +397,7 @@ export function initExecStmt(ctx: RunContext): void {
         let bodyError: unknown;
         let bodyThrew = false;
         try {
-          ctx.execBlock(st.body, env, repcount, depth, contextLine);
+          ctx.execBlock(st.body, env, repcount, depth, sourceContext);
         } catch (error) {
           bodyError = error;
           bodyThrew = true;
@@ -415,12 +451,12 @@ export function initExecStmt(ctx: RunContext): void {
           default:
             throw new NeedlescriptError(`Unhandled transform ${st.name}`, st.line);
         }
-        ctx.m.currentLine = contextLine ?? st.line;
+        setMachineSource(st.line, sourceContext);
         ctx.m.flushSatin();
         ctx.m.pushTransform(delta);
         ctx.structuralDepth++;
         try {
-          ctx.execBlock(st.body, env, repcount, depth, contextLine);
+          ctx.execBlock(st.body, env, repcount, depth, sourceContext);
         } finally {
           ctx.structuralDepth--;
           ctx.m.flushSatin();
@@ -430,7 +466,7 @@ export function initExecStmt(ctx: RunContext): void {
       }
       case 'effect': {
         // Effects share the transform discipline: flush satin on both edges.
-        ctx.m.currentLine = contextLine ?? st.line;
+        setMachineSource(st.line, sourceContext);
         ctx.m.flushSatin();
         if (st.name === 'warp') {
           const refVal = ctx.evalExpr(st.args[0], env, repcount, depth);
@@ -443,7 +479,7 @@ export function initExecStmt(ctx: RunContext): void {
           ctx.m.pushWarp((x, y) => ctx.applyReporter(ref, x, y, st.line));
           ctx.structuralDepth++;
           try {
-            ctx.execBlock(st.body, env, repcount, depth, contextLine);
+            ctx.execBlock(st.body, env, repcount, depth, sourceContext);
           } finally {
             ctx.structuralDepth--;
             ctx.m.flushSatin();
@@ -465,7 +501,7 @@ export function initExecStmt(ctx: RunContext): void {
           ctx.m.pushDeclump(state);
           ctx.structuralDepth++;
           try {
-            ctx.execBlock(st.body, env, repcount, depth, contextLine);
+            ctx.execBlock(st.body, env, repcount, depth, sourceContext);
           } finally {
             ctx.structuralDepth--;
             ctx.m.flushSatin();
@@ -498,7 +534,7 @@ export function initExecStmt(ctx: RunContext): void {
         ctx.m.pushPen(fn);
         ctx.structuralDepth++;
         try {
-          ctx.execBlock(st.body, env, repcount, depth, contextLine);
+          ctx.execBlock(st.body, env, repcount, depth, sourceContext);
         } finally {
           ctx.structuralDepth--;
           ctx.m.flushSatin();
@@ -520,11 +556,11 @@ export function initExecStmt(ctx: RunContext): void {
       case 'continue':
         throw new LoopSignal('continue', st.line);
       case 'call': {
-        ctx.callProc(st.name, st.args, env, repcount, depth, contextLine ?? st.line);
+        ctx.callProc(st.name, st.args, env, repcount, depth, st.line);
         return;
       }
       case 'fillarm': {
-        ctx.m.currentLine = contextLine ?? st.line;
+        setMachineSource(st.line, sourceContext);
         // Arm programmable fill for the next beginfill…endfill (§2).
         if (ctx.m.recording)
           throw new NeedlescriptError(
@@ -623,7 +659,7 @@ export function initExecStmt(ctx: RunContext): void {
         return;
       }
       case 'listcmd': {
-        ctx.m.currentLine = contextLine ?? st.line;
+        setMachineSource(st.line, sourceContext);
         const a = st.args.map((x) => ctx.evalExpr(x, env, repcount, depth));
         switch (st.name) {
           case 'append':
@@ -778,7 +814,7 @@ export function initExecStmt(ctx: RunContext): void {
         throw new NeedlescriptError(`Unhandled command ${st.name}`, st.line);
       }
       case 'cmd': {
-        ctx.m.currentLine = contextLine ?? st.line;
+        setMachineSource(st.line, sourceContext);
 
         // assert: evaluate condition first; message only on failure (lazy).
         if (st.name === 'assert') {

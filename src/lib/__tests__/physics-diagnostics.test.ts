@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import ampmodSource from '../../../examples/generative/ampmod1.ns?raw';
 import {
   assignPhysicsDiagnosticIdentities,
   buildPhysicsDiagnosticFingerprint,
@@ -11,6 +12,7 @@ import {
   PHYSICS_THRESHOLD_VERSION,
   run,
   validatePhysicsDiagnosticCatalog,
+  eventSourceLine,
 } from '../engine.ts';
 import type {
   DiagnosticGeometry,
@@ -481,5 +483,38 @@ describe('preflight compatibility adapter', () => {
     expect(result.physics?.diagnostics).toContainEqual(
       expect.objectContaining({ code: 'machine.continuous-stitch-run' }),
     );
+  });
+
+  it('attributes the amplitude-modulated ring to its movement statements and call site', () => {
+    const result = run(ampmodSource, { physicsAnalysis: 'full' });
+    const movementEvents = result.events.filter(({ t }) => t === 'stitch' || t === 'jump');
+
+    expect(new Set(movementEvents.map(eventSourceLine))).toEqual(new Set([26, 28]));
+    expect(new Set(movementEvents.map(({ line }) => line))).toEqual(new Set([34]));
+    expect(
+      result.physics?.diagnostics.find(({ code }) => code === 'stitch.below-reliable-movement')
+        ?.sourceLocations,
+    ).toEqual([
+      { line: 28, role: 'primary' },
+      { line: 34, role: 'related' },
+    ]);
+  });
+
+  it('retains procedure call context on buffered construction findings', () => {
+    const source = `underlay 'center'
+satin 4
+def draw() [
+  fd 8
+]
+draw()
+satin 0`;
+    const diagnostic = run(source, { physicsAnalysis: 'full' }).physics?.diagnostics.find(
+      ({ code }) => code === 'underlay.unsuitable-wide-construction',
+    );
+
+    expect(diagnostic?.sourceLocations).toEqual([
+      { line: 4, role: 'primary' },
+      { line: 6, role: 'related' },
+    ]);
   });
 });

@@ -5,6 +5,7 @@ import { NeedlescriptError } from '../../core/errors.ts';
 import { IDENTITY, apply, isIdentity, linApply } from '../../geometry/affine.ts';
 import type { Mat } from '../../geometry/affine.ts';
 import { MachineCore } from './machine-core.ts';
+import type { MachineBufferedPoint, MachineGeneratedSource } from './machine-core.ts';
 import type { Pt } from '../../geometry/genmath.ts';
 import { prepareRailPair } from '../../geometry/rail-pair.ts';
 import type { RailCheckpoint, RailPairGeometry, RailPairSample } from '../../geometry/rail-pair.ts';
@@ -64,6 +65,47 @@ interface WideSatinLaneSample {
   readonly a: Pt;
   readonly b: Pt;
   readonly mid: Pt;
+}
+
+function bufferedSourceResolver(
+  path: readonly MachineBufferedPoint[],
+  ctm: Mat,
+): ((x: number, y: number) => MachineGeneratedSource | undefined) | null {
+  const points = path.flatMap((point) => {
+    if (!point.source) return [];
+    const [x, y] = apply(ctm, point.x, point.y);
+    return [{ x, y, source: point.source, legacyLine: point.legacyLine }];
+  });
+  if (!points.length) return null;
+  const bucketMM = 4;
+  const buckets = new Map<string, typeof points>();
+  for (const point of points) {
+    const key = `${Math.floor(point.x / bucketMM)},${Math.floor(point.y / bucketMM)}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(point);
+    else buckets.set(key, [point]);
+  }
+  return (x, y) => {
+    const bx = Math.floor(x / bucketMM);
+    const by = Math.floor(y / bucketMM);
+    let best: (typeof points)[number] | undefined;
+    let bestDistance = Infinity;
+    for (let ring = 0; ring < 100_000; ring++) {
+      if (best && (ring - 1) * bucketMM > bestDistance) break;
+      for (let gx = bx - ring; gx <= bx + ring; gx++)
+        for (let gy = by - ring; gy <= by + ring; gy++) {
+          if (Math.max(Math.abs(gx - bx), Math.abs(gy - by)) !== ring) continue;
+          for (const point of buckets.get(`${gx},${gy}`) ?? []) {
+            const distance = Math.hypot(point.x - x, point.y - y);
+            if (distance < bestDistance) {
+              best = point;
+              bestDistance = distance;
+            }
+          }
+        }
+    }
+    return best ? { source: best.source, legacyLine: best.legacyLine } : undefined;
+  };
 }
 
 export class SatinMachine extends MachineCore {
@@ -1597,6 +1639,15 @@ export class SatinMachine extends MachineCore {
     const path = this.satinPath;
     this.satinPath = null;
     if (!path || path.length < 2) return;
+    const savedLine = this.currentLine;
+    const savedLegacyLine = this.currentLegacyLine;
+    const savedSource = this.currentSource;
+    const savedGeneratedSourceAt = this.generatedSourceAt;
+    const pathSource = path.at(-1);
+    this.currentLine = pathSource?.source?.line ?? savedLine;
+    this.currentLegacyLine = pathSource?.legacyLine ?? savedLegacyLine;
+    this.currentSource = pathSource?.source ?? savedSource;
+    this.generatedSourceAt = this.satinHasWarp ? null : bufferedSourceResolver(path, this.satinCTM);
     // After-split effects (humanize / snaptogrid / declump) deliberately skip satin:
     // the rails are emitted via _push, not _emitPen, so they sew unaffected —
     // quantizing, jittering, or easing a precise satin rail wrecks the column. Warn once.
@@ -1610,10 +1661,21 @@ export class SatinMachine extends MachineCore {
     // column is mapped to hoop space (warp deforms the centerline; width stays
     // affine). With no transform and no warp the original (exact) path runs, so
     // existing output is byte-for-byte unchanged.
-    if (this.satinReporter) this._flushSatinProgrammable(path);
-    else if (this.compensationMode === 'legacy' && isIdentity(this.satinCTM) && !this.satinHasWarp)
-      this._flushSatinPlain(path);
-    else this._flushSatinTransformed(path, this.satinCTM);
+    try {
+      if (this.satinReporter) this._flushSatinProgrammable(path);
+      else if (
+        this.compensationMode === 'legacy' &&
+        isIdentity(this.satinCTM) &&
+        !this.satinHasWarp
+      )
+        this._flushSatinPlain(path);
+      else this._flushSatinTransformed(path, this.satinCTM);
+    } finally {
+      this.currentLine = savedLine;
+      this.currentLegacyLine = savedLegacyLine;
+      this.currentSource = savedSource;
+      this.generatedSourceAt = savedGeneratedSourceAt;
+    }
   }
 
   _flushSatinPlain(path: { x: number; y: number }[]) {
@@ -2530,7 +2592,7 @@ export class SatinMachine extends MachineCore {
    * The reporter runs with m.ctm = identity so that coverat(p) calls inside
    * it treat p as hoop-space (the same contract as the warp reporter).
    */
-  _splitBufferedStretch(buf: readonly { x: number; y: number }[]) {
+  _splitBufferedStretch(buf: readonly MachineBufferedPoint[]) {
     const reporter = this.stitchLenReporter!;
     const n = buf.length;
     if (n < 2) return;
@@ -2565,9 +2627,21 @@ export class SatinMachine extends MachineCore {
     const savedCTM = this.ctm;
     const savedLayers = this.outLayers;
     const savedHasWarp = this.hasWarp;
+    const savedLine = this.currentLine;
+    const savedLegacyLine = this.currentLegacyLine;
+    const savedSource = this.currentSource;
     this.ctm = IDENTITY;
     this.outLayers = [];
     this.hasWarp = false;
+
+    const setSourceAt = (arc: number) => {
+      let segment = 1;
+      while (segment < n - 1 && cum[segment] < arc - 1e-9) segment++;
+      const point = buf[segment];
+      this.currentLine = point.source?.line ?? savedLine;
+      this.currentLegacyLine = point.legacyLine ?? savedLegacyLine;
+      this.currentSource = point.source ?? savedSource;
+    };
 
     try {
       let cursor = 0;
@@ -2625,6 +2699,7 @@ export class SatinMachine extends MachineCore {
         if (actualAdv < LIMITS.minStitch * 0.5) {
           // Tiny remainder — merge (drop and record).
           const [tx, ty] = atT(cursor + actualAdv);
+          setSourceAt(cursor + actualAdv);
           this._dropTiny(tx, ty);
           cursor += actualAdv;
           stitchIdx++;
@@ -2633,6 +2708,7 @@ export class SatinMachine extends MachineCore {
 
         cursor += actualAdv;
         const [nx2, ny2] = atT(cursor);
+        setSourceAt(cursor);
         this._emitPen(nx2, ny2);
         for (let r = 1; r < this.beanRepeats; r++) {
           this._emitPen(r % 2 === 1 ? prevPt[0] : nx2, r % 2 === 1 ? prevPt[1] : ny2);
@@ -2644,6 +2720,9 @@ export class SatinMachine extends MachineCore {
       this.ctm = savedCTM;
       this.outLayers = savedLayers;
       this.hasWarp = savedHasWarp;
+      this.currentLine = savedLine;
+      this.currentLegacyLine = savedLegacyLine;
+      this.currentSource = savedSource;
     }
   }
 }

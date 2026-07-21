@@ -220,7 +220,7 @@ export function initEvalExpr(ctx: RunContext): void {
         ctx.insideTrace++;
         let runs: [number, number][][];
         try {
-          ctx.execBlock(node.body, env, repcount, depth, node.line);
+          ctx.execBlock(node.body, env, repcount, depth, ctx.executionSource);
         } catch (e) {
           if (e instanceof ReturnSignal)
             throw new NeedlescriptError(

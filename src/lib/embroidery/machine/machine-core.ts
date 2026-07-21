@@ -7,6 +7,7 @@ import type {
   HoopInfo,
   MaterialIntent,
   WarningLocation,
+  SourceTrace,
 } from '../../core/types.ts';
 import { NeedlescriptError } from '../../core/errors.ts';
 import { IDENTITY, apply, linApply, compose } from '../../geometry/affine.ts';
@@ -42,6 +43,18 @@ import type {
  */
 type OutLayer =
   { kind: 'aff'; m: Mat } | { kind: 'warp'; fn: (x: number, y: number) => [number, number] };
+
+export interface MachineBufferedPoint {
+  x: number;
+  y: number;
+  source?: SourceTrace;
+  legacyLine?: number;
+}
+
+export interface MachineGeneratedSource {
+  source: SourceTrace;
+  legacyLine?: number;
+}
 
 type StitchLengthReporter = (t: number, s: number, i: number, p: [number, number]) => number;
 type SatinReporter = (
@@ -136,7 +149,7 @@ interface MachineSnapshot {
   stitchLenStretchStart: boolean;
   stitchLenReporter: StitchLengthReporter | null;
   // Running-stitch buffer (reporter buffered mode)
-  runBuffer: { x: number; y: number }[] | null;
+  runBuffer: MachineBufferedPoint[] | null;
   runBufferCTM: Mat;
   runBufferLayers: OutLayer[];
   runBufferHasWarp: boolean;
@@ -184,7 +197,10 @@ interface MachineSnapshot {
   eventsLen: number;
   lastEmit: { x: number; y: number } | null;
   started: boolean;
-  satinPath: { x: number; y: number }[] | null;
+  satinPath: MachineBufferedPoint[] | null;
+  currentLine: number | undefined;
+  currentLegacyLine: number | undefined;
+  currentSource: SourceTrace | undefined;
   satinReporter: SatinReporter | null;
   satinDensityNoted: boolean;
   satinCTM: Mat;
@@ -239,7 +255,7 @@ export abstract class MachineCore {
   stitchLenReporter: StitchLengthReporter | null = null; // per-stitch reporter; null = numeric/list form
   // Running-stitch buffer for the reporter form. When non-null, travel() appends
   // spine points here and defers splitting until flushRunningStitch() is called.
-  runBuffer: { x: number; y: number }[] | null = null;
+  runBuffer: MachineBufferedPoint[] | null = null;
   runBufferCTM: Mat = IDENTITY; // transform snapshot taken at buffer start
   runBufferLayers: OutLayer[] = []; // warp-layer snapshot
   runBufferHasWarp: boolean = false;
@@ -283,7 +299,7 @@ export abstract class MachineCore {
   autoTrim = 7; // insert trim before jumps ≥ this (0 = off)
   maxDensity = 3.5; // coverage warning threshold, in layers of thread
   materialIntent: MaterialIntent = { ...DEFAULT_MATERIAL_INTENT };
-  satinPath: { x: number; y: number }[] | null = null; // buffered satin column
+  satinPath: MachineBufferedPoint[] | null = null; // buffered satin column
   // Programmable satin (`satin @fn`): a user shape reporter that supersedes the
   // built-in generator, queried once per stitch pair at flush time. null = the
   // built-in numeric generator. Set/cleared by the `satin`/`estitch` commands.
@@ -332,8 +348,15 @@ export abstract class MachineCore {
   tinyDropped = 0;
   // Locations of the first few merged sub-minimum moves, so the warning can be
   // pointed to in the preview / playback bar. Capped to keep memory bounded.
-  tinyDroppedSpots: { x: number; y: number; line?: number }[] = [];
+  tinyDroppedSpots: { x: number; y: number; line?: number; source?: SourceTrace }[] = [];
   currentLine: number | undefined = undefined; // source line being executed
+  /** Existing public event-line projection retained for library compatibility. */
+  currentLegacyLine: number | undefined = undefined;
+  /** Precise statement plus addressable procedure invocation path. */
+  currentSource: SourceTrace | undefined = undefined;
+  /** Temporary attribution resolver for buffered generators such as satin. */
+  protected generatedSourceAt:
+    ((x: number, y: number) => MachineGeneratedSource | undefined) | null = null;
   stateStack: { x: number; y: number; heading: number; penDown: boolean }[] = [];
 
   // Hoop and field configuration (set by the `hoop` command, §hoop).
@@ -345,7 +368,13 @@ export abstract class MachineCore {
   fieldLocked = false;
   // Overflow tracking: stitches outside the sewable field or hoop boundary.
   // Capped at 50 to bound memory; only 'stitch' events are checked.
-  fieldOverflows: { x: number; y: number; line?: number; kind: 'field' | 'hoop' }[] = [];
+  fieldOverflows: {
+    x: number;
+    y: number;
+    line?: number;
+    source?: SourceTrace;
+    kind: 'field' | 'hoop';
+  }[] = [];
 
   // Per-run budget limits — start as a mutable copy of STOCK_LIMITS and can be
   // raised (with a warning) or lowered (with an info note) by the `override`
@@ -655,6 +684,9 @@ export abstract class MachineCore {
       started: this.started,
       // Satin buffer
       satinPath: this.satinPath ? this.satinPath.slice() : null,
+      currentLine: this.currentLine,
+      currentLegacyLine: this.currentLegacyLine,
+      currentSource: this.currentSource,
       satinReporter: this.satinReporter,
       satinDensityNoted: this.satinDensityNoted,
       satinCTM: this.satinCTM,
@@ -795,6 +827,9 @@ export abstract class MachineCore {
     this.started = snap.started;
     // Satin buffer
     this.satinPath = snap.satinPath ? snap.satinPath.slice() : null;
+    this.currentLine = snap.currentLine;
+    this.currentLegacyLine = snap.currentLegacyLine;
+    this.currentSource = snap.currentSource;
     this.satinReporter = snap.satinReporter;
     this.satinDensityNoted = snap.satinDensityNoted;
     this.satinCTM = snap.satinCTM;
@@ -934,8 +969,16 @@ export abstract class MachineCore {
   /** Record a merged sub-minimum move so it can be located later. */
   _dropTiny(x: number, y: number) {
     this.tinyDropped++;
-    if (this.tinyDroppedSpots.length < 200)
-      this.tinyDroppedSpots.push({ x, y, line: this.currentLine });
+    if (this.tinyDroppedSpots.length < 200) {
+      const generated = this.generatedSourceAt?.(x, y);
+      const source = generated?.source ?? this.currentSource;
+      this.tinyDroppedSpots.push({
+        x,
+        y,
+        line: source?.line ?? this.currentLine,
+        ...(source ? { source } : {}),
+      });
+    }
   }
 
   _push(t: EventType, x: number, y: number, u = false) {
@@ -952,7 +995,17 @@ export abstract class MachineCore {
             : ''),
       );
     }
-    const ev: StitchEvent = { t, x, y, c: this.colorIdx, line: this.currentLine };
+    const generated = this.generatedSourceAt?.(x, y);
+    const source = generated?.source ?? this.currentSource;
+    const preciseLine = source?.line ?? this.currentLine;
+    const ev: StitchEvent = {
+      t,
+      x,
+      y,
+      c: this.colorIdx,
+      line: generated?.legacyLine ?? this.currentLegacyLine ?? preciseLine,
+      ...(source ? { source } : {}),
+    };
     if (u) ev.u = 1;
     this.events.push(ev);
     if (this.activeConstruction) {
@@ -962,14 +1015,15 @@ export abstract class MachineCore {
         ...(this.activeConstructionLane === undefined ? {} : { lane: this.activeConstructionLane }),
       });
     }
-    this.density.feed(t, x, y, this.currentLine);
+    this.density.feed(t, x, y, preciseLine);
     if (t === 'stitch' || t === 'jump') this.lastEmit = { x, y };
     // Overflow check: collect the first 50 stitches outside the sewable field.
     if (t === 'stitch' && this.fieldOverflows.length < 50 && !inHoopField(this.hoopInfo, x, y)) {
       this.fieldOverflows.push({
         x,
         y,
-        line: this.currentLine,
+        line: preciseLine,
+        ...(source ? { source } : {}),
         kind: inHoopOuter(this.hoopInfo, x, y) ? 'field' : 'hoop',
       });
     }
@@ -1090,7 +1144,14 @@ export abstract class MachineCore {
       throw new NeedlescriptError(
         `Design exceeds ${this.effectiveLimits.maxStitches.toLocaleString('en-US')} stitches — stopped.`,
       );
-    const ev: StitchEvent = { t: 'mark', x: hx, y: hy, c: this.colorIdx, line: this.currentLine };
+    const ev: StitchEvent = {
+      t: 'mark',
+      x: hx,
+      y: hy,
+      c: this.colorIdx,
+      line: this.currentLegacyLine ?? this.currentLine,
+      ...(this.currentSource ? { source: this.currentSource } : {}),
+    };
     if (label !== undefined) ev.label = label;
     this.events.push(ev);
     this.density.feed('mark', hx, hy, this.currentLine);
@@ -1178,13 +1239,26 @@ export abstract class MachineCore {
       const localLen = Math.hypot(nx - ox, ny - oy);
       if (localLen > 1e-9) {
         if (!this.satinPath) {
-          this.satinPath = [{ x: ox, y: oy }];
+          this.satinPath = [
+            {
+              x: ox,
+              y: oy,
+              source: this.currentSource,
+              legacyLine: this.currentLegacyLine,
+            },
+          ];
           this.satinCTM = this.ctm;
           this.satinHasWarp = this.hasWarp;
           this.satinLayers = this.hasWarp ? this.outLayers.slice() : this.satinLayers;
         }
         const lastP = this.satinPath[this.satinPath.length - 1];
-        if (Math.hypot(nx - lastP.x, ny - lastP.y) > 0.05) this.satinPath.push({ x: nx, y: ny });
+        if (Math.hypot(nx - lastP.x, ny - lastP.y) > 0.05)
+          this.satinPath.push({
+            x: nx,
+            y: ny,
+            source: this.currentSource,
+            legacyLine: this.currentLegacyLine,
+          });
       }
       this.x = nx;
       this.y = ny;
@@ -1241,12 +1315,24 @@ export abstract class MachineCore {
     // buffer. The actual splitting happens when the stretch ends (flushRunningStitch).
     if (this.stitchLenReporter) {
       if (!this.runBuffer) {
-        this.runBuffer = [{ x: ox, y: oy }];
+        this.runBuffer = [
+          {
+            x: ox,
+            y: oy,
+            source: this.currentSource,
+            legacyLine: this.currentLegacyLine,
+          },
+        ];
         this.runBufferCTM = this.ctm;
         this.runBufferHasWarp = this.hasWarp;
         this.runBufferLayers = this.hasWarp ? this.outLayers.slice() : [];
       }
-      this.runBuffer.push({ x: nx, y: ny });
+      this.runBuffer.push({
+        x: nx,
+        y: ny,
+        source: this.currentSource,
+        legacyLine: this.currentLegacyLine,
+      });
       this.x = nx;
       this.y = ny;
       return;

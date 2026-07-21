@@ -10,6 +10,15 @@ import type { Machine } from '../embroidery/machine/index.ts';
 import type { Val, NsList, FuncRef, ComposedRef, RefSignature } from './list.ts';
 import type { Pt } from '../geometry/genmath.ts';
 
+export interface ExecutionSourceContext {
+  /** `main` is addressable in the active editor; module sources are not. */
+  sourceId: 'main' | string;
+  /** Existing public `StitchEvent.line` projection, retained for compatibility. */
+  legacyLine?: number;
+  /** Addressable main-source procedure calls, outermost first. */
+  callLines: readonly number[];
+}
+
 /** Environment frame: local variable bindings inside a procedure call. */
 export type Env = Record<string, Val> | null;
 
@@ -59,6 +68,7 @@ export interface RunContext {
   backgroundSetLine?: number;
   colorOrStopLine?: number;
   usedColorIndices: Set<number>;
+  executionSource?: ExecutionSourceContext;
   m: Machine;
 
   // ---- budget (initBudget) ----
@@ -92,15 +102,21 @@ export interface RunContext {
     env: Env,
     repcount: number,
     depth: number,
-    contextLine?: number,
+    sourceContext?: ExecutionSourceContext,
   ) => void;
-  execStmt: (st: ASTNode, env: Env, repcount: number, depth: number, contextLine?: number) => void;
+  execStmt: (
+    st: ASTNode,
+    env: Env,
+    repcount: number,
+    depth: number,
+    sourceContext?: ExecutionSourceContext,
+  ) => void;
   runLoopBody: (
     body: ASTNode[],
     env: Env,
     repcount: number,
     depth: number,
-    contextLine?: number,
+    sourceContext?: ExecutionSourceContext,
   ) => boolean;
 
   // ---- procedure call machinery (initProcCall) ----

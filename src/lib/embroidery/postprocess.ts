@@ -10,6 +10,7 @@ import type {
   TravelPlanStats,
 } from '../core/types.ts';
 import { DEFAULT_THREAD_WIDTH_MM } from './embroidery-registry.ts';
+import { eventSourceLine } from '../core/source-trace.ts';
 
 interface LockResult {
   events: StitchEvent[];
@@ -58,8 +59,22 @@ export function applyLocks(events: StitchEvent[], L: number): LockResult {
     const ux = (toward.x - at.x) / d,
       uy = (toward.y - at.y) / d;
     for (let k = 0; k < 2; k++) {
-      out.push({ t: 'stitch', x: at.x + ux * l, y: at.y + uy * l, c, line: at.line });
-      out.push({ t: 'stitch', x: at.x, y: at.y, c, line: at.line });
+      out.push({
+        t: 'stitch',
+        x: at.x + ux * l,
+        y: at.y + uy * l,
+        c,
+        line: at.line,
+        ...(at.source ? { source: at.source } : {}),
+      });
+      out.push({
+        t: 'stitch',
+        x: at.x,
+        y: at.y,
+        c,
+        line: at.line,
+        ...(at.source ? { source: at.source } : {}),
+      });
     }
     locks++;
   }
@@ -149,7 +164,14 @@ export function applyAutoTrim(
         j++;
       }
       if (sewn && pos && jl >= threshold) {
-        out.push({ t: 'trim', x: pos.x, y: pos.y, c: e.c, line: e.line });
+        out.push({
+          t: 'trim',
+          x: pos.x,
+          y: pos.y,
+          c: e.c,
+          line: e.line,
+          ...(e.source ? { source: e.source } : {}),
+        });
         trims++;
         sewn = false;
       }
@@ -433,7 +455,7 @@ export function densityMap(
   threadWidthMM = DEFAULT_THREAD_WIDTH_MM,
 ): DensityResult {
   const g = new DensityGrid(cellMM, threadWidthMM);
-  for (const e of events) g.feed(e.t, e.x, e.y, e.line);
+  for (const e of events) g.feed(e.t, e.x, e.y, eventSourceLine(e));
   return g.finalize(threshold);
 }
 

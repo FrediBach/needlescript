@@ -20,6 +20,7 @@ import type {
   StitchEvent,
   WarningLocation,
 } from '../core/types.ts';
+import { eventSourceLine, sourceLocationsForEvents } from '../core/source-trace.ts';
 
 export const PREFLIGHT_MODES: readonly PreflightMode[] = defineModes(['off', 'warn', 'strict']);
 
@@ -128,7 +129,8 @@ function capabilityIssue(
       ? `${profile.name} requires operator action for each ${operation}.`
       : `${profile.name} does not support the design's ${operation} operation.`,
     points: [{ x: event.x, y: event.y }],
-    lines: event.line === undefined ? [] : [event.line],
+    lines: eventSourceLine(event) === undefined ? [] : [eventSourceLine(event)!],
+    sourceLocations: sourceLocationsForEvents([event]),
     eventIndices: [eventIndex],
   };
 }
@@ -148,6 +150,27 @@ function analyzeMachineCapabilities(
       ? [capabilityIssue(color, colorIndex, profile, 'color change', profile.colorChangeCapability)]
       : []),
   ].filter((issue): issue is PreflightIssue => issue !== undefined);
+}
+
+function enrichIssueEventSources(
+  issue: PreflightIssue,
+  events: readonly StitchEvent[],
+): PreflightIssue {
+  if (!issue.eventIndices?.length) return issue;
+  const inferred = sourceLocationsForEvents(issue.eventIndices.map((index) => events[index]));
+  if (!inferred.length) return issue;
+  if (!issue.sourceLocations?.length) return { ...issue, sourceLocations: inferred };
+  const sourceLocations = issue.sourceLocations.map((location) => ({ ...location }));
+  const seen = new Set(sourceLocations.map(({ line }) => line));
+  for (const location of inferred) {
+    if (seen.has(location.line)) continue;
+    seen.add(location.line);
+    sourceLocations.push({
+      ...location,
+      role: location.role === 'related' ? 'related' : 'contributor',
+    });
+  }
+  return { ...issue, sourceLocations };
 }
 
 /**
@@ -170,16 +193,25 @@ function buildResult(input: PreflightInput, includeExtended: boolean): Preflight
         return [];
       }
       if (message === undefined) return [];
+      const eventIndices = eventIndicesForLocation(input.events, location);
+      const eventSourceLocations = sourceLocationsForEvents(
+        eventIndices.map((index) => input.events[index]),
+      );
       return [
         {
           ...descriptor,
           message,
           points: location.points.map(({ x, y }) => ({ x, y })),
           lines: uniqueLines(location.lines),
+          ...(location.sourceLocations?.length
+            ? { sourceLocations: location.sourceLocations.map((entry) => ({ ...entry })) }
+            : eventSourceLocations.length
+              ? { sourceLocations: eventSourceLocations }
+              : {}),
           ...(location.geometry
             ? { geometry: location.geometry.map((geometry) => ({ ...geometry })) }
             : {}),
-          eventIndices: eventIndicesForLocation(input.events, location),
+          eventIndices,
         },
       ];
     });
@@ -195,7 +227,9 @@ function buildResult(input: PreflightInput, includeExtended: boolean): Preflight
         }),
       ]
     : [];
-  const issues = [...legacyIssues, ...capabilityIssues, ...extendedIssues];
+  const issues = [...legacyIssues, ...capabilityIssues, ...extendedIssues].map((issue) =>
+    enrichIssueEventSources(issue, input.events),
+  );
   const count = (severity: PreflightSeverity) =>
     issues.reduce((total, issue) => total + Number(issue.severity === severity), 0);
   return {
