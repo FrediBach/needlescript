@@ -1,9 +1,9 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-4 complete** (2026-07-21) — editor analysis now has revision-aware
-current/stale/checking/blocked lifecycle state, 500 ms background checks, a coalescing priority
-queue, and drag suspension with one commit-time run. Preview-overlay legibility remains an explicit
-PI-7 implementation risk.
+Status: **PI-5 complete** (2026-07-21) — the playground now has a responsive Console/Physics
+surface with structured status, assumptions, in-memory filters, concept grouping, linked selection,
+expandable guidance, copyable reports, and duplicate-console-warning suppression. Preview-overlay
+legibility remains an explicit PI-7 implementation risk.
 
 Last updated: 2026-07-21
 
@@ -14,7 +14,8 @@ Last updated: 2026-07-21
 | PI-2    | Complete    | Editor analysis is independent from source-selected preflight policy    |
 | PI-3    | Complete    | Rich source, geometry, construction, and playback attribution shipped   |
 | PI-4    | Complete    | Revision lifecycle, background analysis, and priority queue shipped     |
-| PI-5–11 | Not started | Follow the dependency and acceptance gates documented below             |
+| PI-5    | Complete    | Responsive, keyboard-operable Physics panel shipped                     |
+| PI-6–11 | Not started | Follow the dependency and acceptance gates documented below             |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
 playback—not a renamed or enlarged preflight panel.
@@ -729,6 +730,8 @@ Validation record (2026-07-21):
 
 ### PI-5 — Physics panel MVP
 
+Status: **complete** (2026-07-21)
+
 Deliverables:
 
 - Add Console/Physics tabs.
@@ -743,6 +746,49 @@ Acceptance:
 - All functionality is keyboard accessible.
 - Filters never trigger compilation.
 - The panel works at the existing minimum editor width and on mobile.
+
+Implementation progress:
+
+- [x] Replaced the embedded preflight list with a Console/Physics tab surface. The badge reports
+      blockers and risks without opening for risks/notes; only a previously unseen blocker
+      fingerprint can auto-open Physics.
+- [x] Added lifecycle-aware summary and current/checking/stale/blocked/clean states, including the
+      approved cautious clean-state copy and continued inspection of the previous report while it
+      is stale or blocked.
+- [x] Added report-level assumptions, severity and category filters, a current-selection filter,
+      category-based concept groups, expandable diagnostic cards, visible severity/evidence/source
+      metadata, measurements when available, prioritized remedies, and stable-code details.
+- [x] Added application-level `selectedDiagnosticId` and `hoveredDiagnosticId` state. Panel
+      selection reveals the primary source line and projects the diagnostic's semantic geometry to
+      the existing stage/playback highlight boundary without moving the scrubber; Escape clears
+      persistent selection.
+- [x] Deduplicated each locatable legacy console warning only when a matching structured diagnostic
+      occurrence is present. `RunResult.warnings`, warning locations, preflight compatibility data,
+      prints, non-physics notes, and unmatched warning occurrences remain unchanged.
+- [x] Added a versioned local show/hide-note preference and a copy action that serializes report
+      version, lifecycle revision/status, assumptions, context, stable identities, and diagnostics
+      for bug reports.
+- [x] Kept all filters local to React report state with no compiler callback. Used native buttons,
+      checkboxes, selects, and explicit expanded/selected state for keyboard operation.
+- [x] Added compact/half/full mobile bottom-sheet states and narrow-card reflow while retaining the
+      existing draggable desktop bottom panel and 240 px minimum editor split.
+- [x] Added focused tests for combined filtering, concept grouping, occurrence-counted console
+      deduplication, semantic location projection, and copied lifecycle/report content. Removed the
+      now-unused `PreflightPanel` component and stylesheet.
+
+Validation record (2026-07-21):
+
+- `npm test`: 80 files and 2,086 tests passed; generated references are current.
+- `npm run lint` and `npm run build` passed. The build retained its pre-existing large-chunk
+  advisory.
+- `npm run build:lib` and `npm run check:lib` passed; publint and the package type check found no
+  problems.
+- React Doctor's final changed-file scan scored 85/100. Its nine remaining findings are pre-existing
+  EditorPane/App accessibility, performance, lifecycle, storage, and component-size findings; the
+  PI-5 callback-subscription finding from the first scan was corrected.
+- Targeted Prettier validation passed for every changed source, test, stylesheet, and this plan.
+- Automated browser rendering was unavailable in the session; mobile/minimum-width behavior was
+  validated through the production build, responsive CSS constraints, and semantic-control review.
 
 ### PI-6 — Monaco integration
 

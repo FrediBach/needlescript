@@ -6,8 +6,8 @@ import type { ConsoleMessage } from '../App.tsx';
 import type { LineStitchBounds } from '../App.tsx';
 import type {
   ChalkDataVar,
-  PreflightIssue,
-  PreflightResult,
+  PhysicsDiagnostic,
+  PhysicsReport,
   ReferenceDataVar,
   WarningLocation,
 } from '../lib/engine.ts';
@@ -27,8 +27,8 @@ import ParametersPanel from './ParametersPanel.tsx';
 import styles from './EditorPane.module.css';
 import { Input } from '@/components/ui/input.tsx';
 import type { EditorContextActions } from './MachineMenu.tsx';
-import PreflightPanel from './PreflightPanel.tsx';
-import { physicsStatusMessage, type PhysicsReportState } from '../physics-analysis-state.ts';
+import PhysicsPanel from './PhysicsPanel.tsx';
+import type { PhysicsReportState } from '../physics-analysis-state.ts';
 
 interface Props {
   source: string;
@@ -38,13 +38,15 @@ interface Props {
   onRun: (src?: string) => void;
   onAnalysisInteractionChange: (active: boolean) => void;
   messages: ConsoleMessage[];
-  preflight?: PreflightResult;
+  physics?: PhysicsReport;
   physicsReportState: PhysicsReportState;
+  selectedDiagnosticId: string | null;
+  onDiagnosticHover: (diagnostic: PhysicsDiagnostic | null) => void;
+  onDiagnosticSelect: (diagnostic: PhysicsDiagnostic) => void;
+  onDiagnosticClear: () => void;
   isDragging: boolean;
   activeLine: number | null; // source line currently sewing (playback), 1-based
   onWarnHover: (loc: WarningLocation | null) => void;
-  onPreflightHover: (issue: PreflightIssue | null) => void;
-  onPreflightSelect: (issue: PreflightIssue) => void;
   /** Compiler error markers to display as squiggles in the editor.
    *  Pass an empty array (or omit) to clear any existing markers. */
   errorMarkers?: ReadonlyArray<{ message: string; line: number }>;
@@ -118,13 +120,15 @@ export default function EditorPane({
   onRun,
   onAnalysisInteractionChange,
   messages,
-  preflight,
+  physics,
   physicsReportState,
+  selectedDiagnosticId,
+  onDiagnosticHover,
+  onDiagnosticSelect,
+  onDiagnosticClear,
   isDragging,
   activeLine,
   onWarnHover,
-  onPreflightHover,
-  onPreflightSelect,
   errorMarkers,
   lineStitchMap,
   onHoverLine,
@@ -161,6 +165,12 @@ export default function EditorPane({
   const CONSOLE_MAX = 360;
 
   const [consoleHeight, setConsoleHeight] = useState(CONSOLE_DEFAULT);
+  const [activeBottomTab, setActiveBottomTab] = useState<'console' | 'physics'>('console');
+  const [mobilePhysicsSize, setMobilePhysicsSize] = useState<'collapsed' | 'half' | 'full'>('half');
+  const [seenBlockerFingerprints, setSeenBlockerFingerprints] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [lastAutoOpenReport, setLastAutoOpenReport] = useState<PhysicsReport | undefined>();
 
   const handleConsoleDrag = useCallback((delta: number) => {
     // Positive delta = dragging the handle down = Monaco grows, console shrinks.
@@ -180,6 +190,7 @@ export default function EditorPane({
   // even after source/design state changes rebuild the callback.
   const onRunRef = useRef(onRun);
   const onEditorReadyRef = useRef(onEditorReady);
+  const onDiagnosticClearRef = useRef(onDiagnosticClear);
 
   // Stable ref to source so the parameter-change handler never captures a
   // stale closure value.
@@ -193,11 +204,20 @@ export default function EditorPane({
   useLayoutEffect(() => {
     onRunRef.current = onRun;
     onEditorReadyRef.current = onEditorReady;
+    onDiagnosticClearRef.current = onDiagnosticClear;
     sourceRef.current = source;
     lineStitchMapRef.current = lineStitchMap;
     onHoverLineRef.current = onHoverLine;
     onMachineContextMenuRef.current = onMachineContextMenu;
-  }, [lineStitchMap, onEditorReady, onHoverLine, onMachineContextMenu, onRun, source]);
+  }, [
+    lineStitchMap,
+    onDiagnosticClear,
+    onEditorReady,
+    onHoverLine,
+    onMachineContextMenu,
+    onRun,
+    source,
+  ]);
 
   // Disposables created in handleMount — cleaned up on unmount.
   const hoverProviderRef = useRef<IDisposable | null>(null);
@@ -252,31 +272,53 @@ export default function EditorPane({
     onRunRef.current(sourceRef.current);
   }, [onAnalysisInteractionChange]);
 
-  const selectPreflightIssue = useCallback(
-    (issue: PreflightIssue) => {
+  const selectPhysicsDiagnostic = useCallback(
+    (diagnostic: PhysicsDiagnostic) => {
       const ed = editorRef.current;
       const model = ed?.getModel();
-      if (ed && model && issue.lines.length > 0) {
-        const lines = [...new Set(issue.lines)]
-          .filter((line) => line >= 1 && line <= model.getLineCount())
-          .toSorted((a, b) => a - b);
-        if (lines.length > 0) {
-          ed.setSelections(
-            lines.map((line) => ({
-              selectionStartLineNumber: line,
-              selectionStartColumn: 1,
-              positionLineNumber: line,
-              positionColumn: model.getLineMaxColumn(line),
-            })),
-          );
-          ed.revealLineInCenter(lines[0], 0);
+      if (ed && model) {
+        const primary =
+          diagnostic.sourceLocations.find(({ role }) => role === 'primary') ??
+          diagnostic.sourceLocations[0];
+        if (primary && primary.line >= 1 && primary.line <= model.getLineCount()) {
+          ed.setPosition({ lineNumber: primary.line, column: primary.startColumn ?? 1 });
+          ed.revealLineInCenter(primary.line, 0);
           ed.focus();
         }
       }
-      onPreflightSelect(issue);
+      onDiagnosticSelect(diagnostic);
     },
-    [onPreflightSelect],
+    [onDiagnosticSelect],
   );
+
+  // Adjust controlled panel state when a new current report arrives. This is
+  // guarded by report identity so React performs at most one adjustment per
+  // report and no synchronization effect/cascading render is needed.
+  if (physics && physicsReportState.status === 'current' && physics !== lastAutoOpenReport) {
+    let hasNewBlocker = false;
+    const nextSeen = new Set(seenBlockerFingerprints);
+    for (const diagnostic of physics.diagnostics) {
+      if (diagnostic.severity !== 'error') continue;
+      if (!nextSeen.has(diagnostic.fingerprint)) hasNewBlocker = true;
+      nextSeen.add(diagnostic.fingerprint);
+    }
+    setLastAutoOpenReport(physics);
+    setSeenBlockerFingerprints(nextSeen);
+    if (hasNewBlocker) {
+      setActiveBottomTab('physics');
+      setConsoleHeight((height) => Math.max(height, 240));
+      setMobilePhysicsSize('half');
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedDiagnosticId) return;
+    const clearSelection = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onDiagnosticClearRef.current();
+    };
+    window.addEventListener('keydown', clearSelection);
+    return () => window.removeEventListener('keydown', clearSelection);
+  }, [selectedDiagnosticId]);
 
   // ── Monaco lifecycle callbacks ──────────────────────────────────────
   const handleBeforeMount = useCallback<BeforeMount>((monaco) => {
@@ -749,37 +791,89 @@ export default function EditorPane({
       />
 
       <div
-        ref={consoleRef}
-        className={styles.console}
-        aria-live="polite"
+        className={styles.bottomPanel}
+        data-active-tab={activeBottomTab}
+        data-mobile-size={mobilePhysicsSize}
         style={{ height: consoleHeight }}
       >
-        {physicsStatusMessage(physicsReportState) && (
-          <div
-            className={styles.physicsStatus}
-            data-status={physicsReportState.status}
-            role="status"
+        <div className={styles.bottomTabs} role="tablist" aria-label="Editor output">
+          <button
+            type="button"
+            role="tab"
+            id="console-tab"
+            aria-controls="console-panel"
+            aria-selected={activeBottomTab === 'console'}
+            onClick={() => setActiveBottomTab('console')}
           >
-            {physicsStatusMessage(physicsReportState)}
+            Console
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="physics-tab"
+            aria-controls="physics-panel"
+            aria-selected={activeBottomTab === 'physics'}
+            onClick={() => {
+              setActiveBottomTab('physics');
+              setConsoleHeight((height) => Math.max(height, 240));
+            }}
+          >
+            Physics
+            {physics && physics.diagnostics.length > 0 && (
+              <span className={styles.physicsBadge}>
+                {physics.summary.error} · {physics.summary.warning}
+              </span>
+            )}
+          </button>
+          <div className={styles.mobileSheetControls} aria-label="Physics sheet height">
+            {(['collapsed', 'half', 'full'] as const).map((size) => (
+              <button
+                key={size}
+                type="button"
+                aria-label={`${size === 'half' ? 'Half-height' : size} Physics sheet`}
+                aria-pressed={mobilePhysicsSize === size}
+                onClick={() => setMobilePhysicsSize(size)}
+              >
+                {size === 'collapsed' ? '—' : size === 'half' ? '½' : '□'}
+              </button>
+            ))}
           </div>
-        )}
-        {preflight && (
-          <PreflightPanel
-            result={preflight}
-            onIssueHover={onPreflightHover}
-            onIssueSelect={selectPreflightIssue}
+        </div>
+        <div
+          ref={activeBottomTab === 'console' ? consoleRef : undefined}
+          id="console-panel"
+          role="tabpanel"
+          aria-labelledby="console-tab"
+          hidden={activeBottomTab !== 'console'}
+          className={styles.console}
+          aria-live="polite"
+        >
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`${styles[msg.type] || ''} ${msg.loc ? styles.locatable : ''}`}
+              onMouseEnter={msg.loc ? () => onWarnHover(msg.loc!) : undefined}
+              onMouseLeave={msg.loc ? () => onWarnHover(null) : undefined}
+            >
+              {msg.text}
+            </div>
+          ))}
+        </div>
+        <div
+          id="physics-panel"
+          role="tabpanel"
+          aria-labelledby="physics-tab"
+          hidden={activeBottomTab !== 'physics'}
+          className={styles.physicsContent}
+        >
+          <PhysicsPanel
+            report={physics}
+            reportState={physicsReportState}
+            selectedDiagnosticId={selectedDiagnosticId}
+            onDiagnosticHover={onDiagnosticHover}
+            onDiagnosticSelect={selectPhysicsDiagnostic}
           />
-        )}
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`${styles[msg.type] || ''} ${msg.loc ? styles.locatable : ''}`}
-            onMouseEnter={msg.loc ? () => onWarnHover(msg.loc!) : undefined}
-            onMouseLeave={msg.loc ? () => onWarnHover(null) : undefined}
-          >
-            {msg.text}
-          </div>
-        ))}
+        </div>
       </div>
 
       <div className={styles.replRow}>

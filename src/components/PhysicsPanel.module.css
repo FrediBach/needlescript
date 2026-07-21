@@ -1,0 +1,321 @@
+.panel {
+  min-width: 0;
+  padding: 7px 10px 12px;
+  color: var(--text-muted);
+}
+
+.statusHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text);
+}
+
+.statusHeader > div {
+  min-width: 0;
+}
+
+.lifecycle {
+  display: block;
+  margin-top: 2px;
+  color: var(--gold);
+}
+
+.lifecycle[data-status='blocked'] {
+  color: var(--console-err);
+}
+
+.copyButton,
+.expandButton {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  color: var(--text-muted);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.copyButton {
+  flex-shrink: 0;
+}
+
+.copyButton:hover:not(:disabled),
+.copyButton:focus-visible,
+.expandButton:hover,
+.expandButton:focus-visible {
+  border-color: var(--gold);
+  color: var(--text);
+  outline: none;
+}
+
+.copyButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.assumptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  margin-top: 7px;
+  padding: 5px 7px;
+  border-left: 2px solid var(--border);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.assumptions > :first-child {
+  color: var(--text);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 7px 14px;
+  margin-top: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border);
+}
+
+.severityFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.severityFilters legend,
+.selectFilter > span {
+  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.severityFilters label,
+.selectedFilter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.severityFilters input,
+.selectedFilter input {
+  accent-color: var(--gold);
+}
+
+.selectFilter {
+  display: flex;
+  flex-direction: column;
+  min-width: 125px;
+}
+
+.selectFilter select {
+  min-width: 0;
+  max-width: 170px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 4px;
+  color: var(--text);
+  background: var(--bg-panel);
+  font: inherit;
+}
+
+.selectedFilter {
+  padding-bottom: 2px;
+}
+
+.emptyState,
+.blockedState,
+.cleanState {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed var(--border);
+}
+
+.blockedState {
+  border-color: color-mix(in srgb, var(--console-err) 45%, var(--border));
+}
+
+.blockedState strong {
+  color: var(--console-err);
+}
+
+.cleanState {
+  color: var(--text);
+}
+
+.groups {
+  min-width: 0;
+}
+
+.group {
+  margin-top: 9px;
+}
+
+.group h3 {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.group h3 span {
+  opacity: 0.65;
+}
+
+.card {
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.card[data-severity='error'] {
+  border-left-color: var(--console-err);
+}
+
+.card[data-severity='warning'] {
+  border-left-color: var(--gold);
+}
+
+.card[data-severity='info'] {
+  border-left-color: var(--text-muted);
+}
+
+.card[data-selected] {
+  border-color: var(--gold);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.selectCard {
+  display: grid;
+  flex: 1;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1px 8px;
+  min-width: 0;
+  border: 0;
+  padding: 7px 8px;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.selectCard:hover,
+.selectCard:focus-visible {
+  background: var(--gold-13, rgba(203, 161, 109, 0.1));
+  outline: none;
+}
+
+.selectCard > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.severity {
+  grid-row: 1 / span 2;
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+  white-space: nowrap;
+}
+
+.card[data-severity='error'] .severity {
+  color: var(--console-err);
+}
+
+.card[data-severity='warning'] .severity {
+  color: var(--gold);
+}
+
+.cardMeta,
+.measurement {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+}
+
+.measurement {
+  margin-top: 2px;
+  color: var(--text);
+}
+
+.expandButton {
+  align-self: center;
+  margin-right: 7px;
+  white-space: nowrap;
+}
+
+.cardDetails {
+  padding: 1px 10px 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.cardDetails p,
+.cardDetails ul {
+  margin: 6px 0;
+}
+
+.cardDetails ul {
+  padding-left: 18px;
+}
+
+.cardDetails code {
+  font-size: var(--fs-label);
+  opacity: 0.7;
+}
+
+.remedies > strong {
+  color: var(--text);
+}
+
+@media (max-width: 420px) {
+  .statusHeader,
+  .cardHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .copyButton,
+  .expandButton {
+    align-self: flex-start;
+    margin: 0 8px 7px;
+  }
+
+  .statusHeader .copyButton {
+    margin: 0;
+  }
+
+  .selectCard {
+    grid-template-columns: 1fr;
+  }
+
+  .severity,
+  .cardMeta,
+  .measurement {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}

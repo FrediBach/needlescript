@@ -20,8 +20,8 @@ import type {
   ChalkDataVar,
   ReferenceDataVar,
   ColorTableEntry,
-  PreflightIssue,
   PreflightResult,
+  PhysicsDiagnostic,
   PhysicsReport,
   ResolvedMachineProfile,
   MaterialIntent,
@@ -122,6 +122,10 @@ import {
   physicsSourceChanged,
   type PhysicsReportState,
 } from './physics-analysis-state.ts';
+import {
+  consoleWarningsWithoutStructuredDuplicates,
+  physicsDiagnosticLocation,
+} from './components/physics-panel-model.ts';
 
 export interface LineSegment {
   line: number;
@@ -172,17 +176,6 @@ export interface ConsoleMessage {
   text: string;
   type: 'info' | 'ok' | 'err' | 'print' | 'warn' | 'time';
   loc?: WarningLocation; // present for hover-locatable hotspot warnings
-}
-
-function preflightIssueLocation(issue: PreflightIssue): WarningLocation {
-  return {
-    index: -1,
-    points: issue.points,
-    lines: issue.lines,
-    // The canvas consumes only points/lines; `fill` is the neutral existing
-    // location kind for a structured diagnostic that is not a legacy warning.
-    kind: 'fill',
-  };
 }
 
 const INITIAL_DESIGN: DesignState = {
@@ -381,7 +374,8 @@ export default function App() {
   // Location of the warning currently hovered in the console — drives the
   // preview marker and playback-bar part highlight. null = nothing hovered.
   const [hoverWarn, setHoverWarn] = useState<WarningLocation | null>(null);
-  const [selectedPreflightLoc, setSelectedPreflightLoc] = useState<WarningLocation | null>(null);
+  const [selectedDiagnosticId, setSelectedDiagnosticId] = useState<string | null>(null);
+  const [hoveredDiagnosticId, setHoveredDiagnosticId] = useState<string | null>(null);
   const [program, dispatch] = useReducer(programReducer, {
     design: INITIAL_DESIGN,
     messages: [],
@@ -528,7 +522,7 @@ export default function App() {
       updatePhysicsReportState((state) => physicsCheckStarted(state, revision));
       // A fresh compile invalidates any hovered warning marker.
       setHoverWarn(null);
-      setSelectedPreflightLoc(null);
+      setHoveredDiagnosticId(null);
       // Separator with a human-readable timestamp so consecutive compiles are
       // visually distinguishable in the console.
       addMsg(new Date().toLocaleTimeString(), 'time');
@@ -570,9 +564,6 @@ export default function App() {
       const newDesign = buildDesignState(result, stats, designName);
       // Map each engine warning to its location (hotspot warnings only). Indices
       // refer to result.warnings, so App-appended warnings below get no location.
-      const locByIndex = new Map<number, WarningLocation>();
-      for (const wl of result.warningLocations ?? []) locByIndex.set(wl.index, wl);
-
       const ms = Math.round(performance.now() - t0);
       result.printed.forEach((p) => addMsg(p, 'print'));
       addMsg(
@@ -582,9 +573,11 @@ export default function App() {
             : ''),
         'ok',
       );
-      newDesign.warnings.forEach((warning, index) =>
-        addMsg(warning, 'warn', locByIndex.get(index)),
-      );
+      consoleWarningsWithoutStructuredDuplicates(
+        newDesign.warnings,
+        result.warningLocations ?? [],
+        result.physics,
+      ).forEach(({ warning, location }) => addMsg(warning, 'warn', location));
       setErrorMarkers([]);
       lastErrorRef.current = null;
       updatePhysicsReportState((state) => physicsCheckSucceeded(state, revision));
@@ -631,7 +624,7 @@ export default function App() {
 
         const nextDesign = buildDesignState(response.result, response.stats, designNameRef.current);
         setHoverWarn(null);
-        setSelectedPreflightLoc(null);
+        setHoveredDiagnosticId(null);
         setErrorMarkers([]);
         lastErrorRef.current = null;
         updatePhysicsReportState((current) => physicsCheckSucceeded(current, revision));
@@ -1178,6 +1171,20 @@ export default function App() {
   const [hoveredEditorLine, setHoveredEditorLine] = useState<number | null>(null);
   const hoveredLineBounds =
     hoveredEditorLine !== null ? (lineStitchMap.get(hoveredEditorLine) ?? null) : null;
+  const selectedDiagnostic =
+    design.physics?.diagnostics.find(({ id }) => id === selectedDiagnosticId) ?? null;
+  const hoveredDiagnostic =
+    design.physics?.diagnostics.find(({ id }) => id === hoveredDiagnosticId) ?? null;
+  const selectedDiagnosticLoc = selectedDiagnostic
+    ? physicsDiagnosticLocation(selectedDiagnostic)
+    : null;
+  const hoveredDiagnosticLoc = hoveredDiagnostic
+    ? physicsDiagnosticLocation(hoveredDiagnostic)
+    : null;
+
+  const handleDiagnosticHover = useCallback((diagnostic: PhysicsDiagnostic | null) => {
+    setHoveredDiagnosticId(diagnostic?.id ?? null);
+  }, []);
 
   return (
     <div
@@ -1216,13 +1223,15 @@ export default function App() {
             onRun={handleRun}
             onAnalysisInteractionChange={handleAnalysisInteractionChange}
             messages={messages}
-            preflight={design.preflight}
+            physics={design.physics}
             physicsReportState={physicsReportState}
+            selectedDiagnosticId={selectedDiagnosticId}
+            onDiagnosticHover={handleDiagnosticHover}
+            onDiagnosticSelect={(diagnostic) => setSelectedDiagnosticId(diagnostic.id)}
+            onDiagnosticClear={() => setSelectedDiagnosticId(null)}
             isDragging={isDragging}
             activeLine={activeLine}
             onWarnHover={setHoverWarn}
-            onPreflightHover={(issue) => setHoverWarn(issue ? preflightIssueLocation(issue) : null)}
-            onPreflightSelect={(issue) => setSelectedPreflightLoc(preflightIssueLocation(issue))}
             errorMarkers={errorMarkers}
             lineStitchMap={lineStitchMap}
             onHoverLine={setHoveredEditorLine}
@@ -1259,7 +1268,7 @@ export default function App() {
           onScrubChange={(pos) => dispatch({ type: 'scrub', pos })}
           activeLine={activeLine}
           lineSegments={lineSegments}
-          warningLoc={hoverWarn ?? selectedPreflightLoc}
+          warningLoc={hoverWarn ?? hoveredDiagnosticLoc ?? selectedDiagnosticLoc}
           hoveredLineBounds={hoveredLineBounds}
           showDensity={showDensity}
           onToggleDensity={() => setShowDensity((v) => !v)}
