@@ -8,8 +8,8 @@ exception remains. Copied diagnostic reports are local files and no telemetry is
 
 ## Evidence and rate record
 
-`PhysicsReport` version 2 records diagnostic catalog version 1, threshold bundle
-`physics-thresholds-v1`, and versioned evidence references. A pending physical protocol is labelled
+`PhysicsReport` version 2 records diagnostic catalog version 2, threshold bundle
+`physics-thresholds-v2`, and versioned evidence references. A pending physical protocol is labelled
 pending in the report and UI; it is not treated as validated evidence.
 
 The expected/absent ledger is

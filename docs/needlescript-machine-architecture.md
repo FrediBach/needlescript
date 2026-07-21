@@ -700,8 +700,8 @@ documentation ID. PI-9 expansion entries additionally carry methodology, known l
 human-readable performance cap. Catalog validation rejects duplicate code/remedy identities,
 missing copy or documentation, and fields outside the renderer-independent schema.
 
-PI-11 versions this provenance independently of display copy. Catalog version 1 and the global
-`physics-thresholds-v1` bundle are recorded on report version 2 and every diagnostic. Standalone
+PI-11 versions this provenance independently of display copy. Catalog version 2 and the global
+`physics-thresholds-v2` bundle are recorded on report version 2 and every diagnostic. Standalone
 evidence references distinguish validated engine/fixture contracts from the pending physical
 sew-out protocol, so copied reports cannot silently imply completed physical validation. The
 version-pinned expected/absent fixture ledger and per-code rate reporter measure software
@@ -737,15 +737,15 @@ thresholds.
 
 `preflight 'warn'` and `'strict'` additionally run `embroidery/preflight-event-stream.ts` over the final
 planned/autotrimmed stream captured immediately before locks. Its bounded, fixed-order checks cover
-short-stitch runs, local reversals, moving-window
-near-hole penetrations, long sewn spans, untrimmed jump chains, accumulated untrimmed jump distance
-within a color run, profile-limited continuous stitch runs, and tight sharp-turn clusters. The
+short-stitch runs, local reversals, moving-window near-hole penetrations, long sewn spans, untrimmed
+jump chains, profile-limited continuous stitch runs, and tight sharp-turn clusters. The
 default metrics are: eight consecutive segments shorter
 than 1.5 × the 0.4 mm reliable movement; four reversals of at least 150° within 1 mm; eight
 penetrations within 0.3 mm among the latest twenty; sewn spans above 8 mm; jump chains above 12 mm;
 20,000 stitches without trim/color; and six 75°–150° turns on at-most-1 mm segments within 2 mm.
-The color-run check requires at least two jump segments and compares their total with the resolved
-profile's preferred jump length. Each check yields at most three issues with at most sixteen points. These are conservative
+Each check yields at most three issues with at most sixteen points. Separated jump connectors are
+not added together: the machine profile's preferred jump length applies to one consecutive jump
+chain, not cumulative travel across an arbitrarily long color run. These are conservative
 engineering defaults and deliberately have no fabric/thread multiplier pending physical sew-out
 evidence; resolved thread width already influences the separate coverage metric.
 

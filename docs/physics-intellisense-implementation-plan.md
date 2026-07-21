@@ -1026,8 +1026,11 @@ Implementation progress:
       20% uncovered-sample threshold and semantic region/cell geometry.
 - [x] Added per-construction short-stitch ratios against the selected machine profile's reliable
       movement threshold, with a 25% ratio gate and capped segment inspection.
-- [x] Added accumulated jump burden per uninterrupted color/run. It requires at least two jump
-      segments and compares their total with the selected machine profile's preferred jump length.
+- [x] Kept jump analysis scoped to consecutive untrimmed jump chains. A cumulative color-run
+      detector was removed after the adaptive hatch regression showed that adding individually
+      acceptable connectors and comparing the sum with a single-jump preference creates false
+      risks. A separate cumulative metric remains deferred until it has its own physical evidence
+      and threshold.
 - [x] Retained declared fabric, thread/profile width, needle, stabilizer, and topping in report
       context. No fabric- or needle-specific warning or threshold modifier was added without
       physical evidence.
@@ -1037,7 +1040,8 @@ Implementation progress:
       performance caps, spatial/source/playback attribution, and at least one construction-oriented
       remedy for every expansion detector. Expanded Physics details display that evidence context.
 - [x] Added trigger and adjacent-safe fixtures for underlay width, construction coverage,
-      construction short ratios, color-run jump burden, and directional mode; catalog and material
+      construction short ratios, jump-chain length, and directional mode; a regression confirms
+      separated short connectors are not combined into one travel risk. Catalog and material
       evidence-boundary tests cover the remaining contract.
 
 Validation record (2026-07-21):
@@ -1050,6 +1054,14 @@ Validation record (2026-07-21):
   barrel/chained-iteration/property-access observations in files touched for metadata capture; the
   PI-9 numeric conditional and repeated array lookups were corrected.
 - Prettier formatting and `git diff --check` passed.
+
+Adaptive-hatch correction validation (2026-07-21):
+
+- `npm test`: 86 files and 2,128 tests passed, including a checked-in fish-example regression.
+- `npm run lint`, `npx prettier --check .`, `npm run build`, `npm run build:lib`, and
+  `npm run check:lib` passed. The app build retained its pre-existing large-chunk advisory.
+- The fish plan still reduces travel from 1,340.02 mm to 101.98 mm and now produces no travel
+  diagnostics under full analysis.
 
 ### PI-10 — Acknowledgments and intentional exceptions
 
@@ -1116,8 +1128,9 @@ Deliverables:
 
 Implementation progress (2026-07-21):
 
-- [x] Bumped `PhysicsReport` to version 2 and added diagnostic catalog version 1, the global
-      `physics-thresholds-v1` bundle, and standalone versioned evidence references. Heuristic,
+- [x] Bumped `PhysicsReport` to version 2 and added versioned diagnostic catalogs and threshold
+      bundles. Catalog version 2 and `physics-thresholds-v2` retire the unsupported cumulative
+      color-run jump detector without reinterpreting archived version-1 reports. Heuristic,
       machine-profile, and experimental findings retain the physical protocol as explicitly
       pending rather than presenting it as validated evidence.
 - [x] Added a version-pinned expected/absent ledger across the production validation sheet,

@@ -237,17 +237,13 @@ describe('event-stream preflight checks', () => {
     expect(hasCode(trimmed, 'travel.long-untrimmed-jump')).toBe(false);
   });
 
-  it('totals multiple jump segments within each color run and accepts the adjacent limit', () => {
-    const trigger = [stitch(0, 0), jump(7, 0), stitch(8, 0), jump(15, 0)];
-    const safe = [stitch(0, 0), jump(6, 0), stitch(7, 0), jump(13, 0)];
-    const issue = streamIssues(trigger).find(({ code }) => code === 'travel.color-run-jump-burden');
+  it('does not combine individually short jumps into one long-travel risk', () => {
+    const events: StitchEvent[] = [stitch(0, 0)];
+    for (let index = 0; index < 20; index++) {
+      events.push(jump(index + 1, index), stitch(index + 1, index + 1));
+    }
 
-    expect(issue).toMatchObject({
-      measurements: expect.arrayContaining([
-        expect.objectContaining({ value: 14, threshold: 12, unit: 'mm' }),
-      ]),
-    });
-    expect(hasCode(safe, 'travel.color-run-jump-burden')).toBe(false);
+    expect(streamIssues(events).filter(({ code }) => code.startsWith('travel.'))).toEqual([]);
   });
 
   it('detects profile-limited continuous stitch runs and accepts the exact ceiling', () => {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "thresholdVersion": "physics-thresholds-v1",
+  "thresholdVersion": "physics-thresholds-v2",
   "groundTruth": "software-expectation",
   "physicalEvidenceStatus": "pending",
   "cases": [
@@ -10,8 +10,7 @@
       "expectedCodes": [
         "construction.underlay-outside-topping",
         "fill.border-overlap-too-small",
-        "fill.connector-outside-region",
-        "travel.color-run-jump-burden"
+        "fill.connector-outside-region"
       ],
       "absentCodes": [
         "coverage.density-hotspot",
@@ -28,7 +27,6 @@
         "satin.snag-risk",
         "stitch.long-sewn-float",
         "stitch.short-cluster",
-        "travel.color-run-jump-burden",
         "travel.long-untrimmed-jump"
       ],
       "absentCodes": [
@@ -57,16 +55,12 @@
       "id": "planned-travel",
       "sourcePath": "examples/production/constrained-travel-plan.ns",
       "expectedCodes": [],
-      "absentCodes": [
-        "hoop.unreachable",
-        "travel.color-run-jump-burden",
-        "travel.long-untrimmed-jump"
-      ]
+      "absentCodes": ["hoop.unreachable", "travel.long-untrimmed-jump"]
     },
     {
       "id": "fleece-knockdown",
       "sourcePath": "examples/production/knockdown-fleece.ns",
-      "expectedCodes": ["stitch.below-reliable-movement", "travel.color-run-jump-burden"],
+      "expectedCodes": ["stitch.below-reliable-movement"],
       "absentCodes": ["coverage.density-hotspot", "hoop.unreachable", "penetration.same-hole-stack"]
     }
   ]

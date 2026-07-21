@@ -378,72 +378,6 @@ function excessiveContinuousRuns(
   return issues;
 }
 
-function colorRunJumpBurden(
-  events: readonly AttributedEvent[],
-  profile: ResolvedMachineProfile,
-): PreflightIssue[] {
-  const issues: PreflightIssue[] = [];
-  let runNumber = 1;
-  let hasSewn = false;
-  let jumpDistance = 0;
-  let jumpSegments = 0;
-  let previous: AttributedEvent | undefined;
-  let points: AttributedEvent[] = [];
-
-  const flush = () => {
-    if (
-      hasSewn &&
-      jumpSegments >= 2 &&
-      jumpDistance > profile.maximumPreferredJumpMM &&
-      points.length
-    ) {
-      const color = points[0].c + 1;
-      issues.push(
-        issue(
-          'travel.color-run-jump-burden',
-          `color ${color}, run ${runNumber} accumulates ${jumpDistance.toFixed(2)} mm across ${jumpSegments} untrimmed jumps (preferred maximum ${profile.maximumPreferredJumpMM.toFixed(2)} mm)`,
-          points,
-          [
-            {
-              label: 'Accumulated jump travel',
-              value: jumpDistance,
-              unit: 'mm',
-              threshold: profile.maximumPreferredJumpMM,
-              comparison: 'above',
-            },
-            { label: 'Jump segments', value: jumpSegments, unit: 'jumps' },
-          ],
-        ),
-      );
-    }
-    hasSewn = false;
-    jumpDistance = 0;
-    jumpSegments = 0;
-    points = [];
-  };
-
-  for (const event of events) {
-    if (event.t === 'mark') continue;
-    if (event.t === 'trim' || event.t === 'color') {
-      flush();
-      runNumber++;
-      previous = event;
-      if (issues.length >= EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumIssuesPerCode) return issues;
-      continue;
-    }
-    if (event.t === 'stitch') hasSewn = true;
-    if (event.t === 'jump' && hasSewn && previous) {
-      jumpDistance += distance(previous, event);
-      jumpSegments++;
-      if (!points.length) points.push(previous);
-      points.push(event);
-    }
-    previous = event;
-  }
-  flush();
-  return issues.slice(0, EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumIssuesPerCode);
-}
-
 function directionChangeClusters(runs: readonly AttributedEvent[][]): PreflightIssue[] {
   const {
     directionChangeClusterRadiusMM,
@@ -480,7 +414,6 @@ export function analyzeEventStreamPreflight(
     ...nearHoleClusters(attributed),
     ...longSewnFloats(attributed, profile),
     ...longUntrimmedJumpChains(attributed, profile),
-    ...colorRunJumpBurden(attributed, profile),
     ...excessiveContinuousRuns(attributed, profile),
     ...directionChangeClusters(runs),
   ];

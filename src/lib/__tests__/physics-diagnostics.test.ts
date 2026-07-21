@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import ampmodSource from '../../../examples/generative/ampmod1.ns?raw';
+import fishSource from '../../../examples/fills/fish.ns?raw';
 import {
   assignPhysicsDiagnosticIdentities,
   buildPhysicsDiagnosticFingerprint,
@@ -56,7 +57,6 @@ const EMITTED_CODES = [
   'stitch.construction-short-ratio',
   'stitch.long-sewn-float',
   'stitch.short-cluster',
-  'travel.color-run-jump-burden',
   'travel.long-untrimmed-jump',
   'underlay.missing-wide-construction',
   'underlay.unsuitable-wide-construction',
@@ -91,7 +91,6 @@ describe('physics diagnostic catalog', () => {
         'underlay.unsuitable-wide-construction',
         'coverage.construction-gap',
         'stitch.construction-short-ratio',
-        'travel.color-run-jump-burden',
         'material.directional-compensation-mismatch',
       ].includes(code),
     )) {
@@ -483,6 +482,14 @@ describe('preflight compatibility adapter', () => {
     expect(result.physics?.diagnostics).toContainEqual(
       expect.objectContaining({ code: 'machine.continuous-stitch-run' }),
     );
+  });
+
+  it('does not report planned adaptive hatch connectors as cumulative travel risks', () => {
+    const result = run(fishSource, { physicsAnalysis: 'full' });
+
+    expect(result.plan).toMatchObject({ planMode: 'reversing-nearest' });
+    expect(result.plan!.travelAfterMm).toBeLessThan(result.plan!.travelBeforeMm);
+    expect(result.physics?.diagnostics.filter(({ category }) => category === 'travel')).toEqual([]);
   });
 
   it('attributes the amplitude-modulated ring to its movement statements and call site', () => {

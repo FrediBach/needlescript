@@ -7,8 +7,8 @@ import type {
   PreflightSeverity,
 } from '../../core/types.ts';
 
-export const PHYSICS_DIAGNOSTIC_CATALOG_VERSION = 1;
-export const PHYSICS_THRESHOLD_VERSION = 'physics-thresholds-v1';
+export const PHYSICS_DIAGNOSTIC_CATALOG_VERSION = 2;
+export const PHYSICS_THRESHOLD_VERSION = 'physics-thresholds-v2';
 
 const ENGINE_CONTRACT_REFERENCE: PhysicsEvidenceReference = Object.freeze({
   id: 'needlescript-physics-engine-contract',
@@ -480,28 +480,6 @@ export const PHYSICS_DIAGNOSTIC_CATALOG = Object.freeze([
       ),
     ],
     documentationId: 'physics.stitch.construction-short-ratio',
-  },
-  {
-    code: 'travel.color-run-jump-burden',
-    category: 'travel',
-    defaultSeverity: 'warning',
-    evidence: 'machine-profile',
-    geometryRole: 'travel',
-    title: 'Color run accumulates excessive jump travel',
-    explanation:
-      'One uninterrupted color run accumulates several untrimmed jumps whose total exceeds the selected machine profile’s preferred travel.',
-    methodology:
-      'Groups jumps between trim/color boundaries, totals physical jump distance per color run, and requires at least two jump segments.',
-    limitations: ['A machine or operator may trim connectors outside the generated event stream.'],
-    performanceCap: 'One linear event-stream pass and at most three findings.',
-    remedies: [
-      guidance(
-        'travel.color-run-jump-burden',
-        'Shorten or cut the travel',
-        'Reorder motifs within the color run or add trims between disconnected groups.',
-      ),
-    ],
-    documentationId: 'physics.travel.color-run-jump-burden',
   },
   {
     code: 'material.directional-compensation-mismatch',
