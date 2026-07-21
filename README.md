@@ -139,7 +139,12 @@ The REPL can generate, improve, fix, and explain designs using a model available
 ```
 
 The selected key and model are stored in browser `localStorage`. Generation receives the compact
-NeedleScript reference, and generated source is compiled before being placed in the editor.
+NeedleScript reference. Before generated source is placed in the editor, the playground compiles it
+with full physics analysis and runs up to two bounded revision passes. Compiler failures are returned
+with their reported source line; modeled blockers and risks are returned with source roles, line
+text, measurements, evidence limits, and prioritized construction remedies. The best successfully
+compiled revision is retained if a later revision regresses. Informational physics notes remain for
+human review and do not trigger automatic source changes.
 
 ## Using the engine as a library
 

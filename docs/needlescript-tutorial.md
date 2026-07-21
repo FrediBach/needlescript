@@ -2181,7 +2181,12 @@ To remove both:
 /ai create concentric hexagons with alternating fill angles
 ```
 
-The generated code is compiled silently. If it fails, the AI is asked to fix the error automatically (one retry). The final result — passing or not — is placed in the editor and run so you can see it and its warnings immediately.
+The generated code is compiled with full editor physics analysis. The playground can ask the AI for
+up to two revisions: compile failures include the reported source line, while successful candidates
+with modeled blockers or risks include their exact source roles and lines, measurements, evidence
+limits, assumptions, and prioritized construction remedies. Informational notes do not trigger an
+automatic rewrite. If a revision regresses, the best successfully compiled candidate is retained.
+The chosen result is then placed in the editor and run so you can inspect it immediately.
 
 **`/ai improve <instruction>`** — rewrites the current code according to your instruction:
 
@@ -2227,7 +2232,7 @@ The model knows the full NeedleScript language, the embroidery physics, and the 
 - **Name numerical targets.** "Make it less dense" is helpful; "reduce fillspacing from 0.35 to 0.55" is better.
 - **Reference existing structure.** With code in the editor, `improve` already sees it — say "add a second colour for the outer ring" without re-explaining what the outer ring is.
 
-If the first result isn't right, iterate: `/ai improve add more variation` or `/ai fix the jumps are too long`. Each command starts fresh with the current source, not a conversation history, so each attempt is independent.
+If the first result isn't right, iterate: `/ai improve add more variation` or `/ai fix the jumps are too long`. Each command starts fresh with the current source, not a conversation history, so each command is independent; the bounded compiler/physics revisions within one command do share their candidate and findings.
 
 ### The workflow loop
 
@@ -2237,6 +2242,9 @@ The natural rhythm for new designs:
 2. Inspect the canvas and console; tweak values with the Parameters panel or the normal REPL
 3. `/ai improve <what you want to change>` — push it further
 4. If an error appears: `/ai fix` or `/ai fix <short description>`
-5. Repeat until the design fits the hoop and the density heatmap is calm
+5. Review any remaining Physics findings, then repeat until the design fits the hoop and its modeled
+   construction risks are understood
 
-The playback scrubber and source-line highlight still work on AI-generated code — step through it stitch by stitch to see exactly what each line produces.
+The playback scrubber and source-line highlight still work on AI-generated code — step through it
+stitch by stitch to see exactly what each line produces. A clean modeled report is not a guarantee of
+sewability; use a physical test sew-out before production.

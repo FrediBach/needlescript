@@ -550,6 +550,8 @@ Preflight can flag dense/perforating penetrations, long jumps without trims, tin
 
 The playground's PhysicsIntellisense is caller-selected editor analysis, not source syntax and not a reason to insert `preflight`. It may show the full bounded report while source policy is off. Read the finding's severity, measurement, threshold-set version, evidence references, assumptions, limitations, source/geometry attribution, and remedies. A pending physical reference is not validated evidence. Never describe “no modeled risks” as safe to sew; recommend a physical test sew-out. Apply only a previewed narrow quick fix after checking the before/after report, and never acknowledge a finding merely to make the report clean.
 
+During playground AI generation, a successful compile may be followed by a structured physics review containing exact source lines and construction remedies. Treat each review as feedback on the complete candidate: preserve the requested visual intent, address blockers before risks, and return a complete revised program. Do not chase informational notes automatically. If a finding persists, change the attributed construction instead of weakening thresholds, deleting material intent, inserting `preflight`, or otherwise hiding the report.
+
 ## Debugging
 
 print expr / print "label expr / print('part: ', i, ' of ', total) — variadic call form concatenates

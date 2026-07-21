@@ -6,6 +6,8 @@ import type { ConsoleMessage } from '../App.tsx';
 import type { CompileResponse } from '../compiler.worker.types.ts';
 import {
   buildMessages,
+  buildPhysicsFeedback,
+  buildPhysicsRetryMessages,
   buildRetryMessages,
   extractCode,
   AI_HELP_TEXT,
@@ -18,6 +20,7 @@ import {
 const NS_AI_APIKEY_KEY = 'ns-ai-apikey';
 const NS_AI_MODEL_KEY = 'ns-ai-model';
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-5';
+const MAX_AI_REVISIONS = 2;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +41,12 @@ interface UseAIOptions {
   getLastError: () => string | null;
 }
 
+interface SuccessfulAiCandidate {
+  code: string;
+  errors: number;
+  warnings: number;
+}
+
 export interface UseAIReturn {
   handleAiCommand: (input: string) => Promise<void>;
   aiModels: AIModelInfo[];
@@ -54,6 +63,15 @@ export interface UseAIReturn {
  */
 function toSdkMessages(messages: ChatMessage[]): ChatMessages[] {
   return messages as unknown as ChatMessages[];
+}
+
+function isBetterCandidate(
+  candidate: SuccessfulAiCandidate,
+  current: SuccessfulAiCandidate | null,
+): boolean {
+  if (!current) return true;
+  if (candidate.errors !== current.errors) return candidate.errors < current.errors;
+  return candidate.warnings <= current.warnings;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -244,50 +262,82 @@ export function useAI({
 
       const source = sourceRef.current;
       const lastError = type === 'fix' ? (getLastError() ?? undefined) : undefined;
-      const messages = buildMessages(type, instruction, source, lastError);
+      let messages = buildMessages(type, instruction, source, lastError);
 
       addMsg(`generating with ${selectedModel}…`, 'info');
 
       try {
-        // ── First generation attempt ──
-        const result = await client.chat.send({
-          chatRequest: {
-            model: selectedModel,
-            messages: toSdkMessages(messages),
-          },
-        });
+        let bestSuccessful: SuccessfulAiCandidate | null = null;
+        let lastCode = '';
 
-        const rawContent = result.choices[0]?.message?.content;
-        const rawText = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent);
-        let code = extractCode(rawText);
-
-        // ── Silent compile check ──
-        addMsg('checking…', 'info');
-        const check = await compile(code);
-
-        if (check !== null && !check.ok) {
-          // ── Auto-retry with error context ──
-          addMsg(`compile error — retrying: ${check.message}`, 'warn');
-          const retryMessages = buildRetryMessages(messages, code, check.message);
-
-          const retryResult = await client.chat.send({
+        for (let attempt = 0; attempt <= MAX_AI_REVISIONS; attempt++) {
+          const result = await client.chat.send({
             chatRequest: {
               model: selectedModel,
-              messages: toSdkMessages(retryMessages),
+              messages: toSdkMessages(messages),
             },
           });
+          const rawContent = result.choices[0]?.message?.content;
+          const rawText = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent);
+          const code = extractCode(rawText);
+          lastCode = code;
 
-          const retryRaw = retryResult.choices[0]?.message?.content;
-          const retryText = typeof retryRaw === 'string' ? retryRaw : JSON.stringify(retryRaw);
-          code = extractCode(retryText);
-
-          const recheck = await compile(code);
-          if (recheck !== null && !recheck.ok) {
-            addMsg('retry failed — applying code anyway; fix manually or try again', 'warn');
+          addMsg(attempt === 0 ? 'checking…' : `checking revision ${attempt}…`, 'info');
+          const check = await compile(code);
+          if (check === null) {
+            addMsg('AI review cancelled because a newer compile started', 'warn');
+            return;
           }
+
+          if (!check.ok) {
+            if (attempt < MAX_AI_REVISIONS) {
+              addMsg(
+                `compile error — refining (${attempt + 1}/${MAX_AI_REVISIONS}): ${check.message}`,
+                'warn',
+              );
+              messages = buildRetryMessages(messages, code, check.message, check.slLine);
+              continue;
+            }
+            addMsg(
+              bestSuccessful
+                ? 'AI revisions still do not compile; using the best compiled revision'
+                : 'AI revisions still do not compile; keeping the last revision for manual repair',
+              'warn',
+            );
+            break;
+          }
+
+          const feedback = buildPhysicsFeedback(check.result.physics, code);
+          const errorCount = feedback?.counts.error ?? 0;
+          const warningCount = feedback?.counts.warning ?? 0;
+          const candidate: SuccessfulAiCandidate = {
+            code,
+            errors: errorCount,
+            warnings: warningCount,
+          };
+          if (isBetterCandidate(candidate, bestSuccessful)) bestSuccessful = candidate;
+
+          if (!feedback) {
+            addMsg('physics review found no modeled blockers or risks', 'ok');
+            break;
+          }
+          if (attempt >= MAX_AI_REVISIONS) {
+            addMsg(
+              `physics review finished with ${errorCount} blocker(s) and ${warningCount} risk(s); review them before sewing`,
+              'warn',
+            );
+            break;
+          }
+
+          addMsg(
+            `physics review — ${errorCount} blocker(s), ${warningCount} risk(s); refining (${attempt + 1}/${MAX_AI_REVISIONS})…`,
+            'warn',
+          );
+          messages = buildPhysicsRetryMessages(messages, code, feedback);
         }
 
-        // ── Apply and run the final code ──
+        const code = bestSuccessful?.code ?? lastCode;
+        if (!code) throw new Error('The model returned no NeedleScript code');
         setSource(code);
         await runProgram(code, 'ai');
       } catch (err) {

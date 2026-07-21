@@ -4,6 +4,7 @@
  */
 
 import rawSystemPrompt from '../../../docs/ai-system-prompt.md?raw';
+import type { PhysicsDiagnostic, PhysicsReport, PreflightSeverity } from '../core/types.ts';
 
 export type AiCommandType = 'create' | 'improve' | 'fix' | 'explain' | 'default';
 
@@ -11,6 +12,21 @@ export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
+
+export interface AiPhysicsFeedback {
+  content: string;
+  counts: Record<'error' | 'warning', number>;
+  fingerprints: string[];
+}
+
+const MAX_AI_PHYSICS_FINDINGS = 8;
+const MAX_AI_SOURCE_LOCATIONS = 4;
+const ACTIONABLE_SEVERITIES: ReadonlySet<PreflightSeverity> = new Set(['error', 'warning']);
+const SEVERITY_PRIORITY: Record<PreflightSeverity, number> = {
+  error: 0,
+  warning: 1,
+  info: 2,
+};
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
@@ -105,13 +121,151 @@ export function buildRetryMessages(
   originalMessages: ChatMessage[],
   badCode: string,
   compileError: string,
+  line?: number,
 ): ChatMessage[] {
+  const sourceLine = line === undefined ? undefined : badCode.split(/\r?\n/)[line - 1];
+  const lineContext =
+    line === undefined
+      ? ''
+      : `\nReported source line: ${line}${sourceLine === undefined ? '' : `\n${line} | ${sourceLine}`}`;
   return [
     ...originalMessages,
     { role: 'assistant', content: badCode },
     {
       role: 'user',
-      content: `The code you generated has a compile error:\n${compileError}\n\nPlease fix it and return ONLY the corrected NeedleScript code. No markdown, no explanation.`,
+      content: `The code you generated has a compile error:\n${compileError}${lineContext}\n\nPlease fix it and return ONLY the corrected NeedleScript code. No markdown, no explanation.`,
+    },
+  ];
+}
+
+function formatSourceLocations(diagnostic: PhysicsDiagnostic, lines: readonly string[]): string[] {
+  if (diagnostic.sourceLocations.length === 0) {
+    return diagnostic.sourceReason ? [`Source: ${diagnostic.sourceReason.explanation}`] : [];
+  }
+
+  const locations = diagnostic.sourceLocations.slice(0, MAX_AI_SOURCE_LOCATIONS);
+  const formatted = locations.map((location) => {
+    const columns =
+      location.startColumn === undefined
+        ? ''
+        : `:${location.startColumn}${
+            location.endColumn === undefined ? '' : `-${location.endColumn}`
+          }`;
+    const sourceLine = lines[location.line - 1];
+    return `Source (${location.role}): line ${location.line}${columns}${
+      sourceLine === undefined ? '' : `\n${location.line} | ${sourceLine}`
+    }`;
+  });
+  const omitted = diagnostic.sourceLocations.length - locations.length;
+  return omitted > 0 ? [...formatted, `Source: ${omitted} related location(s) omitted`] : formatted;
+}
+
+function formatPhysicsDiagnostic(diagnostic: PhysicsDiagnostic, lines: readonly string[]): string {
+  const details = [
+    `[${diagnostic.severity.toUpperCase()}] ${diagnostic.code} — ${diagnostic.title}`,
+    ...formatSourceLocations(diagnostic, lines),
+    `Finding: ${diagnostic.explanation}`,
+  ];
+
+  if (diagnostic.measurements?.length) {
+    details.push(
+      `Measurements: ${diagnostic.measurements
+        .slice(0, 4)
+        .map(
+          ({ label, value, unit, comparison, threshold }) =>
+            `${label} ${value} ${unit}${
+              threshold === undefined
+                ? ''
+                : ` (${comparison ?? 'vs'} threshold ${threshold} ${unit})`
+            }`,
+        )
+        .join('; ')}`,
+    );
+  }
+  if (diagnostic.methodology) details.push(`Method: ${diagnostic.methodology}`);
+  if (diagnostic.limitations?.length) {
+    details.push(`Limitations: ${diagnostic.limitations.join(' ')}`);
+  }
+  if (diagnostic.performanceCap) details.push(`Analysis cap: ${diagnostic.performanceCap}`);
+  if (diagnostic.remedies.length) {
+    details.push(
+      `Suggested remedies: ${diagnostic.remedies
+        .slice(0, 2)
+        .map(({ title, description }) => `${title} — ${description}`)
+        .join('; ')}`,
+    );
+  }
+  const evidenceReferences = diagnostic.evidenceReferences
+    .map(({ title, version, status }) => `${title} v${version} [${status}]`)
+    .join('; ');
+  const hasPendingEvidence = diagnostic.evidenceReferences.some(
+    ({ status }) => status === 'pending',
+  );
+  details.push(
+    `Evidence: ${diagnostic.evidence}; threshold set: ${diagnostic.thresholdVersion}${
+      evidenceReferences ? `; references: ${evidenceReferences}` : ''
+    }${hasPendingEvidence ? '; physical validation is pending' : ''}`,
+  );
+  return details.join('\n');
+}
+
+/**
+ * Converts the structured physics report into compact, source-linked model feedback.
+ * Informational notes remain visible in the UI but do not trigger automatic source changes.
+ */
+export function buildPhysicsFeedback(
+  report: PhysicsReport | undefined,
+  source: string,
+): AiPhysicsFeedback | null {
+  if (!report) return null;
+  const actionable = report.diagnostics
+    .filter(({ severity }) => ACTIONABLE_SEVERITIES.has(severity))
+    .toSorted(
+      (a, b) =>
+        SEVERITY_PRIORITY[a.severity] - SEVERITY_PRIORITY[b.severity] ||
+        Number(b.sourceLocations.length > 0) - Number(a.sourceLocations.length > 0) ||
+        a.code.localeCompare(b.code),
+    );
+  if (actionable.length === 0) return null;
+
+  const selected = actionable.slice(0, MAX_AI_PHYSICS_FINDINGS);
+  const lines = source.split(/\r?\n/);
+  const omitted = actionable.length - selected.length;
+  const assumptions = report.assumptions
+    .map(({ label, value, source: assumptionSource }) => `${label}=${value} (${assumptionSource})`)
+    .join('; ');
+  const content = [
+    `Physics review found ${report.summary.error} blocker(s) and ${report.summary.warning} risk(s).`,
+    `Report v${report.version}; threshold set ${report.thresholdVersion}; machine profile ${report.profile.name}.`,
+    assumptions ? `Analysis assumptions: ${assumptions}` : '',
+    ...selected.map(
+      (diagnostic, index) =>
+        `\nFinding ${index + 1}\n${formatPhysicsDiagnostic(diagnostic, lines)}`,
+    ),
+    omitted > 0 ? `\n${omitted} lower-priority finding(s) omitted from this pass.` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    content,
+    counts: { error: report.summary.error, warning: report.summary.warning },
+    fingerprints: selected.map(({ fingerprint }) => fingerprint),
+  };
+}
+
+/** Adds a successful compile's physics findings as the next revision turn. */
+export function buildPhysicsRetryMessages(
+  originalMessages: ChatMessage[],
+  code: string,
+  feedback: AiPhysicsFeedback,
+): ChatMessage[] {
+  return [
+    ...originalMessages,
+    { role: 'assistant', content: code },
+    {
+      role: 'user',
+      content: `${feedback.content}\n\nRevise the complete program to address these findings, prioritizing blockers and then risks. Preserve the requested design and intentional geometry. Use the source locations and construction remedies above. Do not hide findings by weakening limits, removing material intent, adding preflight, or acknowledging/silencing diagnostics. Return ONLY the complete corrected NeedleScript code. No markdown or explanation.`,
     },
   ];
 }
@@ -128,5 +282,7 @@ export const AI_HELP_TEXT = `AI commands (prefix: /ai):
   fix <desc>         — fix current code (includes last error)
   explain <question> — explain the current code or a specific line
   <anything>         — shorthand for create/improve depending on context
-  
+
+Generated code is compiled and reviewed for modeled physics blockers/risks with up to 2 revisions.
+
 Tip: Start typing "/ai model " to see model suggestions.`;
