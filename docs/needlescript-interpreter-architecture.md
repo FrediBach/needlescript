@@ -603,9 +603,10 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    a subjective construction recommendation. Event-stream analysis sees planned/autotrimmed
    events before `applyLocks`, excluding deliberate tie-off micro-stitches. It does not mutate the
    completed events or the legacy warning array. Density hotspots, same-hole stacks, merged tiny
-   movements, field/physical-hoop overflow, satin snag advisories, short/reversal/near-hole and
-   sharp-turn clusters, long sewn/jump spans, and continuous runs participate; unrelated fill
-   construction warnings remain string-only. Construction analysis additionally consumes internal
+   movements, field/physical-hoop overflow, satin snag advisories, locatable fill construction
+   warnings, short/reversal/near-hole and sharp-turn clusters, long sewn/jump spans, and continuous
+   runs participate. Spatial fill/satin sidecars must name a catalog code, so a new physical warning
+   cannot be silently excluded. Construction analysis additionally consumes internal
    fill/satin IDs, boundaries, layer event identities, connector records, and split lanes to check
    containment, fill/border registration and stacking, split overlap, and post-plan layer order. It
    never infers construction roles from ordinary running stitches. `preflight 'strict'` rejects
@@ -616,10 +617,14 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
       still retains its compatibility preflight result while the physics report additionally receives
       the event-stream and construction findings. `warn` and `strict` already select that full set, so
       the completed analysis is reused rather than rerun.
-      Existing points become renderer-independent point geometry; richer geometry and playback ranges
-      remain empty until the attribution pass can supply them. Fingerprints use code, canonical source
+      Coverage cells, affected point sets, paths/travel, construction regions, boundaries, and satin
+      envelopes become renderer-independent geometry with derived anchors and bounds. Event and
+      construction checks retain indices in the analyzed pre-lock stream; after locks, preserved event
+      identity maps only those events into inclusive indices in the final stitch/jump playback stream.
+      Source attribution distinguishes primary, contributor, and related lines, and diagnostics with no
+      source carry an explicit generated-source explanation. Fingerprints use code, canonical source
       locations, sorted construction IDs, and semantic geometry quantized to 0.01 mm. Diagnostic copy,
-      severity, evidence explanations, and remedies do not participate in identity.
+      severity, evidence explanations, remedies, and playback ranges do not participate in identity.
 9. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
    `warningLocations`, optional `preflight` and `physics`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `machineProfile`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional
@@ -660,8 +665,8 @@ producer does not support PhysicsIntellisense; it is not an empty report. Its `p
 `preflight.mode`, while its diagnostic breadth comes from `RunOptions.physicsAnalysis`. Source
 `preflight 'strict'` gates only its own policy result, never extra caller-requested editor findings.
 The report also records the resolved machine profile, material intent, default-context assumptions,
-severity summary, semantic hoop-space geometry, and deterministic IDs. UI lifecycle state and
-presentation styling are not part of the core contract.
+severity summary, semantic hoop-space geometry, exact playback ranges, source roles/reasons, and
+deterministic IDs. UI lifecycle state and presentation styling are not part of the core contract.
 
 ---
 

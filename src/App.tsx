@@ -511,13 +511,6 @@ export default function App() {
       const locByIndex = new Map<number, WarningLocation>();
       for (const wl of result.warningLocations ?? []) locByIndex.set(wl.index, wl);
 
-      // density check
-      const density = stats.stitches / Math.max(1, stats.width * stats.height);
-      if (density > 4)
-        warnings.push(
-          `very dense (${density.toFixed(1)} st/mm² avg) — may pucker; raise stitchlen or shrink repeats`,
-        );
-
       const ms = Math.round(performance.now() - t0);
       result.printed.forEach((p) => addMsg(p, 'print'));
       addMsg(

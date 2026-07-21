@@ -1,9 +1,9 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-2 complete** (2026-07-21) — editor analysis is decoupled from portable source policy,
-the playground requests full diagnostics, and worker instrumentation includes analysis timing and
-counts. PI-3 is ready to start. Preview-overlay legibility remains an explicit PI-3/PI-7
-implementation risk.
+Status: **PI-3 complete** (2026-07-21) — findings retain semantic affected geometry, rich source
+roles or an explicit generated-source reason, and exact final playback ranges. Spatial fill/satin
+warnings are cataloged, and core coverage replaces the removed app-only density heuristic.
+Preview-overlay legibility remains an explicit PI-7 implementation risk.
 
 Last updated: 2026-07-21
 
@@ -12,7 +12,7 @@ Last updated: 2026-07-21
 | PI-0    | Complete    | Product owner approved the contract and prototype concept on 2026-07-21 |
 | PI-1    | Complete    | Unified catalog/types shipped without freezing overlay presentation     |
 | PI-2    | Complete    | Editor analysis is independent from source-selected preflight policy    |
-| PI-3    | Ready       | Add rich source, geometry, construction, and playback attribution       |
+| PI-3    | Complete    | Rich source, geometry, construction, and playback attribution shipped   |
 | PI-4–11 | Not started | Follow the dependency and acceptance gates documented below             |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
@@ -618,6 +618,8 @@ Validation record (2026-07-21):
 
 ### PI-3 — Rich attribution
 
+Status: **complete** (2026-07-21)
+
 Deliverables:
 
 - Add diagnostic geometry unions.
@@ -638,6 +640,35 @@ Acceptance:
 - Spatial findings render the affected construct, not merely one representative point.
 - Playback ranges cover the problematic events rather than all events from the same line.
 - No plain-string physical warning is silently excluded from the audit.
+
+Implementation progress:
+
+- [x] Event-stream checks retain the exact analyzed event indices and emit affected path, travel,
+      or penetration geometry instead of reducing evidence to source-line intervals.
+- [x] Construction checks retain fill regions, satin envelopes, overlap spans, connector paths,
+      and primary/contributor/related source roles.
+- [x] The report adapter derives reusable anchors and bounds for every non-empty geometry and maps
+      preserved pre-lock event identities through final lock insertion into inclusive stitch/jump
+      playback ranges.
+- [x] Diagnostics without an attributable source expose an explicit generated-source explanation;
+      whole-line attribution remains the fallback because current statement AST nodes do not retain
+      token columns.
+- [x] Every locatable fill/satin warning has a catalog code and structured counterpart. Analysis now
+      fails explicitly if a future spatial fill/satin warning omits its code.
+- [x] Removed the playground's stitches-per-bounding-box-area warning; the locatable core coverage
+      grid remains the single density diagnostic.
+- [x] Added focused catalog, semantic-geometry, source-role/reason, playback identity, and
+      compatibility coverage; updated the machine and interpreter architecture documents.
+
+Validation record (2026-07-21):
+
+- `npm test`: 77 files and 2,076 tests passed; generated references are current.
+- `npm run lint`, `npm run build`, `npm run build:lib`, and `npm run check:lib` passed. The app
+  build retained its pre-existing large-chunk advisory; publint and the package type check found no
+  problems.
+- React Doctor's final changed-file scan scored 85/100. Its remaining 12 findings are pre-existing
+  App/runtime/machine issues; PI-3's new attribution code introduced no reported finding.
+- Targeted Prettier validation passed for every changed source, test, and documentation file.
 
 ### PI-4 — Analysis state and background checking
 

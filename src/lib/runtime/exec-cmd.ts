@@ -1017,6 +1017,7 @@ export function initExecCmdHandler(
             points: [],
             lines: ctx.m.currentLine === undefined ? [] : [ctx.m.currentLine],
             kind: 'satin',
+            code: 'satin.snag-risk',
           });
         }
         ctx.m.satinWidth = v;
@@ -1096,6 +1097,7 @@ export function initExecCmdHandler(
             points: [],
             lines: ctx.m.currentLine === undefined ? [] : [ctx.m.currentLine],
             kind: 'satin',
+            code: 'satin.snag-risk',
           });
         }
         ctx.m.eWidth = v;

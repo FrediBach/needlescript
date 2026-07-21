@@ -673,10 +673,12 @@ identity correction the extra mapping/rebuild is bypassed and legacy event/warni
 unchanged.
 
 After physical diagnostics are complete, `embroidery/preflight.ts` purely adapts their internal
-`WarningLocation` sidecars into `RunResult.preflight`. Stable codes currently cover density,
-same-hole penetration stacks, merged tiny movements, sewable-field and physical-hoop overflow, and
-satin snag risk. Realized rail-pair and programmable-satin snag sidecars retain the measured chord
-endpoints; width-only satin/E-stitch advisories have source attribution but no invented coordinate.
+`WarningLocation` sidecars into `RunResult.preflight`. Stable codes cover density, same-hole
+penetration stacks, merged tiny movements, sewable-field and physical-hoop overflow, satin snag
+risk, and every locatable fill construction warning. Realized rail-pair and programmable-satin snag
+sidecars retain the measured chord endpoints; width-only satin/E-stitch advisories have source
+attribution but no invented coordinate. A spatial fill/satin sidecar without a catalog code now
+fails analysis explicitly instead of disappearing from the structured audit.
 Issues follow legacy warning-index order, so ordering and copied hoop-space coordinates are
 deterministic. Exporters still consume only `events`, and preflight never rewrites them. With no
 directive or `preflight 'off'`, these compatibility diagnostics are the complete structured result.
@@ -694,15 +696,21 @@ is `off`. The playground worker requests this full breadth and retains the repor
 design state. No source directive is inserted or rewritten.
 
 The compatibility adapter builds `RunResult.physics` from the selected analysis list. Report version
-1 preserves diagnostic order and maps existing locations to point geometry without inventing cells,
-regions, paths, bounds, anchors, or playback ranges. Stable
+1 preserves diagnostic order while retaining affected coverage cells, construction regions,
+boundaries, satin envelopes, penetration sets, and travel/path polylines. Geometry is semantic and
+renderer-independent; the adapter derives reusable anchors and bounds without adding canvas style.
+Event and construction checks retain analyzed event indices. After the lock pass, object identity
+maps those original events into zero-based inclusive ranges in the final stitch/jump playback stream;
+inserted tie-off events do not become evidence. Findings use primary, contributor, and related source
+roles, or an explicit generated-source explanation when no honest source location exists. Stable
 fingerprints canonicalize source locations and construction IDs plus semantic geometry at 0.01 mm;
 occurrence IDs add deterministic suffixes only when the same fingerprint coexists. Severity and
 wording changes therefore do not invalidate identity. This report is stitch-inert and the legacy
 warnings, warning locations, preflight result, strict failure, and exporter inputs remain unchanged.
 Analysis timing and info/warning/error/total counts flow through `RunTimings` and are included in the
 worker's compile timing detail. Extended analysis remains bounded by the existing per-check limits
-and the worker's current compile timeout.
+and the worker's current compile timeout. The playground no longer adds its former stitch-count per
+bounding-box-area warning; core coverage cells are the only density diagnostic source.
 An explicitly selected local profile also adds objective trim/color-change capability findings:
 manual operations are info-level worksheet reminders, unsupported operations are errors, and neither
 changes the event stream. The resolved speed class remains advisory metadata pending sew-out-backed

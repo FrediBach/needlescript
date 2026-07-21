@@ -40,6 +40,10 @@ export interface WarningLocation {
   points: { x: number; y: number }[]; // hoop-space coordinates (mm)
   lines: number[]; // source lines that contributed to the hotspot
   kind: 'density' | 'stack' | 'tiny' | 'overflow' | 'fill' | 'satin';
+  /** Stable diagnostic code when the warning has a structured physics counterpart. */
+  code?: string;
+  /** Optional affected construct, kept semantic and renderer-independent. */
+  geometry?: DiagnosticGeometry[];
 }
 
 export type PreflightSeverity = 'info' | 'warning' | 'error';
@@ -56,6 +60,12 @@ export interface PreflightIssue {
   lines: number[];
   constructionIds?: number[];
   suggestion?: string;
+  /** Rich source attribution; `lines` remains the compatibility projection. */
+  sourceLocations?: PhysicsSourceLocation[];
+  /** Semantic affected geometry; `points` remains the compatibility projection. */
+  geometry?: DiagnosticGeometry[];
+  /** Indices into the pre-lock analysis event stream. Internal attribution sidecar. */
+  eventIndices?: number[];
 }
 
 /**
@@ -209,8 +219,15 @@ export interface PhysicsSourceLocation {
 }
 
 export interface PhysicsPlaybackRange {
+  /** Zero-based index in RunResult's stitch/jump playback stream, inclusive. */
   start: number;
+  /** Zero-based index in RunResult's stitch/jump playback stream, inclusive. */
   end: number;
+}
+
+export interface PhysicsSourceReason {
+  kind: 'generated' | 'unavailable';
+  explanation: string;
 }
 
 export interface PhysicsRemedy {
@@ -240,6 +257,8 @@ export interface PhysicsDiagnostic {
   explanation: string;
   measurements?: PhysicsMeasurement[];
   sourceLocations: PhysicsSourceLocation[];
+  /** Present only when no source location can honestly be assigned. */
+  sourceReason?: PhysicsSourceReason;
   geometry: DiagnosticGeometry[];
   playbackRanges: PhysicsPlaybackRange[];
   constructionIds?: number[];

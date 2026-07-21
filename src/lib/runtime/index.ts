@@ -267,6 +267,17 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         points: [{ x: h.x, y: h.y }],
         lines: h.lines,
         kind: 'density',
+        code: 'coverage.density-hotspot',
+        geometry: [
+          {
+            kind: 'cell',
+            role: 'hotspot',
+            x: h.x - density.cellMM / 2,
+            y: h.y - density.cellMM / 2,
+            width: density.cellMM,
+            height: density.cellMM,
+          },
+        ],
       });
       m.warnings.push(
         `${h.value.toFixed(1)} layers of thread (limit ${m.maxDensity}) near (${h.x.toFixed(0)}, ${h.y.toFixed(0)})` +
@@ -283,6 +294,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         points: [{ x: h.x, y: h.y }],
         lines: h.lines,
         kind: 'stack',
+        code: 'penetration.same-hole-stack',
       });
       m.warnings.push(
         `${h.value} needle penetrations in the same hole near (${h.x.toFixed(0)}, ${h.y.toFixed(0)})` +
@@ -325,6 +337,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         points: pts.map((o) => ({ x: o.x, y: o.y })),
         lines,
         kind: 'overflow',
+        code: 'hoop.field-overflow',
       });
       const first = fieldHits[0];
       m.warnings.push(
@@ -344,6 +357,7 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         points: pts.map((o) => ({ x: o.x, y: o.y })),
         lines,
         kind: 'overflow',
+        code: 'hoop.unreachable',
       });
       const first = hoopHits[0];
       m.warnings.push(
@@ -484,7 +498,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     physicsAnalysis === 'full' && preflight.mode === 'off'
       ? buildFullPhysicsAnalysisResult(preflightInput)
       : preflight;
-  const physics = buildPhysicsReport({ preflight: physicsInput, material: m.materialIntent });
+  const physics = buildPhysicsReport({
+    preflight: physicsInput,
+    material: m.materialIntent,
+    analysisEvents: preflightEvents,
+    playbackEvents: m.events,
+  });
   const analysisCompletedAt = performance.now();
 
   const result: RunResult = {

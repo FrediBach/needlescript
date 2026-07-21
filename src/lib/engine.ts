@@ -30,6 +30,7 @@ export type {
   PhysicsMeasurementUnit,
   PhysicsMeasurement,
   PhysicsSourceLocation,
+  PhysicsSourceReason,
   PhysicsPlaybackRange,
   PhysicsRemedy,
   PhysicsAssumption,

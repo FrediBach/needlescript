@@ -9,6 +9,7 @@ import { evenOddInside } from './machine/fill.ts';
 import { segdist } from '../geometry/genmath.ts';
 import type { PreflightIssue, StitchEvent } from '../core/types.ts';
 import { preflightCatalogMetadata } from './physics-diagnostics/catalog.ts';
+import { eventIndicesFor } from './physics-diagnostics/attribution.ts';
 
 export const CONSTRUCTION_PREFLIGHT_THRESHOLDS = Object.freeze({
   boundaryToleranceMM: 0.05,
@@ -24,6 +25,37 @@ export const CONSTRUCTION_PREFLIGHT_THRESHOLDS = Object.freeze({
 });
 
 const point = (value: readonly [number, number]) => ({ x: value[0], y: value[1] });
+
+const regionGeometry = (rings: readonly (readonly (readonly [number, number])[])[]) => ({
+  kind: 'region' as const,
+  role: 'boundary' as const,
+  rings: rings.map((ring) => ring.map(point)),
+});
+
+function sourceLocations(
+  primary: number | undefined,
+  contributors: readonly (number | undefined)[] = [],
+  related: readonly (number | undefined)[] = [],
+) {
+  const resolvedPrimary =
+    primary ??
+    contributors.find((line) => line !== undefined) ??
+    related.find((line) => line !== undefined);
+  const seen = new Set(resolvedPrimary === undefined ? [] : [resolvedPrimary]);
+  return [
+    ...(resolvedPrimary === undefined ? [] : [{ line: resolvedPrimary, role: 'primary' as const }]),
+    ...contributors.flatMap((line) => {
+      if (line === undefined || seen.has(line)) return [];
+      seen.add(line);
+      return [{ line, role: 'contributor' as const }];
+    }),
+    ...related.flatMap((line) => {
+      if (line === undefined || seen.has(line)) return [];
+      seen.add(line);
+      return [{ line, role: 'related' as const }];
+    }),
+  ];
+}
 
 function linesOf(events: readonly ConstructionEventRecord[], fallback?: number): number[] {
   const lines = events
@@ -71,7 +103,10 @@ function satinEnvelope(record: SatinConstructionRecord): [number, number][][] {
   ];
 }
 
-function underlayEnvelopeIssues(records: readonly ConstructionRecord[]): PreflightIssue[] {
+function underlayEnvelopeIssues(
+  records: readonly ConstructionRecord[],
+  finalEvents: readonly StitchEvent[],
+): PreflightIssue[] {
   const issues: PreflightIssue[] = [];
   for (const record of records) {
     const region = record.kind === 'fill' ? record.region : satinEnvelope(record);
@@ -91,6 +126,24 @@ function underlayEnvelopeIssues(records: readonly ConstructionRecord[]): Preflig
         .slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue)
         .map(({ event }) => ({ x: event.x, y: event.y })),
       lines: linesOf(outside, record.line),
+      sourceLocations: sourceLocations(
+        record.line,
+        outside.map(({ event }) => event.line),
+      ),
+      geometry: [
+        regionGeometry(region),
+        {
+          kind: 'points',
+          role: 'overlap',
+          points: outside
+            .slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue)
+            .map(({ event }) => ({ x: event.x, y: event.y })),
+        },
+      ],
+      eventIndices: eventIndicesFor(
+        finalEvents,
+        outside.map(({ event }) => event),
+      ),
       constructionIds: [record.id],
     });
     if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck) break;
@@ -140,7 +193,10 @@ function relatedBorderSamples(
   return samples;
 }
 
-function fillBorderIssues(records: readonly ConstructionRecord[]): PreflightIssue[] {
+function fillBorderIssues(
+  records: readonly ConstructionRecord[],
+  finalEvents: readonly StitchEvent[],
+): PreflightIssue[] {
   const fills = records.filter(
     (record): record is FillConstructionRecord => record.kind === 'fill',
   );
@@ -161,6 +217,22 @@ function fillBorderIssues(records: readonly ConstructionRecord[]): PreflightIssu
       const lines = [
         ...new Set([fill.line, satin.line].filter((line): line is number => line !== undefined)),
       ];
+      const overlapGeometry = [
+        regionGeometry(fill.region),
+        regionGeometry(satinEnvelope(satin)),
+        {
+          kind: 'polyline' as const,
+          role: 'overlap' as const,
+          points: [point(representative.section.a), point(representative.section.b)],
+        },
+      ];
+      const nearbyEvents: StitchEvent[] = [];
+      for (const { event } of [...fill.events, ...satin.events])
+        if (
+          Math.hypot(event.x - representative.location[0], event.y - representative.location[1]) <=
+          CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumFillBorderOverlapMM + 0.5
+        )
+          nearbyEvents.push(event);
       if (representative.overlapMM < CONSTRUCTION_PREFLIGHT_THRESHOLDS.minimumFillBorderOverlapMM) {
         issues.push({
           ...preflightCatalogMetadata('fill.border-overlap-too-small'),
@@ -168,6 +240,9 @@ function fillBorderIssues(records: readonly ConstructionRecord[]): PreflightIssu
           message: `Fill ${fill.id} and satin border ${satin.id} overlap by about ${Math.max(0, representative.overlapMM).toFixed(2)} mm, below the ${CONSTRUCTION_PREFLIGHT_THRESHOLDS.minimumFillBorderOverlapMM.toFixed(1)} mm construction minimum.`,
           points: [point(representative.location)],
           lines,
+          sourceLocations: sourceLocations(fill.line, [], [satin.line]),
+          geometry: overlapGeometry,
+          eventIndices: eventIndicesFor(finalEvents, nearbyEvents),
           constructionIds: ids,
         });
       } else if (
@@ -179,6 +254,9 @@ function fillBorderIssues(records: readonly ConstructionRecord[]): PreflightIssu
           message: `Fill ${fill.id} extends about ${representative.overlapMM.toFixed(2)} mm beneath satin border ${satin.id}, above the ${CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumFillBorderOverlapMM.toFixed(1)} mm dense-overlap threshold.`,
           points: [point(representative.location)],
           lines,
+          sourceLocations: sourceLocations(fill.line, [], [satin.line]),
+          geometry: overlapGeometry,
+          eventIndices: eventIndicesFor(finalEvents, nearbyEvents),
           constructionIds: ids,
         });
       }
@@ -192,16 +270,27 @@ function fillBorderIssues(records: readonly ConstructionRecord[]): PreflightIssu
           insideOrOnBoundary(envelope, [event.x, event.y]),
       );
       if (stacked) {
+        const stackedLines = linesOf([stacked], fill.line);
+        const stackedLineSet = new Set(stackedLines);
         issues.push({
           ...preflightCatalogMetadata('fill.edge-run-border-stack'),
           code: 'fill.edge-run-border-stack',
           message: `Fill ${fill.id} edge run is stacked beneath explicit satin border ${satin.id}.`,
           points: [{ x: stacked.event.x, y: stacked.event.y }],
-          lines: linesOf([stacked], fill.line).concat(
-            satin.line === undefined || linesOf([stacked], fill.line).includes(satin.line)
-              ? []
-              : [satin.line],
+          lines: stackedLines.concat(
+            satin.line === undefined || stackedLineSet.has(satin.line) ? [] : [satin.line],
           ),
+          sourceLocations: sourceLocations(fill.line, [stacked.event.line], [satin.line]),
+          geometry: [
+            regionGeometry(fill.region),
+            regionGeometry(envelope),
+            {
+              kind: 'points',
+              role: 'overlap',
+              points: [{ x: stacked.event.x, y: stacked.event.y }],
+            },
+          ],
+          eventIndices: eventIndicesFor(finalEvents, [stacked.event]),
           constructionIds: ids,
         });
       }
@@ -212,7 +301,10 @@ function fillBorderIssues(records: readonly ConstructionRecord[]): PreflightIssu
   return issues;
 }
 
-function splitOverlapIssues(records: readonly ConstructionRecord[]): PreflightIssue[] {
+function splitOverlapIssues(
+  records: readonly ConstructionRecord[],
+  finalEvents: readonly StitchEvent[],
+): PreflightIssue[] {
   const issues: PreflightIssue[] = [];
   for (const record of records) {
     if (record.kind !== 'satin' || !(record.splitColumnCount && record.splitColumnCount > 1))
@@ -225,17 +317,14 @@ function splitOverlapIssues(records: readonly ConstructionRecord[]): PreflightIs
     const key = (x: number, y: number) => `${Math.floor(x / radius)},${Math.floor(y / radius)}`;
     let hotspot: ConstructionEventRecord[] | undefined;
     for (const candidate of topping) {
-      const ix = Math.floor(candidate.event.x / radius);
-      const iy = Math.floor(candidate.event.y / radius);
+      const { x, y } = candidate.event;
+      const ix = Math.floor(x / radius);
+      const iy = Math.floor(y / radius);
       const cluster = [candidate];
       for (let dx = -1; dx <= 1; dx++)
         for (let dy = -1; dy <= 1; dy++)
           for (const other of buckets.get(`${ix + dx},${iy + dy}`) ?? [])
-            if (
-              Math.hypot(other.event.x - candidate.event.x, other.event.y - candidate.event.y) <=
-              radius
-            )
-              cluster.push(other);
+            if (Math.hypot(other.event.x - x, other.event.y - y) <= radius) cluster.push(other);
       if (
         cluster.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.splitHotspotPenetrations &&
         new Set(cluster.map(({ lane }) => lane)).size > 1
@@ -257,6 +346,24 @@ function splitOverlapIssues(records: readonly ConstructionRecord[]): PreflightIs
         .slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue)
         .map(({ event }) => ({ x: event.x, y: event.y })),
       lines: linesOf(hotspot, record.line),
+      sourceLocations: sourceLocations(
+        record.line,
+        hotspot.map(({ event }) => event.line),
+      ),
+      geometry: [
+        regionGeometry(satinEnvelope(record)),
+        {
+          kind: 'points',
+          role: 'overlap',
+          points: hotspot
+            .slice(0, CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue)
+            .map(({ event }) => ({ x: event.x, y: event.y })),
+        },
+      ],
+      eventIndices: eventIndicesFor(
+        finalEvents,
+        hotspot.map(({ event }) => event),
+      ),
       constructionIds: [record.id],
     });
     if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck) break;
@@ -264,7 +371,10 @@ function splitOverlapIssues(records: readonly ConstructionRecord[]): PreflightIs
   return issues;
 }
 
-function connectorIssues(records: readonly ConstructionRecord[]): PreflightIssue[] {
+function connectorIssues(
+  records: readonly ConstructionRecord[],
+  finalEvents: readonly StitchEvent[],
+): PreflightIssue[] {
   const issues: PreflightIssue[] = [];
   for (const record of records) {
     if (record.kind !== 'fill') continue;
@@ -278,6 +388,15 @@ function connectorIssues(records: readonly ConstructionRecord[]): PreflightIssue
           ]),
       );
       if (connector.action !== 'sew' || contained) continue;
+      const connectorEvents: StitchEvent[] = [];
+      for (const { event, layer } of record.events)
+        if (
+          layer === 'travel' &&
+          (connector.line === undefined || event.line === connector.line) &&
+          (Math.hypot(event.x - connector.from[0], event.y - connector.from[1]) < 0.05 ||
+            Math.hypot(event.x - connector.to[0], event.y - connector.to[1]) < 0.05)
+        )
+          connectorEvents.push(event);
       issues.push({
         ...preflightCatalogMetadata('fill.connector-outside-region'),
         code: 'fill.connector-outside-region',
@@ -289,6 +408,16 @@ function connectorIssues(records: readonly ConstructionRecord[]): PreflightIssue
               ? []
               : [record.line]
             : [connector.line],
+        sourceLocations: sourceLocations(connector.line ?? record.line),
+        geometry: [
+          regionGeometry(record.region),
+          {
+            kind: 'polyline',
+            role: 'travel',
+            points: [point(connector.from), point(connector.to)],
+          },
+        ],
+        eventIndices: eventIndicesFor(finalEvents, connectorEvents),
         constructionIds: [record.id],
       });
       if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck) return issues;
@@ -335,6 +464,24 @@ function orderIssues(
           { x: lastUnderlay.event.x, y: lastUnderlay.event.y },
         ],
         lines: linesOf([firstDecorative, lastUnderlay], record.line),
+        sourceLocations: sourceLocations(record.line, [
+          firstDecorative.event.line,
+          lastUnderlay.event.line,
+        ]),
+        geometry: [
+          record.kind === 'fill'
+            ? regionGeometry(record.region)
+            : regionGeometry(satinEnvelope(record)),
+          {
+            kind: 'points',
+            role: 'overlap',
+            points: [
+              { x: firstDecorative.event.x, y: firstDecorative.event.y },
+              { x: lastUnderlay.event.x, y: lastUnderlay.event.y },
+            ],
+          },
+        ],
+        eventIndices: eventIndicesFor(finalEvents, [firstDecorative.event, lastUnderlay.event]),
         constructionIds: [record.id],
       });
       if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck) return issues;
@@ -351,10 +498,10 @@ export function analyzeConstructionPreflight(
   if (!records.length) return [];
   const counts = new Map<string, number>();
   return [
-    ...underlayEnvelopeIssues(records),
-    ...fillBorderIssues(records),
-    ...splitOverlapIssues(records),
-    ...connectorIssues(records),
+    ...underlayEnvelopeIssues(records, finalEvents),
+    ...fillBorderIssues(records, finalEvents),
+    ...splitOverlapIssues(records, finalEvents),
+    ...connectorIssues(records, finalEvents),
     ...orderIssues(records, finalEvents),
   ].filter((issue) => {
     const count = counts.get(issue.code) ?? 0;

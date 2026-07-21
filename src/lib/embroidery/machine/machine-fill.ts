@@ -260,6 +260,7 @@ export class FillMachine extends SatinMachine {
       points: [{ x, y }],
       lines: this.currentLine === undefined ? [] : [this.currentLine],
       kind: 'fill',
+      code: 'fill.stagger-short-fragment',
     });
   }
 
@@ -276,6 +277,7 @@ export class FillMachine extends SatinMachine {
       points: [{ x, y }],
       lines: this.currentLine === undefined ? [] : [this.currentLine],
       kind: 'fill',
+      code: 'fill.short-fragment-omitted',
     });
   }
 
@@ -298,6 +300,17 @@ export class FillMachine extends SatinMachine {
       points: [{ x: to[0], y: to[1] }],
       lines: this.currentLine === undefined ? [] : [this.currentLine],
       kind: 'fill',
+      code: 'fill.compensation-outside-boundary',
+      geometry: [
+        {
+          kind: 'polyline',
+          role: 'boundary',
+          points: [
+            { x: from[0], y: from[1] },
+            { x: to[0], y: to[1] },
+          ],
+        },
+      ],
     });
   }
 
@@ -328,7 +341,12 @@ export class FillMachine extends SatinMachine {
     this._noteDirectionalFillBoundaryCrossing(poly[poly.length - 1], extended[extended.length - 1]);
   }
 
-  _noteFillEdgeRun(message: string, point: [number, number]) {
+  _noteFillEdgeRun(
+    code: 'fill.edge-run-collapse' | 'fill.edge-run-penetration-guard',
+    message: string,
+    point: [number, number],
+    rings: [number, number][][],
+  ) {
     const lineSuffix = this.currentLine === undefined ? '' : ` (line ${this.currentLine})`;
     const index = this.warnings.length;
     this.warnings.push(`${message}${lineSuffix}`);
@@ -337,6 +355,14 @@ export class FillMachine extends SatinMachine {
       points: [{ x: point[0], y: point[1] }],
       lines: this.currentLine === undefined ? [] : [this.currentLine],
       kind: 'fill',
+      code,
+      geometry: [
+        {
+          kind: 'region',
+          role: 'boundary',
+          rings: rings.map((ring) => ring.map(([x, y]) => ({ x, y }))),
+        },
+      ],
     });
   }
 
@@ -411,8 +437,10 @@ export class FillMachine extends SatinMachine {
     if (!insetRings.length) {
       const location = rings[0]?.[0] ?? [0, 0];
       this._noteFillEdgeRun(
+        'fill.edge-run-collapse',
         `filledgerun ${this.fillEdgeRun} mm collapsed inside this construction region — edge run omitted`,
         location,
+        rings,
       );
       return;
     }
@@ -432,8 +460,10 @@ export class FillMachine extends SatinMachine {
         if (guarded.droppedAt && !cornerWarned) {
           cornerWarned = true;
           this._noteFillEdgeRun(
+            'fill.edge-run-penetration-guard',
             'filledgerun bounded repeated penetrations at an acute or collapsed corner',
             guarded.droppedAt,
+            rings,
           );
         }
         if (!guarded.points.length) continue;
@@ -476,6 +506,16 @@ export class FillMachine extends SatinMachine {
       points: [{ x: sample.x, y: sample.y }],
       lines: sample.line === undefined ? [] : [sample.line],
       kind: 'fill',
+      code: 'fill.edge-run-dense-overlap',
+      geometry: this.constructionRecords
+        .toReversed()
+        .filter((record) => record.kind === 'fill')
+        .slice(0, 1)
+        .map((record) => ({
+          kind: 'region' as const,
+          role: 'overlap' as const,
+          rings: record.region.map((ring) => ring.map(([x, y]) => ({ x, y }))),
+        })),
     });
   }
 
@@ -1350,6 +1390,23 @@ export class FillMachine extends SatinMachine {
           points: [{ x: location[0], y: location[1] }],
           lines: this.currentLine === undefined ? [] : [this.currentLine],
           kind: 'fill',
+          code: 'fill.inset-region-change',
+          geometry: [
+            {
+              kind: 'region',
+              role: 'boundary',
+              rings: normalized.map((ring) => ring.map(([x, y]) => ({ x, y }))),
+            },
+            ...(inset.length
+              ? [
+                  {
+                    kind: 'region' as const,
+                    role: 'envelope' as const,
+                    rings: inset.map((ring) => ring.map(([x, y]) => ({ x, y }))),
+                  },
+                ]
+              : []),
+          ],
         });
     };
 

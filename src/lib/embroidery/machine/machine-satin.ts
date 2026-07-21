@@ -1431,6 +1431,19 @@ export class SatinMachine extends MachineCore {
             : [{ x: point.x, y: point.y }],
           lines: this.currentLine === undefined ? [] : [this.currentLine],
           kind: 'satin',
+          code: 'satin.snag-risk',
+          geometry: previous
+            ? [
+                {
+                  kind: 'polyline',
+                  role: 'envelope',
+                  points: [
+                    { x: previous.x, y: previous.y },
+                    { x: point.x, y: point.y },
+                  ],
+                },
+              ]
+            : undefined,
         });
         snagWarned = true;
       }
@@ -2338,6 +2351,10 @@ export class SatinMachine extends MachineCore {
         points: maxChordPoints ?? [],
         lines: this.currentLine === undefined ? [] : [this.currentLine],
         kind: 'satin',
+        code: 'satin.snag-risk',
+        geometry: maxChordPoints
+          ? [{ kind: 'polyline', role: 'envelope', points: maxChordPoints }]
+          : undefined,
       });
     }
 

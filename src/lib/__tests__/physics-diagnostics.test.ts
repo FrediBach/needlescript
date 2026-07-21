@@ -23,8 +23,15 @@ const EMITTED_CODES = [
   'coverage.density-hotspot',
   'fill.border-overlap-dense',
   'fill.border-overlap-too-small',
+  'fill.compensation-outside-boundary',
   'fill.connector-outside-region',
   'fill.edge-run-border-stack',
+  'fill.edge-run-collapse',
+  'fill.edge-run-dense-overlap',
+  'fill.edge-run-penetration-guard',
+  'fill.inset-region-change',
+  'fill.short-fragment-omitted',
+  'fill.stagger-short-fragment',
   'hoop.field-overflow',
   'hoop.unreachable',
   'machine.color-change-manual',
@@ -191,6 +198,22 @@ describe('physics diagnostic identity', () => {
     expect(new Set(forward.map(({ id }) => id)).size).toBe(2);
     expect(idsByValue(reverse)).toEqual(idsByValue(forward));
   });
+
+  it('canonicalizes large closed regions without depending on start or winding', () => {
+    const ring = Array.from({ length: 2_000 }, (_, index) => ({
+      x: Math.cos((index / 2_000) * Math.PI * 2) * 10,
+      y: Math.sin((index / 2_000) * Math.PI * 2) * 10,
+    }));
+    const rotated = [...ring.slice(731), ...ring.slice(0, 731)].toReversed();
+    const fingerprint = (points: typeof ring) =>
+      buildPhysicsDiagnosticFingerprint({
+        code: 'fill.inset-region-change',
+        sourceLocations: [{ line: 2, role: 'primary' }],
+        geometry: [{ kind: 'region', role: 'boundary', rings: [points] }],
+      });
+
+    expect(fingerprint(rotated)).toBe(fingerprint(ring));
+  });
 });
 
 describe('preflight compatibility adapter', () => {
@@ -214,7 +237,7 @@ describe('preflight compatibility adapter', () => {
       expect.objectContaining({
         id: expect.stringMatching(/^physics-v1:/),
         fingerprint: expect.stringMatching(/^physics-v1:/),
-        playbackRanges: [],
+        playbackRanges: expect.any(Array),
       }),
     );
   });
@@ -226,19 +249,42 @@ describe('preflight compatibility adapter', () => {
     );
 
     expect(diagnostic?.geometry).toEqual([
-      {
+      expect.objectContaining({
         kind: 'points',
         role: 'hotspot',
         points: [
           { x: 0, y: 0.1 },
           { x: 0, y: 0.2 },
         ],
-      },
+        anchor: { x: 0, y: 0.15000000000000002 },
+        bounds: { minX: 0, minY: 0.1, maxX: 0, maxY: 0.2 },
+      }),
     ]);
     expect(result.physics?.assumptions.map(({ key }) => key)).toEqual([
       'machine-profile',
       'fabric-profile',
     ]);
+  });
+
+  it('catalogs locatable fill warnings with their affected region', () => {
+    const result = run(
+      'lock 0 maxdensity 0 fillinset 10 beginfill repeat 4 [ fd 10 rt 90 ] endfill',
+    );
+    const diagnostic = result.physics?.diagnostics.find(
+      ({ code }) => code === 'fill.inset-region-change',
+    );
+
+    expect(diagnostic).toEqual(
+      expect.objectContaining({
+        sourceLocations: expect.arrayContaining([expect.objectContaining({ role: 'primary' })]),
+        geometry: expect.arrayContaining([
+          expect.objectContaining({ kind: 'region', role: 'boundary' }),
+        ]),
+      }),
+    );
+    const issue = result.preflight?.issues.find(({ code }) => code === diagnostic?.code);
+    expect(issue).toBeDefined();
+    expect(result.warnings).toContain(issue!.message);
   });
 
   it('fails instead of silently dropping an uncatalogued emitted code', () => {
@@ -258,6 +304,61 @@ describe('preflight compatibility adapter', () => {
 
     expect(() => buildPhysicsReport({ preflight, material: result.material })).toThrow(
       /Unknown physics diagnostic code 'unknown.detector'/,
+    );
+  });
+
+  it('retains exact event identity through final lock insertion', () => {
+    const result = run('lock 0.7\nstitchlen 0.5\nfd 4.5', { physicsAnalysis: 'full' });
+    const diagnostic = result.physics?.diagnostics.find(
+      ({ code }) => code === 'stitch.short-cluster',
+    );
+    const playbackPoints = result.events.filter(({ t }) => t === 'stitch' || t === 'jump');
+
+    expect(diagnostic?.playbackRanges.length).toBeGreaterThan(0);
+    const attributed = diagnostic!.playbackRanges.flatMap(({ start, end }) =>
+      playbackPoints.slice(start, end + 1),
+    );
+    expect(attributed.length).toBeGreaterThanOrEqual(9);
+    expect(attributed.every(({ line }) => line === 3)).toBe(true);
+  });
+
+  it('adds construct geometry, source roles, and explicit generated-source reasons', () => {
+    const result = run(`preflight 'warn' lock 0 autotrim 0 maxdensity 0 fillunderlay 'off'
+      fillspacing 2 filllen 2 fillinset 2
+      beginfill repeat 4 [ fd 20 rt 90 ] endfill
+      satin 4 repeat 4 [ fd 20 rt 90 ] satin 0`);
+    const overlap = result.physics?.diagnostics.find(
+      ({ code }) => code === 'fill.border-overlap-too-small',
+    );
+
+    expect(overlap?.geometry).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'region', role: 'boundary' }),
+        expect.objectContaining({ kind: 'polyline', role: 'overlap' }),
+      ]),
+    );
+    expect(overlap?.sourceLocations.map(({ role }) => role)).toContain('related');
+
+    const synthetic: PreflightResult = {
+      ...result.preflight!,
+      issues: [
+        {
+          severity: 'warning',
+          code: 'stitch.below-reliable-movement',
+          message: 'Generated movement',
+          points: [],
+          lines: [],
+        },
+      ],
+    };
+    expect(
+      buildPhysicsReport({ preflight: synthetic, material: result.material }).diagnostics[0]
+        .sourceReason,
+    ).toEqual(
+      expect.objectContaining({
+        kind: 'generated',
+        explanation: expect.any(String),
+      }),
     );
   });
 

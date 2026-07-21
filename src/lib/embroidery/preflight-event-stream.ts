@@ -1,5 +1,6 @@
 import type { PreflightIssue, ResolvedMachineProfile, StitchEvent } from '../core/types.ts';
 import {
+  getPhysicsDiagnosticCatalogEntry,
   preflightCatalogMetadata,
   type PhysicsDiagnosticCode,
 } from './physics-diagnostics/catalog.ts';
@@ -33,6 +34,11 @@ interface Point {
   line?: number;
 }
 
+interface AttributedEvent extends StitchEvent {
+  event: StitchEvent;
+  index: number;
+}
+
 function distance(a: Point, b: Point): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
@@ -48,22 +54,43 @@ function uniqueLines(points: readonly Point[]): number[] {
 function issue(
   code: PhysicsDiagnosticCode,
   message: string,
-  points: readonly Point[],
+  points: readonly AttributedEvent[],
 ): PreflightIssue {
+  const selected = points.slice(0, EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue);
+  const geometryPoints = selected.map(({ x, y }) => ({ x, y }));
+  const role = preflightCatalogMetadata(code);
+  const geometryRole = getPhysicsDiagnosticCatalogEntry(code).geometryRole;
+  const lines = uniqueLines(points);
   return {
-    ...preflightCatalogMetadata(code),
+    ...role,
     code,
     message,
-    points: points
-      .slice(0, EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue)
-      .map(({ x, y }) => ({ x, y })),
-    lines: uniqueLines(points),
+    points: geometryPoints,
+    lines,
+    sourceLocations: lines.map((line, index) => ({
+      line,
+      role: index === 0 ? 'primary' : 'contributor',
+    })),
+    geometry: [
+      code.startsWith('penetration.')
+        ? { kind: 'points', role: geometryRole, points: geometryPoints }
+        : {
+            kind: 'polyline',
+            role: geometryRole,
+            points: geometryPoints,
+          },
+    ],
+    eventIndices: points.map(({ index }) => index),
   };
 }
 
-function stitchRuns(events: readonly StitchEvent[]): StitchEvent[][] {
-  const runs: StitchEvent[][] = [];
-  let current: StitchEvent[] = [];
+function attributedEvents(events: readonly StitchEvent[]): AttributedEvent[] {
+  return events.map((event, index) => ({ ...event, event, index }));
+}
+
+function stitchRuns(events: readonly AttributedEvent[]): AttributedEvent[][] {
+  const runs: AttributedEvent[][] = [];
+  let current: AttributedEvent[] = [];
   const flush = () => {
     if (current.length > 0) runs.push(current);
     current = [];
@@ -77,7 +104,7 @@ function stitchRuns(events: readonly StitchEvent[]): StitchEvent[][] {
 }
 
 function shortStitchClusters(
-  runs: readonly StitchEvent[][],
+  runs: readonly AttributedEvent[][],
   profile: ResolvedMachineProfile,
 ): PreflightIssue[] {
   const maximumLength =
@@ -122,8 +149,8 @@ function turnAngle(a: Point, b: Point, c: Point): number {
 }
 
 function turnClusters(
-  runs: readonly StitchEvent[][],
-  accepts: (run: readonly StitchEvent[], index: number, angle: number) => boolean,
+  runs: readonly AttributedEvent[][],
+  accepts: (run: readonly AttributedEvent[], index: number, angle: number) => boolean,
   minimumTurns: number,
   radiusMM: number,
   code: PhysicsDiagnosticCode,
@@ -157,7 +184,7 @@ function turnClusters(
   return issues;
 }
 
-function reversalClusters(runs: readonly StitchEvent[][]): PreflightIssue[] {
+function reversalClusters(runs: readonly AttributedEvent[][]): PreflightIssue[] {
   const { reversalAngleDeg, reversalClusterRadiusMM, reversalClusterTurns } =
     EVENT_STREAM_PREFLIGHT_THRESHOLDS;
   return turnClusters(
@@ -173,10 +200,10 @@ function reversalClusters(runs: readonly StitchEvent[][]): PreflightIssue[] {
   );
 }
 
-function nearHoleClusters(events: readonly StitchEvent[]): PreflightIssue[] {
+function nearHoleClusters(events: readonly AttributedEvent[]): PreflightIssue[] {
   const { nearHolePenetrationLimit, nearHoleRadiusMM, nearHoleWindowPenetrations } =
     EVENT_STREAM_PREFLIGHT_THRESHOLDS;
-  const window: StitchEvent[] = [];
+  const window: AttributedEvent[] = [];
   const issues: PreflightIssue[] = [];
   let lastReportedPenetration = -nearHoleWindowPenetrations;
   let penetration = 0;
@@ -205,11 +232,11 @@ function nearHoleClusters(events: readonly StitchEvent[]): PreflightIssue[] {
 }
 
 function longSewnFloats(
-  events: readonly StitchEvent[],
+  events: readonly AttributedEvent[],
   profile: ResolvedMachineProfile,
 ): PreflightIssue[] {
   const issues: PreflightIssue[] = [];
-  let previous: StitchEvent | undefined;
+  let previous: AttributedEvent | undefined;
   for (const event of events) {
     if (event.t === 'mark') continue;
     if (event.t === 'stitch' && previous) {
@@ -235,14 +262,15 @@ function longSewnFloats(
 }
 
 function longUntrimmedJumpChains(
-  events: readonly StitchEvent[],
+  events: readonly AttributedEvent[],
   profile: ResolvedMachineProfile,
 ): PreflightIssue[] {
   const issues: PreflightIssue[] = [];
-  let previous: StitchEvent | undefined;
+  let previous: AttributedEvent | undefined;
   let sewnSinceCut = false;
   let chain:
-    { length: number; eligible: boolean; points: StitchEvent[]; start?: StitchEvent } | undefined;
+    | { length: number; eligible: boolean; points: AttributedEvent[]; start?: AttributedEvent }
+    | undefined;
   const flush = () => {
     if (chain?.eligible && chain.length > profile.maximumPreferredJumpMM) {
       const points = chain.start ? [chain.start, ...chain.points] : chain.points;
@@ -276,29 +304,29 @@ function longUntrimmedJumpChains(
 }
 
 function excessiveContinuousRuns(
-  events: readonly StitchEvent[],
+  events: readonly AttributedEvent[],
   profile: ResolvedMachineProfile,
 ): PreflightIssue[] {
   const issues: PreflightIssue[] = [];
   let count = 0;
-  let first: StitchEvent | undefined;
+  let current: AttributedEvent[] = [];
   let reported = false;
   for (const event of events) {
     if (event.t === 'trim' || event.t === 'color') {
       count = 0;
-      first = undefined;
+      current = [];
       reported = false;
       continue;
     }
     if (event.t !== 'stitch') continue;
-    first ??= event;
+    current.push(event);
     count++;
     if (!reported && count > profile.maximumConsecutiveStitches) {
       issues.push(
         issue(
           'machine.continuous-stitch-run',
           `more than ${profile.maximumConsecutiveStitches.toLocaleString('en-US')} consecutive stitches occur without a trim or color boundary`,
-          [first, event],
+          current,
         ),
       );
       reported = true;
@@ -308,7 +336,7 @@ function excessiveContinuousRuns(
   return issues;
 }
 
-function directionChangeClusters(runs: readonly StitchEvent[][]): PreflightIssue[] {
+function directionChangeClusters(runs: readonly AttributedEvent[][]): PreflightIssue[] {
   const {
     directionChangeClusterRadiusMM,
     directionChangeClusterTurns,
@@ -336,14 +364,15 @@ export function analyzeEventStreamPreflight(
   events: readonly StitchEvent[],
   profile: ResolvedMachineProfile,
 ): PreflightIssue[] {
-  const runs = stitchRuns(events);
+  const attributed = attributedEvents(events);
+  const runs = stitchRuns(attributed);
   return [
     ...shortStitchClusters(runs, profile),
     ...reversalClusters(runs),
-    ...nearHoleClusters(events),
-    ...longSewnFloats(events, profile),
-    ...longUntrimmedJumpChains(events, profile),
-    ...excessiveContinuousRuns(events, profile),
+    ...nearHoleClusters(attributed),
+    ...longSewnFloats(attributed, profile),
+    ...longUntrimmedJumpChains(attributed, profile),
+    ...excessiveContinuousRuns(attributed, profile),
     ...directionChangeClusters(runs),
   ];
 }

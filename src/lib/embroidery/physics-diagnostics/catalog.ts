@@ -444,6 +444,132 @@ export const PHYSICS_DIAGNOSTIC_CATALOG = Object.freeze([
     documentationId: 'physics.fill.connector-outside-region',
   },
   {
+    code: 'fill.stagger-short-fragment',
+    category: 'fill',
+    defaultSeverity: 'warning',
+    evidence: 'engine-derived',
+    geometryRole: 'hotspot',
+    title: 'Fill stagger created a short fragment',
+    explanation:
+      'The selected row staggering produced an edge movement below the reliable stitch length, so the engine merged it.',
+    remedies: [
+      guidance(
+        'fill.stagger-short-fragment',
+        'Adjust the row phase',
+        'Reduce the stagger amount or use a different stagger mode for this boundary.',
+      ),
+    ],
+    documentationId: 'physics.fill.stagger-short-fragment',
+  },
+  {
+    code: 'fill.short-fragment-omitted',
+    category: 'fill',
+    defaultSeverity: 'info',
+    evidence: 'engine-derived',
+    geometryRole: 'hotspot',
+    title: 'Short fill fragment omitted',
+    explanation:
+      'A topping row fragment was shorter than the configured useful-edge threshold and was intentionally omitted.',
+    remedies: [
+      context(
+        'fill.short-fragment-omitted',
+        'Review the small edge gap',
+        'Reduce filledgeshort only if the omitted fragment leaves a visible coverage gap.',
+      ),
+    ],
+    documentationId: 'physics.fill.short-fragment-omitted',
+  },
+  {
+    code: 'fill.compensation-outside-boundary',
+    category: 'fill',
+    defaultSeverity: 'warning',
+    evidence: 'engine-derived',
+    geometryRole: 'boundary',
+    title: 'Compensated fill crosses its boundary',
+    explanation:
+      'Directional endpoint compensation extends a fill row beyond the authored construction boundary.',
+    remedies: [
+      guidance(
+        'fill.compensation-outside-boundary',
+        'Reserve registration space',
+        'Increase fillinset, reduce pull compensation, or add an overlapping border.',
+      ),
+    ],
+    documentationId: 'physics.fill.compensation-outside-boundary',
+  },
+  {
+    code: 'fill.edge-run-collapse',
+    category: 'fill',
+    defaultSeverity: 'warning',
+    evidence: 'engine-derived',
+    geometryRole: 'boundary',
+    title: 'Fill edge run collapsed',
+    explanation:
+      'The requested inward edge-run offset has no usable contour in this part of the fill.',
+    remedies: [
+      guidance(
+        'fill.edge-run-collapse',
+        'Reduce the edge-run inset',
+        'Reduce filledgerun or omit it for this narrow construction.',
+      ),
+    ],
+    documentationId: 'physics.fill.edge-run-collapse',
+  },
+  {
+    code: 'fill.edge-run-penetration-guard',
+    category: 'penetration',
+    defaultSeverity: 'info',
+    evidence: 'engine-derived',
+    geometryRole: 'penetration-cluster',
+    title: 'Fill edge-run penetrations bounded',
+    explanation:
+      'The engine omitted repeated edge-run visits at an acute or collapsed corner to avoid concentrating penetrations.',
+    remedies: [
+      context(
+        'fill.edge-run-penetration-guard',
+        'Review the corner shape',
+        'Open the acute corner or reduce the edge-run inset if the guarded result is visibly uneven.',
+      ),
+    ],
+    documentationId: 'physics.fill.edge-run-penetration-guard',
+  },
+  {
+    code: 'fill.edge-run-dense-overlap',
+    category: 'fill',
+    defaultSeverity: 'warning',
+    evidence: 'engine-derived',
+    geometryRole: 'overlap',
+    title: 'Fill edge run overlaps dense coverage',
+    explanation:
+      'The optional fill edge run occupies an area that already has dense border coverage.',
+    remedies: [
+      guidance(
+        'fill.edge-run-dense-overlap',
+        'Remove the redundant coverage',
+        'Increase the edge-run inset or omit the edge run beneath the border.',
+      ),
+    ],
+    documentationId: 'physics.fill.edge-run-dense-overlap',
+  },
+  {
+    code: 'fill.inset-region-change',
+    category: 'fill',
+    defaultSeverity: 'warning',
+    evidence: 'engine-derived',
+    geometryRole: 'boundary',
+    title: 'Fill inset changed region topology',
+    explanation:
+      'The requested fill inset emptied, split, or collapsed part of the authored compound region.',
+    remedies: [
+      guidance(
+        'fill.inset-region-change',
+        'Reduce the fill inset',
+        'Reduce fillinset or widen the narrow part of the authored boundary.',
+      ),
+    ],
+    documentationId: 'physics.fill.inset-region-change',
+  },
+  {
     code: 'construction.layer-order',
     category: 'underlay',
     defaultSeverity: 'error',

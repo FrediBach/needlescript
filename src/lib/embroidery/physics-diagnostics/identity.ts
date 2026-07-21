@@ -26,11 +26,28 @@ function canonicalRing(points: readonly DiagnosticPoint[]): string {
   if (!points.length) return '';
   const values = points.map(pointKey);
   if (values.length > 1 && values[0] === values.at(-1)) values.pop();
-  const variants: string[] = [];
-  for (const ordered of [values, values.toReversed()])
-    for (let offset = 0; offset < ordered.length; offset++)
-      variants.push([...ordered.slice(offset), ...ordered.slice(0, offset)].join(';'));
-  return variants.toSorted()[0] ?? '';
+  const minimalRotation = (ordered: readonly string[]): string => {
+    const length = ordered.length;
+    if (!length) return '';
+    let left = 0;
+    let right = 1;
+    let offset = 0;
+    while (left < length && right < length && offset < length) {
+      const a = ordered[(left + offset) % length];
+      const b = ordered[(right + offset) % length];
+      if (a === b) {
+        offset++;
+        continue;
+      }
+      if (a > b) left += offset + 1;
+      else right += offset + 1;
+      if (left === right) right++;
+      offset = 0;
+    }
+    const start = Math.min(left, right);
+    return [...ordered.slice(start), ...ordered.slice(0, start)].join(';');
+  };
+  return [minimalRotation(values), minimalRotation(values.toReversed())].toSorted()[0];
 }
 
 function commonGeometryKey(geometry: DiagnosticGeometry): string {
