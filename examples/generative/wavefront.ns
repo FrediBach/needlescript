@@ -76,15 +76,16 @@ for i = 0 to nlines - 1 [
     let cx = startX + f * travel
 
     // walk the line left to right, displacing y by the packet
+    let segments = max(1, floor(half * 2 / samp))
+
     up
-    setpos([ 0 - half, y + packet(0 - half - cx) ])
+    setpos([0 - half, y + packet(0 - half - cx)])
     down
-    let x = 0 - half + samp
-    while x < half [
-      setpos([ x, y + packet(x - cx) ])
-      x = x + samp
+
+    for j = 1 to segments [
+      let x = lerp(0 - half, half, j / segments)
+      setpos([x, y + packet(x - cx)])
     ]
-    setpos([ half, y + packet(half - cx) ])
   ]
   trim
 ]
