@@ -29,7 +29,10 @@
     "knip": "knip",
     "e18e": "npx @e18e/cli analyze",
     "analyze": "ANALYZE=true npm run build",
-    "build:size": "node scripts/report-build-sizes.mjs"
+    "build:size": "node scripts/report-build-sizes.mjs",
+    "physics:rates": "node --experimental-strip-types scripts/report-physics-diagnostic-rates.mjs",
+    "physics:benchmark": "node --experimental-strip-types scripts/benchmark-physics-analysis.mjs",
+    "physics:a11y": "node scripts/check-physics-accessibility.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

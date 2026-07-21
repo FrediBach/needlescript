@@ -27,6 +27,7 @@ export type {
   DiagnosticGeometry,
   PhysicsDiagnosticCategory,
   PhysicsEvidence,
+  PhysicsEvidenceReference,
   PhysicsMeasurementUnit,
   PhysicsMeasurement,
   PhysicsSourceLocation,
@@ -91,7 +92,11 @@ export {
   buildPhysicsReport,
   getPhysicsDiagnosticCatalogEntry,
   PHYSICS_DIAGNOSTIC_CATALOG,
+  PHYSICS_DIAGNOSTIC_CATALOG_VERSION,
+  PHYSICS_EVIDENCE_REFERENCES,
   PHYSICS_REPORT_VERSION,
+  PHYSICS_THRESHOLD_VERSION,
+  physicsEvidenceReferences,
   validatePhysicsDiagnosticCatalog,
 } from './embroidery/physics-diagnostics/index.ts';
 export type {

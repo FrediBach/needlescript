@@ -689,6 +689,13 @@ documentation ID. PI-9 expansion entries additionally carry methodology, known l
 human-readable performance cap. Catalog validation rejects duplicate code/remedy identities,
 missing copy or documentation, and fields outside the renderer-independent schema.
 
+PI-11 versions this provenance independently of display copy. Catalog version 1 and the global
+`physics-thresholds-v1` bundle are recorded on report version 2 and every diagnostic. Standalone
+evidence references distinguish validated engine/fixture contracts from the pending physical
+sew-out protocol, so copied reports cannot silently imply completed physical validation. The
+version-pinned expected/absent fixture ledger and per-code rate reporter measure software
+conformance; physical prediction rates remain unavailable until specimen observations exist.
+
 Source preflight policy and caller-selected physics analysis now choose their issue lists
 independently. `RunResult.preflight` remains source-controlled and is the only input to strict
 failure. The default `RunOptions.physicsAnalysis: 'preflight'` retains the PI-1/library behavior;
@@ -697,7 +704,7 @@ is `off`. The playground worker requests this full breadth and retains the repor
 design state. No source directive is inserted or rewritten.
 
 The compatibility adapter builds `RunResult.physics` from the selected analysis list. Report version
-1 preserves diagnostic order while retaining affected coverage cells, construction regions,
+2 preserves diagnostic order while retaining affected coverage cells, construction regions,
 boundaries, satin envelopes, penetration sets, and travel/path polylines. Geometry is semantic and
 renderer-independent; the adapter derives reusable anchors and bounds without adding canvas style.
 Event and construction checks retain analyzed event indices. After the lock pass, object identity

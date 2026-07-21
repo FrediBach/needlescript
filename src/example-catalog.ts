@@ -838,9 +838,9 @@ const catalogByCategory = {
     {
       id: 'preflight-issue-sampler',
       title: 'Preflight issue sampler',
-      summary: 'Intentionally trigger production warnings for diagnostic teaching.',
+      summary: 'Navigate linked source, stage, and playback findings in the Physics panel.',
       kind: 'validation',
-      tags: ['preflight', 'warnings', 'hoop', 'diagnostics'],
+      tags: ['physics', 'preflight', 'warnings', 'hoop', 'diagnostics'],
     },
   ],
 } satisfies Record<ExampleCategoryId, readonly ExampleCatalogSeed[]>;

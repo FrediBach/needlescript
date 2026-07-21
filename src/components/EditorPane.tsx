@@ -1291,7 +1291,12 @@ export default function EditorPane({
             Physics
             {physics && physics.diagnostics.length > 0 && (
               <span className={styles.physicsBadge}>
-                {physics.summary.error} · {physics.summary.warning}
+                <span aria-hidden="true">
+                  {physics.summary.error} · {physics.summary.warning}
+                </span>
+                <span className="sr-only">
+                  {physics.summary.error} blockers and {physics.summary.warning} risks
+                </span>
               </span>
             )}
           </button>

@@ -249,6 +249,18 @@ export interface PhysicsAssumption {
   effect: string;
 }
 
+export interface PhysicsEvidenceReference {
+  /** Stable identifier retained in copied reports and validation ledgers. */
+  id: string;
+  /** Version of the referenced contract, corpus, or protocol. */
+  version: string;
+  title: string;
+  kind: 'engine-contract' | 'validation-corpus' | 'physical-protocol';
+  /** Pending references are context, never a claim of completed physical validation. */
+  status: 'validated' | 'pending';
+  documentationId: string;
+}
+
 export interface PhysicsDiagnostic {
   id: string;
   fingerprint: string;
@@ -256,6 +268,10 @@ export interface PhysicsDiagnostic {
   category: PhysicsDiagnosticCategory;
   severity: PreflightSeverity;
   evidence: PhysicsEvidence;
+  /** Versioned threshold bundle used to produce this diagnostic. */
+  thresholdVersion: string;
+  /** Standalone provenance retained when a diagnostic report is copied or archived. */
+  evidenceReferences: PhysicsEvidenceReference[];
   title: string;
   explanation: string;
   /** Calculation and threshold provenance for expanded diagnostic details. */
@@ -277,6 +293,8 @@ export interface PhysicsDiagnostic {
 
 export interface PhysicsReport {
   version: number;
+  catalogVersion: number;
+  thresholdVersion: string;
   diagnostics: PhysicsDiagnostic[];
   assumptions: PhysicsAssumption[];
   summary: Record<PreflightSeverity, number>;

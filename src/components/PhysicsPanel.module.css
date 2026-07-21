@@ -72,7 +72,8 @@
 .previewActions button:focus-visible {
   border-color: var(--gold);
   color: var(--text);
-  outline: none;
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
 }
 
 .copyButton:disabled {
@@ -290,7 +291,8 @@
 .selectCard:hover,
 .selectCard:focus-visible {
   background: var(--gold-13, rgba(203, 161, 109, 0.1));
-  outline: none;
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
 }
 
 .selectCard > strong {
@@ -468,7 +470,8 @@
 
 .acknowledgmentForm textarea:focus-visible {
   border-color: var(--gold);
-  outline: none;
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
 }
 
 .acknowledgmentForm > span,

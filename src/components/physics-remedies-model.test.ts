@@ -16,6 +16,8 @@ function diagnostic(overrides: Partial<PhysicsDiagnostic> = {}): PhysicsDiagnost
     category: 'fill',
     severity: 'warning',
     evidence: 'engine-derived',
+    thresholdVersion: 'test-thresholds-v1',
+    evidenceReferences: [],
     title: 'Fill and border overlap too little',
     explanation: 'The fill needs more registration overlap.',
     sourceLocations: [{ line: 2, role: 'primary' }],

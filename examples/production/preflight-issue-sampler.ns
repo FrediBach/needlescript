@@ -1,6 +1,6 @@
 // PREFLIGHT ISSUE SAMPLER — INTENTIONALLY NOT EXPORT-READY
 // This is a diagnostic teaching fixture, not a production design. Keep
-// preflight in warn mode so the preview can show every issue at once. Do not
+// preflight in warn mode so portable policy and the Physics panel can show every issue at once. Do not
 // send it to a machine: the final target is physically outside the 4x4 hoop.
 
 hoop '4x4'

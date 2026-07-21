@@ -75,6 +75,7 @@ export default function PhysicsDiagnosticCard({
   const [showAcknowledgmentForm, setShowAcknowledgmentForm] = useState(false);
   const [acknowledgmentReason, setAcknowledgmentReason] = useState('');
   const primaryLine = diagnostic.sourceLocations.find(({ role }) => role === 'primary')?.line;
+  const headingId = `physics-heading-${diagnostic.id}`;
   const previewing = quickFixPreview?.diagnosticId === diagnostic.id;
   const canAcknowledge = canAcknowledgePhysicsDiagnostic(diagnostic);
   const submitAcknowledgment = () => {
@@ -103,10 +104,16 @@ export default function PhysicsDiagnosticCard({
           onClick={() => onSelect(diagnostic)}
         >
           <span className={styles.severity}>
-            {diagnostic.severity === 'error' ? '◆' : diagnostic.severity === 'warning' ? '▲' : '●'}{' '}
+            <span aria-hidden="true">
+              {diagnostic.severity === 'error'
+                ? '◆'
+                : diagnostic.severity === 'warning'
+                  ? '▲'
+                  : '●'}{' '}
+            </span>
             {SEVERITY_LABELS[diagnostic.severity]}
           </span>
-          <strong>{diagnostic.title}</strong>
+          <strong id={headingId}>{diagnostic.title}</strong>
           <span className={styles.cardMeta}>
             {EVIDENCE_LABELS[diagnostic.evidence]}
             {primaryLine !== undefined ? ` · line ${primaryLine}` : ' · generated'}
@@ -134,6 +141,7 @@ export default function PhysicsDiagnosticCard({
             className={styles.expandButton}
             aria-expanded={expanded}
             aria-controls={`physics-details-${diagnostic.id}`}
+            aria-label={`${expanded ? 'Hide' : 'Show'} details for ${diagnostic.title}`}
             onClick={() => onToggleExpanded(diagnostic.id)}
           >
             {expanded ? 'Hide details' : 'Show details'}
@@ -166,7 +174,12 @@ export default function PhysicsDiagnosticCard({
         </div>
       )}
       {expanded && (
-        <div id={`physics-details-${diagnostic.id}`} className={styles.cardDetails}>
+        <div
+          id={`physics-details-${diagnostic.id}`}
+          className={styles.cardDetails}
+          role="region"
+          aria-labelledby={headingId}
+        >
           {acknowledgment && (
             <div className={styles.acknowledgment}>
               <strong>Acknowledged for this project</strong>
@@ -230,6 +243,22 @@ export default function PhysicsDiagnosticCard({
             <p>
               <strong>Analysis cap:</strong> {diagnostic.performanceCap}
             </p>
+          )}
+          <p>
+            <strong>Threshold set:</strong> {diagnostic.thresholdVersion}
+          </p>
+          {diagnostic.evidenceReferences.length > 0 && (
+            <div className={styles.evidenceReferences}>
+              <strong>Evidence references</strong>
+              <ul>
+                {diagnostic.evidenceReferences.map((reference) => (
+                  <li key={`${reference.id}@${reference.version}`}>
+                    {reference.title} v{reference.version}
+                    {reference.status === 'pending' ? ' — physical validation pending' : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           {diagnostic.measurements && diagnostic.measurements.length > 1 && (
             <ul>

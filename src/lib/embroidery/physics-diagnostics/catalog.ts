@@ -1,10 +1,55 @@
 import type {
   DiagnosticGeometryRole,
   PhysicsDiagnosticCategory,
+  PhysicsEvidenceReference,
   PhysicsEvidence,
   PhysicsRemedy,
   PreflightSeverity,
 } from '../../core/types.ts';
+
+export const PHYSICS_DIAGNOSTIC_CATALOG_VERSION = 1;
+export const PHYSICS_THRESHOLD_VERSION = 'physics-thresholds-v1';
+
+const ENGINE_CONTRACT_REFERENCE: PhysicsEvidenceReference = Object.freeze({
+  id: 'needlescript-physics-engine-contract',
+  version: '1',
+  title: 'NeedleScript physics diagnostic engine contract',
+  kind: 'engine-contract',
+  status: 'validated',
+  documentationId: 'architecture.physics-diagnostics',
+});
+
+const VALIDATION_CORPUS_REFERENCE: PhysicsEvidenceReference = Object.freeze({
+  id: 'needlescript-physics-validation-corpus',
+  version: '1',
+  title: 'NeedleScript expected/absent diagnostic fixture corpus',
+  kind: 'validation-corpus',
+  status: 'validated',
+  documentationId: 'physics.validation-corpus-v1',
+});
+
+const PHYSICAL_PROTOCOL_REFERENCE: PhysicsEvidenceReference = Object.freeze({
+  id: 'needlescript-physical-sewout',
+  version: '1',
+  title: 'NeedleScript physical sew-out validation protocol',
+  kind: 'physical-protocol',
+  status: 'pending',
+  documentationId: 'physics.physical-sewout-v1',
+});
+
+export const PHYSICS_EVIDENCE_REFERENCES = Object.freeze([
+  ENGINE_CONTRACT_REFERENCE,
+  VALIDATION_CORPUS_REFERENCE,
+  PHYSICAL_PROTOCOL_REFERENCE,
+]);
+
+export function physicsEvidenceReferences(evidence: PhysicsEvidence): PhysicsEvidenceReference[] {
+  const references =
+    evidence === 'hard-limit' || evidence === 'engine-derived'
+      ? [ENGINE_CONTRACT_REFERENCE, VALIDATION_CORPUS_REFERENCE]
+      : [ENGINE_CONTRACT_REFERENCE, VALIDATION_CORPUS_REFERENCE, PHYSICAL_PROTOCOL_REFERENCE];
+  return references.map((reference) => ({ ...reference }));
+}
 
 export interface PhysicsDiagnosticCatalogEntry {
   code: string;

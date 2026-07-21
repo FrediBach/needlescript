@@ -18,6 +18,8 @@ function diagnostic(overrides: Partial<PhysicsDiagnostic> = {}): PhysicsDiagnost
     category: 'coverage',
     severity: 'warning',
     evidence: 'engine-derived',
+    thresholdVersion: 'test-thresholds-v1',
+    evidenceReferences: [],
     title: 'Dense thread coverage',
     explanation: 'Several layers overlap here.',
     sourceLocations: [{ line: 3, role: 'primary' }],

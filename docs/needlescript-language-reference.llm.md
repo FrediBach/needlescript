@@ -94,7 +94,7 @@
 
 ### 20.1 PhysicsIntellisense diagnostics
 
-- Full physics analysis adds bounded underlay, construction-coverage, per-construction short-stitch, per-color-run jump, and experimental directional-compensation findings. Material declarations remain context unless backed by physical evidence.
+- Full physics analysis adds bounded construction findings with versioned thresholds and evidence references. Material declarations remain context unless backed by physical evidence; pending sew-out protocols are not validated evidence.
 
 ### 21. Debugging commands
 

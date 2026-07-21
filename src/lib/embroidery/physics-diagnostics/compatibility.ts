@@ -7,11 +7,16 @@ import type {
   PreflightResult,
   StitchEvent,
 } from '../../core/types.ts';
-import { getPhysicsDiagnosticCatalogEntry } from './catalog.ts';
+import {
+  getPhysicsDiagnosticCatalogEntry,
+  PHYSICS_DIAGNOSTIC_CATALOG_VERSION,
+  PHYSICS_THRESHOLD_VERSION,
+  physicsEvidenceReferences,
+} from './catalog.ts';
 import { assignPhysicsDiagnosticIdentities } from './identity.ts';
 import { addDiagnosticGeometryContext, playbackRangesForEventIndices } from './attribution.ts';
 
-export const PHYSICS_REPORT_VERSION = 1;
+export const PHYSICS_REPORT_VERSION = 2;
 
 export interface PhysicsReportCompatibilityInput {
   preflight: PreflightResult;
@@ -128,6 +133,8 @@ function diagnosticDraft(
     category: catalog.category,
     severity: issue.severity,
     evidence: catalog.evidence,
+    thresholdVersion: PHYSICS_THRESHOLD_VERSION,
+    evidenceReferences: physicsEvidenceReferences(catalog.evidence),
     title: catalog.title,
     explanation: catalog.explanation,
     ...(catalog.methodology ? { methodology: catalog.methodology } : {}),
@@ -163,6 +170,8 @@ export function buildPhysicsReport(input: PhysicsReportCompatibilityInput): Phys
     diagnostics.reduce((total, diagnostic) => total + Number(diagnostic.severity === severity), 0);
   return {
     version: PHYSICS_REPORT_VERSION,
+    catalogVersion: PHYSICS_DIAGNOSTIC_CATALOG_VERSION,
+    thresholdVersion: PHYSICS_THRESHOLD_VERSION,
     diagnostics,
     assumptions: assumptionsFor(input),
     summary: {

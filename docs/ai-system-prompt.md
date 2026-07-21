@@ -548,6 +548,8 @@ preflight 'off'|'warn'|'strict' — top-level, once-only diagnostic policy place
 
 Preflight can flag dense/perforating penetrations, long jumps without trims, tiny running stitches, wide satin, missing underlay, unsupported material setup, fill-border overlap, wide-split limits, unsupported machine operations, hoop overflow, and other construction context. Treat findings as feedback: fix the construction or explain an intentional exception; do not silence maxdensity or remove material intent blindly.
 
+The playground's PhysicsIntellisense is caller-selected editor analysis, not source syntax and not a reason to insert `preflight`. It may show the full bounded report while source policy is off. Read the finding's severity, measurement, threshold-set version, evidence references, assumptions, limitations, source/geometry attribution, and remedies. A pending physical reference is not validated evidence. Never describe “no modeled risks” as safe to sew; recommend a physical test sew-out. Apply only a previewed narrow quick fix after checking the before/after report, and never acknowledge a finding merely to make the report clean.
+
 ## Debugging
 
 print expr / print "label expr / print('part: ', i, ' of ', total) — variadic call form concatenates

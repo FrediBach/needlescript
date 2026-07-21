@@ -67,6 +67,9 @@ The playground is available at <http://localhost:5173>.
 | `npm run test:watch`              | Run tests in watch mode                             |
 | `npm run test:coverage`           | Run tests with V8 coverage                          |
 | `npm run lint`                    | Run ESLint over the project                         |
+| `npm run physics:rates`           | Report expected/absent diagnostic rates by code     |
+| `npm run physics:benchmark`       | Benchmark full physics analysis at three sizes      |
+| `npm run physics:a11y`            | Check Physics motion and contrast CSS               |
 
 The app is a React 19 + TypeScript + Vite single-page app. The language engine in `src/lib/` has
 no DOM dependencies and can be used as a standalone library.
@@ -109,6 +112,9 @@ design and data flow.
 - **REPL and console** — run commands interactively and inspect output, warnings, and errors.
 - **Stage and playback** — preview the hoop, stitches, jumps, density, point handles, and sewing
   order.
+- **Physics** — inspect modeled blockers, risks, and notes with linked source, geometry, playback,
+  measurements, threshold/evidence provenance, and previewable reviewed remedies. Physics analysis
+  is independent from the source's portable `preflight` export policy and never edits stitches.
 - **Examples** — search bundled programs by technique, language feature, or purpose.
 - **Customizer** — expose sliders, toggles, text inputs, paths, curves, point handles, and presets
   with source annotations documented in the

@@ -1422,6 +1422,8 @@ The generic gates are 4 mm satin width or 100 mm² fill area for underlay review
 
 Declared fabric, thread width/profile, needle, stabilizer, and topping are retained as report context. Needle, stabilizer, topping, and fabric presets do not create material-specific warnings or alter thresholds pending physical sew-out evidence. Directional mismatch is an informational experimental model only and never fails strict preflight. Every expansion detector examines at most the documented construction/event caps, emits at most three findings, and never changes events, warnings, RNG state, or exports.
 
+Physics report version 2 records diagnostic catalog version 1 and threshold bundle `physics-thresholds-v1`. Every finding retains versioned evidence references; a pending physical sew-out protocol remains visibly pending and is not treated as validated evidence. The software expected/absent corpus reports conformance rates by evaluated code, while physical false-positive and false-negative rates remain unavailable until measured specimens are recorded.
+
 ---
 
 ## 21. Debugging commands

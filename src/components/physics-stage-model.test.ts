@@ -18,6 +18,8 @@ function diagnostic(
     category: 'stitch',
     severity: 'warning',
     evidence: 'engine-derived',
+    thresholdVersion: 'test-thresholds-v1',
+    evidenceReferences: [],
     title: id,
     explanation: id,
     sourceLocations: [],

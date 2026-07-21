@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "thresholdVersion": "physics-thresholds-v1",
+  "groundTruth": "software-expectation",
+  "physicalEvidenceStatus": "pending",
+  "cases": [
+    {
+      "id": "physical-sheet-woven",
+      "sourcePath": "examples/production/physical-sewout-validation-v1.ns",
+      "expectedCodes": [
+        "construction.underlay-outside-topping",
+        "fill.border-overlap-too-small",
+        "fill.connector-outside-region",
+        "travel.color-run-jump-burden"
+      ],
+      "absentCodes": [
+        "coverage.density-hotspot",
+        "hoop.field-overflow",
+        "hoop.unreachable",
+        "penetration.same-hole-stack"
+      ]
+    },
+    {
+      "id": "diagnostic-teaching-sampler",
+      "sourcePath": "examples/production/preflight-issue-sampler.ns",
+      "expectedCodes": [
+        "hoop.unreachable",
+        "satin.snag-risk",
+        "stitch.long-sewn-float",
+        "stitch.short-cluster",
+        "travel.color-run-jump-burden",
+        "travel.long-untrimmed-jump"
+      ],
+      "absentCodes": [
+        "coverage.density-hotspot",
+        "hoop.field-overflow",
+        "penetration.same-hole-stack"
+      ]
+    },
+    {
+      "id": "split-wide-column",
+      "sourcePath": "examples/satin/wide-column-split-sampler.ns",
+      "expectedCodes": ["stitch.short-cluster"],
+      "absentCodes": ["hoop.unreachable", "satin.snag-risk", "underlay.missing-wide-construction"]
+    },
+    {
+      "id": "directional-compensation-enabled",
+      "sourcePath": "examples/production/anisotropic-material-compensation.ns",
+      "expectedCodes": [],
+      "absentCodes": [
+        "hoop.unreachable",
+        "material.directional-compensation-mismatch",
+        "underlay.missing-wide-construction"
+      ]
+    },
+    {
+      "id": "planned-travel",
+      "sourcePath": "examples/production/constrained-travel-plan.ns",
+      "expectedCodes": [],
+      "absentCodes": [
+        "hoop.unreachable",
+        "travel.color-run-jump-burden",
+        "travel.long-untrimmed-jump"
+      ]
+    },
+    {
+      "id": "fleece-knockdown",
+      "sourcePath": "examples/production/knockdown-fleece.ns",
+      "expectedCodes": ["stitch.below-reliable-movement", "travel.color-run-jump-burden"],
+      "absentCodes": ["coverage.density-hotspot", "hoop.unreachable", "penetration.same-hole-stack"]
+    }
+  ]
+}

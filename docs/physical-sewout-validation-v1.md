@@ -3,6 +3,11 @@
 Status: **awaiting physical measurements**. This document is a versioned protocol and result record;
 blank measured fields are intentional and must not be interpreted as evidence.
 
+PhysicsIntellisense's software expected/absent ledger is maintained separately in
+[`physics-diagnostic-validation-corpus-v1.json`](./physics-diagnostic-validation-corpus-v1.json).
+Its zero-error fixture result is software conformance only. Physical false-positive and
+false-negative rates remain unavailable until the specimen records below contain observations.
+
 Source: `examples/production/physical-sewout-validation-v1.ns`
 
 This sheet evaluates the candidate directional compensation behavior introduced in Sessions 7.3–7.5.

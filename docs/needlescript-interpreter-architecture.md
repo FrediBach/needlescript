@@ -618,20 +618,21 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    finalization only when this completed list contains severity `error`; warning/info
    recommendations are never fatal. The check reads the completed stream and does not mutate it.
    The compatibility adapter then maps the caller-selected analysis list to `PhysicsReport` version
-   1. By default this is the exact policy issue list. With `physicsAnalysis: 'full'`, an `off` policy
-      still retains its compatibility preflight result while the physics report additionally receives
-      the event-stream and construction findings. `warn` and `strict` already select that full set, so
-      the completed analysis is reused rather than rerun.
-      Coverage cells, affected point sets, paths/travel, construction regions, boundaries, and satin
-      envelopes become renderer-independent geometry with derived anchors and bounds. Event and
-      construction checks retain indices in the analyzed pre-lock stream; after locks, preserved event
-      identity maps only those events into inclusive indices in the final stitch/jump playback stream.
-      Source attribution distinguishes primary, contributor, and related lines, and diagnostics with no
-      source carry an explicit generated-source explanation. Fingerprints use code, canonical source
-      locations, sorted construction IDs, and semantic geometry quantized to 0.01 mm. Diagnostic copy,
-      severity, evidence explanations, remedies, and playback ranges do not participate in identity.
-      Measurements are copied from detector output. Expansion catalog entries also expose their
-      methodology, false-positive limitations, and analysis cap in expanded UI details.
+   2, including catalog/threshold versions and standalone evidence references. By default this is
+   the exact policy issue list. With `physicsAnalysis: 'full'`, an `off` policy
+   still retains its compatibility preflight result while the physics report additionally receives
+   the event-stream and construction findings. `warn` and `strict` already select that full set, so
+   the completed analysis is reused rather than rerun.
+   Coverage cells, affected point sets, paths/travel, construction regions, boundaries, and satin
+   envelopes become renderer-independent geometry with derived anchors and bounds. Event and
+   construction checks retain indices in the analyzed pre-lock stream; after locks, preserved event
+   identity maps only those events into inclusive indices in the final stitch/jump playback stream.
+   Source attribution distinguishes primary, contributor, and related lines, and diagnostics with no
+   source carry an explicit generated-source explanation. Fingerprints use code, canonical source
+   locations, sorted construction IDs, and semantic geometry quantized to 0.01 mm. Diagnostic copy,
+   severity, evidence explanations, remedies, and playback ranges do not participate in identity.
+   Measurements are copied from detector output. Expansion catalog entries also expose their
+   methodology, false-positive limitations, and analysis cap in expanded UI details.
 9. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
    `warningLocations`, optional `preflight` and `physics`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `machineProfile`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional

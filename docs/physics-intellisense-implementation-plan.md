@@ -1,27 +1,27 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-10 complete; PI-7 product review remains open** (2026-07-21) — project-scoped local
-acknowledgments now require a reason, follow stable finding fingerprints, remain countable and
-filterable, and cannot suppress blockers, hard limits, source, stitches, or export policy. PI-7
-remains open until representative visual iteration, product-owner approval, and the
-five-participant usability protocol are complete.
+Status: **PI-11 in review; PI-7 product and physical-evidence gates remain open** (2026-07-21) —
+versioned report provenance, a software expected/absent corpus with rate reporting, accessibility
+coverage, benchmarks, rollout documentation, and user/agent guidance are implemented. Default-on
+rollout remains closed until representative visual iteration, product-owner approval, the
+five-participant usability protocol, and the applicable physical evidence records are complete.
 
 Last updated: 2026-07-21
 
-| Session | Status      | Exit gate                                                                 |
-| ------- | ----------- | ------------------------------------------------------------------------- |
-| PI-0    | Complete    | Product owner approved the contract and prototype concept on 2026-07-21   |
-| PI-1    | Complete    | Unified catalog/types shipped without freezing overlay presentation       |
-| PI-2    | Complete    | Editor analysis is independent from source-selected preflight policy      |
-| PI-3    | Complete    | Rich source, geometry, construction, and playback attribution shipped     |
-| PI-4    | Complete    | Revision lifecycle, background analysis, and priority queue shipped       |
-| PI-5    | Complete    | Responsive, keyboard-operable Physics panel shipped                       |
-| PI-6    | Complete    | Independent markers, linked selection, rich hover, and navigation shipped |
-| PI-7    | In review   | Visual/product iteration and five-participant protocol remain             |
-| PI-8    | Complete    | Previewed literal edits recompile and compare findings                    |
-| PI-9    | Complete    | Bounded expansion detectors, paired fixtures, evidence, and remedies ship |
-| PI-10   | Complete    | Project-local, reasoned fingerprint acknowledgments shipped               |
-| PI-11   | Not started | Follow the dependency and acceptance gates documented below               |
+| Session | Status    | Exit gate                                                                 |
+| ------- | --------- | ------------------------------------------------------------------------- |
+| PI-0    | Complete  | Product owner approved the contract and prototype concept on 2026-07-21   |
+| PI-1    | Complete  | Unified catalog/types shipped without freezing overlay presentation       |
+| PI-2    | Complete  | Editor analysis is independent from source-selected preflight policy      |
+| PI-3    | Complete  | Rich source, geometry, construction, and playback attribution shipped     |
+| PI-4    | Complete  | Revision lifecycle, background analysis, and priority queue shipped       |
+| PI-5    | Complete  | Responsive, keyboard-operable Physics panel shipped                       |
+| PI-6    | Complete  | Independent markers, linked selection, rich hover, and navigation shipped |
+| PI-7    | In review | Visual/product iteration and five-participant protocol remain             |
+| PI-8    | Complete  | Previewed literal edits recompile and compare findings                    |
+| PI-9    | Complete  | Bounded expansion detectors, paired fixtures, evidence, and remedies ship |
+| PI-10   | Complete  | Project-local, reasoned fingerprint acknowledgments shipped               |
+| PI-11   | In review | Automated hardening is complete; human and physical gates remain open     |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
 playback—not a renamed or enlarged preflight panel.
@@ -1105,6 +1105,53 @@ Deliverables:
 - Confirm that PI-7's five-participant findings are resolved or explicitly accepted before the
   Physics tab becomes default-on.
 - Update language reference, machine/interpreter architecture, README, book debugging chapters, examples, and AI guidance.
+
+Implementation progress (2026-07-21):
+
+- [x] Bumped `PhysicsReport` to version 2 and added diagnostic catalog version 1, the global
+      `physics-thresholds-v1` bundle, and standalone versioned evidence references. Heuristic,
+      machine-profile, and experimental findings retain the physical protocol as explicitly
+      pending rather than presenting it as validated evidence.
+- [x] Added a version-pinned expected/absent ledger across the production validation sheet,
+      diagnostic sampler, split satin, directional compensation, planned travel, and fleece
+      fixtures. `npm run physics:rates -- --check` reports per-code software false-positive and
+      false-negative rates and rejects ledger drift.
+- [ ] Complete physical specimen observations and calculate physical prediction rates by diagnostic
+      code. The current zero-error result is software conformance only; unevaluated rate directions
+      remain `null` and physical evidence status remains `pending`.
+- [x] Added mounted component and keyboard-focus tests for native/named controls, textual severity,
+      labelled expanded regions, and report provenance. Added screen-reader copy for the Physics
+      badge and decorative severity-symbol hiding, high-visibility focus outlines, reduced-motion
+      duration overrides, and automated WCAG AA contrast checks for Physics text/status tokens.
+- [x] Ran React Doctor over the complete application and the changed-file scope. The Physics card,
+      report, styles, and tests introduce no finding; the changed-scope scan retains three
+      pre-existing EditorPane observations documented below.
+- [x] Added `npm run physics:benchmark` with deterministic small (201 events), typical (10,001), and
+      limit-sized (90,001) fixtures plus a dated machine-local baseline and explicit interpretation
+      limits.
+- [ ] Complete PI-7 representative visual iteration, product-owner approval, and the five-participant
+      usability protocol before changing the initial tab from Console to Physics. The release record
+      identifies opt-in beta as the current stage and keeps the default-on gate closed.
+- [x] Updated the generated language references, machine/interpreter architecture, README, physical
+      protocol, debugging book chapter, diagnostic example/catalog, AI guidance, and a dedicated
+      release-readiness record.
+
+Validation record (2026-07-21):
+
+- `npm test`: 86 files and 2,121 tests passed; generated language references are current.
+- `npm run lint`, `npm run build`, `npm run build:lib`, and `npm run check:lib` passed. The app build
+  retained its pre-existing large-chunk advisory; publint and the package type check found no
+  problems.
+- `npm run physics:rates -- --check` passed with no observed expected/absent ledger failures for
+  evaluated software fixtures. Physical rates remain unavailable and are not inferred from these
+  results.
+- Three-iteration analysis medians on darwin-arm64 / Node 24.13.0 were 0.77 ms for 201 events,
+  10.84 ms for 10,001 events, and 114.21 ms for 90,001 events.
+- React Doctor's full-repository scan scored 67/100 across 168 existing observations. Its final
+  changed-file scan scored 89/100 with three pre-existing EditorPane observations: eager Monaco
+  loading, component size, and the REPL suggestion option focus model. No new Physics UI finding was
+  reported.
+- Prettier formatting and `git diff --check` passed.
 
 Rollout:
 

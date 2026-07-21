@@ -18,6 +18,8 @@ function diagnostic(overrides: Partial<PhysicsDiagnostic> = {}): PhysicsDiagnost
     category: 'coverage',
     severity: 'warning',
     evidence: 'engine-derived',
+    thresholdVersion: 'test-thresholds-v1',
+    evidenceReferences: [],
     title: 'Thread coverage is concentrated here',
     explanation: 'Several fill passes overlap in this area.',
     measurements: [{ label: 'Coverage', value: 4.8, unit: 'layers', threshold: 3.5 }],

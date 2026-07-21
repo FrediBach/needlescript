@@ -5,7 +5,10 @@ import {
   buildPhysicsReport,
   getPhysicsDiagnosticCatalogEntry,
   PHYSICS_DIAGNOSTIC_CATALOG,
+  PHYSICS_DIAGNOSTIC_CATALOG_VERSION,
+  PHYSICS_EVIDENCE_REFERENCES,
   PHYSICS_REPORT_VERSION,
+  PHYSICS_THRESHOLD_VERSION,
   run,
   validatePhysicsDiagnosticCatalog,
 } from '../engine.ts';
@@ -190,6 +193,8 @@ describe('physics diagnostic identity', () => {
       category: 'coverage',
       severity: 'warning',
       evidence: 'heuristic',
+      thresholdVersion: PHYSICS_THRESHOLD_VERSION,
+      evidenceReferences: [],
       title: 'Title',
       explanation: 'Explanation',
       sourceLocations: [{ line: 1, role: 'primary' }],
@@ -245,6 +250,8 @@ describe('preflight compatibility adapter', () => {
     const physics = result.physics!;
 
     expect(physics.version).toBe(PHYSICS_REPORT_VERSION);
+    expect(physics.catalogVersion).toBe(PHYSICS_DIAGNOSTIC_CATALOG_VERSION);
+    expect(physics.thresholdVersion).toBe(PHYSICS_THRESHOLD_VERSION);
     expect(physics.policy).toBe(result.preflight?.mode);
     expect(physics.profile).toEqual(result.machineProfile);
     expect(physics.material).toEqual(result.material);
@@ -258,6 +265,10 @@ describe('preflight compatibility adapter', () => {
     });
     expect(physics.diagnostics[0]).toEqual(
       expect.objectContaining({
+        thresholdVersion: PHYSICS_THRESHOLD_VERSION,
+        evidenceReferences: expect.arrayContaining([
+          expect.objectContaining({ id: PHYSICS_EVIDENCE_REFERENCES[0].id }),
+        ]),
         id: expect.stringMatching(/^physics-v1:/),
         fingerprint: expect.stringMatching(/^physics-v1:/),
         playbackRanges: expect.any(Array),
