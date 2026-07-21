@@ -257,6 +257,13 @@ export interface PhysicsReport {
   policy: PreflightMode;
 }
 
+/** Caller-selected diagnostic breadth. Source preflight policy remains independent. */
+export type PhysicsAnalysisMode = 'preflight' | 'full';
+
+export interface PhysicsDiagnosticCounts extends Record<PreflightSeverity, number> {
+  total: number;
+}
+
 /** Physical hoop and derived sewable field, as configured by the `hoop` command. */
 export interface HoopInfo {
   shape: 'circle' | 'oval' | 'rectangle';
@@ -584,6 +591,8 @@ export interface RunOptions {
   seed?: number;
   /** Explicit caller-local constraints and calibration; never sourced from the program text. */
   machineProfile?: MachineProfile;
+  /** Diagnostic breadth only; does not alter source-selected preflight policy or stitch events. */
+  physicsAnalysis?: PhysicsAnalysisMode;
   /** Optional synchronous timing sink for profiling the language pipeline. */
   onTiming?: (timings: RunTimings) => void;
 }
@@ -592,4 +601,8 @@ export interface RunTimings {
   tokenizeMs: number;
   parseMs: number;
   executeMs: number;
+  /** Time spent selecting, running, and adapting physics diagnostics. */
+  analysisMs: number;
+  /** Counts from the returned PhysicsReport, at the selected analysis breadth. */
+  diagnosticCounts: PhysicsDiagnosticCounts;
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import * as Comlink from 'comlink';
 import type { CompilerWorkerApi } from '../compiler.worker.ts';
 import type { CompileResponse } from '../compiler.worker.types.ts';
-import type { MachineProfile } from '../lib/core/types.ts';
+import type { MachineProfile, PhysicsAnalysisMode } from '../lib/core/types.ts';
 
 // Import the worker via Vite's native ?worker syntax so it gets bundled as a
 // separate chunk and never runs on the main thread.
@@ -14,6 +14,7 @@ interface QueuedCompile {
   source: string;
   seed?: number;
   machineProfile?: MachineProfile;
+  physicsAnalysis?: PhysicsAnalysisMode;
   isStale: () => boolean;
   resolve: (response: CompileResponse | null) => void;
 }
@@ -77,7 +78,7 @@ function runNextJob(): void {
   }, COMPILE_TIMEOUT_MS);
 
   proxy
-    .compile(job.source, job.seed, job.machineProfile)
+    .compile(job.source, job.seed, job.machineProfile, job.physicsAnalysis)
     .then((response) => {
       if (settled) return;
       settled = true;
@@ -99,10 +100,11 @@ function enqueueCompile(
   source: string,
   seed: number | undefined,
   machineProfile: MachineProfile | undefined,
+  physicsAnalysis: PhysicsAnalysisMode | undefined,
   isStale: () => boolean,
 ): Promise<CompileResponse | null> {
   return new Promise((resolve) => {
-    queue.push({ source, seed, machineProfile, isStale, resolve });
+    queue.push({ source, seed, machineProfile, physicsAnalysis, isStale, resolve });
     runNextJob();
   });
 }
@@ -127,7 +129,11 @@ function releaseCompiler(): void {
   }, 0);
 }
 
-export function useCompiler() {
+export interface UseCompilerOptions {
+  physicsAnalysis?: PhysicsAnalysisMode;
+}
+
+export function useCompiler({ physicsAnalysis }: UseCompilerOptions = {}) {
   // Monotonic counter scoped to this hook consumer. A shared worker serializes
   // jobs across the playground/book, while stale-result semantics stay local.
   const latestIdRef = useRef(0);
@@ -146,25 +152,29 @@ export function useCompiler() {
       const id = ++latestIdRef.current;
       const startedAt = performance.now();
 
-      return enqueueCompile(source, seed, machineProfile, () => latestIdRef.current !== id).then(
-        (response) => {
-          if (response === null || latestIdRef.current !== id) return null;
-          return {
-            ...response,
-            id,
-            ...(response.ok
-              ? {
-                  timings: {
-                    ...response.timings,
-                    roundTripMs: performance.now() - startedAt,
-                  },
-                }
-              : {}),
-          };
-        },
-      );
+      return enqueueCompile(
+        source,
+        seed,
+        machineProfile,
+        physicsAnalysis,
+        () => latestIdRef.current !== id,
+      ).then((response) => {
+        if (response === null || latestIdRef.current !== id) return null;
+        return {
+          ...response,
+          id,
+          ...(response.ok
+            ? {
+                timings: {
+                  ...response.timings,
+                  roundTripMs: performance.now() - startedAt,
+                },
+              }
+            : {}),
+        };
+      });
     },
-    [],
+    [physicsAnalysis],
   );
 
   return { compile };

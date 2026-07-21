@@ -35,6 +35,8 @@ export type {
   PhysicsAssumption,
   PhysicsDiagnostic,
   PhysicsReport,
+  PhysicsAnalysisMode,
+  PhysicsDiagnosticCounts,
   ResolvedMachineProfile,
   MachineProfile,
   MachineCalibration,

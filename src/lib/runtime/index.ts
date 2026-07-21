@@ -39,7 +39,7 @@ import { inspectChalkValue } from './chalk.ts';
 import { DEFAULT_BACKGROUND, defaultSlotColor } from '../core/colormath.ts';
 import type { ColorTableEntry } from '../core/types.ts';
 import { directionalCompensationPreview } from '../embroidery/directional-compensation.ts';
-import { buildPreflightResult } from '../embroidery/preflight.ts';
+import { buildFullPhysicsAnalysisResult, buildPreflightResult } from '../embroidery/preflight.ts';
 import { buildPhysicsReport } from '../embroidery/physics-diagnostics/compatibility.ts';
 import {
   applyMachineCalibration,
@@ -52,6 +52,9 @@ import {
 
 export function run(source: string, opts: RunOptions = {}): RunResult {
   const startedAt = performance.now();
+  const physicsAnalysis = opts.physicsAnalysis ?? 'preflight';
+  if (physicsAnalysis !== 'preflight' && physicsAnalysis !== 'full')
+    throw new RangeError("physicsAnalysis must be 'preflight' or 'full'");
   const tokens = tokenize(source);
   const tokenizedAt = performance.now();
   const parseNotes: string[] = [];
@@ -457,7 +460,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
       `note: design uses ${allIndices.size} thread slots — plan the thread changes for your machine`,
     );
 
-  const preflight = buildPreflightResult({
+  const analysisStartedAt = performance.now();
+  const preflightInput = {
     events: preflightEvents,
     warnings: m.warnings,
     warningLocations,
@@ -466,7 +470,8 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
     profile: machineProfile,
     mode: ctx.preflightMode,
     constructionRecords,
-  });
+  };
+  const preflight = buildPreflightResult(preflightInput);
   if (ctx.preflightMode === 'strict') {
     const blockingIssue = preflight.issues.find(({ severity }) => severity === 'error');
     if (blockingIssue)
@@ -475,7 +480,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         blockingIssue.lines[0] ?? ctx.preflightLine,
       );
   }
-  const physics = buildPhysicsReport({ preflight, material: m.materialIntent });
+  const physicsInput =
+    physicsAnalysis === 'full' && preflight.mode === 'off'
+      ? buildFullPhysicsAnalysisResult(preflightInput)
+      : preflight;
+  const physics = buildPhysicsReport({ preflight: physicsInput, material: m.materialIntent });
+  const analysisCompletedAt = performance.now();
 
   const result: RunResult = {
     events: m.events,
@@ -506,7 +516,12 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
   opts.onTiming?.({
     tokenizeMs: tokenizedAt - startedAt,
     parseMs: parsedAt - tokenizedAt,
-    executeMs: completedAt - parsedAt,
+    executeMs: completedAt - parsedAt - (analysisCompletedAt - analysisStartedAt),
+    analysisMs: analysisCompletedAt - analysisStartedAt,
+    diagnosticCounts: {
+      total: physics.diagnostics.length,
+      ...physics.summary,
+    },
   });
   return result;
 }

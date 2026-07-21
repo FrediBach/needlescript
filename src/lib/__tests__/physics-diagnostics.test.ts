@@ -260,4 +260,69 @@ describe('preflight compatibility adapter', () => {
       /Unknown physics diagnostic code 'unknown.detector'/,
     );
   });
+
+  it('keeps library defaults policy-bound while full analysis is caller-controlled', () => {
+    const source = 'lock 0 stitchlen 0.5 fd 4.5';
+    const compatible = run(source);
+    const full = run(source, { physicsAnalysis: 'full' });
+
+    expect(
+      compatible.physics?.diagnostics.some(({ code }) => code === 'stitch.short-cluster'),
+    ).toBe(false);
+    expect(full.physics?.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'stitch.short-cluster' }),
+    );
+    expect(full.physics?.policy).toBe('off');
+    expect(full.preflight).toEqual(compatible.preflight);
+    expect(full.events).toEqual(compatible.events);
+    expect(full.warnings).toEqual(compatible.warnings);
+    expect(full.warningLocations).toEqual(compatible.warningLocations);
+  });
+
+  it('keeps source policy behavior and event streams identical at full analysis breadth', () => {
+    const source = 'lock 0 stitchlen 0.5 fd 4.5';
+    const off = run(`preflight 'off'\n${source}`, { physicsAnalysis: 'full' });
+    const warn = run(`preflight 'warn'\n${source}`, { physicsAnalysis: 'full' });
+    const strict = run(`preflight 'strict'\n${source}`, { physicsAnalysis: 'full' });
+
+    expect(off.events).toEqual(warn.events);
+    expect(strict.events).toEqual(warn.events);
+    expect(off.preflight?.issues.some(({ code }) => code === 'stitch.short-cluster')).toBe(false);
+    expect(warn.preflight?.issues.some(({ code }) => code === 'stitch.short-cluster')).toBe(true);
+    expect(strict.preflight?.issues).toEqual(warn.preflight?.issues);
+    for (const result of [off, warn, strict])
+      expect(result.physics?.diagnostics).toContainEqual(
+        expect.objectContaining({ code: 'stitch.short-cluster' }),
+      );
+  });
+
+  it('leaves export blocking source-controlled when full analysis finds a blocker', () => {
+    const source = "hoop '5x7'\nmoveto 70 0\nfd 1";
+    const editorAnalysis = run(source, { physicsAnalysis: 'full' });
+
+    expect(editorAnalysis.physics?.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'hoop.unreachable', severity: 'error' }),
+    );
+    expect(editorAnalysis.physics?.policy).toBe('off');
+    expect(() => run(`preflight 'strict'\n${source}`, { physicsAnalysis: 'full' })).toThrow(
+      /preflight strict failed \[hoop\.unreachable\]/,
+    );
+  });
+
+  it('rejects unknown caller analysis levels', () => {
+    expect(() => run('fd 1', { physicsAnalysis: 'maximum' as never })).toThrow(
+      /physicsAnalysis must be 'preflight' or 'full'/,
+    );
+  });
+
+  it('keeps full analysis bounded on a large event stream', () => {
+    const result = run('lock 0 stitchlen 1 repeat 25000 [ fd 1 ]', {
+      physicsAnalysis: 'full',
+    });
+
+    expect(result.events.length).toBeGreaterThanOrEqual(25_000);
+    expect(result.physics?.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'machine.continuous-stitch-run' }),
+    );
+  });
 });

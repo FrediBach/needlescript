@@ -1,8 +1,9 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-1 complete** (2026-07-21) — unified public contracts, catalog, stable identity, and the
-compatibility report adapter are implemented; PI-2 is ready to start. Preview-overlay legibility
-remains an explicit PI-3/PI-7 implementation risk.
+Status: **PI-2 complete** (2026-07-21) — editor analysis is decoupled from portable source policy,
+the playground requests full diagnostics, and worker instrumentation includes analysis timing and
+counts. PI-3 is ready to start. Preview-overlay legibility remains an explicit PI-3/PI-7
+implementation risk.
 
 Last updated: 2026-07-21
 
@@ -10,8 +11,9 @@ Last updated: 2026-07-21
 | ------- | ----------- | ----------------------------------------------------------------------- |
 | PI-0    | Complete    | Product owner approved the contract and prototype concept on 2026-07-21 |
 | PI-1    | Complete    | Unified catalog/types shipped without freezing overlay presentation     |
-| PI-2    | Ready       | Decouple editor analysis from source-selected preflight policy          |
-| PI-3–11 | Not started | Follow the dependency and acceptance gates documented below             |
+| PI-2    | Complete    | Editor analysis is independent from source-selected preflight policy    |
+| PI-3    | Ready       | Add rich source, geometry, construction, and playback attribution       |
+| PI-4–11 | Not started | Follow the dependency and acceptance gates documented below             |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
 playback—not a renamed or enlarged preflight panel.
@@ -559,6 +561,8 @@ Validation record (2026-07-21):
 
 ### PI-2 — Decouple analysis from source preflight policy
 
+Status: **complete** (2026-07-21)
+
 Deliverables:
 
 - Split “what to analyze” from “what blocks export.”
@@ -580,6 +584,37 @@ Acceptance:
 - `off`, `warn`, and `strict` still produce identical stitch events.
 - Export gating remains deterministic and source-controlled.
 - Large designs stay within the current compile timeout.
+
+Implementation progress:
+
+- [x] Added public `PhysicsAnalysisMode = 'preflight' | 'full'` and
+      `RunOptions.physicsAnalysis`. Omission retains the PI-1/library behavior; invalid runtime
+      values fail explicitly.
+- [x] Kept `RunResult.preflight` source-policy-selected while allowing `RunResult.physics` to use
+      full event-stream and construction analysis independently. The report's `policy` still records
+      the source mode.
+- [x] Kept strict failure bound exclusively to the source-policy preflight result. Caller-requested
+      blocker diagnostics cannot turn an `off` or `warn` program into a strict failure.
+- [x] Threaded analysis breadth through the shared compiler queue and worker. The main playground
+      requests `'full'` and retains the resulting physics report in `DesignState`; other worker and
+      direct-library consumers retain the compatibility default.
+- [x] Added `analysisMs` and info/warning/error/total diagnostic counts to `RunTimings`, which the
+      worker carries into `CompileResponse.timings` alongside existing statistics and total timings.
+- [x] Added compatibility, source-policy, event-inertness, strict-gating, invalid-option, timing, and
+      25,000-event bounded-analysis coverage.
+- [x] Updated the interpreter and machine architecture documents with the analysis/policy boundary,
+      playground opt-in, timing contract, and reuse behavior.
+
+Validation record (2026-07-21):
+
+- `npm test`: 77 files and 2,072 tests passed; generated references are current.
+- `npm run lint` and `npm run build` passed. The build retained its pre-existing large-chunk
+  advisory.
+- `npm run build:lib` and `npm run check:lib` passed; publint and the package type check found no
+  problems.
+- React Doctor's changed-file scan scored 88/100. Its seven findings are in pre-existing unrelated
+  App/runtime code; the new compiler option and physics-state wiring introduced no reported issue.
+- Targeted Prettier validation passed for every changed source, test, and documentation file.
 
 ### PI-3 — Rich attribution
 

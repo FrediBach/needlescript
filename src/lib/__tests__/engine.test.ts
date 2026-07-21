@@ -482,6 +482,29 @@ describe('run — performance instrumentation', () => {
     expect(timings!.tokenizeMs).toBeGreaterThanOrEqual(0);
     expect(timings!.parseMs).toBeGreaterThanOrEqual(0);
     expect(timings!.executeMs).toBeGreaterThanOrEqual(0);
+    expect(timings!.analysisMs).toBeGreaterThanOrEqual(0);
+    expect(timings!.diagnosticCounts).toEqual({
+      total: 0,
+      info: 0,
+      warning: 0,
+      error: 0,
+    });
+  });
+
+  it('reports counts from the caller-selected diagnostic breadth', () => {
+    let timings: RunTimings | undefined;
+    const result = run('lock 0 stitchlen 0.5 fd 4.5', {
+      physicsAnalysis: 'full',
+      onTiming(value) {
+        timings = value;
+      },
+    });
+
+    expect(timings!.diagnosticCounts).toEqual({
+      total: result.physics!.diagnostics.length,
+      ...result.physics!.summary,
+    });
+    expect(timings!.diagnosticCounts.warning).toBeGreaterThan(0);
   });
 });
 

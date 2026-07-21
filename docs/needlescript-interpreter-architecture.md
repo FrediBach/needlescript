@@ -47,15 +47,22 @@ ranged-arity builtin. This preserves old three-argument sources while allowing t
 fourth dash-phase argument without adding optional procedure parameters to the grammar.
 
 For profiling, `RunOptions.onTiming` receives the elapsed time for root tokenization,
-module linking/parsing (including module tokenization and pre-scan), and execution/finalization. The callback is optional
-and synchronous, so normal library results and deterministic language behavior are
-unchanged. The playground worker adds statistics, worker-total, and message
-round-trip timings in `CompileResponse.timings`.
+module linking/parsing (including module tokenization and pre-scan), execution/finalization, and
+physics analysis, plus diagnostic counts at the selected analysis breadth. The callback is optional
+and synchronous, so normal library results and deterministic language behavior are unchanged. The
+playground worker adds statistics, worker-total, and message round-trip timings in
+`CompileResponse.timings`.
 
-`RunOptions.machineProfile` is the other non-source input. It is a serializable local machine
+`RunOptions.machineProfile` is another non-source input. It is a serializable local machine
 profile resolved and validated by `embroidery/machine-profile.ts`; it never enters the AST, globals, share URL,
 or source text. The resolved identity/default or caller profile is returned in
 `RunResult.machineProfile` and reused by structured preflight.
+
+`RunOptions.physicsAnalysis` is a caller-only analysis selector. Its default, `'preflight'`, retains
+the library's compatibility behavior by analyzing the checks selected by source policy; `'full'`
+requests all existing event-stream and construction checks without modifying that policy. The
+playground worker opts into `'full'`, while book, staging, and direct-library callers retain the
+default unless they request otherwise.
 
 The interpreter is a **tree-walker**: it recursively evaluates `ASTNode`/`ExprNode`
 values directly, with no bytecode or intermediate compilation step. CPU-heavy runs are
@@ -604,11 +611,15 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    never infers construction roles from ordinary running stitches. `preflight 'strict'` rejects
    finalization only when this completed list contains severity `error`; warning/info
    recommendations are never fatal. The check reads the completed stream and does not mutate it.
-   The compatibility adapter then maps that exact selected issue list to `PhysicsReport` version 1.
-   Existing points become renderer-independent point geometry; richer geometry and playback ranges
-   remain empty until the attribution pass can supply them. Fingerprints use code, canonical source
-   locations, sorted construction IDs, and semantic geometry quantized to 0.01 mm. Diagnostic copy,
-   severity, evidence explanations, and remedies do not participate in identity.
+   The compatibility adapter then maps the caller-selected analysis list to `PhysicsReport` version
+   1. By default this is the exact policy issue list. With `physicsAnalysis: 'full'`, an `off` policy
+      still retains its compatibility preflight result while the physics report additionally receives
+      the event-stream and construction findings. `warn` and `strict` already select that full set, so
+      the completed analysis is reused rather than rerun.
+      Existing points become renderer-independent point geometry; richer geometry and playback ranges
+      remain empty until the attribution pass can supply them. Fingerprints use code, canonical source
+      locations, sorted construction IDs, and semantic geometry quantized to 0.01 mm. Diagnostic copy,
+      severity, evidence explanations, and remedies do not participate in identity.
 9. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
    `warningLocations`, optional `preflight` and `physics`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `machineProfile`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional
@@ -645,12 +656,12 @@ show-info toggle filters only rendered findings and never recompiles or changes 
 
 `RunResult.physics` is optional in the public type for compatibility with serialized results from
 older producers, but every successful in-process `run()` now populates it. Absence means that the
-producer does not support PhysicsIntellisense; it is not an empty report. Its `policy` mirrors
-`preflight.mode`, and PI-1 deliberately derives diagnostics from the same selected issues, so source
-`preflight 'off'` still excludes extended event/construction checks. The report also records the
-resolved machine profile, material intent, default-context assumptions, severity summary, semantic
-hoop-space geometry, and deterministic IDs. UI lifecycle state and presentation styling are not
-part of the core contract.
+producer does not support PhysicsIntellisense; it is not an empty report. Its `policy` always mirrors
+`preflight.mode`, while its diagnostic breadth comes from `RunOptions.physicsAnalysis`. Source
+`preflight 'strict'` gates only its own policy result, never extra caller-requested editor findings.
+The report also records the resolved machine profile, material intent, default-context assumptions,
+severity summary, semantic hoop-space geometry, and deterministic IDs. UI lifecycle state and
+presentation styling are not part of the core contract.
 
 ---
 

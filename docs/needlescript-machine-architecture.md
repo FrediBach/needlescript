@@ -686,13 +686,23 @@ default severity, evidence class, semantic geometry role, title, explanation, re
 documentation ID. Catalog validation rejects duplicate code/remedy identities, missing copy or
 documentation, and fields outside the renderer-independent schema.
 
-After preflight policy selects the issue list, the compatibility adapter builds
-`RunResult.physics`. Report version 1 preserves preflight order and maps existing locations to point
-geometry without inventing cells, regions, paths, bounds, anchors, or playback ranges. Stable
+Source preflight policy and caller-selected physics analysis now choose their issue lists
+independently. `RunResult.preflight` remains source-controlled and is the only input to strict
+failure. The default `RunOptions.physicsAnalysis: 'preflight'` retains the PI-1/library behavior;
+`'full'` adds event-stream and construction findings to `RunResult.physics` even when source policy
+is `off`. The playground worker requests this full breadth and retains the report in playground
+design state. No source directive is inserted or rewritten.
+
+The compatibility adapter builds `RunResult.physics` from the selected analysis list. Report version
+1 preserves diagnostic order and maps existing locations to point geometry without inventing cells,
+regions, paths, bounds, anchors, or playback ranges. Stable
 fingerprints canonicalize source locations and construction IDs plus semantic geometry at 0.01 mm;
 occurrence IDs add deterministic suffixes only when the same fingerprint coexists. Severity and
 wording changes therefore do not invalidate identity. This report is stitch-inert and the legacy
 warnings, warning locations, preflight result, strict failure, and exporter inputs remain unchanged.
+Analysis timing and info/warning/error/total counts flow through `RunTimings` and are included in the
+worker's compile timing detail. Extended analysis remains bounded by the existing per-check limits
+and the worker's current compile timeout.
 An explicitly selected local profile also adds objective trim/color-change capability findings:
 manual operations are info-level worksheet reminders, unsupported operations are errors, and neither
 changes the event stream. The resolved speed class remains advisory metadata pending sew-out-backed

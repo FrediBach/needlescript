@@ -109,7 +109,7 @@ function analyzeMachineCapabilities(
  * Build structured issues from completed, internal diagnostic metadata.
  * This function is deliberately pure: it neither rewrites events nor warnings.
  */
-export function buildPreflightResult(input: PreflightInput): PreflightResult {
+function buildResult(input: PreflightInput, includeExtended: boolean): PreflightResult {
   const mode = input.mode ?? 'off';
   const profile = input.profile ?? resolveMachineProfile(input.maximumDensityLayers);
   const legacyIssues: PreflightIssue[] = input.warningLocations
@@ -129,13 +129,12 @@ export function buildPreflightResult(input: PreflightInput): PreflightResult {
     });
 
   const capabilityIssues = analyzeMachineCapabilities(input.events, profile);
-  const extendedIssues =
-    mode === 'off'
-      ? []
-      : [
-          ...analyzeEventStreamPreflight(input.events, profile),
-          ...analyzeConstructionPreflight(input.constructionRecords ?? [], input.events),
-        ];
+  const extendedIssues = includeExtended
+    ? [
+        ...analyzeEventStreamPreflight(input.events, profile),
+        ...analyzeConstructionPreflight(input.constructionRecords ?? [], input.events),
+      ]
+    : [];
   const issues = [...legacyIssues, ...capabilityIssues, ...extendedIssues];
   const count = (severity: PreflightSeverity) =>
     issues.reduce((total, issue) => total + Number(issue.severity === severity), 0);
@@ -150,4 +149,13 @@ export function buildPreflightResult(input: PreflightInput): PreflightResult {
       error: count('error'),
     },
   };
+}
+
+export function buildPreflightResult(input: PreflightInput): PreflightResult {
+  return buildResult(input, input.mode !== undefined && input.mode !== 'off');
+}
+
+/** Internal preflight-shaped envelope for a caller-requested full physics report. */
+export function buildFullPhysicsAnalysisResult(input: PreflightInput): PreflightResult {
+  return buildResult(input, true);
 }

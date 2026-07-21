@@ -22,6 +22,7 @@ import type {
   ColorTableEntry,
   PreflightIssue,
   PreflightResult,
+  PhysicsReport,
   ResolvedMachineProfile,
   MaterialIntent,
 } from './lib/engine.ts';
@@ -141,6 +142,7 @@ export interface DesignState {
   stats: DesignStats | null;
   warnings: string[];
   preflight?: PreflightResult;
+  physics?: PhysicsReport;
   machineProfile?: ResolvedMachineProfile;
   name: string;
   ok: boolean;
@@ -182,6 +184,7 @@ const INITIAL_DESIGN: DesignState = {
   stats: null,
   warnings: [],
   preflight: undefined,
+  physics: undefined,
   chalk: [],
   dataVars: [],
   referenceVars: [],
@@ -452,7 +455,7 @@ export default function App() {
     [],
   );
 
-  const { compile } = useCompiler();
+  const { compile } = useCompiler({ physicsAnalysis: 'full' });
 
   const runProgram = useCallback(
     async (src: string, designName: string) => {
@@ -534,6 +537,7 @@ export default function App() {
         stats,
         warnings,
         preflight: result.preflight,
+        physics: result.physics,
         machineProfile: result.machineProfile,
         name: designName,
         ok: true,
