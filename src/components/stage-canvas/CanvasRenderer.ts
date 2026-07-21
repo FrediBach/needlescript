@@ -1,6 +1,13 @@
 import type { DesignState, LineStitchBounds } from '../../App.tsx';
 import type { HoopConfig } from '../../data.ts';
-import type { ChalkStroke, HoopInfo, WarningLocation } from '../../lib/engine.ts';
+import type {
+  ChalkStroke,
+  HoopInfo,
+  PhysicsDiagnostic,
+  PhysicsDiagnosticCategory,
+  PreflightSeverity,
+  WarningLocation,
+} from '../../lib/engine.ts';
 import type { PointParamDef, XYRegion } from '../../lib/editor/parameters.ts';
 import {
   canvasJumpThread,
@@ -24,6 +31,7 @@ import {
 } from '../../theme.ts';
 import type { CanvasOverlay, RenderTransform, Viewport } from './types.ts';
 import { colorDist, defaultSlotColor } from '../../lib/core/colormath.ts';
+import { buildPhysicsOverlayFixture } from '../physics-stage-model.ts';
 
 // ── rendering ────────────────────────────────────────────────────────────────
 
@@ -41,7 +49,12 @@ export function draw(
   pinnedDataVars: Set<string>,
   viewport: Viewport | null,
   warningLoc: WarningLocation | null,
-  hoveredLineBounds: LineStitchBounds | null,
+  physicsDiagnostics: PhysicsDiagnostic[] = [],
+  selectedDiagnosticId: string | null = null,
+  hoveredDiagnosticId: string | null = null,
+  showSelectedDiagnostic: boolean = true,
+  dimBaseForDiagnostic: boolean = false,
+  hoveredLineBounds: LineStitchBounds | null = null,
   overlays: CanvasOverlay[] = [],
   pointParams: PointParamDef[] = [],
   showHandles: boolean = true,
@@ -105,6 +118,20 @@ export function draw(
       dpr,
       darkGround,
     );
+    drawPhysicsDiagnostics(
+      ctx,
+      physicsDiagnostics,
+      selectedDiagnosticId,
+      hoveredDiagnosticId,
+      showSelectedDiagnostic,
+      X,
+      Y,
+      scale,
+      dpr,
+      w,
+      h,
+      darkGround,
+    );
     if (showHandles && pointParams.length > 0) {
       drawHandles(
         ctx,
@@ -143,6 +170,28 @@ export function draw(
   drawHoveredLineBounds(ctx, hoveredLineBounds, X, Y, scale, dpr);
   drawWarningMarkers(ctx, warningLoc, X, Y, dpr);
 
+  if (dimBaseForDiagnostic && selectedDiagnosticId && showSelectedDiagnostic) {
+    ctx.save();
+    ctx.globalAlpha = darkGround ? 0.62 : 0.7;
+    ctx.fillStyle = design.background;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+  drawPhysicsDiagnostics(
+    ctx,
+    physicsDiagnostics,
+    selectedDiagnosticId,
+    hoveredDiagnosticId,
+    showSelectedDiagnostic,
+    X,
+    Y,
+    scale,
+    dpr,
+    w,
+    h,
+    darkGround,
+  );
+
   // Selection highlight drawn last
   drawOverlays(ctx, overlays, X, Y, dpr, 'highlight');
 
@@ -164,6 +213,246 @@ export function draw(
   }
 
   return { scale, cx, cy, viewCX, viewCY };
+}
+
+const PHYSICS_SEVERITY_COLOR: Record<PreflightSeverity, string> = {
+  error: '#d8392b',
+  warning: '#db8b12',
+  info: '#3186c7',
+};
+
+const PHYSICS_CATEGORY_DASH: Record<PhysicsDiagnosticCategory, number[]> = {
+  coverage: [],
+  penetration: [2, 3],
+  stitch: [],
+  path: [8, 3],
+  travel: [9, 4],
+  satin: [5, 2],
+  fill: [7, 2, 2, 2],
+  underlay: [3, 3],
+  hoop: [10, 3, 2, 3],
+  machine: [2, 2],
+  material: [6, 3],
+};
+
+function tracePhysicsPoints(
+  ctx: CanvasRenderingContext2D,
+  points: readonly { x: number; y: number }[],
+  closed: boolean,
+  X: (mm: number) => number,
+  Y: (mm: number) => number,
+) {
+  if (!points.length) return;
+  ctx.moveTo(X(points[0].x), Y(points[0].y));
+  for (const point of points.slice(1)) ctx.lineTo(X(point.x), Y(point.y));
+  if (closed) ctx.closePath();
+}
+
+function drawPhysicsPointGlyph(
+  ctx: CanvasRenderingContext2D,
+  category: PhysicsDiagnosticCategory,
+  x: number,
+  y: number,
+  radius: number,
+) {
+  ctx.beginPath();
+  if (category === 'penetration') {
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.moveTo(x + radius * 0.52, y);
+    ctx.arc(x, y, radius * 0.52, 0, Math.PI * 2);
+  } else if (category === 'coverage' || category === 'fill') {
+    ctx.rect(x - radius, y - radius, radius * 2, radius * 2);
+  } else if (category === 'travel' || category === 'hoop') {
+    ctx.moveTo(x, y - radius);
+    ctx.lineTo(x + radius, y + radius);
+    ctx.lineTo(x - radius, y + radius);
+    ctx.closePath();
+  } else {
+    ctx.moveTo(x, y - radius);
+    ctx.lineTo(x + radius, y);
+    ctx.lineTo(x, y + radius);
+    ctx.lineTo(x - radius, y);
+    ctx.closePath();
+  }
+  ctx.stroke();
+}
+
+function drawPhysicsDiagnostics(
+  ctx: CanvasRenderingContext2D,
+  diagnostics: readonly PhysicsDiagnostic[],
+  selectedDiagnosticId: string | null,
+  hoveredDiagnosticId: string | null,
+  showSelectedDiagnostic: boolean,
+  X: (mm: number) => number,
+  Y: (mm: number) => number,
+  scale: number,
+  dpr: number,
+  canvasW: number,
+  canvasH: number,
+  darkGround: boolean,
+) {
+  for (const diagnostic of diagnostics) {
+    const selected = diagnostic.id === selectedDiagnosticId;
+    const hovered = diagnostic.id === hoveredDiagnosticId;
+    if (selected && !showSelectedDiagnostic) continue;
+    const fixture = buildPhysicsOverlayFixture(diagnostic);
+    const color = PHYSICS_SEVERITY_COLOR[diagnostic.severity];
+    const active = selected || hovered;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = active ? 1 : 0.32;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = (selected ? 2.4 : hovered ? 1.9 : 1.15) * dpr;
+    ctx.setLineDash(PHYSICS_CATEGORY_DASH[diagnostic.category].map((value) => value * dpr));
+
+    for (const primitive of fixture.primitives) {
+      if (primitive.kind === 'point') {
+        if (selected) {
+          ctx.save();
+          ctx.globalAlpha = 0.16;
+          ctx.beginPath();
+          ctx.arc(X(primitive.point.x), Y(primitive.point.y), 14 * dpr, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          ctx.save();
+          ctx.globalAlpha = 0.95;
+          ctx.strokeStyle = darkGround ? '#fffdf7' : '#302b25';
+          ctx.lineWidth = 5 * dpr;
+          ctx.setLineDash([]);
+          drawPhysicsPointGlyph(
+            ctx,
+            diagnostic.category,
+            X(primitive.point.x),
+            Y(primitive.point.y),
+            8 * dpr,
+          );
+          ctx.restore();
+        }
+        drawPhysicsPointGlyph(
+          ctx,
+          diagnostic.category,
+          X(primitive.point.x),
+          Y(primitive.point.y),
+          (selected ? 8 : 5) * dpr,
+        );
+        continue;
+      }
+
+      ctx.beginPath();
+      if (primitive.kind === 'segment') {
+        tracePhysicsPoints(ctx, primitive.points, false, X, Y);
+      } else if (primitive.kind === 'polyline') {
+        tracePhysicsPoints(ctx, primitive.points, primitive.closed, X, Y);
+      } else if (primitive.kind === 'cell') {
+        ctx.rect(
+          X(primitive.x),
+          Y(primitive.y + primitive.height),
+          primitive.width * scale,
+          primitive.height * scale,
+        );
+      } else {
+        for (const ring of primitive.rings) tracePhysicsPoints(ctx, ring, true, X, Y);
+      }
+
+      if (
+        primitive.kind === 'cell' ||
+        primitive.kind === 'region' ||
+        (primitive.kind === 'polyline' && primitive.closed)
+      ) {
+        ctx.save();
+        ctx.globalAlpha = selected ? 0.1 : hovered ? 0.07 : 0.025;
+        ctx.fill('evenodd');
+        ctx.restore();
+      }
+      if (selected) {
+        ctx.save();
+        ctx.globalAlpha = 0.95;
+        ctx.strokeStyle = darkGround ? '#fffdf7' : '#302b25';
+        ctx.lineWidth = 5 * dpr;
+        ctx.setLineDash([]);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    if (selected && showSelectedDiagnostic && fixture.anchor && fixture.bounds) {
+      drawPhysicsCallout(
+        ctx,
+        diagnostic,
+        fixture.anchor,
+        fixture.bounds,
+        X,
+        Y,
+        dpr,
+        canvasW,
+        canvasH,
+        darkGround,
+      );
+    }
+  }
+}
+
+function drawPhysicsCallout(
+  ctx: CanvasRenderingContext2D,
+  diagnostic: PhysicsDiagnostic,
+  anchor: { x: number; y: number },
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+  X: (mm: number) => number,
+  Y: (mm: number) => number,
+  dpr: number,
+  canvasW: number,
+  canvasH: number,
+  darkGround: boolean,
+) {
+  const label = diagnostic.measurements?.[0]
+    ? `${diagnostic.title} · ${diagnostic.measurements[0].value.toLocaleString()} ${diagnostic.measurements[0].unit}`
+    : diagnostic.title;
+  const fontSize = 10 * dpr;
+  const paddingX = 7 * dpr;
+  const paddingY = 5 * dpr;
+  ctx.save();
+  ctx.font = `${fontSize}px ${fontMono}`;
+  const width = Math.min(ctx.measureText(label).width + paddingX * 2, canvasW - 16 * dpr);
+  const height = fontSize + paddingY * 2;
+  const geometryTop = Y(bounds.maxY);
+  const geometryBottom = Y(bounds.minY);
+  const preferredY = geometryTop - height - 12 * dpr;
+  const y =
+    preferredY >= 8 * dpr
+      ? preferredY
+      : Math.min(canvasH - height - 8 * dpr, geometryBottom + 12 * dpr);
+  const x = Math.max(8 * dpr, Math.min(canvasW - width - 8 * dpr, X(anchor.x) - width / 2));
+  const leaderX = Math.max(x + 8 * dpr, Math.min(x + width - 8 * dpr, X(anchor.x)));
+  const leaderY = y < geometryTop ? y + height : y;
+
+  ctx.strokeStyle = PHYSICS_SEVERITY_COLOR[diagnostic.severity];
+  ctx.lineWidth = 1.2 * dpr;
+  ctx.setLineDash([2 * dpr, 2 * dpr]);
+  ctx.beginPath();
+  ctx.moveTo(X(anchor.x), Y(anchor.y));
+  ctx.lineTo(leaderX, leaderY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = darkGround ? 'rgba(32,29,25,0.94)' : 'rgba(255,253,247,0.96)';
+  ctx.strokeStyle = PHYSICS_SEVERITY_COLOR[diagnostic.severity];
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 4 * dpr);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = darkGround ? '#fffdf7' : '#302b25';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.beginPath();
+  ctx.rect(x + paddingX, y, width - paddingX * 2, height);
+  ctx.clip();
+  ctx.fillText(label, x + paddingX, y + height / 2);
+  ctx.restore();
 }
 
 const CHALK_PALETTE = ['#333333', '#30443f', '#49363e', '#354052', '#4b3c31', '#3e4631'];

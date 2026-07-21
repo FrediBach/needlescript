@@ -122,10 +122,7 @@ import {
   physicsSourceChanged,
   type PhysicsReportState,
 } from './physics-analysis-state.ts';
-import {
-  consoleWarningsWithoutStructuredDuplicates,
-  physicsDiagnosticLocation,
-} from './components/physics-panel-model.ts';
+import { consoleWarningsWithoutStructuredDuplicates } from './components/physics-panel-model.ts';
 
 export interface LineSegment {
   line: number;
@@ -1171,17 +1168,6 @@ export default function App() {
   const [hoveredEditorLine, setHoveredEditorLine] = useState<number | null>(null);
   const hoveredLineBounds =
     hoveredEditorLine !== null ? (lineStitchMap.get(hoveredEditorLine) ?? null) : null;
-  const selectedDiagnostic =
-    design.physics?.diagnostics.find(({ id }) => id === selectedDiagnosticId) ?? null;
-  const hoveredDiagnostic =
-    design.physics?.diagnostics.find(({ id }) => id === hoveredDiagnosticId) ?? null;
-  const selectedDiagnosticLoc = selectedDiagnostic
-    ? physicsDiagnosticLocation(selectedDiagnostic)
-    : null;
-  const hoveredDiagnosticLoc = hoveredDiagnostic
-    ? physicsDiagnosticLocation(hoveredDiagnostic)
-    : null;
-
   const handleDiagnosticHover = useCallback((diagnostic: PhysicsDiagnostic | null) => {
     setHoveredDiagnosticId(diagnostic?.id ?? null);
   }, []);
@@ -1268,7 +1254,12 @@ export default function App() {
           onScrubChange={(pos) => dispatch({ type: 'scrub', pos })}
           activeLine={activeLine}
           lineSegments={lineSegments}
-          warningLoc={hoverWarn ?? hoveredDiagnosticLoc ?? selectedDiagnosticLoc}
+          warningLoc={hoverWarn}
+          physicsDiagnostics={design.physics?.diagnostics}
+          selectedDiagnosticId={selectedDiagnosticId}
+          hoveredDiagnosticId={hoveredDiagnosticId}
+          onDiagnosticHover={handleDiagnosticHover}
+          onDiagnosticSelect={(diagnostic) => setSelectedDiagnosticId(diagnostic.id)}
           hoveredLineBounds={hoveredLineBounds}
           showDensity={showDensity}
           onToggleDensity={() => setShowDensity((v) => !v)}

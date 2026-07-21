@@ -28,6 +28,74 @@
   gap: 10px;
 }
 
+.diagnosticControls {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 10;
+  display: flex;
+  max-width: calc(100% - 250px);
+  align-items: center;
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid var(--on-canvas-45);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--bg-canvas) 94%, transparent);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.14);
+  color: var(--text-on-canvas);
+}
+
+.diagnosticTitle {
+  max-width: 190px;
+  overflow: hidden;
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnosticAction {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border: 1px solid var(--on-canvas-45);
+  border-radius: 4px;
+  background: var(--bg-canvas);
+  color: var(--text-on-canvas);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.diagnosticAction:hover:not(:disabled) {
+  background: var(--bg-canvas-hover);
+}
+
+.diagnosticAction:focus-visible {
+  outline: 2px solid var(--run);
+  outline-offset: 1px;
+}
+
+.diagnosticAction:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+@media (max-width: 720px) {
+  .diagnosticControls {
+    right: 10px;
+    bottom: 36px;
+    max-width: none;
+    flex-wrap: wrap;
+  }
+
+  .diagnosticTitle {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
 .sampleContextMenu {
   position: fixed;
   z-index: 999;

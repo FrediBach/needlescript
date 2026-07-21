@@ -10,6 +10,8 @@ import {
   SelectItem,
 } from '@/components/ui/select.tsx';
 import { cn } from '@/utils.ts';
+import type { PhysicsDiagnostic, PreflightSeverity } from '../lib/engine.ts';
+import { physicsPlaybackSpans } from './physics-stage-model.ts';
 
 const SPEEDS = [
   { value: 0.125, label: '⅛×' },
@@ -27,7 +29,29 @@ interface Props {
   activeLine: number | null;
   lineSegments: LineSegment[];
   highlightLines: number[];
+  physicsDiagnostics?: PhysicsDiagnostic[];
+  selectedDiagnosticId?: string | null;
 }
+
+const PHYSICS_RANGE_COLOR: Record<PreflightSeverity, string> = {
+  error: '#d8392b',
+  warning: '#db8b12',
+  info: '#3186c7',
+};
+
+const PHYSICS_CATEGORY_LANE: Record<PhysicsDiagnostic['category'], number> = {
+  coverage: 0,
+  penetration: 1,
+  stitch: 2,
+  path: 0,
+  travel: 1,
+  satin: 2,
+  fill: 0,
+  underlay: 1,
+  hoop: 2,
+  machine: 0,
+  material: 1,
+};
 
 export default function PlaybackBar({
   total,
@@ -36,6 +60,8 @@ export default function PlaybackBar({
   activeLine,
   lineSegments,
   highlightLines,
+  physicsDiagnostics = [],
+  selectedDiagnosticId = null,
 }: Props) {
   const [playingForTotal, setPlayingForTotal] = useState<number | null>(null);
   const playing = playingForTotal === total;
@@ -113,6 +139,13 @@ export default function PlaybackBar({
   }
 
   const hi = highlightLines.length ? new Set(highlightLines) : null;
+  const physicsSpans = physicsPlaybackSpans(physicsDiagnostics, total);
+  const unselectedPhysicsSpans = [] as typeof physicsSpans;
+  const selectedPhysicsSpans = [] as typeof physicsSpans;
+  for (const span of physicsSpans) {
+    if (span.diagnosticId === selectedDiagnosticId) selectedPhysicsSpans.push(span);
+    else unselectedPhysicsSpans.push(span);
+  }
 
   const totalStr = total.toLocaleString();
   const paddedPos = scrubPos.toLocaleString().padStart(totalStr.length, '\u2007');
@@ -169,7 +202,7 @@ export default function PlaybackBar({
           aria-label="Stitch playback position"
         />
         <svg
-          viewBox={`0 0 ${total || 1} 1`}
+          viewBox={`0 0 ${total || 1} 3`}
           preserveAspectRatio="none"
           className={styles.lineMap}
           aria-hidden="true"
@@ -183,7 +216,7 @@ export default function PlaybackBar({
                 x={seg.start}
                 y={0}
                 width={nextStart - seg.start}
-                height={1}
+                height={3}
                 fill={
                   isActive
                     ? 'var(--gold-55)'
@@ -206,11 +239,34 @@ export default function PlaybackBar({
                   x={seg.start}
                   y={0}
                   width={nextStart - seg.start}
-                  height={1}
+                  height={3}
                   fill="rgba(200,38,24,0.78)"
                 />
               );
             })}
+          {unselectedPhysicsSpans.map((span, index) => (
+            <rect
+              key={`physics-${span.diagnosticId}-${span.start}-${span.end}-${index}`}
+              x={span.start}
+              y={PHYSICS_CATEGORY_LANE[span.category]}
+              width={span.end - span.start + 1}
+              height={1}
+              fill={PHYSICS_RANGE_COLOR[span.severity]}
+              opacity={0.48}
+            />
+          ))}
+          {selectedPhysicsSpans.map((span, index) => (
+            <rect
+              key={`physics-selected-${span.diagnosticId}-${span.start}-${span.end}-${index}`}
+              x={span.start}
+              y={0.12}
+              width={span.end - span.start + 1}
+              height={2.76}
+              fill={PHYSICS_RANGE_COLOR[span.severity]}
+              stroke="var(--bg-canvas)"
+              strokeWidth={Math.max(0.3, total / 1400)}
+            />
+          ))}
         </svg>
       </div>
 

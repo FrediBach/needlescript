@@ -1,6 +1,6 @@
 import type { DesignState, LineStitchBounds } from '../../App.tsx';
 import type { HoopConfig } from '../../data.ts';
-import type { HoopInfo, WarningLocation } from '../../lib/engine.ts';
+import type { HoopInfo, PhysicsDiagnostic, WarningLocation } from '../../lib/engine.ts';
 import type { PathParamDef, PointParamDef, XYRegion } from '../../lib/editor/parameters.ts';
 
 export interface StageCanvasProps {
@@ -15,6 +15,14 @@ export interface StageCanvasProps {
   hoveredDataVar?: string | null;
   pinnedDataVars?: Set<string>;
   warningLoc: WarningLocation | null;
+  /** Current diagnostics available for stage overlays and semantic hit-testing. */
+  physicsDiagnostics?: PhysicsDiagnostic[];
+  selectedDiagnosticId?: string | null;
+  hoveredDiagnosticId?: string | null;
+  showSelectedDiagnostic?: boolean;
+  dimBaseForDiagnostic?: boolean;
+  onDiagnosticHover?: (diagnostic: PhysicsDiagnostic | null) => void;
+  onDiagnosticSelect?: (diagnostic: PhysicsDiagnostic) => void;
   /** Bounding box of the source line currently hovered in the editor. */
   hoveredLineBounds?: LineStitchBounds | null;
   /** SVG-import staging overlays drawn above the stitches (optional). */

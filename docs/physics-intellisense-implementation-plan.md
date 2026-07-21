@@ -1,9 +1,9 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-6 complete** (2026-07-21) — Monaco now keeps compiler and Physics markers independent,
-shows rich severity-aware findings and source-role selection, synchronizes hover/selection with the
-shared application state, supports F8 navigation, and has inert code-action plumbing ready for PI-8.
-Preview-overlay legibility remains an explicit PI-7 implementation risk.
+Status: **PI-7 implementation ready for product review** (2026-07-21) — semantic stage overlays,
+overlap-aware hit-testing, temporary inspection controls, and exact playback ranges are integrated.
+PI-7 remains open until representative visual iteration, product-owner approval, and the
+five-participant usability protocol are complete.
 
 Last updated: 2026-07-21
 
@@ -16,7 +16,8 @@ Last updated: 2026-07-21
 | PI-4    | Complete    | Revision lifecycle, background analysis, and priority queue shipped       |
 | PI-5    | Complete    | Responsive, keyboard-operable Physics panel shipped                       |
 | PI-6    | Complete    | Independent markers, linked selection, rich hover, and navigation shipped |
-| PI-7–11 | Not started | Follow the dependency and acceptance gates documented below               |
+| PI-7    | In review   | Visual/product iteration and five-participant protocol remain             |
+| PI-8–11 | Not started | Follow the dependency and acceptance gates documented below               |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
 playback—not a renamed or enlarged preflight panel.
@@ -869,6 +870,47 @@ Acceptance:
 - Run the five-participant protocol against the integrated editor/panel/stage experience. All five
   participants must reach responsible code and stage geometry without moderator instruction, and
   none may interpret “no modeled risks” as a sew-out guarantee.
+
+Implementation progress (2026-07-21):
+
+- [x] Added a deterministic semantic overlay projection for point, two-point segment, cell,
+      polyline, and multi-ring region geometry. Canvas rendering consumes the same projection used
+      by the visual-fixture snapshots and millimetre-space hit tests.
+- [x] Added category-specific point shapes and line patterns, severity color, selected contrast
+      outlines, a restrained local halo/fill, and callouts positioned outside affected bounds with
+      a clipped label area. Non-selected findings remain available as subdued stage affordances.
+- [x] Added zoom-aware point/path/area hit-testing. A single hit selects immediately; overlapping
+      hits open a bounded, scrollable keyboard-operable chooser in deterministic
+      distance/severity/identity order.
+- [x] Added local “Hide/Reveal overlay” and “Dim/Restore stitches” controls. Their state is owned by
+      the diagnostic view and does not call or mutate the persistent density or jump controls.
+- [x] Replaced diagnostic source-line approximation in the playback strip with exact inclusive
+      `playbackRanges`, rendered in severity colors and category lanes. The selected range receives
+      an additional non-color outline.
+- [x] Added “Inspect sew order,” which moves to the first attributed playback event only on explicit
+      activation, plus “Return to full design.” Ordinary panel, Monaco, and stage selection leaves
+      playback untouched.
+- [x] Added stable snapshots for every migrated geometry class plus focused overlap, region, and
+      exact/clipped playback-range tests. Existing final-stream attribution tests continue to cover
+      generated locks and planned/autotrimmed event identity.
+- [ ] Iterate halo/dim/outline-pattern/callout treatments on the representative dense and sparse
+      sampler at fit-to-hoop, normal, and high zoom with light/dark threads and heatmap on/off.
+- [ ] Obtain product-owner approval and run the five-participant usability protocol. These remain
+      PI-7 exit gates and must not be inferred from automated tests.
+
+Validation record (2026-07-21):
+
+- `npm test`: 82 files and 2,099 tests passed; generated references are current.
+- `npm run lint`, `npm run build`, `npm run build:lib`, and `npm run check:lib` passed. The app build
+  retained its pre-existing large-chunk advisory; publint and the package type check found no
+  problems.
+- React Doctor's final changed-file scan scored 87/100. Its ten remaining findings are pre-existing
+  App/StageCanvas size and adjacent performance/lifecycle findings; the PI-7 default-prop,
+  iteration, and canvas-keyboard findings from the first scan were corrected.
+- Targeted Prettier validation and `git diff --check` passed.
+- The in-app browser runtime reported no available browser surface, so live rendering and product
+  review could not be performed in this session. The unchecked visual and usability gates above
+  intentionally keep PI-7 in review rather than complete.
 
 ### PI-8 — Guided remedies and safe quick fixes
 

@@ -4,6 +4,7 @@ import type { PathParamDef, PointParamDef } from '../lib/editor/parameters.ts';
 import { CanvasHud } from './stage-canvas/CanvasHud.tsx';
 import { computeAutoFitScale, draw } from './stage-canvas/CanvasRenderer.ts';
 import { formatPointLiteral } from './stage-canvas/sample-point.ts';
+import { hitTestPhysicsDiagnostics } from './physics-stage-model.ts';
 import type {
   DragState,
   HandleDragState,
@@ -13,8 +14,11 @@ import type {
   StageCanvasProps as Props,
   Viewport,
 } from './stage-canvas/types.ts';
+import type { PhysicsDiagnostic } from '../lib/engine.ts';
 
 export type { CanvasOverlay } from './stage-canvas/types.ts';
+
+const EMPTY_PHYSICS_DIAGNOSTICS: PhysicsDiagnostic[] = [];
 
 export default function StageCanvas({
   design,
@@ -27,6 +31,13 @@ export default function StageCanvas({
   hoveredDataVar,
   pinnedDataVars,
   warningLoc,
+  physicsDiagnostics = EMPTY_PHYSICS_DIAGNOSTICS,
+  selectedDiagnosticId = null,
+  hoveredDiagnosticId = null,
+  showSelectedDiagnostic = true,
+  dimBaseForDiagnostic = false,
+  onDiagnosticHover,
+  onDiagnosticSelect,
   hoveredLineBounds,
   overlays,
   onPick,
@@ -50,6 +61,11 @@ export default function StageCanvas({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [sampleContextMenu, setSampleContextMenu] = useState<SampleContextMenu | null>(null);
+  const [diagnosticChooser, setDiagnosticChooser] = useState<{
+    x: number;
+    y: number;
+    ids: string[];
+  } | null>(null);
 
   // ── Handle interaction state ─────────────────────────────────────────────
   /** Active handle drag — kept in a ref (not state) to avoid re-render thrash */
@@ -75,6 +91,9 @@ export default function StageCanvas({
   const onPathDeleteRef = useRef(onPathDelete);
   const onCurveToggleSmoothRef = useRef(onCurveToggleSmooth);
   const onPathTranslateRef = useRef(onPathTranslate);
+  const physicsDiagnosticsRef = useRef(physicsDiagnostics);
+  const onDiagnosticHoverRef = useRef(onDiagnosticHover);
+  const onDiagnosticSelectRef = useRef(onDiagnosticSelect);
   useLayoutEffect(() => {
     pointParamsRef.current = pointParams;
     pathParamsRef.current = pathParams;
@@ -87,6 +106,9 @@ export default function StageCanvas({
     onPathDeleteRef.current = onPathDelete;
     onCurveToggleSmoothRef.current = onCurveToggleSmooth;
     onPathTranslateRef.current = onPathTranslate;
+    physicsDiagnosticsRef.current = physicsDiagnostics;
+    onDiagnosticHoverRef.current = onDiagnosticHover;
+    onDiagnosticSelectRef.current = onDiagnosticSelect;
   });
 
   // ── draw on prop / viewport / handle-state change ────────────────────────
@@ -114,6 +136,11 @@ export default function StageCanvas({
       pinnedDataVars ?? new Set(),
       viewport,
       warningLoc,
+      physicsDiagnostics,
+      selectedDiagnosticId,
+      hoveredDiagnosticId,
+      showSelectedDiagnostic,
+      dimBaseForDiagnostic,
       hoveredLineBounds ?? null,
       overlays,
       pointParams ?? [],
@@ -136,6 +163,11 @@ export default function StageCanvas({
     pinnedDataVars,
     viewport,
     warningLoc,
+    physicsDiagnostics,
+    selectedDiagnosticId,
+    hoveredDiagnosticId,
+    showSelectedDiagnostic,
+    dimBaseForDiagnostic,
     hoveredLineBounds,
     overlays,
     pointParams,
@@ -173,6 +205,11 @@ export default function StageCanvas({
         pinnedDataVars ?? new Set(),
         viewport,
         warningLoc,
+        physicsDiagnosticsRef.current,
+        selectedDiagnosticId,
+        hoveredDiagnosticId,
+        showSelectedDiagnostic,
+        dimBaseForDiagnostic,
         hoveredLineBounds ?? null,
         overlays,
         pointParamsRef.current ?? [],
@@ -198,6 +235,10 @@ export default function StageCanvas({
     pinnedDataVars,
     viewport,
     warningLoc,
+    selectedDiagnosticId,
+    hoveredDiagnosticId,
+    showSelectedDiagnostic,
+    dimBaseForDiagnostic,
     hoveredLineBounds,
     overlays,
     hoveredHandleName,
@@ -397,6 +438,20 @@ export default function StageCanvas({
         }
         setHoveredHandleName((prev) => (prev === found ? prev : found));
       }
+
+      if (t && !dragState && !handleDragRef.current && !pathDragRef.current) {
+        const mm = {
+          x: t.viewCX + (cssX * dpr - t.cx) / t.scale,
+          y: t.viewCY - (cssY * dpr - t.cy) / t.scale,
+        };
+        const toleranceMM = (10 * dpr) / t.scale;
+        const diagnostic = hitTestPhysicsDiagnostics(
+          physicsDiagnosticsRef.current,
+          mm,
+          toleranceMM,
+        )[0]?.diagnostic;
+        onDiagnosticHoverRef.current?.(diagnostic ?? null);
+      }
     },
     [dragState],
   );
@@ -547,7 +602,6 @@ export default function StageCanvas({
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       // If a handle drag just finished, don't fire onPick
       if (draggingHandleName !== null) return;
-      if (!onPick) return;
       const canvas = canvasRef.current;
       const t = transformRef.current;
       if (!canvas || !t) return;
@@ -557,7 +611,26 @@ export default function StageCanvas({
       const cssY = e.clientY - rect.top;
       const mmX = t.viewCX + (cssX * dpr - t.cx) / t.scale;
       const mmY = t.viewCY - (cssY * dpr - t.cy) / t.scale;
-      onPick({ x: mmX, y: mmY });
+      const hits = hitTestPhysicsDiagnostics(
+        physicsDiagnosticsRef.current,
+        { x: mmX, y: mmY },
+        (e.detail === 0 ? 18 : 10) * (dpr / t.scale),
+      );
+      if (hits.length === 1) {
+        setDiagnosticChooser(null);
+        onDiagnosticSelectRef.current?.(hits[0].diagnostic);
+        return;
+      }
+      if (hits.length > 1) {
+        setDiagnosticChooser({
+          x: Math.max(4, Math.min(cssX + 8, rect.width - 288)),
+          y: Math.max(4, Math.min(cssY + 8, rect.height - 180)),
+          ids: hits.map(({ diagnostic }) => diagnostic.id),
+        });
+        return;
+      }
+      setDiagnosticChooser(null);
+      onPick?.({ x: mmX, y: mmY });
     },
     [onPick, draggingHandleName],
   );
@@ -595,11 +668,21 @@ export default function StageCanvas({
     <>
       <canvas
         ref={canvasRef}
+        tabIndex={0}
+        aria-label="Embroidery stage. Hover a Physics overlay and press Enter to select it."
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerLeave={() => onDiagnosticHoverRef.current?.(null)}
         onDoubleClick={handleDoubleClick}
         onClick={handleClick}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          const diagnostic = physicsDiagnostics.find(({ id }) => id === hoveredDiagnosticId);
+          if (!diagnostic) return;
+          event.preventDefault();
+          onDiagnosticSelectRef.current?.(diagnostic);
+        }}
         onContextMenu={handleContextMenu}
         style={{
           position: 'absolute',
@@ -610,6 +693,35 @@ export default function StageCanvas({
           cursor,
         }}
       />
+
+      {diagnosticChooser && (
+        <div
+          className="absolute z-20 max-h-[172px] min-w-[190px] max-w-[280px] overflow-y-auto rounded-md border border-border-warm bg-bg-warm p-1 shadow-xl"
+          style={{ left: diagnosticChooser.x, top: diagnosticChooser.y }}
+          role="menu"
+          aria-label="Overlapping Physics findings"
+        >
+          {diagnosticChooser.ids.map((id) => {
+            const diagnostic = physicsDiagnostics.find((candidate) => candidate.id === id);
+            if (!diagnostic) return null;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="menuitem"
+                className="block w-full rounded px-2 py-1.5 text-left font-mono text-[11px] text-text-warm hover:bg-text-warm-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-run/60"
+                onClick={() => {
+                  setDiagnosticChooser(null);
+                  onDiagnosticSelectRef.current?.(diagnostic);
+                }}
+              >
+                <span className="mr-1 uppercase opacity-65">{diagnostic.severity}</span>
+                {diagnostic.title}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <CanvasHud
         dragRect={dragRect}

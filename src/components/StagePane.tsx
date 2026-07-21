@@ -2,6 +2,7 @@ import type { DesignState, LineSegment, LineStitchBounds } from '../App.tsx';
 import type { HoopConfig } from '../data.ts';
 import type { MachinePreset } from '../data.ts';
 import type { WarningLocation } from '../lib/engine.ts';
+import type { PhysicsDiagnostic } from '../lib/engine.ts';
 import type { PathParamDef, PointParamDef } from '../lib/editor/parameters.ts';
 import StageCanvas from './StageCanvas.tsx';
 import PlaybackBar from './PlaybackBar.tsx';
@@ -9,7 +10,9 @@ import StatsChips from './StatsChips.tsx';
 import styles from './StagePane.module.css';
 import { cn } from '@/utils.ts';
 import { colorDist } from '../lib/core/colormath.ts';
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
+
+const EMPTY_PHYSICS_DIAGNOSTICS: PhysicsDiagnostic[] = [];
 
 interface Props {
   design: DesignState;
@@ -19,6 +22,11 @@ interface Props {
   activeLine: number | null;
   lineSegments: LineSegment[];
   warningLoc: WarningLocation | null;
+  physicsDiagnostics?: PhysicsDiagnostic[];
+  selectedDiagnosticId?: string | null;
+  hoveredDiagnosticId?: string | null;
+  onDiagnosticHover?: (diagnostic: PhysicsDiagnostic | null) => void;
+  onDiagnosticSelect?: (diagnostic: PhysicsDiagnostic) => void;
   hoveredLineBounds: LineStitchBounds | null;
   showDensity: boolean;
   onToggleDensity: () => void;
@@ -113,6 +121,11 @@ export default function StagePane({
   activeLine,
   lineSegments,
   warningLoc,
+  physicsDiagnostics = EMPTY_PHYSICS_DIAGNOSTICS,
+  selectedDiagnosticId = null,
+  hoveredDiagnosticId = null,
+  onDiagnosticHover,
+  onDiagnosticSelect,
   hoveredLineBounds,
   showDensity,
   onToggleDensity,
@@ -139,6 +152,28 @@ export default function StagePane({
   // Only show the handles toggle when there are point params to show
   const hasHandles = (pointParams?.length ?? 0) > 0;
   const darkGround = colorDist(design.background, '#000000') < 0.5;
+  const selectedDiagnostic =
+    physicsDiagnostics.find(({ id }) => id === selectedDiagnosticId) ?? null;
+  const [storedDiagnosticView, setStoredDiagnosticView] = useState({
+    diagnosticId: null as string | null,
+    visible: true,
+    dimmed: false,
+    inspecting: false,
+  });
+  const diagnosticView =
+    storedDiagnosticView.diagnosticId === selectedDiagnosticId
+      ? storedDiagnosticView
+      : {
+          diagnosticId: selectedDiagnosticId,
+          visible: true,
+          dimmed: false,
+          inspecting: false,
+        };
+
+  const firstPlaybackIndex = selectedDiagnostic?.playbackRanges.reduce(
+    (first, range) => Math.min(first, range.start, range.end),
+    Infinity,
+  );
 
   return (
     <section className={styles.pane}>
@@ -162,6 +197,13 @@ export default function StagePane({
           hoveredDataVar={hoveredDataVar}
           pinnedDataVars={pinnedDataVars}
           warningLoc={warningLoc}
+          physicsDiagnostics={physicsDiagnostics}
+          selectedDiagnosticId={selectedDiagnosticId}
+          hoveredDiagnosticId={hoveredDiagnosticId}
+          showSelectedDiagnostic={diagnosticView.visible}
+          dimBaseForDiagnostic={diagnosticView.dimmed}
+          onDiagnosticHover={onDiagnosticHover}
+          onDiagnosticSelect={onDiagnosticSelect}
           hoveredLineBounds={hoveredLineBounds}
           pointParams={pointParams}
           pathParams={pathParams}
@@ -177,6 +219,56 @@ export default function StagePane({
           onMachineContextMenu={onMachineContextMenu}
         />
         <StatsChips design={design} machine={machine} />
+        {selectedDiagnostic && (
+          <div className={styles.diagnosticControls} aria-label="Selected Physics overlay controls">
+            <span className={styles.diagnosticTitle}>{selectedDiagnostic.title}</span>
+            <button
+              type="button"
+              className={styles.diagnosticAction}
+              aria-pressed={!diagnosticView.visible}
+              onClick={() =>
+                setStoredDiagnosticView({ ...diagnosticView, visible: !diagnosticView.visible })
+              }
+            >
+              {diagnosticView.visible ? 'Hide overlay' : 'Reveal overlay'}
+            </button>
+            <button
+              type="button"
+              className={styles.diagnosticAction}
+              aria-pressed={diagnosticView.dimmed}
+              onClick={() =>
+                setStoredDiagnosticView({ ...diagnosticView, dimmed: !diagnosticView.dimmed })
+              }
+              disabled={!diagnosticView.visible}
+            >
+              {diagnosticView.dimmed ? 'Restore stitches' : 'Dim stitches'}
+            </button>
+            {Number.isFinite(firstPlaybackIndex) && !diagnosticView.inspecting && (
+              <button
+                type="button"
+                className={styles.diagnosticAction}
+                onClick={() => {
+                  onScrubChange(Math.min(design.pts.length, (firstPlaybackIndex ?? 0) + 1));
+                  setStoredDiagnosticView({ ...diagnosticView, inspecting: true });
+                }}
+              >
+                Inspect sew order
+              </button>
+            )}
+            {diagnosticView.inspecting && (
+              <button
+                type="button"
+                className={styles.diagnosticAction}
+                onClick={() => {
+                  onScrubChange(design.pts.length);
+                  setStoredDiagnosticView({ ...diagnosticView, inspecting: false });
+                }}
+              >
+                Return to full design
+              </button>
+            )}
+          </div>
+        )}
         <div className={styles.canvasControls}>
           <CanvasSwitch
             checked={!hideJumps}
@@ -215,6 +307,8 @@ export default function StagePane({
         activeLine={activeLine}
         lineSegments={lineSegments}
         highlightLines={warningLoc?.lines ?? []}
+        physicsDiagnostics={physicsDiagnostics}
+        selectedDiagnosticId={selectedDiagnosticId}
       />
     </section>
   );

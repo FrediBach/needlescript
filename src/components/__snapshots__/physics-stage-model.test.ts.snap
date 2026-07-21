@@ -1,0 +1,169 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`physics stage overlay fixtures > builds a deterministic cell fixture 1`] = `
+{
+  "anchor": {
+    "x": 0,
+    "y": 0,
+  },
+  "bounds": {
+    "maxX": 2,
+    "maxY": 1,
+    "minX": -2,
+    "minY": -1,
+  },
+  "category": "stitch",
+  "diagnosticId": "fixture",
+  "primitives": [
+    {
+      "height": 2,
+      "kind": "cell",
+      "width": 4,
+      "x": -2,
+      "y": -1,
+    },
+  ],
+  "severity": "warning",
+}
+`;
+
+exports[`physics stage overlay fixtures > builds a deterministic point fixture 1`] = `
+{
+  "anchor": {
+    "x": 1,
+    "y": 2,
+  },
+  "bounds": {
+    "maxX": 1,
+    "maxY": 2,
+    "minX": 1,
+    "minY": 2,
+  },
+  "category": "stitch",
+  "diagnosticId": "fixture",
+  "primitives": [
+    {
+      "kind": "point",
+      "point": {
+        "x": 1,
+        "y": 2,
+      },
+    },
+  ],
+  "severity": "warning",
+}
+`;
+
+exports[`physics stage overlay fixtures > builds a deterministic polyline fixture 1`] = `
+{
+  "anchor": {
+    "x": 2,
+    "y": 1.5,
+  },
+  "bounds": {
+    "maxX": 4,
+    "maxY": 3,
+    "minX": 0,
+    "minY": 0,
+  },
+  "category": "stitch",
+  "diagnosticId": "fixture",
+  "primitives": [
+    {
+      "closed": false,
+      "kind": "polyline",
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+        },
+        {
+          "x": 2,
+          "y": 3,
+        },
+        {
+          "x": 4,
+          "y": 0,
+        },
+      ],
+    },
+  ],
+  "severity": "warning",
+}
+`;
+
+exports[`physics stage overlay fixtures > builds a deterministic region fixture 1`] = `
+{
+  "anchor": {
+    "x": 0,
+    "y": 0,
+  },
+  "bounds": {
+    "maxX": 2,
+    "maxY": 2,
+    "minX": -2,
+    "minY": -2,
+  },
+  "category": "stitch",
+  "diagnosticId": "fixture",
+  "primitives": [
+    {
+      "kind": "region",
+      "rings": [
+        [
+          {
+            "x": -2,
+            "y": -2,
+          },
+          {
+            "x": 2,
+            "y": -2,
+          },
+          {
+            "x": 2,
+            "y": 2,
+          },
+          {
+            "x": -2,
+            "y": 2,
+          },
+        ],
+      ],
+    },
+  ],
+  "severity": "warning",
+}
+`;
+
+exports[`physics stage overlay fixtures > builds a deterministic segment fixture 1`] = `
+{
+  "anchor": {
+    "x": 2,
+    "y": 0,
+  },
+  "bounds": {
+    "maxX": 4,
+    "maxY": 0,
+    "minX": 0,
+    "minY": 0,
+  },
+  "category": "stitch",
+  "diagnosticId": "fixture",
+  "primitives": [
+    {
+      "kind": "segment",
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+        },
+        {
+          "x": 4,
+          "y": 0,
+        },
+      ],
+    },
+  ],
+  "severity": "warning",
+}
+`;
