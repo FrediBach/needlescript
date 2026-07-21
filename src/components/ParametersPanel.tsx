@@ -42,6 +42,8 @@ interface Props {
   items: ParamItem[];
   onParamChange: (name: string, line: number, value: number | string) => void;
   onAllParamsChange: (changes: ParamChange[]) => void;
+  onInteractionStart: () => void;
+  onInteractionEnd: () => void;
   /** Lock state managed by parent (App.tsx) so stage can also show locked handles */
   lockedParams: Set<string>;
   onToggleLock: (name: string) => void;
@@ -167,9 +169,18 @@ interface SliderRowProps {
   isLocked: boolean;
   onChange: (name: string, line: number, value: number) => void;
   onToggleLock: () => void;
+  onInteractionStart: () => void;
+  onInteractionEnd: () => void;
 }
 
-function SliderRow({ def, onChange, isLocked, onToggleLock }: SliderRowProps) {
+function SliderRow({
+  def,
+  onChange,
+  isLocked,
+  onToggleLock,
+  onInteractionStart,
+  onInteractionEnd,
+}: SliderRowProps) {
   const { name, value, min, max, step, sliderKind, line } = def;
 
   // When focused, we keep a local draft string so the user can type freely.
@@ -232,6 +243,8 @@ function SliderRow({ def, onChange, isLocked, onToggleLock }: SliderRowProps) {
           step={step}
           value={[value]}
           onValueChange={handleSliderChange}
+          onValueCommitted={onInteractionEnd}
+          onPointerDownCapture={onInteractionStart}
           aria-label={name}
           className={styles.slider}
         />
@@ -594,6 +607,8 @@ export default function ParametersPanel({
   items,
   onParamChange,
   onAllParamsChange,
+  onInteractionStart,
+  onInteractionEnd,
   lockedParams,
   onToggleLock,
   onHighlightHandle,
@@ -1008,6 +1023,8 @@ export default function ParametersPanel({
                 isLocked={lockedParams.has(def.name)}
                 onChange={handleParamChange}
                 onToggleLock={() => onToggleLock(def.name)}
+                onInteractionStart={onInteractionStart}
+                onInteractionEnd={onInteractionEnd}
               />
             );
           })}

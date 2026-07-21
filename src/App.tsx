@@ -25,6 +25,7 @@ import type {
   PhysicsReport,
   ResolvedMachineProfile,
   MaterialIntent,
+  RunResult,
 } from './lib/engine.ts';
 import { DEFAULT_MATERIAL_INTENT } from './lib/engine.ts';
 import { useCompiler } from './hooks/useCompiler.ts';
@@ -113,6 +114,14 @@ import {
 import { toast } from 'sonner';
 import { applyHoopDirective } from './hoopSource.ts';
 import { applyHoopSetupPatch } from './hoopSetupSource.ts';
+import {
+  INITIAL_PHYSICS_REPORT_STATE,
+  physicsCheckBlocked,
+  physicsCheckStarted,
+  physicsCheckSucceeded,
+  physicsSourceChanged,
+  type PhysicsReportState,
+} from './physics-analysis-state.ts';
 
 export interface LineSegment {
   line: number;
@@ -195,6 +204,36 @@ const INITIAL_DESIGN: DesignState = {
   ok: false,
 };
 
+function buildDesignState(result: RunResult, stats: DesignStats, name: string): DesignState {
+  const pts: StitchEvent[] = [];
+  const marks: DebugMark[] = [];
+  for (const event of result.events) {
+    if (event.t === 'stitch' || event.t === 'jump') pts.push(event);
+    else if (event.t === 'mark') marks.push({ x: event.x, y: event.y, at: pts.length });
+  }
+  return {
+    events: result.events,
+    pts,
+    marks,
+    density: result.density,
+    stats,
+    warnings: [...result.warnings],
+    preflight: result.preflight,
+    physics: result.physics,
+    machineProfile: result.machineProfile,
+    name,
+    ok: true,
+    activeHoop: result.activeHoop,
+    activeOverrides: result.activeOverrides,
+    chalk: result.chalk ?? [],
+    dataVars: result.dataVars ?? [],
+    referenceVars: result.referenceVars ?? [],
+    colorTable: result.colorTable,
+    background: result.background,
+    material: result.material,
+  };
+}
+
 let msgId = 0;
 
 // Groups the three pieces of state that all change together when the
@@ -250,11 +289,32 @@ function DialogSpinner() {
 }
 
 export default function App() {
-  const [source, setSource] = useState(EXAMPLES[DEFAULT_EXAMPLE_ID]);
+  const [source, setSourceState] = useState(EXAMPLES[DEFAULT_EXAMPLE_ID]);
   // Live ref that always holds the current source code.  Used by handleRun so
   // the Header's Run button never captures a stale closure value — same
   // principle as sourceRef in EditorPane.
   const sourceRef = useRef(source);
+  const [physicsReportState, setPhysicsReportState] = useState<PhysicsReportState>(
+    INITIAL_PHYSICS_REPORT_STATE,
+  );
+  const physicsReportStateRef = useRef(physicsReportState);
+  const updatePhysicsReportState = useCallback(
+    (update: (state: PhysicsReportState) => PhysicsReportState) => {
+      const next = update(physicsReportStateRef.current);
+      physicsReportStateRef.current = next;
+      setPhysicsReportState(next);
+    },
+    [],
+  );
+  const setSource = useCallback(
+    (next: string) => {
+      if (next === sourceRef.current) return;
+      sourceRef.current = next;
+      setSourceState(next);
+      updatePhysicsReportState(physicsSourceChanged);
+    },
+    [updatePhysicsReportState],
+  );
   useLayoutEffect(() => {
     sourceRef.current = source;
   }, [source]);
@@ -455,11 +515,17 @@ export default function App() {
     [],
   );
 
-  const { compile } = useCompiler({ physicsAnalysis: 'full' });
+  const { compile, compileAnalysis } = useCompiler({ physicsAnalysis: 'full' });
+  const backgroundAnalysisSuspendedRef = useRef(false);
+  const foregroundRevisionRef = useRef(-1);
+  const initialised = useRef(false);
 
   const runProgram = useCallback(
     async (src: string, designName: string) => {
       const t0 = performance.now();
+      const revision = physicsReportStateRef.current.sourceRevision;
+      foregroundRevisionRef.current = revision;
+      updatePhysicsReportState((state) => physicsCheckStarted(state, revision));
       // A fresh compile invalidates any hovered warning marker.
       setHoverWarn(null);
       setSelectedPreflightLoc(null);
@@ -472,6 +538,7 @@ export default function App() {
 
       // null means a newer compile superseded this one — discard silently.
       if (response === null) return;
+      if (physicsReportStateRef.current.sourceRevision !== revision) return;
 
       if (response.ok) {
         performance.measure('needlescript:compile-round-trip', {
@@ -495,17 +562,12 @@ export default function App() {
         } else {
           setErrorMarkers([]);
         }
+        updatePhysicsReportState((state) => physicsCheckBlocked(state, revision));
         return;
       }
 
       const { result, stats } = response;
-      const pts: StitchEvent[] = [];
-      const marks: DebugMark[] = [];
-      for (const e of result.events) {
-        if (e.t === 'stitch' || e.t === 'jump') pts.push(e);
-        else if (e.t === 'mark') marks.push({ x: e.x, y: e.y, at: pts.length });
-      }
-      const warnings: string[] = [...result.warnings];
+      const newDesign = buildDesignState(result, stats, designName);
       // Map each engine warning to its location (hotspot warnings only). Indices
       // refer to result.warnings, so App-appended warnings below get no location.
       const locByIndex = new Map<number, WarningLocation>();
@@ -520,40 +582,68 @@ export default function App() {
             : ''),
         'ok',
       );
-      warnings.forEach((w, i) => addMsg(w, 'warn', locByIndex.get(i)));
-
-      const newDesign: DesignState = {
-        events: result.events,
-        pts,
-        marks,
-        density: result.density,
-        stats,
-        warnings,
-        preflight: result.preflight,
-        physics: result.physics,
-        machineProfile: result.machineProfile,
-        name: designName,
-        ok: true,
-        activeHoop: result.activeHoop,
-        activeOverrides: result.activeOverrides,
-        chalk: result.chalk ?? [],
-        dataVars: result.dataVars ?? [],
-        referenceVars: result.referenceVars ?? [],
-        colorTable: result.colorTable,
-        background: result.background,
-        material: result.material,
-      };
+      newDesign.warnings.forEach((warning, index) =>
+        addMsg(warning, 'warn', locByIndex.get(index)),
+      );
       setErrorMarkers([]);
       lastErrorRef.current = null;
-      dispatch({ type: 'run/success', design: newDesign, scrubPos: pts.length });
+      updatePhysicsReportState((state) => physicsCheckSucceeded(state, revision));
+      dispatch({ type: 'run/success', design: newDesign, scrubPos: newDesign.pts.length });
     },
-    [addMsg, compile],
+    [addMsg, compile, updatePhysicsReportState],
   );
 
+  const designNameRef = useRef(design.name);
+  useLayoutEffect(() => {
+    designNameRef.current = design.name;
+  }, [design.name]);
+
+  // Source edits stale the report synchronously. Once typing has been idle for
+  // 500 ms, compile the latest revision without adding console noise.
+  useEffect(() => {
+    if (!initialised.current) return;
+    const revision = physicsReportStateRef.current.sourceRevision;
+    const timeout = setTimeout(() => {
+      if (backgroundAnalysisSuspendedRef.current) return;
+      const state = physicsReportStateRef.current;
+      if (state.sourceRevision !== revision) return;
+      if (foregroundRevisionRef.current === revision) return;
+      if (state.status === 'current' && state.reportRevision === revision) return;
+
+      updatePhysicsReportState((current) => physicsCheckStarted(current, revision));
+      void compileAnalysis(source).then((response) => {
+        if (response === null || physicsReportStateRef.current.sourceRevision !== revision) return;
+        if (!response.ok) {
+          lastErrorRef.current = response.message;
+          setErrorMarkers(
+            response.slLine === undefined
+              ? []
+              : [
+                  {
+                    message: response.message.replace(/\s*\(line\s+\d+\)\s*$/i, ''),
+                    line: response.slLine,
+                  },
+                ],
+          );
+          updatePhysicsReportState((current) => physicsCheckBlocked(current, revision));
+          return;
+        }
+
+        const nextDesign = buildDesignState(response.result, response.stats, designNameRef.current);
+        setHoverWarn(null);
+        setSelectedPreflightLoc(null);
+        setErrorMarkers([]);
+        lastErrorRef.current = null;
+        updatePhysicsReportState((current) => physicsCheckSucceeded(current, revision));
+        dispatch({ type: 'run/success', design: nextDesign, scrubPos: nextDesign.pts.length });
+      });
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [compileAnalysis, source, updatePhysicsReportState]);
+
   // ── XY handle drag callbacks ──────────────────────────────────────────────
-  // Use a ref to track the latest pending rAF id, and another to track the
-  // latest source-after-drag so rapid events always build on the freshest base.
-  const xyDragRafRef = useRef<number | null>(null);
+  // Dragging updates source and stale state, but compilation resumes only once
+  // at commit so pointer movement never competes with the worker.
   const xySourceRef = useRef<string | null>(null);
 
   const updateStageHandle = useCallback(
@@ -616,19 +706,13 @@ export default function App() {
 
   const handleXYHandleDrag = useCallback(
     (name: string, line: number, x: number, y: number, options?: { breakPair: boolean }) => {
+      backgroundAnalysisSuspendedRef.current = true;
       const base = xySourceRef.current ?? sourceRef.current;
       const updated = updateStageHandle(base, name, line, x, y, options);
       xySourceRef.current = updated;
       setSource(updated);
-
-      if (xyDragRafRef.current !== null) cancelAnimationFrame(xyDragRafRef.current);
-      xyDragRafRef.current = requestAnimationFrame(() => {
-        xyDragRafRef.current = null;
-        const latest = xySourceRef.current ?? sourceRef.current;
-        runProgram(latest, design.name);
-      });
     },
-    [design.name, runProgram, updateStageHandle],
+    [setSource, updateStageHandle],
   );
 
   const handleXYHandleCommit = useCallback(
@@ -637,13 +721,10 @@ export default function App() {
       const updated = updateStageHandle(base, name, line, x, y, options);
       xySourceRef.current = null; // reset pending source after final commit
       setSource(updated);
-      if (xyDragRafRef.current !== null) {
-        cancelAnimationFrame(xyDragRafRef.current);
-        xyDragRafRef.current = null;
-      }
+      backgroundAnalysisSuspendedRef.current = false;
       runProgram(updated, design.name);
     },
-    [design.name, runProgram, updateStageHandle],
+    [design.name, runProgram, setSource, updateStageHandle],
   );
 
   const commitPathValue = useCallback(
@@ -658,7 +739,7 @@ export default function App() {
       setSource(updated);
       runProgram(updated, design.name);
     },
-    [design.name, runProgram],
+    [design.name, runProgram, setSource],
   );
 
   const handlePathInsert = useCallback(
@@ -691,6 +772,7 @@ export default function App() {
         drag = { base, def };
         pathTranslateRef.current = drag;
       }
+      backgroundAnalysisSuspendedRef.current = true;
       const delta = constrainPathTranslation(drag.def, dx, dy);
       const updated = updatePathParameterValue(
         drag.base,
@@ -700,10 +782,11 @@ export default function App() {
       setSource(updated);
       if (commit) {
         pathTranslateRef.current = null;
+        backgroundAnalysisSuspendedRef.current = false;
         runProgram(updated, design.name);
       }
     },
-    [design.name, runProgram],
+    [design.name, runProgram, setSource],
   );
 
   // When the source changes from outside (editor, example, share), clear the
@@ -818,7 +901,10 @@ export default function App() {
     [design.name, runProgram],
   );
 
-  const initialised = useRef(false);
+  const handleAnalysisInteractionChange = useCallback((active: boolean) => {
+    backgroundAnalysisSuspendedRef.current = active;
+  }, []);
+
   const handleEditorReady = useCallback(() => {
     if (initialised.current) return;
     initialised.current = true;
@@ -835,7 +921,7 @@ export default function App() {
       runProgram(src, name);
       clearActiveSnippet();
     },
-    [runProgram, clearActiveSnippet],
+    [runProgram, clearActiveSnippet, setSource],
   );
 
   const dialogPalette = useMemo(() => {
@@ -887,7 +973,15 @@ export default function App() {
       setSource(next);
       runProgram(next, design.name);
     },
-    [design.background, design.material, design.name, dialogPalette, effectiveHoop, runProgram],
+    [
+      design.background,
+      design.material,
+      design.name,
+      dialogPalette,
+      effectiveHoop,
+      runProgram,
+      setSource,
+    ],
   );
 
   const applyMachinePreset = useCallback(
@@ -934,7 +1028,7 @@ export default function App() {
         toast('Hoop changed — scatter, voronoi, and relax layouts re-flow with the field.');
       }
     },
-    [design.name, machineBudgetMode, runProgram],
+    [design.name, machineBudgetMode, runProgram, setSource],
   );
 
   const handleApplyFabric = useCallback(
@@ -943,7 +1037,7 @@ export default function App() {
       setSource(next);
       runProgram(next, design.name);
     },
-    [design.name, runProgram],
+    [design.name, runProgram, setSource],
   );
 
   const handleMachineBudgetModeChange = useCallback((enabled: boolean) => {
@@ -956,7 +1050,7 @@ export default function App() {
     if (next === sourceRef.current) return;
     setSource(next);
     runProgram(next, design.name);
-  }, [design.name, runProgram]);
+  }, [design.name, runProgram, setSource]);
 
   const handleStagingCommit = useCallback(
     (nextSource: string) => {
@@ -964,7 +1058,7 @@ export default function App() {
       runProgram(nextSource, 'import');
       closeStaging();
     },
-    [runProgram, closeStaging],
+    [runProgram, closeStaging, setSource],
   );
 
   const handleBitmapInsert = useCallback(
@@ -975,7 +1069,7 @@ export default function App() {
       addMsg(summary, 'ok');
       closeBitmapImport();
     },
-    [addMsg, closeBitmapImport],
+    [addMsg, closeBitmapImport, setSource],
   );
 
   const handleDownload = useCallback(
@@ -1120,8 +1214,10 @@ export default function App() {
             onSourceChange={setSource}
             onEditorReady={handleEditorReady}
             onRun={handleRun}
+            onAnalysisInteractionChange={handleAnalysisInteractionChange}
             messages={messages}
             preflight={design.preflight}
+            physicsReportState={physicsReportState}
             isDragging={isDragging}
             activeLine={activeLine}
             onWarnHover={setHoverWarn}

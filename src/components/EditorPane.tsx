@@ -28,6 +28,7 @@ import styles from './EditorPane.module.css';
 import { Input } from '@/components/ui/input.tsx';
 import type { EditorContextActions } from './MachineMenu.tsx';
 import PreflightPanel from './PreflightPanel.tsx';
+import { physicsStatusMessage, type PhysicsReportState } from '../physics-analysis-state.ts';
 
 interface Props {
   source: string;
@@ -35,8 +36,10 @@ interface Props {
   onSourceChange: (src: string) => void;
   onEditorReady?: () => void;
   onRun: (src?: string) => void;
+  onAnalysisInteractionChange: (active: boolean) => void;
   messages: ConsoleMessage[];
   preflight?: PreflightResult;
+  physicsReportState: PhysicsReportState;
   isDragging: boolean;
   activeLine: number | null; // source line currently sewing (playback), 1-based
   onWarnHover: (loc: WarningLocation | null) => void;
@@ -113,8 +116,10 @@ export default function EditorPane({
   onSourceChange,
   onEditorReady,
   onRun,
+  onAnalysisInteractionChange,
   messages,
   preflight,
+  physicsReportState,
   isDragging,
   activeLine,
   onWarnHover,
@@ -200,39 +205,14 @@ export default function EditorPane({
   const mouseLeaveRef = useRef<IDisposable | null>(null);
   const contextMenuRef = useRef<IDisposable | null>(null);
 
-  // ── Parameters panel throttle ───────────────────────────────────────
-  // Leading + trailing throttle at 250 ms: fire immediately on first change,
-  // then at most once per 250 ms while the slider is being dragged.
-  const lastRunTimeRef = useRef(0);
-  const runTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const handleParamChange = useCallback(
     (name: string, line: number, value: number | string) => {
       const updated =
         typeof value === 'string'
           ? updateTextParameter(sourceRef.current, line, name, value)
           : updateParameter(sourceRef.current, line, name, value);
+      sourceRef.current = updated;
       onSourceChange(updated);
-
-      const now = Date.now();
-      const elapsed = now - lastRunTimeRef.current;
-
-      if (runTimerRef.current !== null) clearTimeout(runTimerRef.current);
-
-      if (elapsed >= 250) {
-        // First event in this burst — fire immediately with the fresh source.
-        lastRunTimeRef.current = now;
-        onRunRef.current(updated);
-      } else {
-        // Mid-burst — schedule a trailing call at the end of the 250 ms window.
-        // Use sourceRef.current (not handleRun's closure) so the latest source
-        // is always used even if the React re-render hasn't committed yet.
-        runTimerRef.current = setTimeout(() => {
-          runTimerRef.current = null;
-          lastRunTimeRef.current = Date.now();
-          onRunRef.current(sourceRef.current);
-        }, 250 - elapsed);
-      }
     },
     [onSourceChange],
   );
@@ -257,13 +237,20 @@ export default function EditorPane({
           src = updateParameter(src, line, name, value);
         }
       }
+      sourceRef.current = src;
       onSourceChange(src);
-      if (runTimerRef.current !== null) clearTimeout(runTimerRef.current);
-      lastRunTimeRef.current = Date.now();
-      onRunRef.current(src);
     },
     [onSourceChange],
   );
+
+  const handleParameterInteractionStart = useCallback(
+    () => onAnalysisInteractionChange(true),
+    [onAnalysisInteractionChange],
+  );
+  const handleParameterInteractionEnd = useCallback(() => {
+    onAnalysisInteractionChange(false);
+    onRunRef.current(sourceRef.current);
+  }, [onAnalysisInteractionChange]);
 
   const selectPreflightIssue = useCallback(
     (issue: PreflightIssue) => {
@@ -735,6 +722,8 @@ export default function EditorPane({
         items={parameterItems}
         onParamChange={handleParamChange}
         onAllParamsChange={handleAllParamsChange}
+        onInteractionStart={handleParameterInteractionStart}
+        onInteractionEnd={handleParameterInteractionEnd}
         lockedParams={lockedParams}
         onToggleLock={onToggleLock}
         onHighlightHandle={onHighlightHandle}
@@ -765,6 +754,15 @@ export default function EditorPane({
         aria-live="polite"
         style={{ height: consoleHeight }}
       >
+        {physicsStatusMessage(physicsReportState) && (
+          <div
+            className={styles.physicsStatus}
+            data-status={physicsReportState.status}
+            role="status"
+          >
+            {physicsStatusMessage(physicsReportState)}
+          </div>
+        )}
         {preflight && (
           <PreflightPanel
             result={preflight}

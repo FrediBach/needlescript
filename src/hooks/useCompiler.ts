@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Comlink from 'comlink';
 import type { CompilerWorkerApi } from '../compiler.worker.ts';
 import type { CompileResponse } from '../compiler.worker.types.ts';
 import type { MachineProfile, PhysicsAnalysisMode } from '../lib/core/types.ts';
+import { CompilerQueue, type CompilePriority } from './compilerQueue.ts';
 
 // Import the worker via Vite's native ?worker syntax so it gets bundled as a
 // separate chunk and never runs on the main thread.
@@ -10,21 +11,18 @@ import CompilerWorker from '../compiler.worker?worker';
 
 const COMPILE_TIMEOUT_MS = 5000;
 
-interface QueuedCompile {
+interface CompileJob {
   source: string;
   seed?: number;
   machineProfile?: MachineProfile;
   physicsAnalysis?: PhysicsAnalysisMode;
-  isStale: () => boolean;
-  resolve: (response: CompileResponse | null) => void;
 }
 
 let sharedWorker: Worker | null = null;
 let sharedProxy: Comlink.Remote<CompilerWorkerApi> | null = null;
-let active = false;
 let consumers = 0;
+let nextConsumerId = 0;
 let cleanupTimer: ReturnType<typeof setTimeout> | null = null;
-const queue: QueuedCompile[] = [];
 
 function disposeSharedWorker(): void {
   const proxy = sharedProxy;
@@ -47,67 +45,56 @@ function ensureSharedWorker(): Comlink.Remote<CompilerWorkerApi> {
   return sharedProxy!;
 }
 
-function finishJob(): void {
-  active = false;
-  runNextJob();
-  if (consumers === 0 && !active && queue.length === 0) disposeSharedWorker();
-}
-
-function runNextJob(): void {
-  if (active) return;
-  let job = queue.shift();
-  while (job?.isStale()) {
-    job.resolve(null);
-    job = queue.shift();
-  }
-  if (!job) return;
-  active = true;
-
+function executeCompile(job: CompileJob, signal: AbortSignal): Promise<CompileResponse> {
   const proxy = ensureSharedWorker();
-  let settled = false;
-  const timeout = setTimeout(() => {
-    if (settled) return;
-    settled = true;
-    spawnSharedWorker();
-    job.resolve({
-      id: 0,
-      ok: false,
-      message: 'Compilation timed out — check for infinite loops',
-    });
-    finishJob();
-  }, COMPILE_TIMEOUT_MS);
-
-  proxy
-    .compile(job.source, job.seed, job.machineProfile, job.physicsAnalysis)
-    .then((response) => {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const abort = () => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      job.resolve(response);
-      finishJob();
-    })
-    .catch(() => {
+      reject(new DOMException('Background compilation cancelled', 'AbortError'));
+    };
+    const timeout = setTimeout(() => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeout);
-      job.resolve({ id: 0, ok: false, message: 'Compilation worker stopped unexpectedly' });
+      signal.removeEventListener('abort', abort);
       spawnSharedWorker();
-      finishJob();
-    });
-}
+      resolve({
+        id: 0,
+        ok: false,
+        message: 'Compilation timed out — check for infinite loops',
+      });
+    }, COMPILE_TIMEOUT_MS);
 
-function enqueueCompile(
-  source: string,
-  seed: number | undefined,
-  machineProfile: MachineProfile | undefined,
-  physicsAnalysis: PhysicsAnalysisMode | undefined,
-  isStale: () => boolean,
-): Promise<CompileResponse | null> {
-  return new Promise((resolve) => {
-    queue.push({ source, seed, machineProfile, physicsAnalysis, isStale, resolve });
-    runNextJob();
+    proxy
+      .compile(job.source, job.seed, job.machineProfile, job.physicsAnalysis)
+      .then((response) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        signal.removeEventListener('abort', abort);
+        resolve(response);
+      })
+      .catch(() => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        signal.removeEventListener('abort', abort);
+        resolve({ id: 0, ok: false, message: 'Compilation worker stopped unexpectedly' });
+        if (sharedProxy === proxy) spawnSharedWorker();
+      });
+    signal.addEventListener('abort', abort, { once: true });
   });
 }
+
+const queue = new CompilerQueue<CompileJob, CompileResponse>(
+  executeCompile,
+  spawnSharedWorker,
+  () => {
+    if (consumers === 0) disposeSharedWorker();
+  },
+);
 
 function acquireCompiler(): void {
   consumers++;
@@ -125,7 +112,7 @@ function releaseCompiler(): void {
   // Delay disposal through React StrictMode's intentional unmount/remount pair.
   cleanupTimer = setTimeout(() => {
     cleanupTimer = null;
-    if (consumers === 0 && !active && queue.length === 0) disposeSharedWorker();
+    if (consumers === 0 && queue.idle) disposeSharedWorker();
   }, 0);
 }
 
@@ -134,48 +121,74 @@ export interface UseCompilerOptions {
 }
 
 export function useCompiler({ physicsAnalysis }: UseCompilerOptions = {}) {
-  // Monotonic counter scoped to this hook consumer. A shared worker serializes
-  // jobs across the playground/book, while stale-result semantics stay local.
-  const latestIdRef = useRef(0);
+  // Generations stay local to this hook consumer even though the worker queue
+  // is shared by the playground, book, and staging UI.
+  const foregroundIdRef = useRef(0);
+  const backgroundIdRef = useRef(0);
+  const [consumerId] = useState(() => ++nextConsumerId);
 
   useEffect(() => {
     acquireCompiler();
     return releaseCompiler;
   }, []);
 
-  const compile = useCallback(
+  const compileWithPriority = useCallback(
     (
       source: string,
       seed?: number,
       machineProfile?: MachineProfile,
+      priority: CompilePriority = 'foreground',
     ): Promise<CompileResponse | null> => {
-      const id = ++latestIdRef.current;
+      const foregroundId =
+        priority === 'foreground' ? ++foregroundIdRef.current : foregroundIdRef.current;
+      if (priority === 'foreground') backgroundIdRef.current++;
+      const backgroundId =
+        priority === 'background' ? ++backgroundIdRef.current : backgroundIdRef.current;
+      const id = priority === 'foreground' ? foregroundId : backgroundId;
       const startedAt = performance.now();
+      const isStale = () =>
+        priority === 'foreground'
+          ? foregroundIdRef.current !== foregroundId
+          : foregroundIdRef.current !== foregroundId || backgroundIdRef.current !== backgroundId;
 
-      return enqueueCompile(
-        source,
-        seed,
-        machineProfile,
-        physicsAnalysis,
-        () => latestIdRef.current !== id,
-      ).then((response) => {
-        if (response === null || latestIdRef.current !== id) return null;
-        return {
-          ...response,
-          id,
-          ...(response.ok
-            ? {
-                timings: {
-                  ...response.timings,
-                  roundTripMs: performance.now() - startedAt,
-                },
-              }
-            : {}),
-        };
-      });
+      return queue
+        .enqueue(
+          { source, seed, machineProfile, physicsAnalysis },
+          {
+            priority,
+            ...(priority === 'background' ? { coalesceKey: consumerId } : {}),
+            isStale,
+          },
+        )
+        .then((response) => {
+          if (response === null || isStale()) return null;
+          return {
+            ...response,
+            id,
+            ...(response.ok
+              ? {
+                  timings: {
+                    ...response.timings,
+                    roundTripMs: performance.now() - startedAt,
+                  },
+                }
+              : {}),
+          };
+        });
     },
-    [physicsAnalysis],
+    [consumerId, physicsAnalysis],
   );
 
-  return { compile };
+  const compile = useCallback(
+    (source: string, seed?: number, machineProfile?: MachineProfile) =>
+      compileWithPriority(source, seed, machineProfile, 'foreground'),
+    [compileWithPriority],
+  );
+  const compileAnalysis = useCallback(
+    (source: string, seed?: number, machineProfile?: MachineProfile) =>
+      compileWithPriority(source, seed, machineProfile, 'background'),
+    [compileWithPriority],
+  );
+
+  return { compile, compileAnalysis };
 }

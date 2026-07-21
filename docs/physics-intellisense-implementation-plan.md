@@ -1,9 +1,9 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-3 complete** (2026-07-21) — findings retain semantic affected geometry, rich source
-roles or an explicit generated-source reason, and exact final playback ranges. Spatial fill/satin
-warnings are cataloged, and core coverage replaces the removed app-only density heuristic.
-Preview-overlay legibility remains an explicit PI-7 implementation risk.
+Status: **PI-4 complete** (2026-07-21) — editor analysis now has revision-aware
+current/stale/checking/blocked lifecycle state, 500 ms background checks, a coalescing priority
+queue, and drag suspension with one commit-time run. Preview-overlay legibility remains an explicit
+PI-7 implementation risk.
 
 Last updated: 2026-07-21
 
@@ -13,7 +13,8 @@ Last updated: 2026-07-21
 | PI-1    | Complete    | Unified catalog/types shipped without freezing overlay presentation     |
 | PI-2    | Complete    | Editor analysis is independent from source-selected preflight policy    |
 | PI-3    | Complete    | Rich source, geometry, construction, and playback attribution shipped   |
-| PI-4–11 | Not started | Follow the dependency and acceptance gates documented below             |
+| PI-4    | Complete    | Revision lifecycle, background analysis, and priority queue shipped     |
+| PI-5–11 | Not started | Follow the dependency and acceptance gates documented below             |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
 playback—not a renamed or enlarged preflight panel.
@@ -672,6 +673,8 @@ Validation record (2026-07-21):
 
 ### PI-4 — Analysis state and background checking
 
+Status: **complete** (2026-07-21)
+
 Deliverables:
 
 - Add `sourceRevision`, `reportRevision`, and current/stale/checking/blocked state.
@@ -686,6 +689,43 @@ Acceptance:
 - Fast typing does not create an unbounded worker queue.
 - Manual Run is not delayed behind obsolete analysis jobs.
 - Parameter dragging stays responsive.
+
+Implementation progress:
+
+- [x] Added playground-only `PhysicsReportState` transitions with monotonic `sourceRevision`, the
+      last successful `reportRevision`, and explicit `current`, `stale`, `checking`, and `blocked`
+      states. Engine `RunResult.physics` remains free of editor lifecycle data.
+- [x] Wrapped every playground source mutation so an edit marks the existing report stale
+      synchronously. The console displays stale/checking/blocked context while retaining the last
+      design, and successful results replace the design and report in one reducer update.
+- [x] Added a 500 ms idle background check that requests full physics analysis without appending
+      console output. Invalid source preserves the previous preview, prioritizes compiler markers,
+      and moves Physics to “Waiting for a valid design.”
+- [x] Replaced the shared FIFO compiler list with foreground/background scheduling. Queued and
+      active background work is coalesced per consumer, manual runs skip queued analysis, and an
+      active obsolete background worker is cancelled before foreground work starts.
+- [x] Separated foreground and background staleness generations so a background request cannot
+      supersede a manual run. Source-revision guards also prevent an in-flight result from applying
+      after a newer edit but before its debounce fires.
+- [x] Suspended compilation during stage point/path dragging and parameter-slider dragging. Source
+      and stale state still update live; pointer commit resumes analysis exactly once.
+- [x] Added no Physics persistence: diagnostics, reports, and revision state are never written to
+      local storage. Only future Physics display preferences are eligible for persistence.
+- [x] Added focused lifecycle and queue coverage for immediate stale state, obsolete-result
+      rejection, blocked/recovery transitions, foreground priority, queued coalescing, and active
+      background cancellation/replacement.
+
+Validation record (2026-07-21):
+
+- `npm test`: 79 files and 2,083 tests passed; generated references are current.
+- `npm run lint` and `npm run build` passed. The app build retained its pre-existing large-chunk
+  advisory.
+- `npm run build:lib` and `npm run check:lib` passed; publint and the package type check found no
+  problems.
+- React Doctor's changed-file scan scored 80/100. Its 22 findings are in pre-existing App,
+  EditorPane, and ParametersPanel code surfaced because those files changed; the PI-4 lifecycle,
+  status, interaction, and queue additions introduced no reported finding.
+- Targeted Prettier validation passed for every changed source, test, and documentation file.
 
 ### PI-5 — Physics panel MVP
 
