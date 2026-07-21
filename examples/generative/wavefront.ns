@@ -13,6 +13,8 @@
 //  reads as a single wave PROPAGATING rather than a wavy texture.
 // ============================================================
 
+plan 'reversing-nearest'
+
 // --- the line field ---
 let nlines  = 20       // [8:1:40] number of parallel lines
 let RF      = 44       // [20:1:46] fill-disc radius, mm
