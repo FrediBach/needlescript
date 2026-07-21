@@ -1,4 +1,8 @@
 import type { PreflightIssue, ResolvedMachineProfile, StitchEvent } from '../core/types.ts';
+import {
+  preflightCatalogMetadata,
+  type PhysicsDiagnosticCode,
+} from './physics-diagnostics/catalog.ts';
 
 /**
  * Conservative event-stream metrics. These are engineering defaults, not
@@ -42,21 +46,18 @@ function uniqueLines(points: readonly Point[]): number[] {
 }
 
 function issue(
-  code: string,
+  code: PhysicsDiagnosticCode,
   message: string,
   points: readonly Point[],
-  suggestion: string,
-  severity: PreflightIssue['severity'] = 'warning',
 ): PreflightIssue {
   return {
-    severity,
+    ...preflightCatalogMetadata(code),
     code,
     message,
     points: points
       .slice(0, EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumPointsPerIssue)
       .map(({ x, y }) => ({ x, y })),
     lines: uniqueLines(points),
-    suggestion,
   };
 }
 
@@ -98,7 +99,6 @@ function shortStitchClusters(
             'stitch.short-cluster',
             `${index - start - 1} consecutive stitches are shorter than ${maximumLength.toFixed(2)} mm`,
             points,
-            'Increase local stitch spacing or simplify the path through this cluster.',
           ),
         );
         if (issues.length >= EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumIssuesPerCode) return issues;
@@ -126,9 +126,8 @@ function turnClusters(
   accepts: (run: readonly StitchEvent[], index: number, angle: number) => boolean,
   minimumTurns: number,
   radiusMM: number,
-  code: string,
+  code: PhysicsDiagnosticCode,
   message: (turns: number) => string,
-  suggestion: string,
 ): PreflightIssue[] {
   const issues: PreflightIssue[] = [];
   for (const run of runs) {
@@ -136,7 +135,7 @@ function turnClusters(
     const flush = () => {
       if (indices.length >= minimumTurns) {
         const points = run.slice(indices[0] - 1, indices.at(-1)! + 2);
-        issues.push(issue(code, message(indices.length), points, suggestion));
+        issues.push(issue(code, message(indices.length), points));
       }
       indices = [];
     };
@@ -171,7 +170,6 @@ function reversalClusters(runs: readonly StitchEvent[][]): PreflightIssue[] {
     reversalClusterRadiusMM,
     'path.reversal-cluster',
     (turns) => `${turns} repeated reversals occur within a ${reversalClusterRadiusMM} mm radius`,
-    'Reduce local backtracking or spread the reversals over a larger area.',
   );
 }
 
@@ -196,7 +194,6 @@ function nearHoleClusters(events: readonly StitchEvent[]): PreflightIssue[] {
           'penetration.near-hole-cluster',
           `${nearby.length} penetrations fall within ${nearHoleRadiusMM.toFixed(2)} mm over the last ${window.length} penetrations`,
           nearby,
-          'Spread nearby penetrations or reduce repeated passes through this area.',
         ),
       );
       lastReportedPenetration = penetration;
@@ -227,7 +224,6 @@ function longSewnFloats(
             'stitch.long-sewn-float',
             `a sewn stitch spans ${length.toFixed(2)} mm (preferred maximum ${profile.maximumPreferredSewnStitchMM.toFixed(2)} mm)`,
             [previous, event],
-            'Shorten or subdivide this sewn span to reduce snag risk.',
           ),
         );
         if (issues.length >= EVENT_STREAM_PREFLIGHT_THRESHOLDS.maximumIssuesPerCode) return issues;
@@ -255,7 +251,6 @@ function longUntrimmedJumpChains(
           'travel.long-untrimmed-jump',
           `an untrimmed jump chain spans ${chain.length.toFixed(2)} mm (preferred maximum ${profile.maximumPreferredJumpMM.toFixed(2)} mm)`,
           points,
-          'Insert a trim before this travel or enable an appropriate autotrim threshold.',
         ),
       );
     }
@@ -304,8 +299,6 @@ function excessiveContinuousRuns(
           'machine.continuous-stitch-run',
           `more than ${profile.maximumConsecutiveStitches.toLocaleString('en-US')} consecutive stitches occur without a trim or color boundary`,
           [first, event],
-          'Add a planned thread boundary if the target machine needs a pause or inspection point.',
-          'info',
         ),
       );
       reported = true;
@@ -335,7 +328,6 @@ function directionChangeClusters(runs: readonly StitchEvent[][]): PreflightIssue
     'path.direction-change-cluster',
     (turns) =>
       `${turns} sharp direction changes occur within a ${directionChangeClusterRadiusMM} mm radius`,
-    'Open the corner spacing or simplify the path to avoid perforating the fabric.',
   );
 }
 

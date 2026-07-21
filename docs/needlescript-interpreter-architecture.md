@@ -584,8 +584,10 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    (`index.ts:206-241`).
 7. **Finalize preview data**: translate each chalk command's raw event-stream offset
    to the stitch/jump playback index, and classify/snapshot chalkable final globals.
-8. **Assemble structured preflight** (`embroidery/preflight.ts`): the pure adapter sorts locatable diagnostic
-   sidecars by their legacy warning index, maps them to stable codes/severities/suggestions, copies
+8. **Assemble structured preflight and physics diagnostics** (`embroidery/preflight.ts`,
+   `embroidery/physics-diagnostics/`): the pure preflight adapter sorts locatable diagnostic
+   sidecars by their legacy warning index, maps them through the central catalog to stable
+   codes/severities/suggestions, copies
    deterministic hoop-space points and source lines, then, when `preflight 'warn'` or `'strict'` is
    active, appends the fixed-order results from the pure event-stream and construction analyzers and
    counts severities. With no directive or `preflight 'off'`, only the structured counterparts to
@@ -602,8 +604,13 @@ After `execBlock` returns, `run` performs post-processing and assembles the resu
    never infers construction roles from ordinary running stitches. `preflight 'strict'` rejects
    finalization only when this completed list contains severity `error`; warning/info
    recommendations are never fatal. The check reads the completed stream and does not mutate it.
+   The compatibility adapter then maps that exact selected issue list to `PhysicsReport` version 1.
+   Existing points become renderer-independent point geometry; richer geometry and playback ranges
+   remain empty until the attribution pass can supply them. Fingerprints use code, canonical source
+   locations, sorted construction IDs, and semantic geometry quantized to 0.01 mm. Diagnostic copy,
+   severity, evidence explanations, and remedies do not participate in identity.
 9. **Assemble `RunResult`** (`index.ts`): `events`, `warnings`,
-   `warningLocations`, optional `preflight`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `machineProfile`, `activeHoop`, `activeOverrides`,
+   `warningLocations`, optional `preflight` and `physics`, `printed`, `locks`, `density` (including `threadWidthMM`), `material`, `machineProfile`, `activeHoop`, `activeOverrides`,
    `globals` (the top-level variable bindings), `chalk`, `dataVars`, and optional
    `plan` statistics. Explicit groups add per-group line, eligibility/movement, accepted-improvement,
    and before/after-travel records.
@@ -635,6 +642,15 @@ analyzer.
 groups current findings by severity and stable code. Clicking a finding creates Monaco selections
 for all attributed source lines and persists its points as stage markers; hover is temporary. The
 show-info toggle filters only rendered findings and never recompiles or changes the result.
+
+`RunResult.physics` is optional in the public type for compatibility with serialized results from
+older producers, but every successful in-process `run()` now populates it. Absence means that the
+producer does not support PhysicsIntellisense; it is not an empty report. Its `policy` mirrors
+`preflight.mode`, and PI-1 deliberately derives diagnostics from the same selected issues, so source
+`preflight 'off'` still excludes extended event/construction checks. The report also records the
+resolved machine profile, material intent, default-context assumptions, severity summary, semantic
+hoop-space geometry, and deterministic IDs. UI lifecycle state and presentation styling are not
+part of the core contract.
 
 ---
 

@@ -125,6 +125,138 @@ export interface PreflightResult {
   summary: Record<PreflightSeverity | 'total', number>;
 }
 
+export type DiagnosticGeometryRole =
+  | 'hotspot'
+  | 'boundary'
+  | 'overlap'
+  | 'travel'
+  | 'envelope'
+  | 'penetration-cluster'
+  | 'unreachable-extent';
+
+export interface DiagnosticPoint {
+  x: number;
+  y: number;
+}
+
+export interface DiagnosticBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export interface DiagnosticGeometryBase {
+  role: DiagnosticGeometryRole;
+  anchor?: DiagnosticPoint;
+  bounds?: DiagnosticBounds;
+}
+
+/** Semantic hoop-space geometry. Rendering style remains caller-owned. */
+export type DiagnosticGeometry =
+  | (DiagnosticGeometryBase & {
+      kind: 'points';
+      points: DiagnosticPoint[];
+    })
+  | (DiagnosticGeometryBase & {
+      kind: 'polyline';
+      points: DiagnosticPoint[];
+      closed?: boolean;
+    })
+  | (DiagnosticGeometryBase & {
+      kind: 'cell';
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    })
+  | (DiagnosticGeometryBase & {
+      kind: 'region';
+      rings: DiagnosticPoint[][];
+    });
+
+export type PhysicsDiagnosticCategory =
+  | 'coverage'
+  | 'penetration'
+  | 'stitch'
+  | 'path'
+  | 'travel'
+  | 'satin'
+  | 'fill'
+  | 'underlay'
+  | 'hoop'
+  | 'machine'
+  | 'material';
+
+export type PhysicsEvidence =
+  'hard-limit' | 'machine-profile' | 'engine-derived' | 'heuristic' | 'experimental';
+
+export type PhysicsMeasurementUnit = 'mm' | 'layers' | 'penetrations' | 'stitches' | 'degrees';
+
+export interface PhysicsMeasurement {
+  label: string;
+  value: number;
+  unit: PhysicsMeasurementUnit;
+  threshold?: number;
+  comparison?: 'above' | 'below' | 'outside';
+}
+
+export interface PhysicsSourceLocation {
+  line: number;
+  startColumn?: number;
+  endColumn?: number;
+  role: 'primary' | 'contributor' | 'related';
+}
+
+export interface PhysicsPlaybackRange {
+  start: number;
+  end: number;
+}
+
+export interface PhysicsRemedy {
+  id: string;
+  title: string;
+  description: string;
+  kind: 'guidance' | 'source-edit' | 'context';
+  documentationId?: string;
+}
+
+export interface PhysicsAssumption {
+  key: string;
+  label: string;
+  value: string;
+  source: 'default' | 'program' | 'run-options';
+  effect: string;
+}
+
+export interface PhysicsDiagnostic {
+  id: string;
+  fingerprint: string;
+  code: string;
+  category: PhysicsDiagnosticCategory;
+  severity: PreflightSeverity;
+  evidence: PhysicsEvidence;
+  title: string;
+  explanation: string;
+  measurements?: PhysicsMeasurement[];
+  sourceLocations: PhysicsSourceLocation[];
+  geometry: DiagnosticGeometry[];
+  playbackRanges: PhysicsPlaybackRange[];
+  constructionIds?: number[];
+  remedies: PhysicsRemedy[];
+  documentationId?: string;
+}
+
+export interface PhysicsReport {
+  version: number;
+  diagnostics: PhysicsDiagnostic[];
+  assumptions: PhysicsAssumption[];
+  summary: Record<PreflightSeverity, number>;
+  profile: ResolvedMachineProfile;
+  material: MaterialIntent;
+  policy: PreflightMode;
+}
+
 /** Physical hoop and derived sewable field, as configured by the `hoop` command. */
 export interface HoopInfo {
   shape: 'circle' | 'oval' | 'rectangle';
@@ -274,6 +406,8 @@ export interface RunResult {
   warningLocations?: WarningLocation[];
   /** Structured counterparts for locatable physical-sewability warnings. */
   preflight?: PreflightResult;
+  /** Versioned semantic diagnostics; absent only when produced by an older implementation. */
+  physics?: PhysicsReport;
   printed: string[];
   locks: number;
   density: DensityResult;

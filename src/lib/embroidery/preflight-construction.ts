@@ -8,6 +8,7 @@ import type {
 import { evenOddInside } from './machine/fill.ts';
 import { segdist } from '../geometry/genmath.ts';
 import type { PreflightIssue, StitchEvent } from '../core/types.ts';
+import { preflightCatalogMetadata } from './physics-diagnostics/catalog.ts';
 
 export const CONSTRUCTION_PREFLIGHT_THRESHOLDS = Object.freeze({
   boundaryToleranceMM: 0.05,
@@ -83,7 +84,7 @@ function underlayEnvelopeIssues(records: readonly ConstructionRecord[]): Preflig
     );
     if (!outside.length) continue;
     issues.push({
-      severity: 'warning',
+      ...preflightCatalogMetadata('construction.underlay-outside-topping'),
       code: 'construction.underlay-outside-topping',
       message: `Construction ${record.id} has underlay protruding beyond its explicit topping envelope.`,
       points: outside
@@ -91,7 +92,6 @@ function underlayEnvelopeIssues(records: readonly ConstructionRecord[]): Preflig
         .map(({ event }) => ({ x: event.x, y: event.y })),
       lines: linesOf(outside, record.line),
       constructionIds: [record.id],
-      suggestion: 'Increase the underlay inset or widen the topping envelope.',
     });
     if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck) break;
   }
@@ -163,26 +163,23 @@ function fillBorderIssues(records: readonly ConstructionRecord[]): PreflightIssu
       ];
       if (representative.overlapMM < CONSTRUCTION_PREFLIGHT_THRESHOLDS.minimumFillBorderOverlapMM) {
         issues.push({
-          severity: 'warning',
+          ...preflightCatalogMetadata('fill.border-overlap-too-small'),
           code: 'fill.border-overlap-too-small',
           message: `Fill ${fill.id} and satin border ${satin.id} overlap by about ${Math.max(0, representative.overlapMM).toFixed(2)} mm, below the ${CONSTRUCTION_PREFLIGHT_THRESHOLDS.minimumFillBorderOverlapMM.toFixed(1)} mm construction minimum.`,
           points: [point(representative.location)],
           lines,
           constructionIds: ids,
-          suggestion: 'Reduce fillinset or widen/reposition the explicit satin border.',
         });
       } else if (
         representative.overlapMM > CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumFillBorderOverlapMM
       ) {
         issues.push({
-          severity: 'warning',
+          ...preflightCatalogMetadata('fill.border-overlap-dense'),
           code: 'fill.border-overlap-dense',
           message: `Fill ${fill.id} extends about ${representative.overlapMM.toFixed(2)} mm beneath satin border ${satin.id}, above the ${CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumFillBorderOverlapMM.toFixed(1)} mm dense-overlap threshold.`,
           points: [point(representative.location)],
           lines,
           constructionIds: ids,
-          suggestion:
-            'Increase fillinset to retain a smaller registration overlap beneath the border.',
         });
       }
 
@@ -196,7 +193,7 @@ function fillBorderIssues(records: readonly ConstructionRecord[]): PreflightIssu
       );
       if (stacked) {
         issues.push({
-          severity: 'warning',
+          ...preflightCatalogMetadata('fill.edge-run-border-stack'),
           code: 'fill.edge-run-border-stack',
           message: `Fill ${fill.id} edge run is stacked beneath explicit satin border ${satin.id}.`,
           points: [{ x: stacked.event.x, y: stacked.event.y }],
@@ -206,7 +203,6 @@ function fillBorderIssues(records: readonly ConstructionRecord[]): PreflightIssu
               : [satin.line],
           ),
           constructionIds: ids,
-          suggestion: 'Increase filledgerun inset or omit the redundant edge run.',
         });
       }
       if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck * 2)
@@ -254,7 +250,7 @@ function splitOverlapIssues(records: readonly ConstructionRecord[]): PreflightIs
     }
     if (!hotspot) continue;
     issues.push({
-      severity: 'warning',
+      ...preflightCatalogMetadata('satin.split-overlap-hotspot'),
       code: 'satin.split-overlap-hotspot',
       message: `Split satin construction ${record.id} has ${hotspot.length} adjacent-lane penetrations within ${CONSTRUCTION_PREFLIGHT_THRESHOLDS.splitHotspotRadiusMM.toFixed(1)} mm.`,
       points: hotspot
@@ -262,7 +258,6 @@ function splitOverlapIssues(records: readonly ConstructionRecord[]): PreflightIs
         .map(({ event }) => ({ x: event.x, y: event.y })),
       lines: linesOf(hotspot, record.line),
       constructionIds: [record.id],
-      suggestion: 'Reduce satinsplitoverlap or simplify the column near this hotspot.',
     });
     if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck) break;
   }
@@ -284,7 +279,7 @@ function connectorIssues(records: readonly ConstructionRecord[]): PreflightIssue
       );
       if (connector.action !== 'sew' || contained) continue;
       issues.push({
-        severity: 'warning',
+        ...preflightCatalogMetadata('fill.connector-outside-region'),
         code: 'fill.connector-outside-region',
         message: `Fill ${record.id} has a sewn connector outside its explicit construction region.`,
         points: [point(connector.from), point(connector.to)],
@@ -295,7 +290,6 @@ function connectorIssues(records: readonly ConstructionRecord[]): PreflightIssue
               : [record.line]
             : [connector.line],
         constructionIds: [record.id],
-        suggestion: "Use fillconnect 'inside' or a jump/trim connector policy.",
       });
       if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck) return issues;
     }
@@ -333,7 +327,7 @@ function orderIssues(
       )
         continue;
       issues.push({
-        severity: 'error',
+        ...preflightCatalogMetadata('construction.layer-order'),
         code: 'construction.layer-order',
         message: `Construction ${record.id}${lane < 0 ? '' : ` lane ${lane + 1}`} is planned with topping before its underlay.`,
         points: [
@@ -342,7 +336,6 @@ function orderIssues(
         ],
         lines: linesOf([firstDecorative, lastUnderlay], record.line),
         constructionIds: [record.id],
-        suggestion: 'Keep foundation and decorative passes in one atomic planning span.',
       });
       if (issues.length >= CONSTRUCTION_PREFLIGHT_THRESHOLDS.maximumIssuesPerCheck) return issues;
     }

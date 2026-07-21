@@ -1,15 +1,17 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-0 complete** (2026-07-21) — product contract and interaction concept approved; PI-1 is
-ready to start. Preview-overlay legibility remains an explicit PI-3/PI-7 implementation risk.
+Status: **PI-1 complete** (2026-07-21) — unified public contracts, catalog, stable identity, and the
+compatibility report adapter are implemented; PI-2 is ready to start. Preview-overlay legibility
+remains an explicit PI-3/PI-7 implementation risk.
 
 Last updated: 2026-07-21
 
 | Session | Status      | Exit gate                                                               |
 | ------- | ----------- | ----------------------------------------------------------------------- |
 | PI-0    | Complete    | Product owner approved the contract and prototype concept on 2026-07-21 |
-| PI-1    | Ready       | Implement unified catalog/types without freezing overlay presentation   |
-| PI-2–11 | Not started | Follow the dependency and acceptance gates documented below             |
+| PI-1    | Complete    | Unified catalog/types shipped without freezing overlay presentation     |
+| PI-2    | Ready       | Decouple editor analysis from source-selected preflight policy          |
+| PI-3–11 | Not started | Follow the dependency and acceptance gates documented below             |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
 playback—not a renamed or enlarged preflight panel.
@@ -454,7 +456,7 @@ Completion decision:
 
 ### PI-1 — Unified diagnostic catalog and types
 
-Status: **ready**
+Status: **complete** (2026-07-21)
 
 Entry conditions satisfied:
 
@@ -524,6 +526,36 @@ Acceptance:
   strings, strict failures, and issue ordering.
 - `src/lib/` remains platform-neutral and no public type contains canvas/UI styling or editor
   lifecycle state.
+
+Implementation progress:
+
+- [x] Added the complete renderer-independent geometry, remedy, assumption, diagnostic, and report
+      contracts to `core/types.ts`; exported them through `engine.ts` and added optional
+      `RunResult.physics`.
+- [x] Added the 24-entry central catalog for every currently emitted diagnostic code. Static
+      severities and compatibility suggestions now come from the catalog rather than detector
+      switches or construction/event analyzers.
+- [x] Added catalog validation for duplicate codes/remedy IDs, missing documentation/copy,
+      missing remedies, and fields outside the semantic schema.
+- [x] Added version-1 fingerprints from code, canonical source locations, sorted construction IDs,
+      and semantic geometry quantized to 0.01 mm, plus deterministic occurrence IDs.
+- [x] Added the compatibility adapter and populated `RunResult.physics` on every successful run from
+      the exact issue list selected by existing preflight behavior. Legacy warnings, warning
+      locations, issue ordering, strict failures, and stitch events are unchanged.
+- [x] Added focused catalog, contract, identity, determinism, unknown-code, and compatibility tests
+      in `physics-diagnostics.test.ts`; kept existing preflight tests unchanged.
+- [x] Updated the interpreter and machine architecture documents with catalog ownership, report
+      versioning, identity rules, and the PI-1 compatibility boundary.
+
+Validation record (2026-07-21):
+
+- `npm test`: 77 files and 2,066 tests passed; generated references are current.
+- `npm run lint` and `npm run build` passed. The build retained its pre-existing large-chunk
+  advisory.
+- `npm run build:lib` and `npm run check:lib` passed; publint and the package type check found no
+  problems.
+- Targeted Prettier validation passed for every changed source, test, and documentation file.
+- React Doctor was not run because PI-1 changes no React component or application UI.
 
 ### PI-2 — Decouple analysis from source preflight policy
 

@@ -20,6 +20,21 @@ export type {
   PreflightSeverity,
   PreflightIssue,
   PreflightResult,
+  DiagnosticGeometryRole,
+  DiagnosticPoint,
+  DiagnosticBounds,
+  DiagnosticGeometryBase,
+  DiagnosticGeometry,
+  PhysicsDiagnosticCategory,
+  PhysicsEvidence,
+  PhysicsMeasurementUnit,
+  PhysicsMeasurement,
+  PhysicsSourceLocation,
+  PhysicsPlaybackRange,
+  PhysicsRemedy,
+  PhysicsAssumption,
+  PhysicsDiagnostic,
+  PhysicsReport,
   ResolvedMachineProfile,
   MachineProfile,
   MachineCalibration,
@@ -67,6 +82,21 @@ export {
   EVENT_STREAM_PREFLIGHT_THRESHOLDS,
 } from './embroidery/preflight-event-stream.ts';
 export { CONSTRUCTION_PREFLIGHT_THRESHOLDS } from './embroidery/preflight-construction.ts';
+export {
+  assignPhysicsDiagnosticIdentities,
+  buildPhysicsDiagnosticFingerprint,
+  buildPhysicsReport,
+  getPhysicsDiagnosticCatalogEntry,
+  PHYSICS_DIAGNOSTIC_CATALOG,
+  PHYSICS_REPORT_VERSION,
+  validatePhysicsDiagnosticCatalog,
+} from './embroidery/physics-diagnostics/index.ts';
+export type {
+  PhysicsDiagnosticCatalogEntry,
+  PhysicsDiagnosticCode,
+  PhysicsDiagnosticIdentityInput,
+  PhysicsReportCompatibilityInput,
+} from './embroidery/physics-diagnostics/index.ts';
 export {
   COLOR_NAMES,
   DEFAULT_PALETTE,

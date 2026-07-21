@@ -680,6 +680,19 @@ endpoints; width-only satin/E-stitch advisories have source attribution but no i
 Issues follow legacy warning-index order, so ordering and copied hoop-space coordinates are
 deterministic. Exporters still consume only `events`, and preflight never rewrites them. With no
 directive or `preflight 'off'`, these compatibility diagnostics are the complete structured result.
+Static code metadata no longer lives in detector switch statements. The focused
+`embroidery/physics-diagnostics/` module owns the catalog entry for every emitted code: category,
+default severity, evidence class, semantic geometry role, title, explanation, remedies, and a
+documentation ID. Catalog validation rejects duplicate code/remedy identities, missing copy or
+documentation, and fields outside the renderer-independent schema.
+
+After preflight policy selects the issue list, the compatibility adapter builds
+`RunResult.physics`. Report version 1 preserves preflight order and maps existing locations to point
+geometry without inventing cells, regions, paths, bounds, anchors, or playback ranges. Stable
+fingerprints canonicalize source locations and construction IDs plus semantic geometry at 0.01 mm;
+occurrence IDs add deterministic suffixes only when the same fingerprint coexists. Severity and
+wording changes therefore do not invalidate identity. This report is stitch-inert and the legacy
+warnings, warning locations, preflight result, strict failure, and exporter inputs remain unchanged.
 An explicitly selected local profile also adds objective trim/color-change capability findings:
 manual operations are info-level worksheet reminders, unsupported operations are errors, and neither
 changes the event stream. The resolved speed class remains advisory metadata pending sew-out-backed
@@ -759,6 +772,7 @@ No preflight mode rewrites, reorders, inserts, or removes an event.
 | `embroidery/preflight-event-stream.ts`           | bounded pure checks over completed pre-lock events                     |
 | `embroidery/construction-metadata.ts`            | internal fill/satin IDs, boundaries, layers, lanes, and connectors     |
 | `embroidery/preflight-construction.ts`           | pure checks over explicit construction records and final event order   |
+| `embroidery/physics-diagnostics/`                | catalog, stable identity, and legacy compatibility report adapter      |
 | `embroidery/routing.ts`                          | generic deterministic route algorithms and endpoint model              |
 | `embroidery/travel-planner.ts`                   | thread-run partitioning, plan modes, and connector reconstruction      |
 | `embroidery/effects.ts`, `embroidery/declump.ts` | after-split effect maps and declump fold state                         |

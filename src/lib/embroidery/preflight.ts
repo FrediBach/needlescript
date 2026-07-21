@@ -4,6 +4,10 @@ import { analyzeConstructionPreflight } from './preflight-construction.ts';
 import type { ConstructionRecord } from './construction-metadata.ts';
 import { defineModes } from '../core/mode-registry.ts';
 import { resolveMachineProfile } from './machine-profile.ts';
+import {
+  preflightCatalogMetadata,
+  type PhysicsDiagnosticCode,
+} from './physics-diagnostics/catalog.ts';
 import type {
   HoopInfo,
   PreflightIssue,
@@ -28,60 +32,31 @@ export interface PreflightInput {
   constructionRecords?: readonly ConstructionRecord[];
 }
 
-function overflowCode(
-  location: WarningLocation,
-  hoop: HoopInfo,
-): { code: string; severity: PreflightSeverity; suggestion: string } {
+function overflowCode(location: WarningLocation, hoop: HoopInfo): PhysicsDiagnosticCode {
   const physicallyUnreachable = location.points.some(
     (point) => !inHoopOuter(hoop, point.x, point.y),
   );
-  return physicallyUnreachable
-    ? {
-        code: 'hoop.unreachable',
-        severity: 'error',
-        suggestion: 'Move or scale the design so every penetration is inside the physical hoop.',
-      }
-    : {
-        code: 'hoop.field-overflow',
-        severity: 'warning',
-        suggestion: 'Move or scale the design into the inset sewable field.',
-      };
+  return physicallyUnreachable ? 'hoop.unreachable' : 'hoop.field-overflow';
 }
+
+const LEGACY_CODE_BY_LOCATION_KIND: Partial<
+  Record<WarningLocation['kind'], PhysicsDiagnosticCode>
+> = {
+  density: 'coverage.density-hotspot',
+  stack: 'penetration.same-hole-stack',
+  tiny: 'stitch.below-reliable-movement',
+  satin: 'satin.snag-risk',
+};
 
 function issueDescriptor(
   location: WarningLocation,
   hoop: HoopInfo,
-): { code: string; severity: PreflightSeverity; suggestion: string } | undefined {
-  switch (location.kind) {
-    case 'density':
-      return {
-        code: 'coverage.density-hotspot',
-        severity: 'warning',
-        suggestion: 'Reduce overlapping layers or increase stitch spacing in this area.',
-      };
-    case 'stack':
-      return {
-        code: 'penetration.same-hole-stack',
-        severity: 'warning',
-        suggestion: 'Offset or remove repeated penetrations through the same needle hole.',
-      };
-    case 'tiny':
-      return {
-        code: 'stitch.below-reliable-movement',
-        severity: 'warning',
-        suggestion: 'Increase stitch spacing or simplify the construction around these points.',
-      };
-    case 'overflow':
-      return overflowCode(location, hoop);
-    case 'satin':
-      return {
-        code: 'satin.snag-risk',
-        severity: 'warning',
-        suggestion: 'Reduce the satin width or rake, or split the column.',
-      };
-    case 'fill':
-      return undefined;
-  }
+): ({ code: PhysicsDiagnosticCode } & ReturnType<typeof preflightCatalogMetadata>) | undefined {
+  const code =
+    location.kind === 'overflow'
+      ? overflowCode(location, hoop)
+      : LEGACY_CODE_BY_LOCATION_KIND[location.kind];
+  return code ? { code, ...preflightCatalogMetadata(code) } : undefined;
 }
 
 function uniqueLines(lines: readonly number[]): number[] {
@@ -95,19 +70,23 @@ function capabilityIssue(
   capability: ResolvedMachineProfile['trimCapability'],
 ): PreflightIssue | undefined {
   if (capability === 'automatic') return undefined;
-  const codeOperation = operation === 'trim' ? 'trim' : 'color-change';
   const manual = capability === 'manual';
+  const code: PhysicsDiagnosticCode =
+    operation === 'trim'
+      ? manual
+        ? 'machine.trim-manual'
+        : 'machine.trim-unsupported'
+      : manual
+        ? 'machine.color-change-manual'
+        : 'machine.color-change-unsupported';
   return {
-    severity: manual ? 'info' : 'error',
-    code: `machine.${codeOperation}-${manual ? 'manual' : 'unsupported'}`,
+    ...preflightCatalogMetadata(code),
+    code,
     message: manual
       ? `${profile.name} requires operator action for each ${operation}.`
       : `${profile.name} does not support the design's ${operation} operation.`,
     points: [{ x: event.x, y: event.y }],
     lines: event.line === undefined ? [] : [event.line],
-    suggestion: manual
-      ? `Include the ${operation} in the sew-out worksheet and pause at this point.`
-      : `Remove the ${operation} or choose a local machine profile that supports it.`,
   };
 }
 

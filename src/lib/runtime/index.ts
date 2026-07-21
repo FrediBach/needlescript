@@ -40,6 +40,7 @@ import { DEFAULT_BACKGROUND, defaultSlotColor } from '../core/colormath.ts';
 import type { ColorTableEntry } from '../core/types.ts';
 import { directionalCompensationPreview } from '../embroidery/directional-compensation.ts';
 import { buildPreflightResult } from '../embroidery/preflight.ts';
+import { buildPhysicsReport } from '../embroidery/physics-diagnostics/compatibility.ts';
 import {
   applyMachineCalibration,
   applyMachineCalibrationToConstructionRecords,
@@ -474,12 +475,14 @@ export function run(source: string, opts: RunOptions = {}): RunResult {
         blockingIssue.lines[0] ?? ctx.preflightLine,
       );
   }
+  const physics = buildPhysicsReport({ preflight, material: m.materialIntent });
 
   const result: RunResult = {
     events: m.events,
     warnings: m.warnings,
     warningLocations,
     preflight,
+    physics,
     printed: ctx.printed,
     locks,
     density,
