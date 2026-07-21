@@ -46,6 +46,24 @@
   border-left: 2px solid var(--gold) !important;
 }
 
+/* Persistent Physics selection is intentionally distinct from playback.
+   The primary cause gets a solid left rail; contributors use a dashed inset
+   rail and a lighter wash, while merely related lines use a dotted baseline. */
+:global(.ns-physics-selected-primary) {
+  background: color-mix(in srgb, var(--gold) 16%, transparent) !important;
+  box-shadow: inset 3px 0 var(--gold);
+}
+
+:global(.ns-physics-selected-contributor) {
+  background: color-mix(in srgb, var(--gold) 8%, transparent) !important;
+  border-left: 2px dashed color-mix(in srgb, var(--gold) 75%, transparent) !important;
+}
+
+:global(.ns-physics-selected-related) {
+  background: color-mix(in srgb, var(--text-muted) 6%, transparent) !important;
+  box-shadow: inset 0 -1px color-mix(in srgb, var(--text-muted) 55%, transparent);
+}
+
 /* ── Stitch-line number highlight ────────────────────────────────────
    Applied via lineNumberClassName on every line that produced at least
    one stitch in the current compile.  Gold tint echoes the playback

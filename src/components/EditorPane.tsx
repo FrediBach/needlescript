@@ -29,6 +29,15 @@ import { Input } from '@/components/ui/input.tsx';
 import type { EditorContextActions } from './MachineMenu.tsx';
 import PhysicsPanel from './PhysicsPanel.tsx';
 import type { PhysicsReportState } from '../physics-analysis-state.ts';
+import {
+  adjacentPhysicsDiagnostic,
+  buildPhysicsMonacoMarkers,
+  COMPILER_MARKER_OWNER,
+  PHYSICS_MARKER_OWNER,
+  physicsCodeActions,
+  physicsDiagnosticMarkerMessage,
+  physicsDiagnosticsAtPosition,
+} from './physics-monaco-model.ts';
 
 interface Props {
   source: string;
@@ -101,6 +110,9 @@ const EDITOR_LINE_HEIGHT = editorLineHeight; // 20 px
 // into its own DOM — the matching rule lives in EditorPane.module.css as a
 // :global block.
 const ACTIVE_LINE_CLASS = 'ns-playback-line';
+const PHYSICS_PRIMARY_LINE_CLASS = 'ns-physics-selected-primary';
+const PHYSICS_CONTRIBUTOR_LINE_CLASS = 'ns-physics-selected-contributor';
+const PHYSICS_RELATED_LINE_CLASS = 'ns-physics-selected-related';
 
 // Prefix that triggers AI command mode in the REPL.
 const AI_TRIGGER = '/ai';
@@ -183,6 +195,8 @@ export default function EditorPane({
   const decoCollRef = useRef<editor.IEditorDecorationsCollection | null>(null);
   // Holds the decoration collection for brightened line numbers on stitch lines.
   const stitchLineDecoCollRef = useRef<editor.IEditorDecorationsCollection | null>(null);
+  // Selected physics source attribution is independent from playback decoration.
+  const physicsDecoCollRef = useRef<editor.IEditorDecorationsCollection | null>(null);
   // Ref for the console panel — used to auto-scroll to the latest message.
   const consoleRef = useRef<HTMLDivElement>(null);
 
@@ -191,6 +205,10 @@ export default function EditorPane({
   const onRunRef = useRef(onRun);
   const onEditorReadyRef = useRef(onEditorReady);
   const onDiagnosticClearRef = useRef(onDiagnosticClear);
+  const onDiagnosticHoverRef = useRef(onDiagnosticHover);
+  const onDiagnosticSelectRef = useRef(onDiagnosticSelect);
+  const physicsRef = useRef(physics);
+  const selectedDiagnosticIdRef = useRef(selectedDiagnosticId);
 
   // Stable ref to source so the parameter-change handler never captures a
   // stale closure value.
@@ -205,6 +223,10 @@ export default function EditorPane({
     onRunRef.current = onRun;
     onEditorReadyRef.current = onEditorReady;
     onDiagnosticClearRef.current = onDiagnosticClear;
+    onDiagnosticHoverRef.current = onDiagnosticHover;
+    onDiagnosticSelectRef.current = onDiagnosticSelect;
+    physicsRef.current = physics;
+    selectedDiagnosticIdRef.current = selectedDiagnosticId;
     sourceRef.current = source;
     lineStitchMapRef.current = lineStitchMap;
     onHoverLineRef.current = onHoverLine;
@@ -212,18 +234,27 @@ export default function EditorPane({
   }, [
     lineStitchMap,
     onDiagnosticClear,
+    onDiagnosticHover,
+    onDiagnosticSelect,
     onEditorReady,
     onHoverLine,
     onMachineContextMenu,
     onRun,
+    physics,
+    selectedDiagnosticId,
     source,
   ]);
 
   // Disposables created in handleMount — cleaned up on unmount.
-  const hoverProviderRef = useRef<IDisposable | null>(null);
+  const stitchHoverProviderRef = useRef<IDisposable | null>(null);
+  const physicsHoverProviderRef = useRef<IDisposable | null>(null);
+  const physicsCodeActionProviderRef = useRef<IDisposable | null>(null);
   const mouseMoveRef = useRef<IDisposable | null>(null);
   const mouseLeaveRef = useRef<IDisposable | null>(null);
+  const mouseDownRef = useRef<IDisposable | null>(null);
+  const keyDownRef = useRef<IDisposable | null>(null);
   const contextMenuRef = useRef<IDisposable | null>(null);
+  const physicsActionRefs = useRef<IDisposable[]>([]);
 
   const handleParamChange = useCallback(
     (name: string, line: number, value: number | string) => {
@@ -343,6 +374,7 @@ export default function EditorPane({
     editorRef.current = ed;
     decoCollRef.current = ed.createDecorationsCollection();
     stitchLineDecoCollRef.current = ed.createDecorationsCollection();
+    physicsDecoCollRef.current = ed.createDecorationsCollection();
 
     // Cmd/Ctrl + Enter → run the program (mirrors the original textarea shortcut).
     // Pass sourceRef.current explicitly so the latest source is used even if
@@ -354,7 +386,7 @@ export default function EditorPane({
     // ── Stitch-bounds hover tooltip ───────────────────────────────────────
     // A second hover provider (merged with the built-in docs provider) that
     // shows the stitch count and mm bounding box for lines that produce stitches.
-    hoverProviderRef.current = monaco.languages.registerHoverProvider('needlescript', {
+    stitchHoverProviderRef.current = monaco.languages.registerHoverProvider('needlescript', {
       provideHover(_model, position) {
         const ln = position.lineNumber;
         const b = lineStitchMapRef.current?.get(ln);
@@ -371,6 +403,56 @@ export default function EditorPane({
       },
     });
 
+    // Physics hover content is sourced from the same structured finding used
+    // by the panel and stage. Multiple findings on one span prefer the current
+    // persistent selection, then primary attribution and severity.
+    physicsHoverProviderRef.current = monaco.languages.registerHoverProvider('needlescript', {
+      provideHover(model, position) {
+        const diagnostic = physicsDiagnosticsAtPosition(
+          physicsRef.current?.diagnostics ?? [],
+          position.lineNumber,
+          position.column,
+          selectedDiagnosticIdRef.current,
+        )[0];
+        if (!diagnostic) return null;
+        const location =
+          diagnostic.sourceLocations.find(
+            ({ line, startColumn, endColumn }) =>
+              line === position.lineNumber &&
+              (startColumn === undefined ||
+                (position.column >= startColumn &&
+                  position.column < (endColumn ?? startColumn + 1))),
+          ) ?? diagnostic.sourceLocations[0];
+        if (!location) return null;
+        const lineLength = model.getLineLength(location.line);
+        const startColumn = Math.max(1, Math.min(location.startColumn ?? 1, lineLength + 1));
+        const endColumn = Math.max(
+          startColumn + Number(startColumn <= lineLength),
+          Math.min(location.endColumn ?? lineLength + 1, lineLength + 1),
+        );
+        return {
+          range: new monaco.Range(location.line, startColumn, location.line, endColumn),
+          contents: [
+            {
+              value: physicsDiagnosticMarkerMessage(diagnostic, location.role),
+            },
+            { value: `Open Physics and select this finding with **F8**.` },
+          ],
+        };
+      },
+    });
+
+    // Register the provider now so PI-8 can add proven, previewable edits
+    // without changing editor lifecycle. PI-6 intentionally returns no edits.
+    physicsCodeActionProviderRef.current = monaco.languages.registerCodeActionProvider(
+      'needlescript',
+      {
+        provideCodeActions() {
+          return { actions: [...physicsCodeActions()], dispose() {} };
+        },
+      },
+    );
+
     // ── Canvas overlay trigger ────────────────────────────────────────────
     // Fire onHoverLine whenever the cursor enters a line (content text or the
     // line-number gutter). The hover provider above handles the tooltip;
@@ -380,14 +462,84 @@ export default function EditorPane({
     mouseMoveRef.current = ed.onMouseMove((e) => {
       const t = e.target;
       if (t.type === GUTTER || t.type === CONTENT) {
-        onHoverLineRef.current?.(t.position?.lineNumber ?? null);
+        const line = t.position?.lineNumber ?? null;
+        onHoverLineRef.current?.(line);
+        const diagnostic =
+          line === null
+            ? undefined
+            : physicsDiagnosticsAtPosition(
+                physicsRef.current?.diagnostics ?? [],
+                line,
+                t.type === CONTENT ? t.position?.column : undefined,
+                selectedDiagnosticIdRef.current,
+              )[0];
+        onDiagnosticHoverRef.current(diagnostic ?? null);
       } else {
         onHoverLineRef.current?.(null);
+        onDiagnosticHoverRef.current(null);
       }
     });
     mouseLeaveRef.current = ed.onMouseLeave(() => {
       onHoverLineRef.current?.(null);
+      onDiagnosticHoverRef.current(null);
     });
+    mouseDownRef.current = ed.onMouseDown((event) => {
+      const target = event.target;
+      if (target.type !== GUTTER && target.type !== CONTENT) return;
+      const line = target.position?.lineNumber;
+      if (line === undefined) return;
+      const diagnostic = physicsDiagnosticsAtPosition(
+        physicsRef.current?.diagnostics ?? [],
+        line,
+        target.type === CONTENT ? target.position?.column : undefined,
+        selectedDiagnosticIdRef.current,
+      )[0];
+      if (diagnostic) {
+        setActiveBottomTab('physics');
+        setConsoleHeight((height) => Math.max(height, 240));
+        onDiagnosticSelectRef.current(diagnostic);
+      }
+    });
+    keyDownRef.current = ed.onKeyDown((event) => {
+      if (event.keyCode === monaco.KeyCode.Escape && selectedDiagnosticIdRef.current) {
+        onDiagnosticClearRef.current();
+      }
+    });
+
+    const navigatePhysics = (direction: 1 | -1) => {
+      const diagnostic = adjacentPhysicsDiagnostic(
+        physicsRef.current?.diagnostics ?? [],
+        selectedDiagnosticIdRef.current,
+        direction,
+      );
+      if (!diagnostic) return;
+      const location =
+        diagnostic.sourceLocations.find(({ role }) => role === 'primary') ??
+        diagnostic.sourceLocations[0];
+      const model = ed.getModel();
+      if (location && model && location.line >= 1 && location.line <= model.getLineCount()) {
+        ed.setPosition({ lineNumber: location.line, column: location.startColumn ?? 1 });
+        ed.revealLineInCenter(location.line, 0);
+        ed.focus();
+      }
+      setActiveBottomTab('physics');
+      setConsoleHeight((height) => Math.max(height, 240));
+      onDiagnosticSelectRef.current(diagnostic);
+    };
+    physicsActionRefs.current = [
+      ed.addAction({
+        id: 'needlescript.physics.next',
+        label: 'Next Physics Finding',
+        keybindings: [monaco.KeyCode.F8],
+        run: () => navigatePhysics(1),
+      }),
+      ed.addAction({
+        id: 'needlescript.physics.previous',
+        label: 'Previous Physics Finding',
+        keybindings: [monaco.KeyMod.Shift | monaco.KeyCode.F8],
+        run: () => navigatePhysics(-1),
+      }),
+    ];
     contextMenuRef.current = ed.onContextMenu((event) => {
       event.event.preventDefault();
       event.event.stopPropagation();
@@ -411,10 +563,15 @@ export default function EditorPane({
   // Dispose Monaco listeners when the editor pane unmounts.
   useEffect(() => {
     return () => {
-      hoverProviderRef.current?.dispose();
+      stitchHoverProviderRef.current?.dispose();
+      physicsHoverProviderRef.current?.dispose();
+      physicsCodeActionProviderRef.current?.dispose();
       mouseMoveRef.current?.dispose();
       mouseLeaveRef.current?.dispose();
+      mouseDownRef.current?.dispose();
+      keyDownRef.current?.dispose();
       contextMenuRef.current?.dispose();
+      physicsActionRefs.current.forEach((action) => action.dispose());
     };
   }, []);
 
@@ -464,6 +621,51 @@ export default function EditorPane({
     );
   }, [lineStitchMap, monaco]);
 
+  // ── Selected physics source attribution ───────────────────────────────
+  // The primary line has a stronger whole-line treatment; contributor and
+  // related lines remain visible without looking like playback or selection.
+  useEffect(() => {
+    const ed = editorRef.current;
+    const coll = physicsDecoCollRef.current;
+    const model = ed?.getModel();
+    if (!ed || !coll || !model || !monaco || !selectedDiagnosticId) {
+      coll?.clear();
+      return;
+    }
+    const diagnostic = physics?.diagnostics.find(({ id }) => id === selectedDiagnosticId);
+    if (!diagnostic) {
+      coll.clear();
+      return;
+    }
+    const classByRole = {
+      primary: PHYSICS_PRIMARY_LINE_CLASS,
+      contributor: PHYSICS_CONTRIBUTOR_LINE_CLASS,
+      related: PHYSICS_RELATED_LINE_CLASS,
+    } as const;
+    coll.set(
+      diagnostic.sourceLocations.flatMap((location) =>
+        location.line < 1 || location.line > model.getLineCount()
+          ? []
+          : [
+              {
+                range: new monaco.Range(location.line, 1, location.line, 1),
+                options: {
+                  isWholeLine: true,
+                  className: classByRole[location.role],
+                  description: `physics-${location.role}-line`,
+                },
+              },
+            ],
+      ),
+    );
+    const primary =
+      diagnostic.sourceLocations.find(({ role }) => role === 'primary') ??
+      diagnostic.sourceLocations[0];
+    if (primary && primary.line >= 1 && primary.line <= model.getLineCount()) {
+      ed.revealLineInCenterIfOutsideViewport(primary.line, 0);
+    }
+  }, [monaco, physics, selectedDiagnosticId]);
+
   // Auto-scroll the console to the bottom whenever a new message arrives.
   useEffect(() => {
     const el = consoleRef.current;
@@ -480,13 +682,13 @@ export default function EditorPane({
     if (!model) return;
 
     if (!errorMarkers || errorMarkers.length === 0) {
-      monaco.editor.setModelMarkers(model, 'needlescript', []);
+      monaco.editor.setModelMarkers(model, COMPILER_MARKER_OWNER, []);
       return;
     }
 
     monaco.editor.setModelMarkers(
       model,
-      'needlescript',
+      COMPILER_MARKER_OWNER,
       errorMarkers.map(({ message, line }) => ({
         severity: monaco.MarkerSeverity.Error,
         startLineNumber: line,
@@ -498,6 +700,42 @@ export default function EditorPane({
       })),
     );
   }, [errorMarkers, monaco]);
+
+  // Physics markers intentionally use a second owner so an analysis refresh
+  // can never clear compiler errors (and vice versa).
+  useEffect(() => {
+    const ed = editorRef.current;
+    if (!ed || !monaco) return;
+    const model = ed.getModel();
+    if (!model) return;
+    const severity = {
+      error: monaco.MarkerSeverity.Error,
+      warning: monaco.MarkerSeverity.Warning,
+      info: monaco.MarkerSeverity.Hint,
+    } as const;
+    const markers = buildPhysicsMonacoMarkers(physics?.diagnostics ?? []).flatMap((marker) => {
+      if (marker.line < 1 || marker.line > model.getLineCount()) return [];
+      const lineLength = model.getLineLength(marker.line);
+      const startColumn = Math.max(1, Math.min(marker.startColumn ?? 1, lineLength + 1));
+      const endColumn = Math.max(
+        startColumn + Number(startColumn <= lineLength),
+        Math.min(marker.endColumn ?? lineLength + 1, lineLength + 1),
+      );
+      return [
+        {
+          severity: severity[marker.severity],
+          startLineNumber: marker.line,
+          startColumn,
+          endLineNumber: marker.line,
+          endColumn,
+          message: marker.message,
+          source: 'NeedleScript Physics',
+          code: marker.code,
+        },
+      ];
+    });
+    monaco.editor.setModelMarkers(model, PHYSICS_MARKER_OWNER, markers);
+  }, [monaco, physics]);
 
   // ── Unified suggestion system ─────────────────────────────────────────
   // A single suggestion panel serves multiple triggers:

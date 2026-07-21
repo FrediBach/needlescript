@@ -1,21 +1,22 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-5 complete** (2026-07-21) — the playground now has a responsive Console/Physics
-surface with structured status, assumptions, in-memory filters, concept grouping, linked selection,
-expandable guidance, copyable reports, and duplicate-console-warning suppression. Preview-overlay
-legibility remains an explicit PI-7 implementation risk.
+Status: **PI-6 complete** (2026-07-21) — Monaco now keeps compiler and Physics markers independent,
+shows rich severity-aware findings and source-role selection, synchronizes hover/selection with the
+shared application state, supports F8 navigation, and has inert code-action plumbing ready for PI-8.
+Preview-overlay legibility remains an explicit PI-7 implementation risk.
 
 Last updated: 2026-07-21
 
-| Session | Status      | Exit gate                                                               |
-| ------- | ----------- | ----------------------------------------------------------------------- |
-| PI-0    | Complete    | Product owner approved the contract and prototype concept on 2026-07-21 |
-| PI-1    | Complete    | Unified catalog/types shipped without freezing overlay presentation     |
-| PI-2    | Complete    | Editor analysis is independent from source-selected preflight policy    |
-| PI-3    | Complete    | Rich source, geometry, construction, and playback attribution shipped   |
-| PI-4    | Complete    | Revision lifecycle, background analysis, and priority queue shipped     |
-| PI-5    | Complete    | Responsive, keyboard-operable Physics panel shipped                     |
-| PI-6–11 | Not started | Follow the dependency and acceptance gates documented below             |
+| Session | Status      | Exit gate                                                                 |
+| ------- | ----------- | ------------------------------------------------------------------------- |
+| PI-0    | Complete    | Product owner approved the contract and prototype concept on 2026-07-21   |
+| PI-1    | Complete    | Unified catalog/types shipped without freezing overlay presentation       |
+| PI-2    | Complete    | Editor analysis is independent from source-selected preflight policy      |
+| PI-3    | Complete    | Rich source, geometry, construction, and playback attribution shipped     |
+| PI-4    | Complete    | Revision lifecycle, background analysis, and priority queue shipped       |
+| PI-5    | Complete    | Responsive, keyboard-operable Physics panel shipped                       |
+| PI-6    | Complete    | Independent markers, linked selection, rich hover, and navigation shipped |
+| PI-7–11 | Not started | Follow the dependency and acceptance gates documented below               |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
 playback—not a renamed or enlarged preflight panel.
@@ -806,6 +807,37 @@ Acceptance:
 - Marker updates never erase compiler errors.
 - Multi-line contributors are visually distinct from the primary cause.
 - Monaco hover, panel selection, and stage selection stay synchronized.
+
+Completion record (2026-07-21):
+
+- [x] Split compiler and Physics markers into stable `needlescript.compiler` and
+      `needlescript.physics` owners. Physics refreshes cannot clear compiler diagnostics, and both
+      marker sets may remain present on the same model.
+- [x] Added blocker/risk/note Monaco severities, optional exact source spans with whole-line
+      fallback, and hover content containing title, measurements, explanation, evidence, remedies,
+      and source role.
+- [x] Connected Monaco content/gutter hover and click interaction to the shared diagnostic hover
+      and selection callbacks already used by the Physics panel and stage projection.
+- [x] Added persistent primary, contributor, and related source-line decorations with distinct
+      treatments from each other and from the playback line; `Escape` clears the selection.
+- [x] Added source-ordered, wrapping `F8`/`Shift+F8` next/previous navigation that selects the
+      finding, reveals its primary line, and opens the Physics tab.
+- [x] Registered an intentionally empty Monaco code-action provider. PI-8 can attach only proven,
+      previewable source edits without changing the editor lifecycle; PI-6 exposes no edits.
+- [x] Added focused tests for marker ownership, rich content, span/role hit testing, shared-selection
+      preference, wrapping navigation, and disabled source edits.
+
+Validation record (2026-07-21):
+
+- `npm test`: 81 files and 2,091 tests passed; generated references are current.
+- `npm run lint`, `npm run build`, `npm run build:lib`, and the subsequent
+  `npm run check:lib` passed. The app build retained its pre-existing large-chunk advisory.
+- React Doctor's changed-file scan scored 89/100. Its three findings are pre-existing EditorPane
+  eager-loading, component-size, and REPL-option focus findings; PI-6 introduced no new category.
+- Targeted Prettier validation and `git diff --check` passed.
+- The in-app browser surface was unavailable, so live visual interaction could not be exercised in
+  this session. Monaco API compatibility is covered by the strict production TypeScript build;
+  production overlay usability remains part of the PI-7 browser/usability exit gate.
 
 ### PI-7 — Stage and playback integration
 
