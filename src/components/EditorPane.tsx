@@ -185,6 +185,8 @@ const LOAD_TRIGGER = '/load ';
 const REMOVE_TRIGGER = '/remove ';
 // Maximum suggestions shown at once.
 const MAX_SUGGESTIONS = 8;
+// Keep customizer previews responsive without compiling on every pointer event.
+const CUSTOMIZER_PREVIEW_THROTTLE_MS = 250;
 
 export default function EditorPane({
   source,
@@ -378,6 +380,48 @@ export default function EditorPane({
   const contextMenuRef = useRef<IDisposable | null>(null);
   const physicsActionRefs = useRef<IDisposable[]>([]);
 
+  // Leading + trailing customizer throttle. Background idle analysis remains
+  // suspended during slider drags, while these explicit preview runs keep the
+  // stage live and the compiler queue discards obsolete queued generations.
+  const lastCustomizerRunTimeRef = useRef(0);
+  const lastCustomizerRunSourceRef = useRef<string | null>(null);
+  const customizerRunTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runCustomizerPreview = useCallback((nextSource: string) => {
+    if (customizerRunTimerRef.current !== null) {
+      clearTimeout(customizerRunTimerRef.current);
+      customizerRunTimerRef.current = null;
+    }
+    lastCustomizerRunTimeRef.current = Date.now();
+    lastCustomizerRunSourceRef.current = nextSource;
+    onRunRef.current(nextSource);
+  }, []);
+
+  const scheduleCustomizerPreview = useCallback(
+    (nextSource: string) => {
+      const elapsed = Date.now() - lastCustomizerRunTimeRef.current;
+      if (elapsed >= CUSTOMIZER_PREVIEW_THROTTLE_MS) {
+        runCustomizerPreview(nextSource);
+        return;
+      }
+
+      if (customizerRunTimerRef.current !== null)
+        clearTimeout(customizerRunTimerRef.current);
+      customizerRunTimerRef.current = setTimeout(() => {
+        runCustomizerPreview(sourceRef.current);
+      }, CUSTOMIZER_PREVIEW_THROTTLE_MS - elapsed);
+    },
+    [runCustomizerPreview],
+  );
+
+  useEffect(
+    () => () => {
+      if (customizerRunTimerRef.current !== null)
+        clearTimeout(customizerRunTimerRef.current);
+    },
+    [],
+  );
+
   const handleParamChange = useCallback(
     (name: string, line: number, value: number | string) => {
       const updated =
@@ -386,8 +430,9 @@ export default function EditorPane({
           : updateParameter(sourceRef.current, line, name, value);
       sourceRef.current = updated;
       onSourceChange(updated);
+      scheduleCustomizerPreview(updated);
     },
-    [onSourceChange],
+    [onSourceChange, scheduleCustomizerPreview],
   );
 
   const handleAllParamsChange = useCallback(
@@ -412,8 +457,9 @@ export default function EditorPane({
       }
       sourceRef.current = src;
       onSourceChange(src);
+      runCustomizerPreview(src);
     },
-    [onSourceChange],
+    [onSourceChange, runCustomizerPreview],
   );
 
   const handleParameterInteractionStart = useCallback(
@@ -422,8 +468,13 @@ export default function EditorPane({
   );
   const handleParameterInteractionEnd = useCallback(() => {
     onAnalysisInteractionChange(false);
-    onRunRef.current(sourceRef.current);
-  }, [onAnalysisInteractionChange]);
+    if (customizerRunTimerRef.current !== null) {
+      clearTimeout(customizerRunTimerRef.current);
+      customizerRunTimerRef.current = null;
+    }
+    if (lastCustomizerRunSourceRef.current !== sourceRef.current)
+      runCustomizerPreview(sourceRef.current);
+  }, [onAnalysisInteractionChange, runCustomizerPreview]);
 
   const selectPhysicsDiagnostic = useCallback(
     (diagnostic: PhysicsDiagnostic) => {
