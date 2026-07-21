@@ -12,6 +12,7 @@ import {
   physicsDiagnosticLocation,
   serializePhysicsDiagnosticReport,
 } from './physics-panel-model.ts';
+import type { PhysicsAcknowledgment } from './physics-acknowledgments-model.ts';
 
 function diagnostic(overrides: Partial<PhysicsDiagnostic> = {}): PhysicsDiagnostic {
   return {
@@ -74,14 +75,24 @@ describe('physics panel model', () => {
     expect(
       filterPhysicsDiagnostics(
         diagnostics,
-        { severities: new Set(['warning', 'error']), category: 'coverage', selectedOnly: false },
+        {
+          severities: new Set(['warning', 'error']),
+          category: 'coverage',
+          selectedOnly: false,
+          acknowledgment: 'all',
+        },
         null,
       ).map(({ id }) => id),
     ).toEqual(['finding-1']);
     expect(
       filterPhysicsDiagnostics(
         diagnostics,
-        { severities: new Set(['warning', 'error']), category: 'all', selectedOnly: true },
+        {
+          severities: new Set(['warning', 'error']),
+          category: 'all',
+          selectedOnly: true,
+          acknowledgment: 'all',
+        },
         'finding-3',
       ).map(({ id }) => id),
     ).toEqual(['finding-3']);
@@ -90,6 +101,56 @@ describe('physics panel model', () => {
       'travel',
       'hoop',
     ]);
+  });
+
+  it('filters acknowledged findings by stable fingerprint without hiding blockers', () => {
+    const acknowledged = diagnostic({ id: 'occurrence-2' });
+    const blocker = diagnostic({
+      id: 'finding-3',
+      fingerprint: 'fingerprint-3',
+      severity: 'error',
+      evidence: 'hard-limit',
+    });
+    const acknowledgments = new Map<string, PhysicsAcknowledgment>([
+      [
+        acknowledged.fingerprint,
+        {
+          fingerprint: acknowledged.fingerprint,
+          reason: 'The doubled border is intentional.',
+          acknowledgedAt: '2026-07-21T12:00:00.000Z',
+        },
+      ],
+      [
+        blocker.fingerprint,
+        {
+          fingerprint: blocker.fingerprint,
+          reason: 'A stale local acknowledgment must not hide a blocker.',
+          acknowledgedAt: '2026-07-21T12:00:00.000Z',
+        },
+      ],
+    ]);
+    const filters = {
+      severities: new Set<PhysicsDiagnostic['severity']>(['warning', 'error']),
+      category: 'all' as const,
+      selectedOnly: false,
+    };
+
+    expect(
+      filterPhysicsDiagnostics(
+        [acknowledged, blocker],
+        { ...filters, acknowledgment: 'acknowledged' },
+        null,
+        acknowledgments,
+      ).map(({ id }) => id),
+    ).toEqual(['occurrence-2']);
+    expect(
+      filterPhysicsDiagnostics(
+        [acknowledged, blocker],
+        { ...filters, acknowledgment: 'active' },
+        null,
+        acknowledgments,
+      ).map(({ id }) => id),
+    ).toEqual(['finding-3']);
   });
 
   it('removes one console warning per equivalent structured occurrence', () => {

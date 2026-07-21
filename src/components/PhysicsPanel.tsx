@@ -10,7 +10,16 @@ import {
   filterPhysicsDiagnostics,
   groupPhysicsDiagnostics,
   serializePhysicsDiagnosticReport,
+  type PhysicsAcknowledgmentFilter,
 } from './physics-panel-model.ts';
+import {
+  acknowledgePhysicsDiagnostic,
+  isPhysicsDiagnosticAcknowledged,
+  readPhysicsAcknowledgments,
+  removePhysicsAcknowledgment,
+  writePhysicsAcknowledgments,
+  type PhysicsAcknowledgment,
+} from './physics-acknowledgments-model.ts';
 import type { PhysicsQuickFix, PhysicsQuickFixOutcome } from './physics-remedies-model.ts';
 import PhysicsDiagnosticCard from './PhysicsDiagnosticCard.tsx';
 import styles from './PhysicsPanel.module.css';
@@ -18,6 +27,7 @@ import styles from './PhysicsPanel.module.css';
 interface Props {
   report?: PhysicsReport;
   reportState: PhysicsReportState;
+  projectKey: string;
   selectedDiagnosticId: string | null;
   onDiagnosticSelect: (diagnostic: PhysicsDiagnostic) => void;
   onDiagnosticHover: (diagnostic: PhysicsDiagnostic | null) => void;
@@ -59,6 +69,100 @@ function readShowInfoPreference(): boolean {
   }
 }
 
+function readProjectAcknowledgments(projectKey: string): Map<string, PhysicsAcknowledgment> {
+  try {
+    return readPhysicsAcknowledgments(localStorage, projectKey);
+  } catch {
+    return new Map();
+  }
+}
+
+interface PhysicsFiltersProps {
+  showInfo: boolean;
+  enabledSeverities: ReadonlySet<PreflightSeverity>;
+  category: PhysicsDiagnosticCategory | 'all';
+  availableCategories: readonly PhysicsDiagnosticCategory[];
+  acknowledgmentFilter: PhysicsAcknowledgmentFilter;
+  acknowledgedCount: number;
+  selectedOnly: boolean;
+  hasSelection: boolean;
+  onSeverityToggle: (severity: PreflightSeverity) => void;
+  onCategoryChange: (category: PhysicsDiagnosticCategory | 'all') => void;
+  onAcknowledgmentFilterChange: (filter: PhysicsAcknowledgmentFilter) => void;
+  onSelectedOnlyChange: (selectedOnly: boolean) => void;
+}
+
+function PhysicsFilters({
+  showInfo,
+  enabledSeverities,
+  category,
+  availableCategories,
+  acknowledgmentFilter,
+  acknowledgedCount,
+  selectedOnly,
+  hasSelection,
+  onSeverityToggle,
+  onCategoryChange,
+  onAcknowledgmentFilterChange,
+  onSelectedOnlyChange,
+}: PhysicsFiltersProps) {
+  return (
+    <div className={styles.filters} aria-label="Physics finding filters">
+      <fieldset className={styles.severityFilters}>
+        <legend>Severity</legend>
+        {SEVERITIES.map((severity) => (
+          <label key={severity}>
+            <input
+              type="checkbox"
+              checked={severity === 'info' ? showInfo : enabledSeverities.has(severity)}
+              onChange={() => onSeverityToggle(severity)}
+            />
+            {SEVERITY_LABELS[severity]}
+          </label>
+        ))}
+      </fieldset>
+      <label className={styles.selectFilter}>
+        <span>Category</span>
+        <select
+          value={category}
+          onChange={(event) =>
+            onCategoryChange(event.target.value as PhysicsDiagnosticCategory | 'all')
+          }
+        >
+          <option value="all">All categories</option>
+          {availableCategories.map((itemCategory) => (
+            <option key={itemCategory} value={itemCategory}>
+              {CATEGORY_LABELS[itemCategory]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className={styles.selectFilter}>
+        <span>Status</span>
+        <select
+          value={acknowledgmentFilter}
+          onChange={(event) =>
+            onAcknowledgmentFilterChange(event.target.value as PhysicsAcknowledgmentFilter)
+          }
+        >
+          <option value="active">Active findings</option>
+          <option value="acknowledged">Acknowledged findings ({acknowledgedCount})</option>
+          <option value="all">All findings</option>
+        </select>
+      </label>
+      <label className={styles.selectedFilter}>
+        <input
+          type="checkbox"
+          checked={selectedOnly}
+          disabled={!hasSelection}
+          onChange={(event) => onSelectedOnlyChange(event.target.checked)}
+        />
+        Current selection
+      </label>
+    </div>
+  );
+}
+
 function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
@@ -89,6 +193,7 @@ async function copyText(text: string): Promise<void> {
 export default function PhysicsPanel({
   report,
   reportState,
+  projectKey,
   selectedDiagnosticId,
   onDiagnosticSelect,
   onDiagnosticHover,
@@ -106,8 +211,13 @@ export default function PhysicsPanel({
   );
   const [category, setCategory] = useState<PhysicsDiagnosticCategory | 'all'>('all');
   const [selectedOnly, setSelectedOnly] = useState(false);
+  const [acknowledgmentFilter, setAcknowledgmentFilter] =
+    useState<PhysicsAcknowledgmentFilter>('active');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [acknowledgments, setAcknowledgments] = useState(() =>
+    readProjectAcknowledgments(projectKey),
+  );
 
   useEffect(() => {
     try {
@@ -134,13 +244,40 @@ export default function PhysicsPanel({
     () =>
       filterPhysicsDiagnostics(
         report?.diagnostics ?? [],
-        { severities: effectiveSeverities, category, selectedOnly },
+        {
+          severities: effectiveSeverities,
+          category,
+          selectedOnly,
+          acknowledgment: acknowledgmentFilter,
+        },
         selectedDiagnosticId,
+        acknowledgments,
       ),
-    [category, effectiveSeverities, report, selectedDiagnosticId, selectedOnly],
+    [
+      acknowledgmentFilter,
+      acknowledgments,
+      category,
+      effectiveSeverities,
+      report,
+      selectedDiagnosticId,
+      selectedOnly,
+    ],
   );
   const groups = useMemo(() => groupPhysicsDiagnostics(filtered), [filtered]);
   const statusMessage = physicsStatusMessage(reportState);
+  const acknowledgedCount =
+    report?.diagnostics.filter((diagnostic) =>
+      isPhysicsDiagnosticAcknowledged(diagnostic, acknowledgments),
+    ).length ?? 0;
+
+  const updateAcknowledgments = (next: Map<string, PhysicsAcknowledgment>) => {
+    try {
+      writePhysicsAcknowledgments(localStorage, projectKey, next);
+    } catch {
+      // The acknowledgment still applies for this session when storage is unavailable.
+    }
+    setAcknowledgments(next);
+  };
 
   const toggleSeverity = (severity: PreflightSeverity) => {
     if (severity === 'info') {
@@ -179,6 +316,11 @@ export default function PhysicsPanel({
       <div className={styles.statusHeader}>
         <div>
           <strong>{report ? formatSummary(report) : 'Physics analysis'}</strong>
+          {acknowledgedCount > 0 && (
+            <span className={styles.acknowledgedCount}>
+              {plural(acknowledgedCount, 'acknowledged finding')}
+            </span>
+          )}
           {statusMessage && (
             <span className={styles.lifecycle} data-status={reportState.status} role="status">
               {statusMessage}
@@ -243,46 +385,20 @@ export default function PhysicsPanel({
       )}
 
       {report && report.diagnostics.length > 0 && (
-        <div className={styles.filters} aria-label="Physics finding filters">
-          <fieldset className={styles.severityFilters}>
-            <legend>Severity</legend>
-            {SEVERITIES.map((severity) => (
-              <label key={severity}>
-                <input
-                  type="checkbox"
-                  checked={severity === 'info' ? showInfo : enabledSeverities.has(severity)}
-                  onChange={() => toggleSeverity(severity)}
-                />
-                {SEVERITY_LABELS[severity]}
-              </label>
-            ))}
-          </fieldset>
-          <label className={styles.selectFilter}>
-            <span>Category</span>
-            <select
-              value={category}
-              onChange={(event) =>
-                setCategory(event.target.value as PhysicsDiagnosticCategory | 'all')
-              }
-            >
-              <option value="all">All categories</option>
-              {availableCategories.map((itemCategory) => (
-                <option key={itemCategory} value={itemCategory}>
-                  {CATEGORY_LABELS[itemCategory]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.selectedFilter}>
-            <input
-              type="checkbox"
-              checked={selectedOnly}
-              disabled={!selectedDiagnosticId}
-              onChange={(event) => setSelectedOnly(event.target.checked)}
-            />
-            Current selection
-          </label>
-        </div>
+        <PhysicsFilters
+          showInfo={showInfo}
+          enabledSeverities={enabledSeverities}
+          category={category}
+          availableCategories={availableCategories}
+          acknowledgmentFilter={acknowledgmentFilter}
+          acknowledgedCount={acknowledgedCount}
+          selectedOnly={selectedOnly}
+          hasSelection={selectedDiagnosticId !== null}
+          onSeverityToggle={toggleSeverity}
+          onCategoryChange={setCategory}
+          onAcknowledgmentFilterChange={setAcknowledgmentFilter}
+          onSelectedOnlyChange={setSelectedOnly}
+        />
       )}
 
       {!report && reportState.status !== 'blocked' && (
@@ -318,12 +434,23 @@ export default function PhysicsPanel({
                 expanded={expandedIds.has(diagnostic.id)}
                 quickFix={quickFixes.get(diagnostic.id)}
                 quickFixPreview={quickFixPreview}
+                acknowledgment={acknowledgments.get(diagnostic.fingerprint)}
                 onSelect={onDiagnosticSelect}
                 onHover={onDiagnosticHover}
                 onToggleExpanded={toggleExpanded}
                 onQuickFixPreview={onQuickFixPreview}
                 onQuickFixCancel={onQuickFixCancel}
                 onQuickFixApply={onQuickFixApply}
+                onAcknowledge={(finding, reason) =>
+                  updateAcknowledgments(
+                    acknowledgePhysicsDiagnostic(acknowledgments, finding, reason),
+                  )
+                }
+                onRemoveAcknowledgment={(finding) =>
+                  updateAcknowledgments(
+                    removePhysicsAcknowledgment(acknowledgments, finding.fingerprint),
+                  )
+                }
               />
             ))}
           </section>

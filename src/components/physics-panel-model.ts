@@ -6,11 +6,18 @@ import type {
   WarningLocation,
 } from '../lib/engine.ts';
 import type { PhysicsReportState } from '../physics-analysis-state.ts';
+import {
+  isPhysicsDiagnosticAcknowledged,
+  type PhysicsAcknowledgment,
+} from './physics-acknowledgments-model.ts';
+
+export type PhysicsAcknowledgmentFilter = 'active' | 'acknowledged' | 'all';
 
 export interface PhysicsPanelFilters {
   severities: ReadonlySet<PreflightSeverity>;
   category: PhysicsDiagnosticCategory | 'all';
   selectedOnly: boolean;
+  acknowledgment: PhysicsAcknowledgmentFilter;
 }
 
 const LEGACY_CODE_BY_LOCATION_KIND: Partial<
@@ -26,13 +33,18 @@ export function filterPhysicsDiagnostics(
   diagnostics: readonly PhysicsDiagnostic[],
   filters: PhysicsPanelFilters,
   selectedDiagnosticId: string | null,
+  acknowledgments: ReadonlyMap<string, PhysicsAcknowledgment> = new Map(),
 ): PhysicsDiagnostic[] {
-  return diagnostics.filter(
-    (diagnostic) =>
+  return diagnostics.filter((diagnostic) => {
+    const acknowledged = isPhysicsDiagnosticAcknowledged(diagnostic, acknowledgments);
+    return (
       filters.severities.has(diagnostic.severity) &&
       (filters.category === 'all' || diagnostic.category === filters.category) &&
-      (!filters.selectedOnly || diagnostic.id === selectedDiagnosticId),
-  );
+      (!filters.selectedOnly || diagnostic.id === selectedDiagnosticId) &&
+      (filters.acknowledgment === 'all' ||
+        (filters.acknowledgment === 'acknowledged' ? acknowledged : !acknowledged))
+    );
+  });
 }
 
 export function groupPhysicsDiagnostics(

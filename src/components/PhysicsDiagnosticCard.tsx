@@ -1,9 +1,15 @@
+import { useState } from 'react';
 import type {
   PhysicsDiagnostic,
   PhysicsEvidence,
   PhysicsMeasurement,
   PreflightSeverity,
 } from '../lib/engine.ts';
+import {
+  canAcknowledgePhysicsDiagnostic,
+  PHYSICS_ACKNOWLEDGMENT_REASON_MAX_LENGTH,
+  type PhysicsAcknowledgment,
+} from './physics-acknowledgments-model.ts';
 import type { PhysicsQuickFix } from './physics-remedies-model.ts';
 import styles from './PhysicsPanel.module.css';
 
@@ -13,12 +19,15 @@ interface Props {
   expanded: boolean;
   quickFix?: PhysicsQuickFix;
   quickFixPreview: PhysicsQuickFix | null;
+  acknowledgment?: PhysicsAcknowledgment;
   onSelect: (diagnostic: PhysicsDiagnostic) => void;
   onHover: (diagnostic: PhysicsDiagnostic | null) => void;
   onToggleExpanded: (id: string) => void;
   onQuickFixPreview: (fix: PhysicsQuickFix) => void;
   onQuickFixCancel: () => void;
   onQuickFixApply: (fix: PhysicsQuickFix) => void;
+  onAcknowledge: (diagnostic: PhysicsDiagnostic, reason: string) => void;
+  onRemoveAcknowledgment: (diagnostic: PhysicsDiagnostic) => void;
 }
 
 const SEVERITY_LABELS: Record<PreflightSeverity, string> = {
@@ -53,20 +62,34 @@ export default function PhysicsDiagnosticCard({
   expanded,
   quickFix,
   quickFixPreview,
+  acknowledgment,
   onSelect,
   onHover,
   onToggleExpanded,
   onQuickFixPreview,
   onQuickFixCancel,
   onQuickFixApply,
+  onAcknowledge,
+  onRemoveAcknowledgment,
 }: Props) {
+  const [showAcknowledgmentForm, setShowAcknowledgmentForm] = useState(false);
+  const [acknowledgmentReason, setAcknowledgmentReason] = useState('');
   const primaryLine = diagnostic.sourceLocations.find(({ role }) => role === 'primary')?.line;
   const previewing = quickFixPreview?.diagnosticId === diagnostic.id;
+  const canAcknowledge = canAcknowledgePhysicsDiagnostic(diagnostic);
+  const submitAcknowledgment = () => {
+    const reason = acknowledgmentReason.trim();
+    if (!reason) return;
+    onAcknowledge(diagnostic, reason);
+    setAcknowledgmentReason('');
+    setShowAcknowledgmentForm(false);
+  };
   return (
     <article
       className={styles.card}
       data-severity={diagnostic.severity}
       data-selected={selected || undefined}
+      data-acknowledged={acknowledgment ? true : undefined}
       onMouseEnter={() => onHover(diagnostic)}
       onMouseLeave={() => onHover(null)}
     >
@@ -87,6 +110,7 @@ export default function PhysicsDiagnosticCard({
           <span className={styles.cardMeta}>
             {EVIDENCE_LABELS[diagnostic.evidence]}
             {primaryLine !== undefined ? ` · line ${primaryLine}` : ' · generated'}
+            {acknowledgment ? ' · Acknowledged' : ''}
           </span>
           {diagnostic.measurements?.slice(0, 1).map((measurement) => (
             <span key={measurement.label} className={styles.measurement}>
@@ -143,6 +167,54 @@ export default function PhysicsDiagnosticCard({
       )}
       {expanded && (
         <div id={`physics-details-${diagnostic.id}`} className={styles.cardDetails}>
+          {acknowledgment && (
+            <div className={styles.acknowledgment}>
+              <strong>Acknowledged for this project</strong>
+              <span>{acknowledgment.reason}</span>
+              <button type="button" onClick={() => onRemoveAcknowledgment(diagnostic)}>
+                Remove acknowledgment
+              </button>
+            </div>
+          )}
+          {showAcknowledgmentForm && !acknowledgment && (
+            <form
+              className={styles.acknowledgmentForm}
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitAcknowledgment();
+              }}
+            >
+              <label htmlFor={`physics-acknowledgment-${diagnostic.id}`}>
+                Why is this finding intentional for this project?
+              </label>
+              <textarea
+                id={`physics-acknowledgment-${diagnostic.id}`}
+                value={acknowledgmentReason}
+                required
+                maxLength={PHYSICS_ACKNOWLEDGMENT_REASON_MAX_LENGTH}
+                rows={2}
+                autoFocus
+                onChange={(event) => setAcknowledgmentReason(event.target.value)}
+              />
+              <span>
+                This local acknowledgment does not change the source, stitches, or export policy.
+              </span>
+              <div className={styles.acknowledgmentActions}>
+                <button type="submit" disabled={!acknowledgmentReason.trim()}>
+                  Save acknowledgment
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAcknowledgmentReason('');
+                    setShowAcknowledgmentForm(false);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
           <p>{diagnostic.explanation}</p>
           {diagnostic.methodology && (
             <p>
@@ -177,6 +249,21 @@ export default function PhysicsDiagnosticCard({
                 ))}
               </ul>
             </div>
+          )}
+          {!acknowledgment && canAcknowledge && !showAcknowledgmentForm && (
+            <button
+              type="button"
+              className={styles.acknowledgeButton}
+              aria-expanded={showAcknowledgmentForm}
+              onClick={() => setShowAcknowledgmentForm(true)}
+            >
+              Acknowledge for this project
+            </button>
+          )}
+          {!canAcknowledge && (
+            <p className={styles.acknowledgmentUnavailable}>
+              Blockers and hard-limit findings cannot be acknowledged.
+            </p>
           )}
           <code>{diagnostic.code}</code>
         </div>

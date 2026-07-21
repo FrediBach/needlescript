@@ -63,6 +63,7 @@ interface Props {
   messages: ConsoleMessage[];
   physics?: PhysicsReport;
   physicsReportState: PhysicsReportState;
+  physicsProjectKey: string;
   selectedDiagnosticId: string | null;
   onDiagnosticHover: (diagnostic: PhysicsDiagnostic | null) => void;
   onDiagnosticSelect: (diagnostic: PhysicsDiagnostic) => void;
@@ -195,6 +196,7 @@ export default function EditorPane({
   messages,
   physics,
   physicsReportState,
+  physicsProjectKey,
   selectedDiagnosticId,
   onDiagnosticHover,
   onDiagnosticSelect,
@@ -1335,8 +1337,10 @@ export default function EditorPane({
           className={styles.physicsContent}
         >
           <PhysicsPanel
+            key={physicsProjectKey}
             report={physics}
             reportState={physicsReportState}
+            projectKey={physicsProjectKey}
             selectedDiagnosticId={selectedDiagnosticId}
             onDiagnosticHover={onDiagnosticHover}
             onDiagnosticSelect={selectPhysicsDiagnostic}

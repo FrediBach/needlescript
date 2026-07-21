@@ -1,26 +1,27 @@
 # PhysicsIntellisense Implementation Plan
 
-Status: **PI-9 complete; PI-7 product review remains open** (2026-07-21) — full analysis now adds
-bounded construction coverage, underlay, short-stitch ratio, color-run travel, declared material
-context, experimental directional-compensation, and machine-profile-aware findings. PI-7 remains
-open until representative visual iteration, product-owner approval, and the five-participant
-usability protocol are complete.
+Status: **PI-10 complete; PI-7 product review remains open** (2026-07-21) — project-scoped local
+acknowledgments now require a reason, follow stable finding fingerprints, remain countable and
+filterable, and cannot suppress blockers, hard limits, source, stitches, or export policy. PI-7
+remains open until representative visual iteration, product-owner approval, and the
+five-participant usability protocol are complete.
 
 Last updated: 2026-07-21
 
-| Session  | Status      | Exit gate                                                                 |
-| -------- | ----------- | ------------------------------------------------------------------------- |
-| PI-0     | Complete    | Product owner approved the contract and prototype concept on 2026-07-21   |
-| PI-1     | Complete    | Unified catalog/types shipped without freezing overlay presentation       |
-| PI-2     | Complete    | Editor analysis is independent from source-selected preflight policy      |
-| PI-3     | Complete    | Rich source, geometry, construction, and playback attribution shipped     |
-| PI-4     | Complete    | Revision lifecycle, background analysis, and priority queue shipped       |
-| PI-5     | Complete    | Responsive, keyboard-operable Physics panel shipped                       |
-| PI-6     | Complete    | Independent markers, linked selection, rich hover, and navigation shipped |
-| PI-7     | In review   | Visual/product iteration and five-participant protocol remain             |
-| PI-8     | Complete    | Previewed literal edits recompile and compare findings                    |
-| PI-9     | Complete    | Bounded expansion detectors, paired fixtures, evidence, and remedies ship |
-| PI-10–11 | Not started | Follow the dependency and acceptance gates documented below               |
+| Session | Status      | Exit gate                                                                 |
+| ------- | ----------- | ------------------------------------------------------------------------- |
+| PI-0    | Complete    | Product owner approved the contract and prototype concept on 2026-07-21   |
+| PI-1    | Complete    | Unified catalog/types shipped without freezing overlay presentation       |
+| PI-2    | Complete    | Editor analysis is independent from source-selected preflight policy      |
+| PI-3    | Complete    | Rich source, geometry, construction, and playback attribution shipped     |
+| PI-4    | Complete    | Revision lifecycle, background analysis, and priority queue shipped       |
+| PI-5    | Complete    | Responsive, keyboard-operable Physics panel shipped                       |
+| PI-6    | Complete    | Independent markers, linked selection, rich hover, and navigation shipped |
+| PI-7    | In review   | Visual/product iteration and five-participant protocol remain             |
+| PI-8    | Complete    | Previewed literal edits recompile and compare findings                    |
+| PI-9    | Complete    | Bounded expansion detectors, paired fixtures, evidence, and remedies ship |
+| PI-10   | Complete    | Project-local, reasoned fingerprint acknowledgments shipped               |
+| PI-11   | Not started | Follow the dependency and acceptance gates documented below               |
 
 PhysicsIntellisense is a unified, always-available analysis layer across the editor, stage, and
 playback—not a renamed or enlarged preflight panel.
@@ -1055,6 +1056,41 @@ Recommended model:
 - Local acknowledgments should not silently alter shared source.
 
 A future comment annotation such as `@physics-ignore` can be considered separately, but should not be introduced in the first release.
+
+Implementation progress:
+
+- [x] Added a versioned, playground-only local acknowledgment store. Entries are scoped to the
+      active named snippet, shared-link ID, or current design identity and never enter source or the
+      platform-neutral `PhysicsReport`.
+- [x] Required a non-empty reason (up to 500 characters) and recorded the acknowledgment timestamp.
+      Recompiled occurrences match through the diagnostic fingerprint rather than occurrence ID or
+      display copy.
+- [x] Added active, acknowledged, and all-finding status filters. The panel defaults to active
+      findings, retains the complete report summary, and shows the number of matching acknowledged
+      occurrences.
+- [x] Added an expanded-card acknowledgment record with its reason and a reversible remove action.
+      The UI explicitly states that the local decision does not change source, stitches, or export
+      policy.
+- [x] Made `error` severity and `hard-limit` evidence ineligible. A stale persisted acknowledgment
+      with the same fingerprint is ignored if a later catalog version promotes the finding to either
+      class.
+- [x] Kept acknowledged diagnostics in the underlying report and all linked editor/stage/playback
+      data. No `@physics-ignore` syntax or shared-source annotation was introduced.
+
+Validation record (2026-07-21):
+
+- `npm test`: 84 files and 2,117 tests passed; generated language references are current.
+- `npm run lint`, `npm run build`, `npm run build:lib`, and `npm run check:lib` passed. The app build
+  retained its pre-existing large-chunk advisory; publint and the package type check found no
+  problems. The library check used a task-local npm cache because the user's default cache contains
+  root-owned entries.
+- React Doctor's final changed-file scan scored 85/100. The nine remaining observations are
+  pre-existing issues in `App.tsx` and `EditorPane.tsx`; the new Physics acknowledgment and filter
+  components have no reported finding.
+- Focused acknowledgment/filter tests, Prettier formatting, and `git diff --check` passed.
+- The in-app browser runtime reported no available browser surface, so a live click-through could
+  not be completed in this session. Interactive visual review remains recommended when that surface
+  is available.
 
 ### PI-11 — Evidence, accessibility, performance, and rollout
 

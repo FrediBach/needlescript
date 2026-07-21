@@ -338,6 +338,10 @@ export default function App() {
   useLayoutEffect(() => {
     activeSnippetNameRef.current = activeSnippetName;
   });
+  const sharedProjectId = useMemo(
+    () => new URLSearchParams(window.location.search).get('share'),
+    [],
+  );
 
   const activeMachine = useMemo((): ActiveMachine | null => {
     const block = findBlock(source);
@@ -1211,6 +1215,13 @@ export default function App() {
             messages={messages}
             physics={design.physics}
             physicsReportState={physicsReportState}
+            physicsProjectKey={
+              activeSnippetName
+                ? `snippet:${activeSnippetName}`
+                : sharedProjectId
+                  ? `share:${sharedProjectId}`
+                  : `design:${design.name}`
+            }
             selectedDiagnosticId={selectedDiagnosticId}
             onDiagnosticHover={handleDiagnosticHover}
             onDiagnosticSelect={(diagnostic) => setSelectedDiagnosticId(diagnostic.id)}

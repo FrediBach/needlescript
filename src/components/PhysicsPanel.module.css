@@ -22,6 +22,13 @@
   color: var(--gold);
 }
 
+.acknowledgedCount {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+}
+
 .lifecycle[data-status='blocked'] {
   color: var(--console-err);
 }
@@ -29,6 +36,9 @@
 .copyButton,
 .expandButton,
 .quickFixButton,
+.acknowledgeButton,
+.acknowledgment button,
+.acknowledgmentActions button,
 .quickFixOutcome button,
 .previewActions button {
   border: 1px solid var(--border);
@@ -50,6 +60,12 @@
 .expandButton:focus-visible,
 .quickFixButton:hover,
 .quickFixButton:focus-visible,
+.acknowledgeButton:hover,
+.acknowledgeButton:focus-visible,
+.acknowledgment button:hover,
+.acknowledgment button:focus-visible,
+.acknowledgmentActions button:hover,
+.acknowledgmentActions button:focus-visible,
 .quickFixOutcome button:hover,
 .quickFixOutcome button:focus-visible,
 .previewActions button:hover,
@@ -246,6 +262,10 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent);
 }
 
+.card[data-acknowledged] {
+  border-left-color: var(--text-muted);
+}
+
 .cardHeader {
   display: flex;
   align-items: stretch;
@@ -404,6 +424,75 @@
 
 .remedies > strong {
   color: var(--text);
+}
+
+.acknowledgeButton {
+  margin: 3px 8px 3px 0;
+  color: var(--text);
+}
+
+.acknowledgment,
+.acknowledgmentForm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 7px 0;
+  padding: 7px 8px;
+  border-left: 2px solid var(--text-muted);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.acknowledgment strong,
+.acknowledgmentForm label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.acknowledgment button,
+.acknowledgmentActions button {
+  margin-top: 2px;
+}
+
+.acknowledgmentForm textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 5px 6px;
+  color: var(--text);
+  background: var(--bg-panel);
+  font: inherit;
+}
+
+.acknowledgmentForm textarea:focus-visible {
+  border-color: var(--gold);
+  outline: none;
+}
+
+.acknowledgmentForm > span,
+.acknowledgmentUnavailable {
+  font-size: var(--fs-label);
+}
+
+.acknowledgmentActions {
+  display: flex;
+  gap: 6px;
+}
+
+.acknowledgmentActions button:first-child {
+  border-color: var(--gold);
+  color: var(--text);
+}
+
+.acknowledgmentActions button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.acknowledgmentUnavailable {
+  color: var(--text-muted);
 }
 
 @media (max-width: 420px) {
