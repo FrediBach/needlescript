@@ -19,6 +19,8 @@ export interface AiActivityEvent {
   tone: AiActivityTone;
   title: string;
   summary?: string;
+  /** Primary model output rendered directly in the AI timeline. */
+  content?: string;
   detail?: string;
   usage?: AiActivityUsage;
 }

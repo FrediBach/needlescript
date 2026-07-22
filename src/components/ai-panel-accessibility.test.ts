@@ -82,4 +82,31 @@ describe('AI panel accessibility', () => {
     expect(container?.textContent).toContain('No AI activity yet');
     expect(container?.textContent).toContain('/ai create');
   });
+
+  it('renders explanation output directly in the AI timeline', async () => {
+    await renderPanel({
+      id: 2,
+      command: 'explain',
+      instruction: 'explain the selected loop',
+      model: 'anthropic/test-model',
+      startedAt: 300,
+      finishedAt: 360,
+      status: 'completed',
+      events: [
+        {
+          id: 3,
+          at: 350,
+          phase: 'response',
+          tone: 'success',
+          title: 'Explanation received',
+          summary: '120 characters',
+          content: 'This loop rotates after each stitched segment, producing a closed polygon.',
+        },
+      ],
+    });
+
+    const response = container?.querySelector('[aria-label="AI response"]');
+    expect(response?.textContent).toContain('producing a closed polygon');
+    expect(response?.closest('details')).toBeNull();
+  });
 });

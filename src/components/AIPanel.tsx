@@ -102,6 +102,11 @@ export default function AIPanel({ activity, selectedModel, hasApiKey }: Props) {
                 </time>
               </div>
               {event.summary && <div className={styles.summary}>{event.summary}</div>}
+              {event.content && (
+                <div className={styles.responseContent} aria-label="AI response">
+                  {event.content}
+                </div>
+              )}
               {event.usage && (
                 <div className={styles.eventUsage}>
                   {event.usage.totalTokens.toLocaleString()} tokens

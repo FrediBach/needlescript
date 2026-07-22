@@ -360,9 +360,9 @@ export function useAI({
           tone: 'success',
           title: 'Explanation received',
           summary: `${result.model} · ${text.length.toLocaleString()} character(s)`,
+          content: text,
           usage: toActivityUsage(result.usage),
         });
-        text.split('\n').forEach((line) => addMsg(line, 'print'));
         endActivity(sessionId, 'completed');
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

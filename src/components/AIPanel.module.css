@@ -150,6 +150,18 @@
   overflow-wrap: anywhere;
 }
 
+.responseContent {
+  max-height: 360px;
+  margin-top: 6px;
+  overflow: auto;
+  border-left: 2px solid var(--gold);
+  padding: 7px 9px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.025);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .details {
   margin-top: 3px;
 }

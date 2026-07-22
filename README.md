@@ -141,7 +141,8 @@ The REPL can generate, improve, fix, and explain designs using a model available
 When an API key and model are selected, the code editor context menu also includes **Explain with
 AI**. Right-click a selection to ask about that exact range, or right-click without a selection to
 ask about the statement and symbol at the pointer. The request includes the precise source location,
-the complete current program, and its compiled spatial context.
+the complete current program, and its compiled spatial context. Explanations appear directly in the
+**AI** activity tab rather than being mixed into Console output.
 
 The selected key and model are stored in browser `localStorage`. Generation receives the compact
 NeedleScript reference. Existing designs are compiled before improve, fix, and explain requests so
