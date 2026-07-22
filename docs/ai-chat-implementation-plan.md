@@ -141,6 +141,9 @@ The important gaps are architectural rather than analytical:
 
 - `/ai chat` opens the AI tab in Chat view and focuses its multiline composer.
 - `/ai chat <message>` opens Chat view and submits `<message>` as a new turn.
+- A new thread first requires an explicit **Create something new** or **Edit current code** choice.
+  Create starts from an empty private draft; edit starts from the current live source. A message
+  supplied with `/ai chat <message>` remains in the composer until this choice is made.
 - Subsequent messages are sent from the chat composer; the general REPL continues to accept normal
   NeedleScript and slash commands.
 - `/ai new` creates a new empty thread for the current workspace after handling any pending proposal.
@@ -759,15 +762,15 @@ prepare bounded context
 
 Initial limits should be constants with tests and activity reporting:
 
-| Limit                    |         Initial value | Behavior at limit                                                              |
-| ------------------------ | --------------------: | ------------------------------------------------------------------------------ |
-| Model steps per turn     |                    16 | Ask model for a final answer with tools disabled once; otherwise fail clearly. |
-| Tool calls per turn      |                    24 | Return a limit result, then request a final answer.                            |
-| Actual compiles per turn |                     4 | Cache hits remain allowed; later compile calls get a budget error.             |
-| Draft edits per call     |                    24 | Reject the complete call.                                                      |
-| Source page              | 400 lines / 24k chars | Return a cursor.                                                               |
-| Tool result              |             32k chars | Deterministically truncate with counts/cursor.                                 |
-| Active turn wall time    |            90 seconds | Abort provider work and stop dispatch; time awaiting user input is excluded.   |
+| Limit                    |         Initial value | Behavior at limit                                                            |
+| ------------------------ | --------------------: | ---------------------------------------------------------------------------- |
+| Model steps per turn     |                    64 | Ask model for a final answer with tools disabled once.                       |
+| Tool calls per turn      |                    96 | Return a limit result, then request a final answer.                          |
+| Actual compiles per turn |                    12 | Cache hits remain allowed; later compile calls get a budget error.           |
+| Draft edits per call     |                    24 | Reject the complete call.                                                    |
+| Source page              | 400 lines / 24k chars | Return a cursor.                                                             |
+| Tool result              |             32k chars | Deterministically truncate with counts/cursor.                               |
+| Active turn wall time    |             5 minutes | Abort provider work and stop dispatch; time awaiting user input is excluded. |
 
 Use `parallel_tool_calls: false` for version 1. OpenRouter documents that this forces one requested
 tool call at a time, which makes draft revisions, compiler caching, transcript ordering, and

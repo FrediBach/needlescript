@@ -6,6 +6,9 @@ The playground's persistent chat prepends an orchestration wrapper to this langu
 sets these behavioral boundaries without duplicating individual JSON tool schemas:
 
 - Answer and review requests remain read-only unless the user asks for a change.
+- Every new thread has a user-selected create-new or edit-current intent. Create-new starts from an
+  empty private draft; edit-current starts from the live design. The model never infers or changes
+  this choice.
 - Change requests may inspect and edit only a private, revisioned draft. Applying that draft to the
   live Monaco editor always requires the user's explicit Apply action.
 - Source, compiled spatial measurements, and structured Physics results are inspected through the

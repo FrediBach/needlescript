@@ -148,6 +148,10 @@ findings, ask one owned set of multiple-choice questions, and maintain a visible
 multi-step work. Tool-capable models are marked in model autocomplete; direct create, improve, fix,
 and explain commands remain available independently.
 
+Every new chat first asks whether it should **Create something new** or **Edit current code**. Create
+mode begins from an empty private draft; edit mode uses the current live source as its starting point.
+The choice is stored with the thread and is never inferred or changed by the model.
+
 Chat tools never write to the live editor. Requested changes accumulate in a private draft and
 appear as a reviewed line diff with **Apply**, **Discard**, and (after a live edit) **Rebase**. Apply
 is one Monaco edit with a single undo boundary, verifies the source revision/hash, and then runs the

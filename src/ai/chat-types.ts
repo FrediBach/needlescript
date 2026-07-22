@@ -3,6 +3,7 @@ import type { AiActivityUsage } from '../ai-activity.ts';
 export type AiThreadStatus = 'idle' | 'running' | 'awaiting-user';
 export type AiTurnStatus = 'running' | 'awaiting-user' | 'completed' | 'cancelled' | 'failed';
 export type AiPlanStepStatus = 'pending' | 'in-progress' | 'completed';
+export type AiChatIntent = 'create' | 'edit';
 
 export interface AiToolCall {
   id: string;
@@ -158,6 +159,7 @@ export interface AiChatThread {
   createdAt: number;
   updatedAt: number;
   status: AiThreadStatus;
+  intent?: AiChatIntent;
   turns: AiChatTurn[];
   draft?: AiDraftState;
   activePlan?: AiWorkPlan;

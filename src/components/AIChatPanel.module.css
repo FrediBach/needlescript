@@ -1,7 +1,9 @@
 .panel {
   display: flex;
-  min-height: 190px;
+  min-height: 0;
+  flex: 1;
   flex-direction: column;
+  overflow: hidden;
   color: var(--text-muted);
 }
 
@@ -72,6 +74,55 @@
 }
 
 .empty strong {
+  color: var(--text);
+}
+
+.intentChooser {
+  display: flex;
+  min-height: 120px;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px;
+  text-align: center;
+}
+
+.intentChooser > strong {
+  color: var(--text);
+}
+
+.intentChooser > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.intentChooser button {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  text-align: left;
+}
+
+.intentChooser button:hover,
+.intentChooser button:focus-visible {
+  border-color: var(--gold);
+}
+
+.intentChooser button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.intentChooser button strong {
   color: var(--text);
 }
 
@@ -307,5 +358,9 @@
 
   .userMessage {
     max-width: 95%;
+  }
+
+  .intentChooser > div {
+    grid-template-columns: 1fr;
   }
 }

@@ -13,6 +13,16 @@ interface StoredThreads {
   threads: AiChatThread[];
 }
 
+function normalizeStoredThreads(threads: unknown[]): AiChatThread[] {
+  return threads.flatMap((value) => {
+    const thread = value as AiChatThread | undefined;
+    if (thread?.version !== 1) return [];
+    return [
+      thread.intent || thread.turns.length === 0 ? thread : { ...thread, intent: 'edit' as const },
+    ];
+  });
+}
+
 function protectedThread(thread: AiChatThread): boolean {
   return Boolean(
     thread.pendingQuestionSet ||
@@ -61,7 +71,7 @@ export function loadChatThreads(): AiChatThread[] {
     if (!parsed || typeof parsed !== 'object' || (parsed as { version?: unknown }).version !== 1)
       return [];
     const threads = (parsed as StoredThreads).threads;
-    return Array.isArray(threads) ? threads.filter((thread) => thread?.version === 1) : [];
+    return Array.isArray(threads) ? normalizeStoredThreads(threads) : [];
   } catch {
     return [];
   }
@@ -94,7 +104,7 @@ export async function loadChatThreadsAsync(): Promise<AiChatThread[]> {
     });
     database.close();
     return value?.version === 1 && Array.isArray(value.threads)
-      ? value.threads.filter((thread) => thread?.version === 1)
+      ? normalizeStoredThreads(value.threads)
       : [];
   } catch {
     return [];

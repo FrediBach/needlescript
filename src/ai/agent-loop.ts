@@ -7,9 +7,7 @@ import type {
   AiToolDisplay,
 } from './chat-types.ts';
 import type { ToolExecution } from './tool-runtime.ts';
-
-export const MAX_MODEL_STEPS_PER_TURN = 16;
-export const MAX_TOOL_CALLS_PER_TURN = 24;
+import { MAX_MODEL_STEPS_PER_TURN, MAX_TOOL_CALLS_PER_TURN } from './chat-limits.ts';
 
 export interface AgentLoopOptions {
   provider: AiProvider;
@@ -35,14 +33,21 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
     while (!options.signal.aborted) {
       const turn = options.getThread().turns.at(-1);
       if (!turn) throw new Error('No active chat turn.');
-      if (turn.modelSteps >= MAX_MODEL_STEPS_PER_TURN) {
-        options.fail('The model-step limit was reached before a final response.');
-        return;
-      }
-      const toolsAllowed = turn.toolCalls < MAX_TOOL_CALLS_PER_TURN;
+      const forceFinal =
+        turn.modelSteps >= MAX_MODEL_STEPS_PER_TURN || turn.toolCalls >= MAX_TOOL_CALLS_PER_TURN;
+      const toolsAllowed = !forceFinal;
       const request = {
         model: options.model,
-        messages: options.messages(),
+        messages: forceFinal
+          ? [
+              ...options.messages(),
+              {
+                role: 'system' as const,
+                content:
+                  'The active-turn tool budget is exhausted. Return the best concise final answer now without calling tools. Clearly state any unfinished validation or plan work.',
+              },
+            ]
+          : options.messages(),
         ...(toolsAllowed ? { tools: options.tools } : {}),
         signal: options.signal,
       };
@@ -66,8 +71,20 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
         response = await options.provider.complete(request);
       }
       if (options.signal.aborted) return;
-      options.appendAssistant(response.message, response.model, response.usage);
-      const calls = response.message.toolCalls ?? [];
+      const assistantMessage = forceFinal
+        ? {
+            role: 'assistant' as const,
+            content:
+              response.message.content ??
+              'I reached the active-turn work budget before completing a final response. The completed draft and tool results are retained for a follow-up turn.',
+          }
+        : response.message;
+      options.appendAssistant(assistantMessage, response.model, response.usage);
+      if (forceFinal) {
+        options.finish();
+        return;
+      }
+      const calls = assistantMessage.toolCalls ?? [];
       if (!calls.length) {
         options.finish();
         return;

@@ -26,6 +26,17 @@ export function createDraft(text: string, revision: number): AiDraftState {
   return { base, text, revision: 0, hash: base.hash, status: 'clean' };
 }
 
+/** Start from empty text while retaining the live source as the apply conflict base. */
+export function createBlankDraft(liveText: string, revision: number): AiDraftState {
+  return {
+    base: createSourceSnapshot(liveText, revision),
+    text: '',
+    revision: 0,
+    hash: hashSource(''),
+    status: 'clean',
+  };
+}
+
 function lineStarts(text: string): number[] {
   const starts = [0];
   for (let index = 0; index < text.length; index++) {
@@ -139,7 +150,7 @@ export function buildLineDiff(before: string, after: string): AiLineDiff[] {
 }
 
 export function createProposal(threadId: string, draft: AiDraftState): AiCodeProposal | null {
-  if (draft.text === draft.base.text) return null;
+  if (draft.revision === 0 || draft.text === draft.base.text) return null;
   const diff = buildLineDiff(draft.base.text, draft.text);
   return {
     id: `${threadId}:${draft.revision}:${draft.hash}`,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { applySourceEdits, createDraft, createProposal, hashSource } from './source-edits.ts';
+import {
+  applySourceEdits,
+  createBlankDraft,
+  createDraft,
+  createProposal,
+  hashSource,
+} from './source-edits.ts';
 
 describe('AI draft source edits', () => {
   it('applies disjoint edits against the same pre-edit document', () => {
@@ -63,5 +69,16 @@ describe('AI draft source edits', () => {
     });
     expect(hashSource('forward 20')).toBe(hashSource('forward 20'));
     expect(hashSource('forward 20')).not.toBe(hashSource('forward 10'));
+  });
+
+  it('starts create intent from empty text without proposing an empty replacement', () => {
+    const draft = createBlankDraft('forward 10', 4);
+    expect(draft).toMatchObject({
+      text: '',
+      revision: 0,
+      status: 'clean',
+      base: { text: 'forward 10', revision: 4 },
+    });
+    expect(createProposal('thread', draft)).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AiChatStep, AiQuestionAnswer } from '../ai/chat-types.ts';
 import type { UseAIChatReturn } from '../hooks/useAIChat.ts';
 import AIQuestionSet from './AIQuestionSet.tsx';
@@ -73,13 +73,34 @@ export default function AIChatPanel({ chat, selectedModel, hasApiKey, onApplyPro
   const [composer, setComposer] = useState(chat.composerSeed);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const transcriptRef = useRef<HTMLOListElement>(null);
+  const active = chat.activeThread;
+  const pending = active?.pendingQuestionSet;
+  const scrollKey = useMemo(
+    () =>
+      active
+        ? [
+            active.id,
+            ...active.turns.map((turn) => `${turn.id}:${turn.status}:${turn.steps.length}`),
+            pending?.openedAt ?? '',
+            chat.proposal?.id ?? '',
+          ].join('|')
+        : '',
+    [active, chat.proposal?.id, pending?.openedAt],
+  );
 
   useEffect(() => {
     requestAnimationFrame(() => composerRef.current?.focus());
   }, [chat.openRequestId]);
-  useEffect(() => {
-    transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight });
-  }, [chat.activeThread?.updatedAt]);
+  useLayoutEffect(() => {
+    const transcript = transcriptRef.current;
+    if (!transcript) return;
+    const scrollToEnd = () => {
+      transcript.scrollTop = transcript.scrollHeight;
+    };
+    scrollToEnd();
+    const frame = requestAnimationFrame(scrollToEnd);
+    return () => cancelAnimationFrame(frame);
+  }, [scrollKey]);
 
   const submit = () => {
     const message = composer.trim();
@@ -87,9 +108,6 @@ export default function AIChatPanel({ chat, selectedModel, hasApiKey, onApplyPro
     setComposer('');
     void chat.sendMessage(message);
   };
-  const active = chat.activeThread;
-  const pending = active?.pendingQuestionSet;
-
   return (
     <section className={styles.panel} aria-label="AI chat">
       <div className={styles.chatToolbar}>
@@ -130,9 +148,30 @@ export default function AIChatPanel({ chat, selectedModel, hasApiKey, onApplyPro
           {selectedModel ?? 'The selected model'} is not known to support tools. Choose a
           tool-capable model with /ai model.
         </div>
+      ) : active && !active.intent ? (
+        <section className={styles.intentChooser} aria-labelledby="ai-chat-intent-title">
+          <strong id="ai-chat-intent-title">What would you like to do?</strong>
+          <span>Choose once for this chat so the assistant uses the right source boundary.</span>
+          <div>
+            <button type="button" onClick={() => chat.setIntent('create')}>
+              <strong>Create something new</strong>
+              <span>
+                Begin with an empty private draft and replace the editor only after Apply.
+              </span>
+            </button>
+            <button type="button" onClick={() => chat.setIntent('edit')}>
+              <strong>Edit current code</strong>
+              <span>Inspect the live design and propose changes in a private draft.</span>
+            </button>
+          </div>
+        </section>
       ) : !active?.turns.length ? (
         <div className={styles.empty}>
-          <strong>Ask about or change this design</strong>
+          <strong>
+            {active?.intent === 'create'
+              ? 'Describe the new design'
+              : 'Ask about or change this design'}
+          </strong>
           <span>
             Chat can inspect source, compiled geometry, and physics. Source edits stay private until
             you review and apply them.
@@ -181,8 +220,18 @@ export default function AIChatPanel({ chat, selectedModel, hasApiKey, onApplyPro
           value={composer}
           rows={3}
           maxLength={8000}
-          placeholder="Ask about or change this design…"
-          disabled={!chat.canSend || Boolean(pending) || !hasApiKey || !chat.modelSupportsTools}
+          placeholder={
+            active?.intent === 'create'
+              ? 'Describe what you want to create…'
+              : 'Ask about or change this design…'
+          }
+          disabled={
+            !active?.intent ||
+            !chat.canSend ||
+            Boolean(pending) ||
+            !hasApiKey ||
+            !chat.modelSupportsTools
+          }
           onChange={(event) => setComposer(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {

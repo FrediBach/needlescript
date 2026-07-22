@@ -8,7 +8,14 @@ import type {
   AiToolDisplay,
   AiWorkPlan,
 } from './chat-types.ts';
-import { applySourceEdits, createDraft, hashSource, type AiSourceEdit } from './source-edits.ts';
+import { MAX_COMPILES_PER_TURN } from './chat-limits.ts';
+import {
+  applySourceEdits,
+  createBlankDraft,
+  createDraft,
+  hashSource,
+  type AiSourceEdit,
+} from './source-edits.ts';
 import {
   hasOnlyKeys,
   parseToolArguments,
@@ -78,12 +85,16 @@ function sourceTarget(
       ? 'live'
       : rawTarget === 'draft'
         ? 'draft'
-        : thread.draft
+        : thread.draft || thread.intent === 'create'
           ? 'draft'
           : 'live';
   if (target === 'draft') {
+    const live = options.liveSource();
     const draft =
-      thread.draft ?? createDraft(options.liveSource().text, options.liveSource().revision);
+      thread.draft ??
+      (thread.intent === 'create'
+        ? createBlankDraft(live.text, live.revision)
+        : createDraft(live.text, live.revision));
     if (!thread.draft) options.updateDraft(draft);
     return { target, text: draft.text, revision: draft.revision, hash: draft.hash };
   }
@@ -180,10 +191,10 @@ export function createToolRuntime(options: ToolRuntimeOptions) {
     if (cached) return { result: cached, cached: true };
     const thread = options.getThread();
     const turn = thread.turns.at(-1);
-    if ((turn?.compiles ?? 0) >= 4)
+    if ((turn?.compiles ?? 0) >= MAX_COMPILES_PER_TURN)
       return {
         cached: false,
-        error: failure(tool, 'compile_budget', 'The four-compile turn budget is exhausted.', false),
+        error: failure(tool, 'compile_budget', 'The compile budget is exhausted.', false),
       };
     options.incrementCompileCount();
     const response = await options.compile(target.text, seed);

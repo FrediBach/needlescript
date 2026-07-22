@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   EMPTY_AI_USAGE,
   type AiChatStep,
+  type AiChatIntent,
   type AiChatThread,
   type AiChatTurn,
   type AiCodeProposal,
@@ -15,9 +16,10 @@ import { AI_CHAT_TOOLS } from '../ai/tool-definitions.ts';
 import { buildProviderMessages } from '../ai/chat-context.ts';
 import { loadChatThreads, loadChatThreadsAsync, saveChatThreads } from '../ai/chat-storage.ts';
 import { OpenRouterAiProvider } from '../ai/openrouter-provider.ts';
-import { createDraft, createProposal, hashSource } from '../ai/source-edits.ts';
+import { createBlankDraft, createDraft, createProposal, hashSource } from '../ai/source-edits.ts';
 import { createToolRuntime } from '../ai/tool-runtime.ts';
 import { runAgentLoop } from '../ai/agent-loop.ts';
+import { ACTIVE_TURN_TIMEOUT_MS } from '../ai/chat-limits.ts';
 import { useCompiler } from './useCompiler.ts';
 import type { AIModelInfo } from './useAI.ts';
 
@@ -42,6 +44,7 @@ export interface UseAIChatReturn {
   modelSupportsTools: boolean;
   setView: (view: 'chat' | 'activity') => void;
   selectThread: (threadId: string) => void;
+  setIntent: (intent: AiChatIntent) => void;
   openChat: (message?: string) => Promise<void>;
   openChats: () => void;
   newChat: () => void;
@@ -284,7 +287,7 @@ export function useAIChat({
             if (index !== thread.turns.length - 1 || turn.status !== 'running') return turn;
             const closed = closeUnmatchedToolCalls(
               turn,
-              'Tool call cancelled after the 90-second turn limit.',
+              'Tool call cancelled after the five-minute active-turn limit.',
             );
             return {
               ...closed,
@@ -295,14 +298,14 @@ export function useAIChat({
                 {
                   kind: 'notice',
                   level: 'error',
-                  text: 'The active turn exceeded its 90-second limit.',
+                  text: 'The active turn exceeded its five-minute limit.',
                 },
               ],
             };
           }),
         }));
         abortRef.current = null;
-      }, 90_000);
+      }, ACTIVE_TURN_TIMEOUT_MS);
       const getThread = () => threadsRef.current.find(({ id }) => id === threadId)!;
       const modelForTurn = getThread().model;
       const updateLatestTurn = (update: (turn: AiChatTurn) => AiChatTurn) =>
@@ -338,6 +341,7 @@ export function useAIChat({
         return [
           'Current workspace snapshot:',
           `workspace=${thread.workspaceId}`,
+          `user intent=${thread.intent === 'create' ? 'create a new design from an empty draft' : thread.intent === 'edit' ? 'edit the current live design' : 'not selected'}`,
           `live revision=${sourceRevisionRef.current}, hash=${hashSource(sourceRef.current)}`,
           `draft=${draft ? `${draft.status}, revision=${draft.revision}, hash=${draft.hash}` : 'not created'}`,
           `plan=${thread.activePlan ? `${thread.activePlan.id} v${thread.activePlan.version}` : 'none'}`,
@@ -460,7 +464,10 @@ export function useAIChat({
       const model = models.find(({ id }) => id === selectedModel);
       if (!model?.supportsTools) return;
       const thread = ensureThread();
-      if (thread.status !== 'idle') return;
+      if (thread.status !== 'idle' || !thread.intent) {
+        setComposerSeed(content);
+        return;
+      }
       const now = Date.now();
       const turn: AiChatTurn = {
         id: makeId('turn'),
@@ -491,10 +498,15 @@ export function useAIChat({
     async (message?: string) => {
       setView('chat');
       setOpenRequestId((id) => id + 1);
-      ensureThread();
+      const thread = ensureThread();
       if (message?.trim()) {
         const supportsTools = models.find(({ id }) => id === selectedModel)?.supportsTools ?? false;
-        if (!localStorage.getItem('ns-ai-apikey') || !supportsTools || directAiBusy) {
+        if (
+          !thread.intent ||
+          !localStorage.getItem('ns-ai-apikey') ||
+          !supportsTools ||
+          directAiBusy
+        ) {
           setComposerSeed(message.trim().slice(0, 8_000));
         } else {
           await sendMessage(message);
@@ -658,7 +670,10 @@ export function useAIChat({
       replaceThread(id, (thread) => ({
         ...thread,
         updatedAt: Date.now(),
-        draft: createDraft(sourceRef.current, sourceRevisionRef.current),
+        draft:
+          thread.intent === 'create'
+            ? createBlankDraft(sourceRef.current, sourceRevisionRef.current)
+            : createDraft(sourceRef.current, sourceRevisionRef.current),
         turns: thread.turns.map((turn, index) =>
           index === thread.turns.length - 1
             ? { ...turn, steps: [...turn.steps, { kind: 'notice', level: 'info', text: notice }] }
@@ -715,6 +730,21 @@ export function useAIChat({
         )
       )
         setActiveThreadId(threadId);
+    },
+    setIntent: (intent) => {
+      const id = activeThreadIdRef.current;
+      if (!id) return;
+      replaceThread(id, (thread) => {
+        if (thread.status !== 'idle' || thread.turns.length > 0) return thread;
+        return {
+          ...thread,
+          intent,
+          title: intent === 'create' ? 'New design' : 'Edit current design',
+          draft: undefined,
+          updatedAt: Date.now(),
+        };
+      });
+      setOpenRequestId((requestId) => requestId + 1);
     },
     openChat,
     openChats: () => {

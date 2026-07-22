@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runAgentLoop } from './agent-loop.ts';
+import { MAX_MODEL_STEPS_PER_TURN } from './chat-limits.ts';
 import { EMPTY_AI_USAGE, type AiChatThread, type AiProviderMessage } from './chat-types.ts';
 import type { AiProvider, AiProviderResponse } from './provider.ts';
 
@@ -182,5 +183,59 @@ describe('AI agent loop', () => {
     });
     expect(paused).toBe(true);
     expect(provider.requests).toHaveLength(1);
+  });
+
+  it('requests a tools-disabled final response after the raised model-step ceiling', async () => {
+    const provider = new FakeProvider([
+      {
+        model: 'fake-model',
+        message: {
+          role: 'assistant',
+          content: 'I completed the available checks; one optional refinement remains.',
+          toolCalls: [
+            {
+              id: 'ignored-call',
+              type: 'function',
+              function: { name: 'read_source', arguments: '{}' },
+            },
+          ],
+        },
+      },
+    ]);
+    const thread = runningThread();
+    thread.turns[0].modelSteps = MAX_MODEL_STEPS_PER_TURN;
+    let finalContent: string | null = null;
+    let finished = false;
+    await runAgentLoop({
+      provider,
+      model: 'fake-model',
+      signal: new AbortController().signal,
+      getThread: () => thread,
+      messages: () => [thread.turns[0].user],
+      tools: [],
+      executeTool: async () => {
+        throw new Error('Finalization must not execute tools.');
+      },
+      appendAssistant: (message) => {
+        finalContent = message.content;
+        expect(message.toolCalls).toBeUndefined();
+      },
+      appendToolResult: () => {
+        throw new Error('Finalization must not append tool results.');
+      },
+      awaitQuestions: () => {
+        throw new Error('Finalization must not ask questions.');
+      },
+      finish: () => {
+        finished = true;
+      },
+      fail: (message) => {
+        throw new Error(message);
+      },
+    });
+    expect(MAX_MODEL_STEPS_PER_TURN).toBe(64);
+    expect(finalContent).toContain('completed the available checks');
+    expect(finished).toBe(true);
+    expect(provider.requests[0].at(-1)?.content).toContain('Return the best concise final answer');
   });
 });

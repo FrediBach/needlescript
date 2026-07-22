@@ -1,5 +1,9 @@
 .root {
+  display: flex;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .viewTabs {
@@ -8,6 +12,7 @@
   gap: 4px;
   padding: 5px 10px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .viewTabs button {
