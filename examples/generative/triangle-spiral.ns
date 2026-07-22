@@ -1,0 +1,34 @@
+// ============================================================
+// TRIANGLE SPIRAL — continuous single-line running stitch
+// Each triangle gets larger by `grow` mm per revolution,
+// creating a smooth outward spiral with no jump stitches.
+// ============================================================
+
+// --- shape ---
+let turns = 19       // [2:1:20] number of full revolutions
+let startSz = 1.5    // [1:0.5:20] innermost triangle side length, mm
+let grow = 3.5       // [1:0.5:15] side growth per full revolution, mm
+let angle = 30       // [-180:1:180] orientation in degrees (−30 = flat bottom / pyramid, 0 = flat top)
+
+// --- quality ---
+let stitch = 1.3     // [0.5:0.1:4] running-stitch length, mm
+
+stitchlen stitch
+rt angle
+
+// Outer loop: one full triangular revolution per iteration.
+// Inner loop: three sides per triangle, each side a bit longer.
+let growStep = grow / 3     // extra mm per individual side
+
+let rev = 0
+let base = 0
+repeat turns [
+  rev = rev + 1
+  base = startSz + growStep * (rev - 1) * 3
+  fd base
+  rt 120
+  fd base + growStep
+  rt 120
+  fd base + growStep * 2
+  rt 120
+]

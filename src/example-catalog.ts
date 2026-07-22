@@ -678,6 +678,13 @@ const catalogByCategory = {
       tags: ['string-art', 'trigonometry', 'lines', 'radial'],
     },
     {
+      id: 'triangle-spiral',
+      title: 'Triangle spiral',
+      summary: 'Expand a triangle one side at a time into a continuous running-stitch spiral.',
+      kind: 'recipe',
+      tags: ['spiral', 'triangle', 'continuous-path', 'running-stitch'],
+    },
+    {
       id: 'waveforms',
       title: 'Waveform sampler',
       summary: 'Construct sine, triangle, sawtooth, and square oscillator paths.',
