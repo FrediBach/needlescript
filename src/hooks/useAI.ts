@@ -43,7 +43,9 @@ const MAX_AI_REVISIONS = 2;
 export interface AIModelInfo {
   id: string;
   name: string;
+  contextLength: number | null;
   supportsImageInput: boolean;
+  supportsTools: boolean;
 }
 
 type AddMsg = (text: string, type?: ConsoleMessage['type']) => void;
@@ -56,6 +58,8 @@ interface UseAIOptions {
   addMsg: AddMsg;
   /** Returns the most recent compile error message, or null if the last run succeeded. */
   getLastError: () => string | null;
+  /** Stable workspace/design name used after applying a direct generated candidate. */
+  getDesignName?: () => string;
 }
 
 interface SuccessfulAiCandidate {
@@ -126,6 +130,7 @@ export function useAI({
   runProgram,
   addMsg,
   getLastError,
+  getDesignName,
 }: UseAIOptions): UseAIReturn {
   const [apiKey, setApiKeyState] = useState(() => localStorage.getItem(NS_AI_APIKEY_KEY) ?? '');
   const [selectedModel, setSelectedModelState] = useState(
@@ -192,7 +197,9 @@ export function useAI({
           models.push({
             id: model.id,
             name: model.name,
+            contextLength: model.contextLength,
             supportsImageInput: model.architecture.inputModalities.includes('image'),
+            supportsTools: model.supportedParameters.includes('tools'),
           });
         }
         models.sort((a, b) => a.name.localeCompare(b.name));
@@ -642,7 +649,7 @@ export function useAI({
             : undefined,
         });
         setSource(code);
-        await runProgram(code, 'ai');
+        await runProgram(code, getDesignName?.() ?? 'ai');
         addActivity(sessionId, {
           phase: 'complete',
           tone: bestSuccessful ? 'success' : 'warning',
@@ -677,6 +684,7 @@ export function useAI({
       runProgram,
       addMsg,
       getLastError,
+      getDesignName,
       addActivity,
       endActivity,
     ],

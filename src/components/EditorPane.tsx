@@ -22,6 +22,8 @@ import type {
 import type { ParamItem } from '../lib/editor/parameters.ts';
 import type { AIModelInfo } from '../hooks/useAI.ts';
 import type { AiActivitySession } from '../ai-activity.ts';
+import type { UseAIChatReturn } from '../hooks/useAIChat.ts';
+import { hashSource } from '../ai/source-edits.ts';
 import { buildEditorExplainRequest } from '../lib/editor/ai-editor-context.ts';
 import { registerNeedlescript, scheduleNeedlescriptProviders } from '../lib/editor/monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
@@ -95,6 +97,8 @@ interface Props {
   aiIsGenerating?: boolean;
   /** Latest AI request/revision timeline shown in the AI output tab. */
   aiActivity?: AiActivitySession | null;
+  /** Persistent workspace-aware AI chat state and actions. */
+  aiChat: UseAIChatReturn;
   /** Called when a non-/ai slash command is entered (/share, /save, /load, /remove). */
   onReplCommand?: (line: string) => Promise<void>;
   /** Sorted list of saved snippet names — drives /load and /remove autocomplete. */
@@ -220,6 +224,7 @@ export default function EditorPane({
   aiHasApiKey,
   aiIsGenerating,
   aiActivity,
+  aiChat,
   onReplCommand,
   savedSnippetNames,
   activeSnippetName,
@@ -255,6 +260,7 @@ export default function EditorPane({
   );
   const [lastAutoOpenReport, setLastAutoOpenReport] = useState<PhysicsReport | undefined>();
   const [lastAutoOpenAiActivityId, setLastAutoOpenAiActivityId] = useState<number | null>(null);
+  const [lastAiChatOpenRequestId, setLastAiChatOpenRequestId] = useState(0);
   const [quickFixUi, dispatchQuickFixUi] = useReducer(physicsQuickFixUiReducer, {
     preview: null,
     outcome: null,
@@ -536,6 +542,44 @@ export default function EditorPane({
     setConsoleHeight((height) => Math.max(height, 240));
     setMobileSheetSize('half');
   }
+
+  if (aiChat.openRequestId !== lastAiChatOpenRequestId) {
+    setLastAiChatOpenRequestId(aiChat.openRequestId);
+    setActiveBottomTab('ai');
+    setConsoleHeight((height) => Math.max(height, 260));
+    setMobileSheetSize('half');
+  }
+
+  const applyAiProposal = useCallback(() => {
+    const proposal = aiChat.proposal;
+    const ed = editorRef.current;
+    const model = ed?.getModel();
+    if (!proposal || !ed || !model || proposal.stale) return;
+    if (
+      proposal.baseRevision !== physicsReportState.sourceRevision ||
+      proposal.baseHash !== hashSource(sourceRef.current)
+    ) {
+      aiChat.rebaseDraft();
+      return;
+    }
+    const firstChangedLine =
+      proposal.diff.find(({ kind }) => kind === 'added' || kind === 'removed')?.newLine ?? 1;
+    ed.pushUndoStop();
+    ed.executeEdits('needlescript.ai-chat.apply', [
+      {
+        range: model.getFullModelRange(),
+        text: proposal.source,
+        forceMoveMarkers: true,
+      },
+    ]);
+    ed.pushUndoStop();
+    onSourceChange(proposal.source);
+    aiChat.proposalApplied();
+    onRun(proposal.source);
+    ed.revealLineInCenter(Math.min(firstChangedLine, model.getLineCount()), 0);
+    ed.setPosition({ lineNumber: Math.min(firstChangedLine, model.getLineCount()), column: 1 });
+    ed.focus();
+  }, [aiChat, onRun, onSourceChange, physicsReportState.sourceRevision]);
 
   useEffect(() => {
     if (!selectedDiagnosticId) return;
@@ -1106,7 +1150,7 @@ export default function EditorPane({
         : aiModels;
       return hits.slice(0, MAX_SUGGESTIONS).map((m) => ({
         label: m.id,
-        description: m.name,
+        description: `${m.name}${m.supportsTools ? ' · tools' : ''}${m.contextLength ? ` · ${Math.round(m.contextLength / 1000)}k context` : ''}`,
         completion: `${MODEL_TRIGGER}${m.id}`,
       }));
     }
@@ -1269,7 +1313,7 @@ export default function EditorPane({
       return 'type a snippet name to filter — ↑↓ to navigate · Tab to complete';
     }
     if (replValue.startsWith(AI_TRIGGER)) {
-      return '/ai create … · /ai improve … · /ai fix … · /ai explain … · /ai help';
+      return '/ai chat … · /ai create … · /ai improve … · /ai fix … · /ai explain … · /ai help';
     }
     if (replValue.startsWith('/')) {
       return '/share · /save [name] · /load [name] · /autosave · /remove <name> · /ai help';
@@ -1513,6 +1557,8 @@ export default function EditorPane({
             activity={aiActivity ?? null}
             selectedModel={aiSelectedModel}
             hasApiKey={aiHasApiKey}
+            chat={aiChat}
+            onApplyProposal={applyAiProposal}
           />
         </div>
       </div>

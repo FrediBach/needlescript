@@ -55,6 +55,7 @@ import { useSvgImport } from './hooks/useSvgImport.ts';
 import { useBitmapImport } from './hooks/useBitmapImport.ts';
 import { useShare } from './hooks/useShare.ts';
 import { useAI } from './hooks/useAI.ts';
+import { useAIChat } from './hooks/useAIChat.ts';
 import { useReplCommands } from './hooks/useReplCommands.ts';
 import styles from './App.module.css';
 import Header from './components/Header.tsx';
@@ -895,7 +896,7 @@ export default function App() {
   });
 
   const {
-    handleAiCommand,
+    handleAiCommand: handleDirectAiCommand,
     aiModels,
     selectedModel: aiSelectedModel,
     hasApiKey: aiHasApiKey,
@@ -908,7 +909,60 @@ export default function App() {
     runProgram,
     addMsg,
     getLastError: () => lastErrorRef.current,
+    getDesignName: () => designNameRef.current,
   });
+
+  const aiWorkspaceId = activeSnippetName
+    ? `snippet:${activeSnippetName}`
+    : sharedProjectId
+      ? `share:${sharedProjectId}`
+      : `design:${design.name}`;
+  const aiChat = useAIChat({
+    workspaceId: aiWorkspaceId,
+    sourceRef,
+    sourceRevision: physicsReportState.sourceRevision,
+    selectedModel: aiSelectedModel,
+    models: aiModels,
+    directAiBusy: aiIsGenerating,
+  });
+
+  const handleAiCommand = useCallback(
+    async (input: string) => {
+      const trimmed = input.trim();
+      const space = trimmed.indexOf(' ');
+      const command = (space < 0 ? trimmed : trimmed.slice(0, space)).toLowerCase();
+      const args = space < 0 ? '' : trimmed.slice(space + 1).trim();
+      if (command === 'chat') {
+        await aiChat.openChat(args);
+        return;
+      }
+      if (command === 'new') {
+        aiChat.newChat();
+        return;
+      }
+      if (command === 'chats') {
+        aiChat.openChats();
+        return;
+      }
+      if (command === 'clear') {
+        aiChat.openChats();
+        if (aiChat.activeThread && window.confirm('Delete the active local AI chat?')) {
+          aiChat.clearActiveChat();
+        }
+        return;
+      }
+      if (aiChat.isBusy) {
+        addMsg(
+          'chat turn is already running — cancel or wait before starting a direct AI command',
+          'warn',
+        );
+        return;
+      }
+      aiChat.setView('activity');
+      await handleDirectAiCommand(input);
+    },
+    [addMsg, aiChat, handleDirectAiCommand],
+  );
 
   const { handleReplCommand, savedSnippetNames } = useReplCommands({
     sourceRef,
@@ -1299,6 +1353,7 @@ export default function App() {
             aiHasApiKey={aiHasApiKey}
             aiIsGenerating={aiIsGenerating}
             aiActivity={aiActivity}
+            aiChat={aiChat}
             onReplCommand={handleReplCommand}
             savedSnippetNames={savedSnippetNames}
             activeSnippetName={activeSnippetName}

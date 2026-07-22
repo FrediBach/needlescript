@@ -130,6 +130,10 @@ The REPL can generate, improve, fix, and explain designs using a model available
 ```text
 /ai apikey sk-or-v1-…
 /ai model claude sonnet
+/ai chat [message]
+/ai new
+/ai chats
+/ai clear
 /ai create <description>
 /ai improve <instruction>
 /ai fix <instruction>
@@ -138,13 +142,30 @@ The REPL can generate, improve, fix, and explain designs using a model available
 /ai help
 ```
 
+`/ai chat` opens a persistent conversation for the current workspace. Chat can read bounded source
+pages, compile a private draft, inspect exact hoop-space measurements and structured Physics
+findings, ask one owned set of multiple-choice questions, and maintain a visible checklist for
+multi-step work. Tool-capable models are marked in model autocomplete; direct create, improve, fix,
+and explain commands remain available independently.
+
+Chat tools never write to the live editor. Requested changes accumulate in a private draft and
+appear as a reviewed line diff with **Apply**, **Discard**, and (after a live edit) **Rebase**. Apply
+is one Monaco edit with a single undo boundary, verifies the source revision/hash, and then runs the
+normal compiler path. A draft becomes stale immediately when the live source changes and cannot be
+applied until it is discarded or rebased.
+
 When an API key and model are selected, the code editor context menu also includes **Explain with
 AI**. Right-click a selection to ask about that exact range, or right-click without a selection to
 ask about the statement and symbol at the pointer. The request includes the precise source location,
 the complete current program, and its compiled spatial context. Explanations appear directly in the
 **AI** activity tab rather than being mixed into Console output.
 
-The selected key and model are stored in browser `localStorage`. Generation receives the compact
+The selected key and model are stored in browser `localStorage`. Chat threads, questions, plans,
+bounded tool results, drafts, and usage are stored locally in versioned IndexedDB so conversations
+survive reloads; API keys, rendered previews, raw stitch arrays, and provider reasoning are never
+stored in chat history. Source and chat content needed for a turn are sent through OpenRouter to the
+selected model/provider, and multi-step tool turns may make several billable model requests. Delete
+removes an individual local thread. Generation receives the compact
 NeedleScript reference. Existing designs are compiled before improve, fix, and explain requests so
 the model also receives exact bounds, placement, color extents, a coarse stitched silhouette, and a
 rendered preview when the selected model supports image input. Before generated source is placed in

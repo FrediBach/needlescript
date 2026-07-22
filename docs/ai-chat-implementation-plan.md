@@ -1,8 +1,14 @@
 # `/ai chat` Implementation Plan
 
-Status: **Proposed**
+Status: **Implemented (v1 core)**
 
 Last updated: 2026-07-22
+
+Implementation note: AI-1 through AI-4 are implemented in the playground, including provider
+capabilities, persistent workspace threads, bounded source/compile/spatial/physics tools, resumable
+questions, visible work plans, private draft edits, stale detection, and explicit Monaco proposal
+application. AI-5's optional vision tool and AI-6's model-generated structured summarization/eval
+rollout remain follow-up hardening; current history uses deterministic complete-turn bounding.
 
 ## Executive decision
 

@@ -1,0 +1,311 @@
+.panel {
+  display: flex;
+  min-height: 190px;
+  flex-direction: column;
+  color: var(--text-muted);
+}
+
+.chatToolbar,
+.composer,
+.proposalActions,
+.questionActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chatToolbar {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chatToolbar label {
+  min-width: 0;
+  flex: 1;
+}
+
+.chatToolbar select {
+  width: 100%;
+}
+
+.chatToolbar select,
+.chatToolbar button,
+.composer textarea,
+.composer button,
+.proposal button,
+.questions button,
+.questions input {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--bg-panel);
+  font: inherit;
+}
+
+.chatToolbar button,
+.composer button,
+.proposal button,
+.questions button {
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.chatToolbar button:focus-visible,
+.composer button:focus-visible,
+.composer textarea:focus-visible,
+.proposal button:focus-visible,
+.questions input:focus-visible,
+.questions button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.empty {
+  display: flex;
+  min-height: 100px;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px;
+  text-align: center;
+}
+
+.empty strong {
+  color: var(--text);
+}
+
+.transcript {
+  min-height: 80px;
+  flex: 1;
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  list-style: none;
+}
+
+.turn + .turn {
+  margin-top: 12px;
+}
+
+.turn article > .userMessage {
+  width: fit-content;
+  max-width: 85%;
+  margin-left: auto;
+  border-radius: 8px 8px 2px 8px;
+  padding: 6px 9px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--gold) 13%, transparent);
+  white-space: pre-wrap;
+}
+
+.steps {
+  margin: 7px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assistantMessage {
+  max-width: 92%;
+  padding: 6px 8px;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.toolRow {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 4px;
+  padding: 3px 8px;
+}
+
+.toolRow[data-status='success'] > span {
+  color: var(--console-ok);
+}
+
+.toolRow[data-status='error'] > span,
+.notice[data-level='error'] {
+  color: var(--console-err);
+}
+
+.toolRow summary {
+  cursor: pointer;
+}
+
+.toolRow pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.notice {
+  margin: 4px 8px;
+  border-left: 2px solid var(--border);
+  padding-left: 8px;
+}
+
+.plan,
+.proposal,
+.questions {
+  margin: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.plan > strong,
+.proposal strong,
+.questions legend {
+  color: var(--text);
+}
+
+.plan ol {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 3px;
+  padding: 2px 0;
+}
+
+.plan li[data-status='completed'] {
+  color: var(--console-ok);
+}
+
+.plan li[data-status='in-progress'] .planCheck {
+  color: var(--gold);
+}
+
+.questions fieldset {
+  margin: 8px 0;
+  border: 0;
+  padding: 0;
+}
+
+.questions fieldset > label {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 6px 0;
+}
+
+.questions label span {
+  display: flex;
+  flex-direction: column;
+}
+
+.questions em {
+  color: var(--gold);
+  font-size: var(--fs-label);
+}
+
+.questions small {
+  display: block;
+}
+
+.questions .otherAnswer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.questions .otherAnswer input {
+  padding: 4px 6px;
+}
+
+.questionActions,
+.proposalActions {
+  justify-content: flex-end;
+}
+
+.proposalHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.proposalMeta {
+  margin-top: 2px;
+  font-size: var(--fs-label);
+}
+
+.stale {
+  margin: 6px 0;
+  border-left: 2px solid var(--console-err);
+  padding: 5px 7px;
+  color: var(--console-err);
+}
+
+.proposal details {
+  margin: 6px 0;
+}
+
+.diff {
+  max-height: 240px;
+  margin: 5px 0;
+  overflow: auto;
+  color: var(--text-muted);
+  white-space: pre;
+}
+
+.diff span {
+  display: block;
+}
+
+.diff span[data-kind='added'] {
+  color: var(--console-ok);
+  background: color-mix(in srgb, var(--console-ok) 8%, transparent);
+}
+
+.diff span[data-kind='removed'] {
+  color: var(--console-err);
+  background: color-mix(in srgb, var(--console-err) 8%, transparent);
+}
+
+.composer {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.composer textarea {
+  min-height: 44px;
+  flex: 1;
+  resize: vertical;
+  padding: 6px 8px;
+}
+
+.composer button {
+  align-self: stretch;
+}
+
+.composer :disabled,
+.questions :disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.usage {
+  padding: 0 10px 6px;
+  text-align: right;
+  font-size: var(--fs-label);
+}
+
+@media (max-width: 560px) {
+  .chatToolbar {
+    flex-wrap: wrap;
+  }
+
+  .chatToolbar label {
+    flex-basis: 100%;
+  }
+
+  .userMessage {
+    max-width: 95%;
+  }
+}

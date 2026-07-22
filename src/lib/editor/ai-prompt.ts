@@ -375,6 +375,10 @@ export const AI_HELP_TEXT = `AI commands (prefix: /ai):
   apikey <key>       — set your OpenRouter API key (stored in browser)
   model <fuzzy>      — select model (e.g. "claude sonnet 4.5" or "gpt-4o")
   credits            — show remaining OpenRouter credit balance
+  chat [message]     — open persistent workspace chat, optionally sending a message
+  new                — start a new chat for this workspace
+  chats              — open the local chat picker
+  clear              — delete the active chat after confirmation
   reset              — clear API key and model selection
   help               — show this message
   create <desc>      — generate new code from description
