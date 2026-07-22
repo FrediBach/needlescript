@@ -11,9 +11,9 @@ one-shot `/ai create`, `/ai improve`, `/ai fix`, and `/ai explain` commands.
 
 The chat model gets a bounded set of local NeedleScript tools. It can read the current source,
 compile a private draft, inspect exact stitch-space measurements, inspect structured physics
-findings, and edit that private draft. It cannot silently overwrite the live editor. Code changes
-become a reviewed proposal that the user can apply or discard; applying is one atomic, undoable
-Monaco edit.
+findings, ask the user structured multiple-choice questions, maintain a visible multi-step plan, and
+edit that private draft. It cannot silently overwrite the live editor. Code changes become a
+reviewed proposal that the user can apply or discard; applying is one atomic, undoable Monaco edit.
 
 ```text
 user message
@@ -22,6 +22,8 @@ model response ──→ final explanation
     │
     └─ tool call → validate → run locally → append tool result → ask model again
                          │
+                         ├─ ask user → pause → selected answer → resume
+                         ├─ create/update visible checklist plan
                          ├─ read live source
                          ├─ compile/inspect private draft
                          ├─ inspect spatial or physics data
@@ -55,6 +57,10 @@ complete conversation to be resubmitted
 6. Retain all current direct AI commands and their bounded compiler/physics review behavior.
 7. Keep `src/lib/` platform-neutral and keep all model/network activity in the playground layer.
 8. Bound latency, token use, compile work, tool loops, stored history, and returned geometry.
+9. Let the model resolve material ambiguity with concise multiple-choice questions and resume the
+   same tool-call turn from the selected answers.
+10. Let the model create and maintain a visible multi-step checklist for complex work, updating each
+    step as it progresses.
 
 ## Non-goals for version 1
 
@@ -97,6 +103,9 @@ The important gaps are architectural rather than analytical:
 - Requests are single-purpose prompt/response exchanges; there is no durable conversation model.
 - `AIModelInfo` tracks image input but not tool-call support or context length.
 - There is no validated tool registry or bounded agent loop.
+- There is no resumable human-input tool or `awaiting-user` turn state.
+- There is no durable, model-maintained task plan whose status the UI can render independently from
+  assistant prose.
 - Source replacement uses React state directly rather than a Monaco edit transaction with an undo
   boundary.
 - Spatial context is optimized for a one-shot prompt, not focused source-line or region queries.
@@ -109,16 +118,18 @@ The important gaps are architectural rather than analytical:
 
 ### Vocabulary
 
-| Term            | Meaning                                                                                                           |
-| --------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Thread**      | A user-visible multi-turn conversation bound to one workspace identity.                                           |
-| **Turn**        | One user message plus every model step, tool call/result, and final assistant message caused by it.               |
-| **Live source** | The exact text currently in Monaco. Tools may read it but never mutate it.                                        |
-| **Draft**       | Conversation-local source derived from a specific live-source revision. Model edit tools mutate only this text.   |
-| **Proposal**    | The diff between a draft and its base live source, ready for user review.                                         |
-| **Apply**       | One user action that writes a current, non-conflicting proposal into Monaco as one undoable transaction.          |
-| **Tool step**   | A model-requested local inspection or draft edit shown in the transcript in summarized form.                      |
-| **Workspace**   | The currently loaded snippet/share/example/import/unsaved document identity, not merely the compiled design name. |
+| Term             | Meaning                                                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Thread**       | A user-visible multi-turn conversation bound to one workspace identity.                                           |
+| **Turn**         | One user message plus every model step, tool call/result, and final assistant message caused by it.               |
+| **Live source**  | The exact text currently in Monaco. Tools may read it but never mutate it.                                        |
+| **Draft**        | Conversation-local source derived from a specific live-source revision. Model edit tools mutate only this text.   |
+| **Proposal**     | The diff between a draft and its base live source, ready for user review.                                         |
+| **Apply**        | One user action that writes a current, non-conflicting proposal into Monaco as one undoable transaction.          |
+| **Tool step**    | A model-requested local inspection or draft edit shown in the transcript in summarized form.                      |
+| **Question set** | One model request containing one or more bounded multiple-choice questions whose answers resume the paused turn.  |
+| **Work plan**    | A model-maintained ordered checklist for a complex task, with durable per-step status.                            |
+| **Workspace**    | The currently loaded snippet/share/example/import/unsaved document identity, not merely the compiled design name. |
 
 ### Required behavior
 
@@ -133,6 +144,17 @@ The important gaps are architectural rather than analytical:
   active draft within the thread's context policy.
 - A chat turn may answer without tools. It should inspect rather than guess whenever the answer
   depends on current source, compiled geometry, stitch statistics, or physics.
+- When multiple plausible interpretations would materially change the design, source edit, plan, or
+  validation target, the model asks one compact set of multiple-choice questions before committing
+  to an interpretation. It should not ask about facts available through inspection tools or block on
+  inconsequential preferences.
+- A question set pauses the active turn. Selecting answers appends a matching tool result and resumes
+  the same turn with its prior tool history and budgets intact.
+- For work with three or more meaningful dependent steps, the model creates a visible work plan
+  before implementation and keeps it current. Simple answers and single edits do not require a
+  ceremonial plan.
+- The plan shows pending, in-progress, and completed steps as empty, active, and checked boxes. The
+  model advances it as work is performed; prose claims never change plan status implicitly.
 - A draft remains active across follow-up turns. “Make that smaller” should refine the pending draft,
   not restart from the live document.
 - Apply, Discard, and Rebase are explicit UI actions, never model-callable live mutations.
@@ -175,6 +197,11 @@ AI  [Chat] [Activity]                         Model ▾   New chat
 ┌────────────────────────────────────────────────────────────┐
 │ user: Make the wavefront denser near the lower-left ...    │
 │                                                            │
+│ Plan                                                       │
+│ ☑ Inspect the current wavefront geometry                   │
+│ ◉ Identify and edit the controlling parameters             │
+│ ☐ Compile and check physics                                │
+│                                                            │
 │ assistant/tool: Read source                    ✓ 3 ms      │
 │ assistant/tool: Inspected spatial layout       ✓ 18 ms     │
 │ assistant/tool: Compiled draft                 ⚠ 1 risk    │
@@ -204,6 +231,62 @@ AI  [Chat] [Activity]                         Model ▾   New chat
 - Sending is disabled only while the active turn is running. Direct AI commands are rejected with a
   clear “chat turn is already running” message while the shared provider session is busy.
 
+### Multiple-choice questions
+
+Render `ask_user_questions` as an owned form inside the transcript rather than ordinary assistant
+Markdown:
+
+```text
+Before I change the wavefront:
+
+1. Which area should become denser?
+   (•) Lower-left (recommended)  ( ) Whole design  ( ) Center
+
+2. What should remain most stable?
+   (•) Overall silhouette  ( ) Stitch count  ( ) Current spacing
+
+                                        [Submit answers]
+```
+
+- One tool call may contain one to three related questions. Each question has two to five concise,
+  mutually exclusive options by default.
+- A question may explicitly allow multiple selections when choices can be combined.
+- The model may mark one option as recommended, but the UI must explain the impact of every option
+  and must not pre-submit it.
+- Include an optional “Other” free-text answer only when the listed choices cannot cover a reasonable
+  interpretation. Bound and sanitize that text like a normal user message.
+- Submit the complete question set atomically. Required unanswered questions keep Submit disabled;
+  optional questions include a visible “No preference” choice.
+- While awaiting answers, the turn status is `awaiting-user`, the provider and wall-time clocks are
+  stopped, and no other model or domain tool runs. The user may cancel the question set, which
+  appends a cancelled tool result and ends the turn cleanly.
+- Submitted questions, options, selected option IDs/labels, and free text appear in the transcript
+  and persist as conversation history. They are never reconstructed from visual labels alone.
+- If the workspace changes while a question is open, preserve it in the old workspace thread and do
+  not display or answer it from the new workspace.
+
+### Multi-step work plans
+
+Render the active plan as a compact checklist card pinned near the latest turn while also preserving
+each plan update in transcript order:
+
+- Pending steps use an empty checkbox, the sole in-progress step uses an indeterminate checkbox or
+  spinner plus “In progress,” and completed steps use checked boxes with completion time.
+- Checkboxes communicate model progress and are not directly toggleable by the user. The user changes
+  scope conversationally, so the model can revise the plan with an explicit tool call and explanation.
+- At most one step may be in progress. Creating a plan may set its first step in progress.
+- The model marks a step complete only after the corresponding action or evidence exists in the
+  transcript. For example, “Check physics” completes after a successful physics tool result, not when
+  the model merely says it will check.
+- One update may complete the current step and start the next atomically, avoiding an intermediate
+  plan with no active work.
+- If new information changes the approach, pending steps may be added, renamed, or reordered.
+  Completed steps remain in the audit trail; reopening one requires a short explanation.
+- Cancellation, provider failure, or a question pauses the plan without erasing it. A later user turn
+  can resume the first incomplete step.
+- A completed plan remains collapsed in the thread with an “All steps completed” summary and can be
+  expanded to review the implementation sequence and evidence links.
+
 ### Workspace and thread lifecycle
 
 - Add an explicit `workspaceId`/`workspaceEpoch` in `App.tsx`. Increment or replace it when an
@@ -226,8 +309,8 @@ AI  [Chat] [Activity]                         Model ▾   New chat
 - Transcript is a semantic list; user and assistant messages have headings available to screen
   readers. Tool status changes use a polite live region, while final failure and stale-proposal
   alerts use assertive status only once.
-- All proposal, thread, model, expand/collapse, cancel, apply, and discard controls are keyboard
-  reachable with visible focus.
+- All question, option, plan, proposal, thread, model, expand/collapse, cancel, apply, and discard
+  controls are keyboard reachable with visible focus.
 - Focus stays in the composer after a completed text-only turn. After an Apply action, focus moves to
   the first changed editor line; after an apply error, it moves to the error alert.
 - Color is never the only indication of tool status, compile result, physics severity, or diff kind.
@@ -239,19 +322,19 @@ AI  [Chat] [Activity]                         Model ▾   New chat
 
 Keep provider protocol, orchestration, domain tools, state, and presentation separate:
 
-| Area               | Responsibility                                                                               | Proposed files                                                        |
-| ------------------ | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Provider           | Convert provider-neutral messages/tools to the OpenRouter SDK and normalize replies/usage    | `src/ai/provider.ts`, `src/ai/openrouter-provider.ts`                 |
-| Thread state       | Immutable thread/turn reducer, status transitions, usage aggregation                         | `src/ai/chat-types.ts`, `src/ai/chat-reducer.ts`                      |
-| Persistence        | Versioned IndexedDB records, retention, migrations, privacy setting                          | `src/ai/chat-storage.ts`                                              |
-| Context            | Build bounded provider history and compact old completed turns                               | `src/ai/chat-context.ts`                                              |
-| Tool registry      | JSON schemas, capability metadata, validation, result envelopes                              | `src/ai/tool-definitions.ts`, `src/ai/tool-validation.ts`             |
-| Tool runtime       | Execute allow-listed read/compile/spatial/physics/draft tools                                | `src/ai/tool-runtime.ts`                                              |
-| Draft edits        | Source hashing, range conversion, overlap checks, diff/proposal creation                     | `src/ai/source-edits.ts`                                              |
-| Agent loop         | Bounded request → tool → result loop with abort and telemetry                                | `src/ai/agent-loop.ts`                                                |
-| React integration  | Bind thread/tool runtime to current source, revision, compiler, and editor apply             | `src/hooks/useAIChat.ts`                                              |
-| UI                 | Transcript, composer, tool rows, proposal diff, thread picker                                | `src/components/AIChatPanel.tsx`, `src/components/AICodeProposal.tsx` |
-| Shared AI services | Model discovery, provider client, spatial/physics formatting reused by direct and chat flows | refactor from `src/hooks/useAI.ts` without changing commands          |
+| Area               | Responsibility                                                                               | Proposed files                                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Provider           | Convert provider-neutral messages/tools to the OpenRouter SDK and normalize replies/usage    | `src/ai/provider.ts`, `src/ai/openrouter-provider.ts`                                                                                      |
+| Thread state       | Immutable thread/turn reducer, questions, plans, status transitions, usage aggregation       | `src/ai/chat-types.ts`, `src/ai/chat-reducer.ts`                                                                                           |
+| Persistence        | Versioned IndexedDB records, retention, migrations, privacy setting                          | `src/ai/chat-storage.ts`                                                                                                                   |
+| Context            | Build bounded provider history and compact old completed turns                               | `src/ai/chat-context.ts`                                                                                                                   |
+| Tool registry      | JSON schemas, capability metadata, validation, result envelopes                              | `src/ai/tool-definitions.ts`, `src/ai/tool-validation.ts`                                                                                  |
+| Tool runtime       | Execute allow-listed read/compile/spatial/physics/draft tools                                | `src/ai/tool-runtime.ts`                                                                                                                   |
+| Draft edits        | Source hashing, range conversion, overlap checks, diff/proposal creation                     | `src/ai/source-edits.ts`                                                                                                                   |
+| Agent loop         | Bounded request → tool → result loop with abort and telemetry                                | `src/ai/agent-loop.ts`                                                                                                                     |
+| React integration  | Bind thread/tool runtime to current source, revision, compiler, and editor apply             | `src/hooks/useAIChat.ts`                                                                                                                   |
+| UI                 | Transcript, composer, questions, plan checklist, tool rows, proposal diff, thread picker     | `src/components/AIChatPanel.tsx`, `src/components/AIQuestionSet.tsx`, `src/components/AIWorkPlan.tsx`, `src/components/AICodeProposal.tsx` |
+| Shared AI services | Model discovery, provider client, spatial/physics formatting reused by direct and chat flows | refactor from `src/hooks/useAI.ts` without changing commands                                                                               |
 
 Avoid a large file move before behavior is covered. Extract shared helpers in small commits, retain
 `useAI.ts` as the direct-command facade, and introduce `useAIChat.ts` beside it. A later cleanup can
@@ -263,7 +346,8 @@ The thread model must preserve complete tool-call bundles. Never flatten history
 strings and try to reconstruct protocol messages later.
 
 ```ts
-type AiThreadStatus = 'idle' | 'running' | 'cancelled' | 'failed';
+type AiThreadStatus = 'idle' | 'running' | 'awaiting-user';
+type AiTurnStatus = 'running' | 'awaiting-user' | 'completed' | 'cancelled' | 'failed';
 
 interface AiChatThread {
   version: 1;
@@ -276,6 +360,8 @@ interface AiChatThread {
   turns: AiChatTurn[];
   summary?: AiConversationSummary;
   draft: AiDraftState;
+  activePlan?: AiWorkPlan;
+  pendingQuestionSet?: AiPendingQuestionSet;
   usage: AiActivityUsage;
 }
 
@@ -283,7 +369,7 @@ interface AiChatTurn {
   id: string;
   startedAt: number;
   finishedAt?: number;
-  status: AiThreadStatus;
+  status: AiTurnStatus;
   user: AiUserMessage;
   steps: AiChatStep[];
   usage: AiActivityUsage;
@@ -292,7 +378,29 @@ interface AiChatTurn {
 type AiChatStep =
   | { kind: 'assistant'; message: AiAssistantMessage; usage?: AiActivityUsage }
   | { kind: 'tool-result'; message: AiToolResultMessage; display: AiToolDisplay }
+  | { kind: 'question-set'; questionSet: AiQuestionSet; status: 'open' | 'answered' | 'cancelled' }
+  | { kind: 'plan-update'; plan: AiWorkPlan; explanation?: string }
   | { kind: 'notice'; level: 'info' | 'warning' | 'error'; text: string };
+
+type AiPlanStepStatus = 'pending' | 'in-progress' | 'completed';
+
+interface AiWorkPlan {
+  id: string;
+  version: number;
+  title: string;
+  steps: Array<{
+    id: string;
+    text: string;
+    status: AiPlanStepStatus;
+    completedAt?: number;
+  }>;
+}
+
+interface AiPendingQuestionSet {
+  toolCallId: string;
+  questions: AiQuestionSet;
+  openedAt: number;
+}
 
 interface AiAssistantMessage {
   role: 'assistant';
@@ -318,6 +426,12 @@ interface AiToolResultMessage {
 
 Never prune an assistant tool-call message independently from its results. Interrupted calls get a
 synthetic bounded error result before a later request is allowed to replay that turn.
+
+An open question set is the one intentional temporary exception: its assistant tool-call message is
+persisted while the matching tool result is pending, but that incomplete protocol history is never
+sent to the provider. Submitting or cancelling the form creates the matching tool result first, then
+the agent loop may resume. Plans are application state derived only from validated plan-tool results;
+assistant prose cannot mutate them.
 
 ### Draft and proposal model
 
@@ -391,7 +505,7 @@ Each result is a serialized envelope:
 interface AiToolResultEnvelope<T> {
   ok: boolean;
   tool: string;
-  source: {
+  source?: {
     target: 'live' | 'draft';
     revision: number;
     hash: string;
@@ -410,11 +524,97 @@ Requirements for every dispatcher:
 - Return validation and runtime failures as tool results so the model can recover.
 - Cap every text field and collection; report omissions explicitly.
 - Normalize non-finite numbers before serialization.
-- Include source target, revision, and hash in every result.
+- Include source target, revision, and hash in every source-dependent result. Human-input and plan
+  tools instead include their question/plan ID and version.
 - Never include the API key, browser storage contents, hidden prompt text, raw reasoning, or data URLs.
 - Log safe display metadata separately from the exact provider result.
 
 ### Version 1 tools
+
+#### `ask_user_questions`
+
+Pauses the current turn and asks a bounded set of structured multiple-choice questions when an
+unresolved ambiguity can materially change the outcome.
+
+```ts
+{
+  introduction?: string;
+  questions: Array<{
+    id: string;
+    prompt: string;
+    selection: 'single' | 'multiple';
+    required: boolean;
+    options: Array<{
+      id: string;
+      label: string;
+      description: string;
+    }>;
+    recommendedOptionId?: string;
+    allowOther?: boolean;
+  }>;
+}
+```
+
+Allow one to three questions, two to five options per question, unique stable IDs, bounded labels,
+and bounded one-sentence descriptions. `recommendedOptionId` must identify an option in that
+question. A multiple-selection question must state how combined choices affect the result.
+
+This tool does not return immediately. The runtime records its call ID and moves the turn to
+`awaiting-user`. Form submission returns selected option IDs and labels plus any bounded “Other”
+text in the normal matching tool-result message, then resumes the agent loop. Cancelling returns
+`{ cancelled: true }` and ends the turn without another model request.
+
+Use it when there are multiple plausible interpretations with meaningful consequences—for example,
+which motif to preserve, whether a change applies locally or globally, or which tradeoff has
+priority. Do not use it for information available from source/spatial/physics tools, for trivial
+styling choices the user delegated, or merely to seek confirmation after a clear instruction.
+
+#### `create_plan`
+
+Creates the active checklist for a complex task.
+
+```ts
+{
+  title: string;
+  steps: Array<{
+    id: string;
+    text: string;
+    status: 'pending' | 'in-progress';
+  }>;
+}
+```
+
+Allow two to eight concrete, outcome-oriented steps with unique stable IDs and at most one initial
+`in-progress` step. The result returns the normalized plan and version. If an unfinished plan already
+exists, reject creation and require `update_plan`; never silently replace the user's visible plan.
+
+#### `update_plan`
+
+Atomically updates progress or revises the active checklist.
+
+```ts
+{
+  planId: string;
+  expectedVersion: number;
+  explanation?: string;
+  steps: Array<{
+    id: string;
+    text: string;
+    status: 'pending' | 'in-progress' | 'completed';
+  }>;
+}
+```
+
+The complete normalized step list is submitted on every update. Validate plan ID/version, unique
+step IDs, two-to-eight-step bounds, at most one in-progress step, and preservation of completed
+steps. Allow adding, renaming, or reordering pending steps. Reopening a completed step requires a
+non-empty explanation and is displayed explicitly. Stamp newly completed steps in the runtime and
+return the new plan version.
+
+Use a plan for dependent multi-step implementation, diagnosis, or iterative design work. Do not
+create one for a simple answer, explanation, or single localized edit. Before substantive work, set
+the relevant step in progress. Mark it completed only after its action/evidence is present, and use
+one atomic update to complete it and start the next when possible.
 
 #### `read_source`
 
@@ -545,7 +745,8 @@ prepare bounded context
   → append exact assistant message
   → no tool calls? finalize turn
   → validate requested call
-  → execute local tool
+  → question call? persist form → await user → append answer result
+  → otherwise execute local/plan tool
   → append matching tool result
   → repeat until final response or limit
 ```
@@ -554,13 +755,13 @@ Initial limits should be constants with tests and activity reporting:
 
 | Limit                    |         Initial value | Behavior at limit                                                              |
 | ------------------------ | --------------------: | ------------------------------------------------------------------------------ |
-| Model steps per turn     |                     8 | Ask model for a final answer with tools disabled once; otherwise fail clearly. |
-| Tool calls per turn      |                    12 | Return a limit result, then request a final answer.                            |
+| Model steps per turn     |                    16 | Ask model for a final answer with tools disabled once; otherwise fail clearly. |
+| Tool calls per turn      |                    24 | Return a limit result, then request a final answer.                            |
 | Actual compiles per turn |                     4 | Cache hits remain allowed; later compile calls get a budget error.             |
 | Draft edits per call     |                    24 | Reject the complete call.                                                      |
 | Source page              | 400 lines / 24k chars | Return a cursor.                                                               |
 | Tool result              |             32k chars | Deterministically truncate with counts/cursor.                                 |
-| Turn wall time           |            90 seconds | Abort provider work and stop dispatch.                                         |
+| Active turn wall time    |            90 seconds | Abort provider work and stop dispatch; time awaiting user input is excluded.   |
 
 Use `parallel_tool_calls: false` for version 1. OpenRouter documents that this forces one requested
 tool call at a time, which makes draft revisions, compiler caching, transcript ordering, and
@@ -571,6 +772,14 @@ Other invariants:
 - Use one `AbortController` per turn and check it before and after every awaited operation.
 - Append the assistant message containing a tool request before executing it.
 - Append one tool result for every call ID, including invalid, cancelled, and runtime-error calls.
+- `ask_user_questions` suspends the loop after persisting the unmatched call. No provider request is
+  made until an answer result exists. Resume with the original turn ID, counters, abort policy, and
+  exact prior messages.
+- Plan tools update application state synchronously and append ordinary tool results. They consume
+  tool/model-step budgets but never source, compile, or wall-clock budgets beyond their execution.
+- Before a final response for an unfinished complex task, the plan must accurately show the first
+  remaining step. Before claiming completion, every plan step must be completed or the final response
+  must clearly state why work stopped.
 - Send the complete `tools` definition on every loop request, as required by OpenRouter.
 - Do not retry provider errors blindly. Retry at most once for transient 429/5xx/network failures,
   with visible status and abort-aware backoff.
@@ -588,6 +797,10 @@ Create a chat-specific wrapper around the existing NeedleScript prompt. It shoul
 
 - answer/review requests are read-only unless the user asks for a change;
 - change/fix/create requests may edit the private draft and validate it without pausing;
+- ask concise multiple-choice questions when a material ambiguity cannot be resolved through tools,
+  and continue without questioning when the user has already delegated the choice;
+- create and maintain a visible plan for genuinely multi-step work, with status grounded in completed
+  actions and evidence;
 - live application always requires the user's Apply action;
 - use compiled spatial and physics data as ground truth;
 - inspect relevant source before editing;
@@ -609,6 +822,8 @@ Add a compact synthetic context item before the new user message:
 
 - workspace ID and live source revision/hash;
 - whether a clean, changed, or stale draft exists;
+- active-plan ID/version and the first incomplete step, if one exists;
+- pending question-set ID, if the turn is awaiting user input;
 - current editor selection/cursor location, if any;
 - current machine/hoop/material identity;
 - last successful live compile status and physics counts;
@@ -627,6 +842,8 @@ The visible transcript and provider context are related but not identical:
 - Use `Model.contextLength` from the OpenRouter model list and a conservative local token estimate.
 - Reserve room for the system/tool schemas, current workspace snapshot, and model output.
 - Compact only completed oldest turns. Never compact the active turn or split a tool-call bundle.
+- Never compact an open question set, its eventual answer, or the active unfinished plan. Summaries
+  preserve answered decisions and the status/evidence of every incomplete plan step.
 - Store a structured summary with user goals, accepted decisions, rejected approaches, pending work,
   applied proposal IDs, and unresolved physics/spatial facts. Do not summarize generated reasoning.
 - Include hashes/revisions with summarized source facts so later turns know when they are historical.
@@ -642,8 +859,9 @@ or change a draft.
 Use IndexedDB for chat threads; keep the existing API-key/model localStorage keys unchanged.
 
 - Schema-version every record and add explicit migration tests.
-- Persist messages, safe tool display summaries, exact bounded provider messages required for replay,
-  conversation summaries, proposal source/diff, usage, timestamps, and model IDs.
+- Persist messages, question sets and answers, plan versions/statuses, safe tool display summaries,
+  exact bounded provider messages required for replay, conversation summaries, proposal source/diff,
+  usage, timestamps, and model IDs.
 - Never persist API keys, raster/data URLs, raw full stitch events, provider reasoning, or request
   headers.
 - Default to local persistence because “knows its chat history” should survive reloads. Add a setting
@@ -651,6 +869,8 @@ Use IndexedDB for chat threads; keep the existing API-key/model localStorage key
 - Suggested initial retention: 20 threads per workspace, 200 completed turns total, 30 days since
   last use, and a 5 MB aggregate soft cap. Evict oldest non-active threads first and never evict a
   pending proposal without a warning.
+- Never evict the active thread while it has an open question set or unfinished plan. If retention
+  cannot proceed without doing so, surface storage management instead of silently deleting it.
 - Corrupt or newer-version records fail closed: show a recoverable reset message and do not submit
   malformed history to the provider.
 - README/settings copy must state that source and chat content are sent to the selected OpenRouter
@@ -692,6 +912,11 @@ installed SDK's `Model` type. The model picker should show capability badges and
 | Provider/network/rate error     | Keep completed steps/draft, mark turn failed, allow Retry from the same last complete protocol boundary.     |
 | Invalid tool JSON               | Append a validation error result; allow the model to correct it.                                             |
 | Unknown tool                    | Append `unknown_tool`; never dynamically resolve a function name.                                            |
+| Invalid question set            | Append a validation error; do not render a partial or ambiguous form.                                        |
+| User leaves a question open     | Persist `awaiting-user` without provider polling, cost, or active wall-time consumption.                     |
+| User cancels a question         | Append a cancelled answer result, end the turn, and leave any work plan paused.                              |
+| Stale plan update               | Return the current plan ID/version; never overwrite newer checklist progress.                                |
+| Model claims untracked progress | Keep checklist state unchanged; only validated `create_plan`/`update_plan` results alter it.                 |
 | Compile timeout                 | Return the existing bounded timeout as a tool error and keep the prior valid compile snapshot.               |
 | Compile error                   | Return line-linked error data; draft remains editable.                                                       |
 | Tool/step budget exhausted      | Disable tools for one final-answer request and disclose the limit.                                           |
@@ -707,6 +932,8 @@ installed SDK's `Model` type. The model picker should show capability badges and
   command execution.
 - The only executable input is NeedleScript source passed to the existing budgeted worker compiler.
 - Model-provided edit coordinates and text are validated before touching the draft.
+- Question option text, “Other” responses, plan labels, and plan explanations are bounded and
+  rendered as untrusted content.
 - Live changes require the Apply control and revision/hash verification.
 - Render model text as untrusted content. No raw HTML, inline event handlers, or unsanitized URLs.
 - Keep image data ephemeral and strip it from activity details, errors, persistence, and analytics.
@@ -724,11 +951,11 @@ Deliverables:
 - Approve this contract, especially draft-only tool writes, persistent local history, workspace
   boundaries, and direct-command separation.
 - Add a static desktop/mobile prototype for Chat, tool rows, proposal review, stale conflict, and
-  empty/missing-key/model-unsupported states.
+  empty/missing-key/model-unsupported states, multiple-choice question forms, and checklist plans.
 - Test keyboard order, screen-reader labels, long code blocks, and a 50-turn transcript in prototype.
 
-Exit gate: product owner can complete “ask → inspect → revise → apply” and “edit live source → stale
-proposal → rebase” without explanation.
+Exit gate: product owner can complete “ask → clarify → plan → inspect → revise → apply” and “edit
+live source → stale proposal → rebase” without explanation.
 
 ### AI-1 — Shared services and model capabilities
 
@@ -752,7 +979,7 @@ Deliverables:
 - Implement workspace IDs, thread picker, new/delete actions, IndexedDB persistence, retention, and
   migration/failure states.
 - Add Chat/Activity views, transcript, multiline composer, cancel affordance, usage footer, and
-  empty/configuration states.
+  empty/configuration states, plus owned question and plan-card components with static fixtures.
 - Initially support text-only multi-turn replies through the provider adapter, without domain tools.
 
 Exit gate: reload preserves a thread; switching workspaces does not leak messages; exact user and
@@ -764,13 +991,17 @@ Deliverables:
 
 - Add schemas, validators, dispatcher, result envelopes, loop budgets, abort behavior, and safe
   telemetry.
-- Add `read_source`, `compile_design`, `inspect_spatial`, and `inspect_physics`.
+- Add `ask_user_questions`, `create_plan`, `update_plan`, `read_source`, `compile_design`,
+  `inspect_spatial`, and `inspect_physics`.
+- Add `awaiting-user` suspension/resume, atomic answer submission, plan versioning, and evidence-aware
+  checklist transitions.
 - Add a dedicated chat compiler consumer and per-turn compile cache.
 - Preserve assistant tool calls and matching results exactly in provider history.
 - Render tool steps and link source/physics results into Monaco/stage selection.
 
-Exit gate: the model can answer source-, placement-, and physics-specific questions using only facts
-returned by tools; malformed calls and loops terminate safely.
+Exit gate: the model can clarify a material ambiguity, create and advance a multi-step plan, and
+answer source-, placement-, and physics-specific questions using only facts returned by tools;
+malformed calls and loops terminate safely.
 
 ### AI-4 — Draft editing and proposal application
 
@@ -783,7 +1014,8 @@ Deliverables:
 - Preserve the draft across follow-ups and cancellation.
 
 Exit gate: a model can perform at least two private edit/compile/inspect cycles, present one diff,
-and never alter live source until Apply. Apply is undoable with one editor Undo.
+keep its checklist synchronized with those cycles, and never alter live source until Apply. Apply is
+undoable with one editor Undo.
 
 ### AI-5 — Visual context and cross-surface polish
 
@@ -817,7 +1049,11 @@ protocol pass without unresolved blocker-class defects.
 ### Pure unit tests
 
 - Thread reducer: start, append assistant, append tool result, finalize, fail, cancel, retry, model
-  switch, new thread, and impossible transitions.
+  switch, await/resume user input, new thread, and impossible transitions.
+- Question validation: question/option limits, unique IDs, recommendation membership, required and
+  optional answers, single/multiple selection, bounded Other text, atomic submit, and cancellation.
+- Plan reducer: create, version conflict, complete-and-start atomic update, at-most-one in-progress,
+  completed-step preservation, explained reopening, pending-step revision, pause, resume, and finish.
 - Provider-message reconstruction preserves assistant tool calls, IDs, order, null content, results,
   and complete bundles.
 - Tool schema validation rejects unknown fields, invalid enums, oversized arrays/text, non-finite
@@ -839,19 +1075,28 @@ protocol pass without unresolved blocker-class defects.
 3. `compile_design → inspect_physics → final answer`.
 4. `read_source → edit_draft → compile error → edit_draft → compile success → final proposal`.
 5. Spatial inspection of selected source lines.
-6. Invalid JSON followed by a corrected call.
-7. Unknown tool, tool exception, compile timeout, and provider failure.
-8. Model returns content plus tool calls.
-9. Tool-call, model-step, compile, output-size, context, and wall-time limits.
-10. Cancel during provider wait, compile, and immediately before tool dispatch.
-11. Workspace switch during a turn.
-12. Live edit during a turn and immediately before Apply.
-13. Retry resumes only from a valid protocol boundary.
-14. Usage/cost aggregation across multiple model steps.
+6. `ask_user_questions → await → answer result → resumed tool work → final answer`.
+7. Cancelled question, persisted/reloaded open question, and workspace switch while awaiting input.
+8. `create_plan → work → update_plan` through every step, with evidence before completion.
+9. Stale plan version, invalid simultaneous in-progress steps, and an interrupted plan resumed later.
+10. Invalid JSON followed by a corrected call.
+11. Unknown tool, tool exception, compile timeout, and provider failure.
+12. Model returns content plus tool calls.
+13. Tool-call, model-step, compile, output-size, context, and active wall-time limits.
+14. Cancel during provider wait, compile, and immediately before tool dispatch.
+15. Workspace switch during a turn.
+16. Live edit during a turn and immediately before Apply.
+17. Retry resumes only from a valid protocol boundary.
+18. Usage/cost aggregation across multiple model steps.
 
 ### UI/integration tests
 
 - `/ai chat` focuses the composer; `/ai chat hello` submits once.
+- Multiple questions render as one accessible form, validate atomically, and resume exactly once.
+- Question focus moves to the first prompt, errors return to the first invalid question, and resumed
+  work does not steal focus before submission feedback is announced.
+- Plan checkboxes correctly expose pending, in-progress, and checked states without being user
+  toggles; updates preserve focus and announce only changed steps.
 - Direct commands still open Activity and retain current generated-code behavior.
 - Chat/Activity switching does not cancel work or lose scroll position.
 - Apply is one undo step and runs the normal program path.
@@ -870,13 +1115,19 @@ Create a small versioned corpus using bundled examples, including `examples/gene
 - move one source-linked construction while preserving another;
 - reduce a blocker through construction changes and retain visual intent;
 - make two follow-up refinements that depend on prior conversation decisions;
+- recognize two materially different interpretations, ask bounded questions, and use the selected
+  answers without asking the same question again;
+- create a useful non-ceremonial plan for a multi-step revision, keep its checkboxes synchronized with
+  actual tool evidence, and finish every step;
 - recognize that a clean physics report is not a sew-out guarantee;
 - refuse to hide a risk by weakening limits when asked for a real construction fix;
 - detect a live-source conflict and avoid applying the stale proposal.
 
 Score task completion, factual agreement with tool data, compile success, blocker/risk delta, visual
-intent retention, unnecessary edits, tool calls, model steps, latency, tokens, cost, and whether Apply
-boundaries were respected. Do not make a single provider/model's prose the golden output.
+intent retention, unnecessary questions, repeated questions, plan usefulness, plan/evidence
+agreement, incomplete or falsely completed steps, tool calls, model steps, latency, tokens, cost,
+and whether Apply boundaries were respected. Do not make a single provider/model's prose the golden
+output.
 
 ## Verification commands
 
@@ -903,8 +1154,8 @@ explicit developer key and must not run in the ordinary deterministic test suite
 
 ## Documentation updates required at implementation time
 
-- `README.md`: `/ai chat`, thread storage/privacy, tool behavior, draft Apply/Discard/Rebase, model
-  capability, costs, and direct-command distinction.
+- `README.md`: `/ai chat`, thread storage/privacy, questions, checklist plans, tool behavior, draft
+  Apply/Discard/Rebase, model capability, costs, and direct-command distinction.
 - `/ai help`: new commands and concise workflow.
 - `docs/ai-system-prompt.md`: chat autonomy, tool, draft, approval, and physics wording without
   duplicating schemas.
@@ -916,21 +1167,25 @@ explicit developer key and must not run in the ordinary deterministic test suite
 
 ## Risks and mitigations
 
-| Risk                                      | Mitigation                                                                               |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Model edits stale source                  | Base revision/hash on every draft and Apply; disable stale Apply.                        |
-| Tool loop runs indefinitely               | Hard model/tool/compile/time budgets plus one tools-disabled final request.              |
-| Prompt/history cost grows                 | On-demand source reads, bounded results, model-aware complete-turn compaction.           |
-| Tool-capability varies by routed model    | Capability metadata, compatible-model filter, normalized adapter, eval matrix.           |
-| Physics/spatial facts drift between tools | Compile cache and source hash on every result.                                           |
-| User Run competes with agent compile      | Dedicated compiler consumer and existing shared foreground priority.                     |
-| AI silently damages code                  | Draft-only edits, reviewed diff, atomic Apply, one-step Undo.                            |
-| History leaks across designs              | Explicit workspace identity/epoch and scoped persistence keys.                           |
-| Persisted history contains sensitive code | Local-only disclosure, deletion controls, retention cap, session-only option.            |
-| Image context bloats or leaks             | Capability-gated later phase; ephemeral data URL; exact text remains canonical.          |
-| Markdown creates an injection surface     | No raw HTML; sanitize links/content; render tool data with owned components.             |
-| Monolithic `useAI` becomes harder to test | Extract provider, reducer, tools, loop, drafts, and persistence as pure modules.         |
-| Direct features regress                   | Refactor behind compatibility tests before Chat and keep direct/chat histories separate. |
+| Risk                                      | Mitigation                                                                                          |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Model edits stale source                  | Base revision/hash on every draft and Apply; disable stale Apply.                                   |
+| Tool loop runs indefinitely               | Hard model/tool/compile/time budgets plus one tools-disabled final request.                         |
+| AI asks too many questions                | Material-ambiguity threshold, bundled questions, eval rate, and no questions for inspectable facts. |
+| Open question consumes work indefinitely  | Persisted `awaiting-user` state with no polling, provider request, or active timer.                 |
+| Checklist reports false progress          | Only plan tools mutate state; completion requires transcript evidence and eval checks.              |
+| Plan updates crowd out real work          | Use plans only for complex tasks, combine complete/start updates, and cap plan length.              |
+| Prompt/history cost grows                 | On-demand source reads, bounded results, model-aware complete-turn compaction.                      |
+| Tool-capability varies by routed model    | Capability metadata, compatible-model filter, normalized adapter, eval matrix.                      |
+| Physics/spatial facts drift between tools | Compile cache and source hash on every result.                                                      |
+| User Run competes with agent compile      | Dedicated compiler consumer and existing shared foreground priority.                                |
+| AI silently damages code                  | Draft-only edits, reviewed diff, atomic Apply, one-step Undo.                                       |
+| History leaks across designs              | Explicit workspace identity/epoch and scoped persistence keys.                                      |
+| Persisted history contains sensitive code | Local-only disclosure, deletion controls, retention cap, session-only option.                       |
+| Image context bloats or leaks             | Capability-gated later phase; ephemeral data URL; exact text remains canonical.                     |
+| Markdown creates an injection surface     | No raw HTML; sanitize links/content; render tool data with owned components.                        |
+| Monolithic `useAI` becomes harder to test | Extract provider, reducer, tools, loop, drafts, and persistence as pure modules.                    |
+| Direct features regress                   | Refactor behind compatibility tests before Chat and keep direct/chat histories separate.            |
 
 ## Definition of done
 
@@ -940,14 +1195,18 @@ The feature is complete when all of the following are true:
 2. The selected model receives valid complete chat/tool history within a bounded context policy.
 3. The model can read source and inspect compile, spatial, and physics facts from the current or draft
    revision.
-4. The model can perform multiple draft edits and validations in one turn.
-5. No chat tool can mutate live source; Apply is explicit, revision-safe, and one-step undoable.
-6. Follow-up turns refine the pending draft and retain earlier user decisions.
-7. Workspace changes, live edits, cancellation, malformed tool calls, provider errors, and exhausted
+4. The model can ask one or more bounded multiple-choice questions, persist while awaiting the user,
+   and resume the exact same tool-call turn from the submitted answers.
+5. The model can create a visible multi-step checklist, work through it, and keep each checkbox status
+   consistent with actual transcript evidence across interruptions and follow-up turns.
+6. The model can perform multiple draft edits and validations in one turn.
+7. No chat tool can mutate live source; Apply is explicit, revision-safe, and one-step undoable.
+8. Follow-up turns refine the pending draft and retain earlier user decisions.
+9. Workspace changes, live edits, cancellation, malformed tool calls, provider errors, and exhausted
    budgets have tested, recoverable states.
-8. Tool and message rendering is accessible on desktop and mobile and exposes useful cost/activity
-   information without credentials or hidden reasoning.
-9. `/ai create`, `/ai improve`, `/ai fix`, `/ai explain`, model selection, credits, reset, context-menu
-   explain, compiled spatial review, and bounded physics revisions still work.
-10. Unit/integration/evaluation gates and the repository's test, lint, formatting, app build, library
+10. Question, plan, tool, and message rendering is accessible on desktop and mobile and exposes useful cost/activity
+    information without credentials or hidden reasoning.
+11. `/ai create`, `/ai improve`, `/ai fix`, `/ai explain`, model selection, credits, reset, context-menu
+    explain, compiled spatial review, and bounded physics revisions still work.
+12. Unit/integration/evaluation gates and the repository's test, lint, formatting, app build, library
     validation (when applicable), and React Doctor checks pass.
