@@ -384,6 +384,7 @@ export const AI_HELP_TEXT = `AI commands (prefix: /ai):
   <anything>         — shorthand for create/improve depending on context
 
 Generated code is compiled and reviewed for spatial intent and modeled physics blockers/risks with up to 2 revisions. Vision-capable models also receive rendered previews.
+With a key and model selected, right-click selected code or a statement and choose "Explain with AI" for a source- and preview-aware explanation.
 Open the AI tab beside Console and Physics to inspect requests, usage, checks, and feedback.
 
 Tip: Start typing "/ai model " to see model suggestions.`;

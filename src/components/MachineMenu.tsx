@@ -9,6 +9,7 @@ import {
   LocateFixedIcon,
   ReplaceAllIcon,
   ScissorsIcon,
+  SparklesIcon,
   Trash2Icon,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -41,6 +42,7 @@ export interface EditorContextActions {
   goToDefinition: () => void;
   changeAll: () => void;
   formatDocument: () => void;
+  explainWithAi?: () => void;
 }
 
 interface Actions {
@@ -160,7 +162,7 @@ export function MachineContextMenu({
   return (
     <div
       role="menu"
-      aria-label="Machine settings"
+      aria-label={props.editorActions ? 'Editor and machine settings' : 'Machine settings'}
       className="fixed z-60 max-h-[calc(100vh-16px)] min-w-56 overflow-y-auto rounded-lg bg-popover p-1 font-mono text-ui shadow-lg ring-1 ring-foreground/10"
       style={{ left: x, top: y }}
       onPointerDown={(event) => event.stopPropagation()}
@@ -191,6 +193,20 @@ export function MachineContextMenu({
               {label}
             </button>
           ))}
+          {props.editorActions.explainWithAi && (
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left hover:bg-accent"
+              onClick={() => {
+                props.editorActions?.explainWithAi?.();
+                onClose();
+              }}
+            >
+              <SparklesIcon className="size-3.5" />
+              Explain with AI
+            </button>
+          )}
           <div className="my-1 border-t border-border" />
         </>
       )}

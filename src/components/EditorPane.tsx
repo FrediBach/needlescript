@@ -22,6 +22,7 @@ import type {
 import type { ParamItem } from '../lib/editor/parameters.ts';
 import type { AIModelInfo } from '../hooks/useAI.ts';
 import type { AiActivitySession } from '../ai-activity.ts';
+import { buildEditorExplainRequest } from '../lib/editor/ai-editor-context.ts';
 import { registerNeedlescript, scheduleNeedlescriptProviders } from '../lib/editor/monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
 import {
@@ -296,6 +297,9 @@ export default function EditorPane({
   const lineStitchMapRef = useRef(lineStitchMap);
   const onHoverLineRef = useRef(onHoverLine);
   const onMachineContextMenuRef = useRef(onMachineContextMenu);
+  const onAiCommandRef = useRef(onAiCommand);
+  const aiHasApiKeyRef = useRef(aiHasApiKey);
+  const aiSelectedModelRef = useRef(aiSelectedModel);
   useLayoutEffect(() => {
     onRunRef.current = onRun;
     onEditorReadyRef.current = onEditorReady;
@@ -309,8 +313,14 @@ export default function EditorPane({
     lineStitchMapRef.current = lineStitchMap;
     onHoverLineRef.current = onHoverLine;
     onMachineContextMenuRef.current = onMachineContextMenu;
+    onAiCommandRef.current = onAiCommand;
+    aiHasApiKeyRef.current = aiHasApiKey;
+    aiSelectedModelRef.current = aiSelectedModel;
   }, [
+    aiHasApiKey,
+    aiSelectedModel,
     lineStitchMap,
+    onAiCommand,
     onDiagnosticClear,
     onDiagnosticHover,
     onDiagnosticSelect,
@@ -778,6 +788,43 @@ export default function EditorPane({
         ed.focus();
         void ed.getAction(id)?.run();
       };
+      const model = ed.getModel();
+      const position = event.target.position ?? ed.getPosition();
+      const selection = ed.getSelection();
+      const selectedRangeApplies =
+        position !== null &&
+        selection !== null &&
+        !selection.isEmpty() &&
+        (event.target.position === null || selection.containsPosition(position));
+      const explainRequest =
+        model && position
+          ? buildEditorExplainRequest({
+              position,
+              lineText: model.getLineContent(position.lineNumber),
+              word: model.getWordAtPosition(position)?.word,
+              ...(selectedRangeApplies && selection
+                ? {
+                    selection: {
+                      startLineNumber: selection.startLineNumber,
+                      startColumn: selection.startColumn,
+                      endLineNumber: selection.endLineNumber,
+                      endColumn: selection.endColumn,
+                      text: model.getValueInRange(selection),
+                    },
+                  }
+                : {}),
+            })
+          : null;
+      const explainWithAi =
+        aiHasApiKeyRef.current &&
+        aiSelectedModelRef.current &&
+        onAiCommandRef.current &&
+        explainRequest
+          ? () => {
+              ed.focus();
+              void onAiCommandRef.current?.(`explain ${explainRequest}`);
+            }
+          : undefined;
       onMachineContextMenuRef.current?.(event.event.posx, event.event.posy, {
         cut: () => runEditorAction('editor.action.clipboardCutAction'),
         copy: () => runEditorAction('editor.action.clipboardCopyAction'),
@@ -785,6 +832,7 @@ export default function EditorPane({
         goToDefinition: () => runEditorAction('editor.action.revealDefinition'),
         changeAll: () => runEditorAction('editor.action.changeAll'),
         formatDocument: () => runEditorAction('editor.action.formatDocument'),
+        ...(explainWithAi ? { explainWithAi } : {}),
       });
     });
   }, []);

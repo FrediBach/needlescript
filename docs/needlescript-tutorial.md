@@ -2227,6 +2227,13 @@ Use this whenever a run produces a red error in the console.
 /ai explain how does the fill angle interact with the satin border?
 ```
 
+With an API key and model selected, you can also right-click in the code editor and choose **Explain
+with AI**. If code is selected, the explanation focuses on that exact line-and-column range. Without
+a selection, it focuses on the statement and symbol under the pointer. In both cases the model also
+receives the complete program and compiled spatial context, so it can connect the source construct to
+the rendered design. The explanation opens in the **AI** activity tab and is printed to Console; it
+does not edit the program.
+
 **Default (no subcommand)** — if the input starts with `/ai` and isn't one of the above keywords, it's treated as a description. With code in the editor it behaves like `improve`; with an empty editor it behaves like `create`:
 
 ```text
