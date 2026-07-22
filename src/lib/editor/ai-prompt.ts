@@ -4,19 +4,29 @@
  */
 
 import rawSystemPrompt from '../../../docs/ai-system-prompt.md?raw';
-import type { PhysicsDiagnostic, PhysicsReport, PreflightSeverity } from '../core/types.ts';
+import type {
+  DiagnosticBounds,
+  DiagnosticGeometry,
+  PhysicsDiagnostic,
+  PhysicsReport,
+  PreflightSeverity,
+} from '../core/types.ts';
+import type { AiSpatialContext } from './ai-spatial.ts';
 
 export type AiCommandType = 'create' | 'improve' | 'fix' | 'explain' | 'default';
 
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
+export type ChatContentPart =
+  { type: 'text'; text: string } | { type: 'image_url'; imageUrl: { url: string; detail: 'low' } };
+
+export type ChatMessage =
+  | { role: 'system' | 'assistant'; content: string }
+  | { role: 'user'; content: string | ChatContentPart[] };
 
 export interface AiPhysicsFeedback {
   content: string;
   counts: Record<'error' | 'warning', number>;
   fingerprints: string[];
+  diagnostics: PhysicsDiagnostic[];
 }
 
 const MAX_AI_PHYSICS_FINDINGS = 8;
@@ -33,6 +43,20 @@ const SEVERITY_PRIORITY: Record<PreflightSeverity, number> = {
 export const SYSTEM_PROMPT = rawSystemPrompt;
 
 // ─── Message builders ─────────────────────────────────────────────────────────
+
+function withSpatialContent(text: string, spatial?: AiSpatialContext): string | ChatContentPart[] {
+  if (!spatial) return text;
+  const contextualText = `${text}\n\n${spatial.content}`;
+  return spatial.imageDataUrl
+    ? [
+        { type: 'text', text: contextualText },
+        {
+          type: 'image_url',
+          imageUrl: { url: spatial.imageDataUrl, detail: 'low' },
+        },
+      ]
+    : contextualText;
+}
 
 /**
  * Extracts plain NeedleScript code from an AI response, stripping markdown fences.
@@ -66,6 +90,7 @@ export function buildMessages(
   instruction: string,
   source?: string,
   lastError?: string,
+  spatial?: AiSpatialContext,
 ): ChatMessage[] {
   const system: ChatMessage = { role: 'system', content: SYSTEM_PROMPT };
 
@@ -110,7 +135,7 @@ export function buildMessages(
       break;
   }
 
-  return [system, { role: 'user', content: userContent }];
+  return [system, { role: 'user', content: withSpatialContent(userContent, spatial) }];
 }
 
 /**
@@ -160,12 +185,67 @@ function formatSourceLocations(diagnostic: PhysicsDiagnostic, lines: readonly st
   return omitted > 0 ? [...formatted, `Source: ${omitted} related location(s) omitted`] : formatted;
 }
 
+function boundsForGeometry(geometry: DiagnosticGeometry): DiagnosticBounds | undefined {
+  if (geometry.bounds) return geometry.bounds;
+  const points =
+    geometry.kind === 'points' || geometry.kind === 'polyline'
+      ? geometry.points
+      : geometry.kind === 'cell'
+        ? [
+            { x: geometry.x, y: geometry.y },
+            { x: geometry.x + geometry.width, y: geometry.y + geometry.height },
+          ]
+        : geometry.rings.flat();
+  if (!points.length) return undefined;
+  return points.reduce<DiagnosticBounds>(
+    (bounds, point) => ({
+      minX: Math.min(bounds.minX, point.x),
+      minY: Math.min(bounds.minY, point.y),
+      maxX: Math.max(bounds.maxX, point.x),
+      maxY: Math.max(bounds.maxY, point.y),
+    }),
+    { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity },
+  );
+}
+
+function formatCoordinate(value: number): string {
+  return (Math.abs(value) < 0.005 ? 0 : value).toFixed(2);
+}
+
+function formatDiagnosticGeometry(diagnostic: PhysicsDiagnostic): string | null {
+  if (!diagnostic.geometry.length) return null;
+  const selected = diagnostic.geometry.slice(0, 3);
+  const descriptions = selected.map((geometry) => {
+    const bounds = boundsForGeometry(geometry);
+    const anchor =
+      geometry.anchor ??
+      (bounds
+        ? {
+            x: (bounds.minX + bounds.maxX) / 2,
+            y: (bounds.minY + bounds.maxY) / 2,
+          }
+        : undefined);
+    const position = anchor
+      ? ` near (${formatCoordinate(anchor.x)}, ${formatCoordinate(anchor.y)}) mm`
+      : '';
+    const extent = bounds
+      ? ` spanning x ${formatCoordinate(bounds.minX)}..${formatCoordinate(bounds.maxX)}, y ${formatCoordinate(bounds.minY)}..${formatCoordinate(bounds.maxY)} mm`
+      : '';
+    return `${geometry.role} ${geometry.kind}${position}${extent}`;
+  });
+  const omitted = diagnostic.geometry.length - selected.length;
+  return `Geometry: ${descriptions.join('; ')}${omitted > 0 ? `; ${omitted} additional shape(s) omitted` : ''}`;
+}
+
 function formatPhysicsDiagnostic(diagnostic: PhysicsDiagnostic, lines: readonly string[]): string {
   const details = [
     `[${diagnostic.severity.toUpperCase()}] ${diagnostic.code} — ${diagnostic.title}`,
     ...formatSourceLocations(diagnostic, lines),
     `Finding: ${diagnostic.explanation}`,
   ];
+
+  const geometry = formatDiagnosticGeometry(diagnostic);
+  if (geometry) details.push(geometry);
 
   if (diagnostic.measurements?.length) {
     details.push(
@@ -251,6 +331,7 @@ export function buildPhysicsFeedback(
     content,
     counts: { error: report.summary.error, warning: report.summary.warning },
     fingerprints: selected.map(({ fingerprint }) => fingerprint),
+    diagnostics: selected,
   };
 }
 
@@ -259,14 +340,33 @@ export function buildPhysicsRetryMessages(
   originalMessages: ChatMessage[],
   code: string,
   feedback: AiPhysicsFeedback,
+  spatial?: AiSpatialContext,
 ): ChatMessage[] {
   return [
     ...originalMessages,
     { role: 'assistant', content: code },
     {
       role: 'user',
-      content: `${feedback.content}\n\nRevise the complete program to address these findings, prioritizing blockers and then risks. Preserve the requested design and intentional geometry. Use the source locations and construction remedies above. Do not hide findings by weakening limits, removing material intent, adding preflight, or acknowledging/silencing diagnostics. Return ONLY the complete corrected NeedleScript code. No markdown or explanation.`,
+      content: withSpatialContent(
+        `${feedback.content}\n\nRevise the complete program to address these findings, prioritizing blockers and then risks. Preserve the requested design and intentional geometry. Use the source locations, spatial evidence, and construction remedies above. Do not hide findings by weakening limits, removing material intent, adding preflight, or acknowledging/silencing diagnostics. Return ONLY the complete corrected NeedleScript code. No markdown or explanation.`,
+        spatial,
+      ),
     },
+  ];
+}
+
+/** Adds one bounded review of the compiled spatial result, even when physics is clean. */
+export function buildSpatialReviewMessages(
+  originalMessages: ChatMessage[],
+  code: string,
+  spatial: AiSpatialContext,
+): ChatMessage[] {
+  const instruction =
+    'Review the compiled design against the original request using the spatial context and rendered preview. Check composition, placement, scale, balance, negative space, color relationships, and whether the visible result matches the requested intent. The preview shows the actual compiled stitch plan, not a conceptual illustration. If it already satisfies the request, return the complete source unchanged. Otherwise make only purposeful spatial improvements. Return ONLY the complete NeedleScript code. No markdown or explanation.';
+  return [
+    ...originalMessages,
+    { role: 'assistant', content: code },
+    { role: 'user', content: withSpatialContent(instruction, spatial) },
   ];
 }
 
@@ -283,7 +383,7 @@ export const AI_HELP_TEXT = `AI commands (prefix: /ai):
   explain <question> — explain the current code or a specific line
   <anything>         — shorthand for create/improve depending on context
 
-Generated code is compiled and reviewed for modeled physics blockers/risks with up to 2 revisions.
+Generated code is compiled and reviewed for spatial intent and modeled physics blockers/risks with up to 2 revisions. Vision-capable models also receive rendered previews.
 Open the AI tab beside Console and Physics to inspect requests, usage, checks, and feedback.
 
 Tip: Start typing "/ai model " to see model suggestions.`;

@@ -1,7 +1,7 @@
 export type AiActivityStatus = 'running' | 'completed' | 'failed' | 'cancelled';
 
 export type AiActivityPhase =
-  'request' | 'response' | 'compile' | 'physics' | 'decision' | 'complete' | 'error';
+  'request' | 'response' | 'compile' | 'spatial' | 'physics' | 'decision' | 'complete' | 'error';
 
 export type AiActivityTone = 'neutral' | 'progress' | 'success' | 'warning' | 'error';
 

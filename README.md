@@ -139,18 +139,22 @@ The REPL can generate, improve, fix, and explain designs using a model available
 ```
 
 The selected key and model are stored in browser `localStorage`. Generation receives the compact
-NeedleScript reference. Before generated source is placed in the editor, the playground compiles it
-with full physics analysis and runs up to two bounded revision passes. Compiler failures are returned
-with their reported source line; modeled blockers and risks are returned with source roles, line
-text, measurements, evidence limits, and prioritized construction remedies. The best successfully
-compiled revision is retained if a later revision regresses. Informational physics notes remain for
-human review and do not trigger automatic source changes.
+NeedleScript reference. Existing designs are compiled before improve, fix, and explain requests so
+the model also receives exact bounds, placement, color extents, a coarse stitched silhouette, and a
+rendered preview when the selected model supports image input. Before generated source is placed in
+the editor, the playground compiles it with full physics analysis and runs up to two bounded revision
+passes. Compiler failures are returned with their reported source line; modeled blockers and risks
+are returned with source roles, line text, spatial coordinates, numbered preview overlays,
+measurements, evidence limits, and prioritized construction remedies. A physics-clean candidate gets
+one bounded composition review against the original request. The best successfully compiled revision
+is retained if a later revision regresses. Informational physics notes remain for human review and do
+not trigger automatic source changes.
 
 The editor's **AI** output tab opens when a command starts and keeps the latest activity timeline:
 requested candidates, the provider model used, token/cost metadata when available, compiler checks,
-structured physics feedback, revision decisions, and the final candidate applied to the editor.
-Expandable details show exactly which line-level compiler or physics context was returned to the
-model without exposing the stored API key.
+spatial-context preparation, structured physics feedback, revision decisions, and the final candidate
+applied to the editor. Expandable details show the text geometry and line-level compiler or physics
+context returned to the model without exposing the stored API key or image data.
 
 ## Using the engine as a library
 

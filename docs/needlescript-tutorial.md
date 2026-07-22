@@ -2181,18 +2181,23 @@ To remove both:
 /ai create concentric hexagons with alternating fill angles
 ```
 
-The generated code is compiled with full editor physics analysis. The playground can ask the AI for
-up to two revisions: compile failures include the reported source line, while successful candidates
-with modeled blockers or risks include their exact source roles and lines, measurements, evidence
-limits, assumptions, and prioritized construction remedies. Informational notes do not trigger an
-automatic rewrite. If a revision regresses, the best successfully compiled candidate is retained.
-The chosen result is then placed in the editor and run so you can inspect it immediately.
+The generated code is compiled with full editor physics analysis. Each successful candidate also
+produces deterministic spatial context: millimetre-space bounds and placement, color extents, a
+coarse stitched silhouette, and—when the selected model accepts images—a hoop-aware rendered preview.
+The playground can ask the AI for up to two revisions. Compile failures include the reported source
+line, while successful candidates with modeled blockers or risks include their exact source roles and
+lines, spatial coordinates, numbered preview overlays, measurements, evidence limits, assumptions,
+and prioritized construction remedies. A physics-clean candidate receives one bounded composition
+review against the original request; the model may return the source unchanged. Informational notes
+do not independently trigger an automatic rewrite. If a revision regresses, the best successfully
+compiled candidate is retained. The chosen result is then placed in the editor and run so you can
+inspect it immediately.
 
 The **AI** tab beside Console and Physics opens as soon as a command starts. It shows each model
 request and candidate, the actual provider model, token and cost data when OpenRouter returns it,
 compiler results, physics review counts, and which revision was ultimately applied. Expand a
-compiler or physics event to inspect the line-level feedback sent into the next revision. The API
-key is never shown in this activity log.
+compiler, spatial, or physics event to inspect the textual feedback sent into the next revision. The
+API key and encoded preview image are never shown in this activity log.
 
 **`/ai improve <instruction>`** — rewrites the current code according to your instruction:
 

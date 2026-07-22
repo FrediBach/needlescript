@@ -4,6 +4,7 @@ import type { ChatMessages } from '@openrouter/sdk/models';
 import type { ChatUsage, Model } from '@openrouter/sdk/models';
 import type { ConsoleMessage } from '../App.tsx';
 import type { CompileResponse } from '../compiler.worker.types.ts';
+import { rasterizeAiPreview } from '../ai-preview.ts';
 import {
   appendAiActivityEvent,
   createAiActivitySession,
@@ -18,11 +19,17 @@ import {
   buildPhysicsFeedback,
   buildPhysicsRetryMessages,
   buildRetryMessages,
+  buildSpatialReviewMessages,
   extractCode,
   AI_HELP_TEXT,
   type AiCommandType,
   type ChatMessage,
 } from '../lib/editor/ai-prompt.ts';
+import {
+  buildAiPreviewSvg,
+  buildSpatialDigest,
+  type AiSpatialContext,
+} from '../lib/editor/ai-spatial.ts';
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 
@@ -36,6 +43,7 @@ const MAX_AI_REVISIONS = 2;
 export interface AIModelInfo {
   id: string;
   name: string;
+  supportsImageInput: boolean;
 }
 
 type AddMsg = (text: string, type?: ConsoleMessage['type']) => void;
@@ -56,6 +64,8 @@ interface SuccessfulAiCandidate {
   warnings: number;
   attempt: number;
 }
+
+type SuccessfulCompileResponse = Extract<CompileResponse, { ok: true }>;
 
 export interface UseAIReturn {
   handleAiCommand: (input: string) => Promise<void>;
@@ -93,6 +103,18 @@ function isBetterCandidate(
   if (!current) return true;
   if (candidate.errors !== current.errors) return candidate.errors < current.errors;
   return candidate.warnings <= current.warnings;
+}
+
+async function buildCompiledSpatialContext(
+  compileResponse: SuccessfulCompileResponse,
+  includeImage: boolean,
+  diagnostics = compileResponse.result.physics?.diagnostics ?? [],
+): Promise<AiSpatialContext> {
+  const content = buildSpatialDigest(compileResponse.result, compileResponse.stats);
+  if (!includeImage) return { content };
+  const svg = buildAiPreviewSvg(compileResponse.result, compileResponse.stats, diagnostics);
+  const imageDataUrl = await rasterizeAiPreview(svg);
+  return imageDataUrl ? { content, imageDataUrl } : { content };
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -164,10 +186,16 @@ export function useAI({
     client.models
       .list()
       .then((res) => {
-        const models = (res.data ?? ([] as Model[]))
-          .filter((m: Model) => m.id && m.name)
-          .map((m: Model) => ({ id: m.id, name: m.name }))
-          .sort((a: AIModelInfo, b: AIModelInfo) => a.name.localeCompare(b.name));
+        const models: AIModelInfo[] = [];
+        for (const model of res.data ?? ([] as Model[])) {
+          if (!model.id || !model.name) continue;
+          models.push({
+            id: model.id,
+            name: model.name,
+            supportsImageInput: model.architecture.inputModalities.includes('image'),
+          });
+        }
+        models.sort((a, b) => a.name.localeCompare(b.name));
         setAiModels(models);
       })
       .catch(() => {
@@ -271,6 +299,10 @@ export function useAI({
   // ── Command: explain ───────────────────────────────────────────
   const explainCode = useCallback(
     async (question: string) => {
+      if (isGeneratingRef.current) {
+        addMsg('already generating — please wait', 'warn');
+        return;
+      }
       const effectiveQuestion = question || 'explain this code';
       const sessionId = beginActivity('explain', effectiveQuestion);
       const client = getClient();
@@ -285,17 +317,36 @@ export function useAI({
         endActivity(sessionId, 'failed');
         return;
       }
-      const source = sourceRef.current;
-      const messages = buildMessages('explain', effectiveQuestion, source);
-
-      addMsg(`asking ${selectedModel}…`, 'info');
-      addActivity(sessionId, {
-        phase: 'request',
-        tone: 'progress',
-        title: 'Explanation requested',
-        summary: `${selectedModel} · ${source.split(/\r?\n/).length} source line(s)`,
-      });
+      isGeneratingRef.current = true;
+      setIsGenerating(true);
       try {
+        const source = sourceRef.current;
+        const supportsImageInput =
+          aiModels.find(({ id }) => id === selectedModel)?.supportsImageInput ?? false;
+        let spatial: AiSpatialContext | undefined;
+        if (source.trim()) {
+          const current = await compile(source);
+          if (current?.ok) {
+            spatial = await buildCompiledSpatialContext(current, supportsImageInput, []);
+            addActivity(sessionId, {
+              phase: 'spatial',
+              tone: 'success',
+              title: 'Compiled spatial context prepared',
+              summary: spatial.imageDataUrl
+                ? 'Exact geometry summary · rendered preview attached'
+                : 'Exact geometry summary · text-only model context',
+            });
+          }
+        }
+        const messages = buildMessages('explain', effectiveQuestion, source, undefined, spatial);
+
+        addMsg(`asking ${selectedModel}…`, 'info');
+        addActivity(sessionId, {
+          phase: 'request',
+          tone: 'progress',
+          title: 'Explanation requested',
+          summary: `${selectedModel} · ${source.split(/\r?\n/).length} source line(s)`,
+        });
         const result = await client.chat.send({
           chatRequest: {
             model: selectedModel,
@@ -323,9 +374,22 @@ export function useAI({
           summary: message,
         });
         endActivity(sessionId, 'failed');
+      } finally {
+        isGeneratingRef.current = false;
+        setIsGenerating(false);
       }
     },
-    [beginActivity, getClient, sourceRef, selectedModel, addMsg, addActivity, endActivity],
+    [
+      beginActivity,
+      getClient,
+      sourceRef,
+      selectedModel,
+      aiModels,
+      compile,
+      addMsg,
+      addActivity,
+      endActivity,
+    ],
   );
 
   // ── Command: create / improve / fix / default ──────────────────
@@ -353,23 +417,53 @@ export function useAI({
       isGeneratingRef.current = true;
       setIsGenerating(true);
 
-      const source = sourceRef.current;
-      const lastError = type === 'fix' ? (getLastError() ?? undefined) : undefined;
-      let messages = buildMessages(type, instruction, source, lastError);
-
-      addMsg(`generating with ${selectedModel}…`, 'info');
-      addActivity(sessionId, {
-        phase: 'request',
-        tone: 'neutral',
-        title: 'Generation prepared',
-        summary: `${selectedModel} · ${source.trim() ? `${source.split(/\r?\n/).length} source line(s)` : 'new design'}`,
-        detail: lastError ? `The latest compile error is included:\n${lastError}` : undefined,
-      });
-
       try {
+        const source = sourceRef.current;
+        const lastError = type === 'fix' ? (getLastError() ?? undefined) : undefined;
+        const supportsImageInput =
+          aiModels.find(({ id }) => id === selectedModel)?.supportsImageInput ?? false;
+        let initialSpatial: AiSpatialContext | undefined;
+        if (source.trim() && type !== 'create') {
+          addActivity(sessionId, {
+            phase: 'spatial',
+            tone: 'progress',
+            title: 'Reading the current compiled design',
+          });
+          const current = await compile(source);
+          if (current?.ok) {
+            initialSpatial = await buildCompiledSpatialContext(current, supportsImageInput, []);
+            addActivity(sessionId, {
+              phase: 'spatial',
+              tone: 'success',
+              title: 'Current spatial context prepared',
+              summary: initialSpatial.imageDataUrl
+                ? 'Exact geometry summary · rendered preview attached'
+                : 'Exact geometry summary · text-only model context',
+            });
+          } else {
+            addActivity(sessionId, {
+              phase: 'spatial',
+              tone: 'warning',
+              title: 'Current preview unavailable',
+              summary: current === null ? 'Compilation was superseded.' : current.message,
+            });
+          }
+        }
+        let messages = buildMessages(type, instruction, source, lastError, initialSpatial);
+
+        addMsg(`generating with ${selectedModel}…`, 'info');
+        addActivity(sessionId, {
+          phase: 'request',
+          tone: 'neutral',
+          title: 'Generation prepared',
+          summary: `${selectedModel} · ${source.trim() ? `${source.split(/\r?\n/).length} source line(s)` : 'new design'}`,
+          detail: lastError ? `The latest compile error is included:\n${lastError}` : undefined,
+        });
+
         let bestSuccessful: SuccessfulAiCandidate | null = null;
         let lastCode = '';
         let revisionReason = 'original instruction';
+        let spatialReviewUsed = false;
 
         for (let attempt = 0; attempt <= MAX_AI_REVISIONS; attempt++) {
           addActivity(sessionId, {
@@ -471,6 +565,27 @@ export function useAI({
             });
           }
 
+          const canRevise = attempt < MAX_AI_REVISIONS;
+          const needsSpatialFeedback = canRevise && (feedback !== null || !spatialReviewUsed);
+          const spatial = needsSpatialFeedback
+            ? await buildCompiledSpatialContext(
+                check,
+                supportsImageInput,
+                feedback?.diagnostics ?? [],
+              )
+            : undefined;
+          if (spatial) {
+            addActivity(sessionId, {
+              phase: 'spatial',
+              tone: 'success',
+              title: `Spatial review of candidate ${attempt + 1} prepared`,
+              summary: spatial.imageDataUrl
+                ? 'Exact geometry summary · annotated preview attached'
+                : 'Exact geometry summary · text-only model context',
+              detail: spatial.content,
+            });
+          }
+
           if (!feedback) {
             addMsg('physics review found no modeled blockers or risks', 'ok');
             addActivity(sessionId, {
@@ -479,6 +594,16 @@ export function useAI({
               title: 'Physics review has no actionable findings',
               summary: `${check.result.physics?.summary.info ?? 0} informational note(s) remain for human review.`,
             });
+            if (spatial && !spatialReviewUsed) {
+              spatialReviewUsed = true;
+              addMsg(
+                `reviewing compiled composition (${attempt + 1}/${MAX_AI_REVISIONS})…`,
+                'info',
+              );
+              messages = buildSpatialReviewMessages(messages, code, spatial);
+              revisionReason = `compiled spatial review of candidate ${attempt + 1}`;
+              continue;
+            }
             break;
           }
           addActivity(sessionId, {
@@ -488,7 +613,7 @@ export function useAI({
             summary: `${errorCount} blocker(s) · ${warningCount} risk(s)`,
             detail: feedback.content,
           });
-          if (attempt >= MAX_AI_REVISIONS) {
+          if (!canRevise) {
             addMsg(
               `physics review finished with ${errorCount} blocker(s) and ${warningCount} risk(s); review them before sewing`,
               'warn',
@@ -500,8 +625,8 @@ export function useAI({
             `physics review — ${errorCount} blocker(s), ${warningCount} risk(s); refining (${attempt + 1}/${MAX_AI_REVISIONS})…`,
             'warn',
           );
-          messages = buildPhysicsRetryMessages(messages, code, feedback);
-          revisionReason = `structured physics feedback from candidate ${attempt + 1}`;
+          messages = buildPhysicsRetryMessages(messages, code, feedback, spatial);
+          revisionReason = `structured physics and spatial feedback from candidate ${attempt + 1}`;
         }
 
         const code = bestSuccessful?.code ?? lastCode;
@@ -546,6 +671,7 @@ export function useAI({
       getClient,
       sourceRef,
       selectedModel,
+      aiModels,
       compile,
       setSource,
       runProgram,

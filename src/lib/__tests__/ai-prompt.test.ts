@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   SYSTEM_PROMPT,
+  buildMessages,
   buildPhysicsFeedback,
   buildPhysicsRetryMessages,
   buildRetryMessages,
+  buildSpatialReviewMessages,
   type ChatMessage,
 } from '../editor/ai-prompt.ts';
 import type { PhysicsDiagnostic, PhysicsReport } from '../core/types.ts';
@@ -159,7 +161,20 @@ describe('NeedleScript AI review feedback', () => {
 
   it('links actionable physics findings to exact source and construction remedies', () => {
     const feedback = buildPhysicsFeedback(
-      physicsReport([diagnostic()]),
+      physicsReport([
+        diagnostic({
+          geometry: [
+            {
+              kind: 'cell',
+              role: 'hotspot',
+              x: 4,
+              y: -3,
+              width: 2,
+              height: 4,
+            },
+          ],
+        }),
+      ]),
       'setpensize 2\nrepeat 4 [ fd 10 ]',
     );
 
@@ -168,6 +183,8 @@ describe('NeedleScript AI review feedback', () => {
     expect(feedback!.content).toContain('line 2:1-10');
     expect(feedback!.content).toContain('2 | repeat 4 [ fd 10 ]');
     expect(feedback!.content).toContain('coverage 7 layers (above threshold 5 layers)');
+    expect(feedback!.content).toContain('hotspot cell near (5.00, -1.00) mm');
+    expect(feedback!.content).toContain('spanning x 4.00..6.00, y -3.00..1.00 mm');
     expect(feedback!.content).toContain('Reduce overlap');
     expect(feedback!.content).toContain('physical validation is pending');
   });
@@ -213,5 +230,33 @@ describe('NeedleScript AI review feedback', () => {
 
     expect(messages.at(-1)?.content).toContain('Reported source line: 2');
     expect(messages.at(-1)?.content).toContain('2 | unknowncommand 2');
+  });
+
+  it('attaches rendered spatial context as a multimodal user message', () => {
+    const spatial = {
+      content: 'Visible design bounds: x -10..10 mm.',
+      imageDataUrl: 'data:image/png;base64,preview',
+    };
+    const messages = buildMessages('improve', 'balance it', 'fd 10', undefined, spatial);
+    const content = messages.at(-1)?.content;
+
+    expect(Array.isArray(content)).toBe(true);
+    if (!Array.isArray(content)) throw new Error('Expected multimodal content');
+    expect(content[0]).toMatchObject({ type: 'text' });
+    expect(content[0].type === 'text' ? content[0].text : '').toContain('Visible design bounds');
+    expect(content[1]).toEqual({
+      type: 'image_url',
+      imageUrl: { url: spatial.imageDataUrl, detail: 'low' },
+    });
+  });
+
+  it('requests a bounded spatial review that may preserve the source unchanged', () => {
+    const messages = buildSpatialReviewMessages(originalMessages, 'fd 10', {
+      content: 'Compiled spatial context',
+    });
+    const content = messages.at(-1)?.content;
+
+    expect(content).toContain('return the complete source unchanged');
+    expect(content).toContain('Compiled spatial context');
   });
 });
