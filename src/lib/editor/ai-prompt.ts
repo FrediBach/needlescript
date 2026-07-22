@@ -284,5 +284,6 @@ export const AI_HELP_TEXT = `AI commands (prefix: /ai):
   <anything>         — shorthand for create/improve depending on context
 
 Generated code is compiled and reviewed for modeled physics blockers/risks with up to 2 revisions.
+Open the AI tab beside Console and Physics to inspect requests, usage, checks, and feedback.
 
 Tip: Start typing "/ai model " to see model suggestions.`;

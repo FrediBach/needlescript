@@ -146,6 +146,12 @@ text, measurements, evidence limits, and prioritized construction remedies. The 
 compiled revision is retained if a later revision regresses. Informational physics notes remain for
 human review and do not trigger automatic source changes.
 
+The editor's **AI** output tab opens when a command starts and keeps the latest activity timeline:
+requested candidates, the provider model used, token/cost metadata when available, compiler checks,
+structured physics feedback, revision decisions, and the final candidate applied to the editor.
+Expandable details show exactly which line-level compiler or physics context was returned to the
+model without exposing the stored API key.
+
 ## Using the engine as a library
 
 The engine is published as [`needlescript`](https://www.npmjs.com/package/needlescript), an ESM-only,

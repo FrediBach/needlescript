@@ -21,6 +21,7 @@ import type {
 } from '../lib/engine.ts';
 import type { ParamItem } from '../lib/editor/parameters.ts';
 import type { AIModelInfo } from '../hooks/useAI.ts';
+import type { AiActivitySession } from '../ai-activity.ts';
 import { registerNeedlescript, scheduleNeedlescriptProviders } from '../lib/editor/monaco.ts';
 import { fontMono, fsBase, editorLineHeight } from '../theme.ts';
 import {
@@ -36,6 +37,7 @@ import styles from './EditorPane.module.css';
 import { Input } from '@/components/ui/input.tsx';
 import type { EditorContextActions } from './MachineMenu.tsx';
 import PhysicsPanel from './PhysicsPanel.tsx';
+import AIPanel from './AIPanel.tsx';
 import type { PhysicsReportState } from '../physics-analysis-state.ts';
 import {
   adjacentPhysicsDiagnostic,
@@ -90,6 +92,8 @@ interface Props {
   aiHasApiKey?: boolean;
   /** Whether the AI hook is currently generating. */
   aiIsGenerating?: boolean;
+  /** Latest AI request/revision timeline shown in the AI output tab. */
+  aiActivity?: AiActivitySession | null;
   /** Called when a non-/ai slash command is entered (/share, /save, /load, /remove). */
   onReplCommand?: (line: string) => Promise<void>;
   /** Sorted list of saved snippet names — drives /load and /remove autocomplete. */
@@ -214,6 +218,7 @@ export default function EditorPane({
   aiSelectedModel,
   aiHasApiKey,
   aiIsGenerating,
+  aiActivity,
   onReplCommand,
   savedSnippetNames,
   activeSnippetName,
@@ -242,12 +247,13 @@ export default function EditorPane({
   const CONSOLE_MAX = 360;
 
   const [consoleHeight, setConsoleHeight] = useState(CONSOLE_DEFAULT);
-  const [activeBottomTab, setActiveBottomTab] = useState<'console' | 'physics'>('console');
-  const [mobilePhysicsSize, setMobilePhysicsSize] = useState<'collapsed' | 'half' | 'full'>('half');
+  const [activeBottomTab, setActiveBottomTab] = useState<'console' | 'physics' | 'ai'>('console');
+  const [mobileSheetSize, setMobileSheetSize] = useState<'collapsed' | 'half' | 'full'>('half');
   const [seenBlockerFingerprints, setSeenBlockerFingerprints] = useState<Set<string>>(
     () => new Set(),
   );
   const [lastAutoOpenReport, setLastAutoOpenReport] = useState<PhysicsReport | undefined>();
+  const [lastAutoOpenAiActivityId, setLastAutoOpenAiActivityId] = useState<number | null>(null);
   const [quickFixUi, dispatchQuickFixUi] = useReducer(physicsQuickFixUiReducer, {
     preview: null,
     outcome: null,
@@ -269,6 +275,7 @@ export default function EditorPane({
   const physicsDecoCollRef = useRef<editor.IEditorDecorationsCollection | null>(null);
   // Ref for the console panel — used to auto-scroll to the latest message.
   const consoleRef = useRef<HTMLDivElement>(null);
+  const aiPanelRef = useRef<HTMLDivElement>(null);
 
   // Stable ref so the keyboard-shortcut handler always calls the latest onRun
   // even after source/design state changes rebuild the callback.
@@ -509,8 +516,15 @@ export default function EditorPane({
     if (hasNewBlocker) {
       setActiveBottomTab('physics');
       setConsoleHeight((height) => Math.max(height, 240));
-      setMobilePhysicsSize('half');
+      setMobileSheetSize('half');
     }
+  }
+
+  if (aiActivity && aiActivity.id !== lastAutoOpenAiActivityId) {
+    setLastAutoOpenAiActivityId(aiActivity.id);
+    setActiveBottomTab('ai');
+    setConsoleHeight((height) => Math.max(height, 240));
+    setMobileSheetSize('half');
   }
 
   useEffect(() => {
@@ -950,6 +964,12 @@ export default function EditorPane({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
+  // Keep the live AI timeline pinned to its latest event while the tab is open.
+  useEffect(() => {
+    const el = aiPanelRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [aiActivity?.events.length]);
+
   // ── Error marker squiggles ──────────────────────────────────────
   // Reflects compile errors (populated only after an explicit run) as red
   // underline decorations.  Cleared immediately when a new run succeeds.
@@ -1312,7 +1332,7 @@ export default function EditorPane({
       <div
         className={styles.bottomPanel}
         data-active-tab={activeBottomTab}
-        data-mobile-size={mobilePhysicsSize}
+        data-mobile-size={mobileSheetSize}
         style={{ height: consoleHeight }}
       >
         <div className={styles.bottomTabs} role="tablist" aria-label="Editor output">
@@ -1349,14 +1369,36 @@ export default function EditorPane({
               </span>
             )}
           </button>
-          <div className={styles.mobileSheetControls} aria-label="Physics sheet height">
+          <button
+            type="button"
+            role="tab"
+            id="ai-tab"
+            aria-controls="ai-panel"
+            aria-selected={activeBottomTab === 'ai'}
+            onClick={() => {
+              setActiveBottomTab('ai');
+              setConsoleHeight((height) => Math.max(height, 200));
+            }}
+          >
+            AI
+            {aiActivity && (
+              <span className={styles.aiBadge} data-status={aiActivity.status}>
+                {aiActivity.status === 'running'
+                  ? 'Working'
+                  : aiActivity.status === 'completed'
+                    ? 'Done'
+                    : aiActivity.status}
+              </span>
+            )}
+          </button>
+          <div className={styles.mobileSheetControls} aria-label="Output sheet height">
             {(['collapsed', 'half', 'full'] as const).map((size) => (
               <button
                 key={size}
                 type="button"
-                aria-label={`${size === 'half' ? 'Half-height' : size} Physics sheet`}
-                aria-pressed={mobilePhysicsSize === size}
-                onClick={() => setMobilePhysicsSize(size)}
+                aria-label={`${size === 'half' ? 'Half-height' : size} output sheet`}
+                aria-pressed={mobileSheetSize === size}
+                onClick={() => setMobileSheetSize(size)}
               >
                 {size === 'collapsed' ? '—' : size === 'half' ? '½' : '□'}
               </button>
@@ -1409,6 +1451,20 @@ export default function EditorPane({
             onQuickFixCancel={() => dispatchQuickFixUi({ type: 'cancel-preview' })}
             onQuickFixApply={applyQuickFix}
             onQuickFixOutcomeDismiss={() => dispatchQuickFixUi({ type: 'dismiss-outcome' })}
+          />
+        </div>
+        <div
+          ref={activeBottomTab === 'ai' ? aiPanelRef : undefined}
+          id="ai-panel"
+          role="tabpanel"
+          aria-labelledby="ai-tab"
+          hidden={activeBottomTab !== 'ai'}
+          className={styles.aiContent}
+        >
+          <AIPanel
+            activity={aiActivity ?? null}
+            selectedModel={aiSelectedModel}
+            hasApiKey={aiHasApiKey}
           />
         </div>
       </div>

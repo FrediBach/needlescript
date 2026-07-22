@@ -2188,6 +2188,12 @@ limits, assumptions, and prioritized construction remedies. Informational notes 
 automatic rewrite. If a revision regresses, the best successfully compiled candidate is retained.
 The chosen result is then placed in the editor and run so you can inspect it immediately.
 
+The **AI** tab beside Console and Physics opens as soon as a command starts. It shows each model
+request and candidate, the actual provider model, token and cost data when OpenRouter returns it,
+compiler results, physics review counts, and which revision was ultimately applied. Expand a
+compiler or physics event to inspect the line-level feedback sent into the next revision. The API
+key is never shown in this activity log.
+
 **`/ai improve <instruction>`** — rewrites the current code according to your instruction:
 
 ```text

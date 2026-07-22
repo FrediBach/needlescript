@@ -134,8 +134,34 @@
   font-size: var(--fs-label);
 }
 
+.aiBadge {
+  margin-left: 6px;
+  border-radius: 8px;
+  padding: 1px 5px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  font-size: var(--fs-label);
+  text-transform: capitalize;
+}
+
+.aiBadge[data-status='running'] {
+  color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+}
+
+.aiBadge[data-status='completed'] {
+  color: var(--console-ok);
+  background: color-mix(in srgb, var(--console-ok) 12%, transparent);
+}
+
+.aiBadge[data-status='failed'] {
+  color: var(--console-err);
+  background: color-mix(in srgb, var(--console-err) 12%, transparent);
+}
+
 .console,
-.physicsContent {
+.physicsContent,
+.aiContent {
   min-height: 0;
   overflow-y: auto;
   flex: 1;
@@ -197,7 +223,7 @@
 }
 
 @media (max-width: 880px) {
-  .bottomPanel[data-active-tab='physics'] {
+  .bottomPanel:not([data-active-tab='console']) {
     position: fixed;
     z-index: 80;
     right: 0;
@@ -210,19 +236,20 @@
     box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
   }
 
-  .bottomPanel[data-active-tab='physics'][data-mobile-size='collapsed'] {
+  .bottomPanel:not([data-active-tab='console'])[data-mobile-size='collapsed'] {
     height: 92px !important;
   }
 
-  .bottomPanel[data-active-tab='physics'][data-mobile-size='full'] {
+  .bottomPanel:not([data-active-tab='console'])[data-mobile-size='full'] {
     height: calc(100dvh - 48px) !important;
   }
 
-  .bottomPanel[data-active-tab='physics'] .mobileSheetControls {
+  .bottomPanel:not([data-active-tab='console']) .mobileSheetControls {
     display: flex;
   }
 
-  .bottomPanel[data-active-tab='physics'][data-mobile-size='collapsed'] .physicsContent {
+  .bottomPanel:not([data-active-tab='console'])[data-mobile-size='collapsed'] .physicsContent,
+  .bottomPanel:not([data-active-tab='console'])[data-mobile-size='collapsed'] .aiContent {
     overflow: hidden;
   }
 }

@@ -900,6 +900,7 @@ export default function App() {
     selectedModel: aiSelectedModel,
     hasApiKey: aiHasApiKey,
     isGenerating: aiIsGenerating,
+    activity: aiActivity,
   } = useAI({
     sourceRef,
     compile,
@@ -1297,6 +1298,7 @@ export default function App() {
             aiSelectedModel={aiSelectedModel}
             aiHasApiKey={aiHasApiKey}
             aiIsGenerating={aiIsGenerating}
+            aiActivity={aiActivity}
             onReplCommand={handleReplCommand}
             savedSnippetNames={savedSnippetNames}
             activeSnippetName={activeSnippetName}

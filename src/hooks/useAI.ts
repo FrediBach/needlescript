@@ -1,9 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { OpenRouter } from '@openrouter/sdk';
 import type { ChatMessages } from '@openrouter/sdk/models';
-import type { Model } from '@openrouter/sdk/models';
+import type { ChatUsage, Model } from '@openrouter/sdk/models';
 import type { ConsoleMessage } from '../App.tsx';
 import type { CompileResponse } from '../compiler.worker.types.ts';
+import {
+  appendAiActivityEvent,
+  createAiActivitySession,
+  finishAiActivitySession,
+  type AiActivityEventDraft,
+  type AiActivitySession,
+  type AiActivityStatus,
+  type AiActivityUsage,
+} from '../ai-activity.ts';
 import {
   buildMessages,
   buildPhysicsFeedback,
@@ -45,6 +54,7 @@ interface SuccessfulAiCandidate {
   code: string;
   errors: number;
   warnings: number;
+  attempt: number;
 }
 
 export interface UseAIReturn {
@@ -53,6 +63,7 @@ export interface UseAIReturn {
   selectedModel: string;
   hasApiKey: boolean;
   isGenerating: boolean;
+  activity: AiActivitySession | null;
 }
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -63,6 +74,16 @@ export interface UseAIReturn {
  */
 function toSdkMessages(messages: ChatMessage[]): ChatMessages[] {
   return messages as unknown as ChatMessages[];
+}
+
+function toActivityUsage(usage: ChatUsage | undefined): AiActivityUsage | undefined {
+  if (!usage) return undefined;
+  return {
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.totalTokens,
+    ...(usage.cost === undefined || usage.cost === null ? {} : { cost: usage.cost }),
+  };
 }
 
 function isBetterCandidate(
@@ -90,9 +111,41 @@ export function useAI({
   );
   const [aiModels, setAiModels] = useState<AIModelInfo[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activity, setActivity] = useState<AiActivitySession | null>(null);
 
   // Guard against concurrent generations
   const isGeneratingRef = useRef(false);
+  const nextActivitySessionIdRef = useRef(0);
+  const nextActivityEventIdRef = useRef(0);
+
+  const beginActivity = useCallback(
+    (command: AiActivitySession['command'], instruction: string): number => {
+      const id = ++nextActivitySessionIdRef.current;
+      setActivity(createAiActivitySession(id, command, instruction, selectedModel, Date.now()));
+      return id;
+    },
+    [selectedModel],
+  );
+
+  const addActivity = useCallback((sessionId: number, event: AiActivityEventDraft) => {
+    const activityEvent = {
+      ...event,
+      id: ++nextActivityEventIdRef.current,
+      at: Date.now(),
+    };
+    setActivity((current) =>
+      current?.id === sessionId ? appendAiActivityEvent(current, activityEvent) : current,
+    );
+  }, []);
+
+  const endActivity = useCallback(
+    (sessionId: number, status: Exclude<AiActivityStatus, 'running'>) => {
+      setActivity((current) =>
+        current?.id === sessionId ? finishAiActivitySession(current, status, Date.now()) : current,
+      );
+    },
+    [],
+  );
 
   // ── OpenRouter client factory ──────────────────────────────────
   const getClient = useCallback((): OpenRouter | null => {
@@ -218,15 +271,30 @@ export function useAI({
   // ── Command: explain ───────────────────────────────────────────
   const explainCode = useCallback(
     async (question: string) => {
+      const effectiveQuestion = question || 'explain this code';
+      const sessionId = beginActivity('explain', effectiveQuestion);
       const client = getClient();
       if (!client) {
         addMsg('set your OpenRouter API key first: /ai apikey sk-or-…', 'err');
+        addActivity(sessionId, {
+          phase: 'error',
+          tone: 'error',
+          title: 'Request blocked',
+          summary: 'No OpenRouter API key is configured.',
+        });
+        endActivity(sessionId, 'failed');
         return;
       }
       const source = sourceRef.current;
-      const messages = buildMessages('explain', question || 'explain this code', source);
+      const messages = buildMessages('explain', effectiveQuestion, source);
 
       addMsg(`asking ${selectedModel}…`, 'info');
+      addActivity(sessionId, {
+        phase: 'request',
+        tone: 'progress',
+        title: 'Explanation requested',
+        summary: `${selectedModel} · ${source.split(/\r?\n/).length} source line(s)`,
+      });
       try {
         const result = await client.chat.send({
           chatRequest: {
@@ -236,12 +304,28 @@ export function useAI({
         });
         const raw = result.choices[0]?.message?.content;
         const text = typeof raw === 'string' ? raw : JSON.stringify(raw);
+        addActivity(sessionId, {
+          phase: 'response',
+          tone: 'success',
+          title: 'Explanation received',
+          summary: `${result.model} · ${text.length.toLocaleString()} character(s)`,
+          usage: toActivityUsage(result.usage),
+        });
         text.split('\n').forEach((line) => addMsg(line, 'print'));
+        endActivity(sessionId, 'completed');
       } catch (err) {
-        addMsg(`AI error: ${err instanceof Error ? err.message : String(err)}`, 'err');
+        const message = err instanceof Error ? err.message : String(err);
+        addMsg(`AI error: ${message}`, 'err');
+        addActivity(sessionId, {
+          phase: 'error',
+          tone: 'error',
+          title: 'Explanation failed',
+          summary: message,
+        });
+        endActivity(sessionId, 'failed');
       }
     },
-    [getClient, sourceRef, selectedModel, addMsg],
+    [beginActivity, getClient, sourceRef, selectedModel, addMsg, addActivity, endActivity],
   );
 
   // ── Command: create / improve / fix / default ──────────────────
@@ -251,9 +335,18 @@ export function useAI({
         addMsg('already generating — please wait', 'warn');
         return;
       }
+      const effectiveInstruction = instruction || `${type} the current design`;
+      const sessionId = beginActivity(type, effectiveInstruction);
       const client = getClient();
       if (!client) {
         addMsg('set your OpenRouter API key first: /ai apikey sk-or-…', 'err');
+        addActivity(sessionId, {
+          phase: 'error',
+          tone: 'error',
+          title: 'Generation blocked',
+          summary: 'No OpenRouter API key is configured.',
+        });
+        endActivity(sessionId, 'failed');
         return;
       }
 
@@ -265,12 +358,26 @@ export function useAI({
       let messages = buildMessages(type, instruction, source, lastError);
 
       addMsg(`generating with ${selectedModel}…`, 'info');
+      addActivity(sessionId, {
+        phase: 'request',
+        tone: 'neutral',
+        title: 'Generation prepared',
+        summary: `${selectedModel} · ${source.trim() ? `${source.split(/\r?\n/).length} source line(s)` : 'new design'}`,
+        detail: lastError ? `The latest compile error is included:\n${lastError}` : undefined,
+      });
 
       try {
         let bestSuccessful: SuccessfulAiCandidate | null = null;
         let lastCode = '';
+        let revisionReason = 'original instruction';
 
         for (let attempt = 0; attempt <= MAX_AI_REVISIONS; attempt++) {
+          addActivity(sessionId, {
+            phase: 'request',
+            tone: 'progress',
+            title: `Requesting candidate ${attempt + 1}`,
+            summary: revisionReason,
+          });
           const result = await client.chat.send({
             chatRequest: {
               model: selectedModel,
@@ -281,21 +388,53 @@ export function useAI({
           const rawText = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent);
           const code = extractCode(rawText);
           lastCode = code;
+          const lineCount = code ? code.split(/\r?\n/).length : 0;
+          addActivity(sessionId, {
+            phase: 'response',
+            tone: 'neutral',
+            title: `Candidate ${attempt + 1} received`,
+            summary: `${result.model} · ${lineCount} line(s) · ${code.length.toLocaleString()} character(s)`,
+            usage: toActivityUsage(result.usage),
+          });
 
           addMsg(attempt === 0 ? 'checking…' : `checking revision ${attempt}…`, 'info');
+          addActivity(sessionId, {
+            phase: 'compile',
+            tone: 'progress',
+            title: `Compiling candidate ${attempt + 1}`,
+          });
           const check = await compile(code);
           if (check === null) {
             addMsg('AI review cancelled because a newer compile started', 'warn');
+            addActivity(sessionId, {
+              phase: 'error',
+              tone: 'warning',
+              title: 'Review cancelled',
+              summary: 'A newer foreground compile superseded this candidate.',
+            });
+            endActivity(sessionId, 'cancelled');
             return;
           }
 
           if (!check.ok) {
+            addActivity(sessionId, {
+              phase: 'compile',
+              tone: 'error',
+              title: `Candidate ${attempt + 1} failed to compile`,
+              summary:
+                check.slLine === undefined
+                  ? check.message
+                  : `Line ${check.slLine}: ${check.message.replace(/\s*\(line\s+\d+\)\s*$/i, '')}`,
+              detail:
+                check.slLine === undefined ? undefined : code.split(/\r?\n/)[check.slLine - 1],
+            });
             if (attempt < MAX_AI_REVISIONS) {
               addMsg(
                 `compile error — refining (${attempt + 1}/${MAX_AI_REVISIONS}): ${check.message}`,
                 'warn',
               );
               messages = buildRetryMessages(messages, code, check.message, check.slLine);
+              revisionReason = `compiler feedback${check.slLine === undefined ? '' : ` for line ${check.slLine}`}`;
               continue;
             }
             addMsg(
@@ -310,17 +449,45 @@ export function useAI({
           const feedback = buildPhysicsFeedback(check.result.physics, code);
           const errorCount = feedback?.counts.error ?? 0;
           const warningCount = feedback?.counts.warning ?? 0;
+          addActivity(sessionId, {
+            phase: 'compile',
+            tone: 'success',
+            title: `Candidate ${attempt + 1} compiled`,
+            summary: `${check.stats.stitches.toLocaleString()} stitch(es) · ${check.result.physics?.diagnostics.length ?? 0} physics finding(s)`,
+          });
           const candidate: SuccessfulAiCandidate = {
             code,
             errors: errorCount,
             warnings: warningCount,
+            attempt: attempt + 1,
           };
-          if (isBetterCandidate(candidate, bestSuccessful)) bestSuccessful = candidate;
+          if (isBetterCandidate(candidate, bestSuccessful)) {
+            bestSuccessful = candidate;
+            addActivity(sessionId, {
+              phase: 'decision',
+              tone: 'neutral',
+              title: `Candidate ${attempt + 1} is the best compiled revision`,
+              summary: `${errorCount} blocker(s) · ${warningCount} risk(s)`,
+            });
+          }
 
           if (!feedback) {
             addMsg('physics review found no modeled blockers or risks', 'ok');
+            addActivity(sessionId, {
+              phase: 'physics',
+              tone: 'success',
+              title: 'Physics review has no actionable findings',
+              summary: `${check.result.physics?.summary.info ?? 0} informational note(s) remain for human review.`,
+            });
             break;
           }
+          addActivity(sessionId, {
+            phase: 'physics',
+            tone: errorCount > 0 ? 'error' : 'warning',
+            title: `Physics review of candidate ${attempt + 1}`,
+            summary: `${errorCount} blocker(s) · ${warningCount} risk(s)`,
+            detail: feedback.content,
+          });
           if (attempt >= MAX_AI_REVISIONS) {
             addMsg(
               `physics review finished with ${errorCount} blocker(s) and ${warningCount} risk(s); review them before sewing`,
@@ -334,20 +501,59 @@ export function useAI({
             'warn',
           );
           messages = buildPhysicsRetryMessages(messages, code, feedback);
+          revisionReason = `structured physics feedback from candidate ${attempt + 1}`;
         }
 
         const code = bestSuccessful?.code ?? lastCode;
         if (!code) throw new Error('The model returned no NeedleScript code');
+        addActivity(sessionId, {
+          phase: 'decision',
+          tone: bestSuccessful ? 'success' : 'warning',
+          title: bestSuccessful
+            ? `Applying candidate ${bestSuccessful.attempt}`
+            : 'Applying the uncompiled final candidate for manual repair',
+          summary: bestSuccessful
+            ? `${bestSuccessful.errors} blocker(s) · ${bestSuccessful.warnings} risk(s)`
+            : undefined,
+        });
         setSource(code);
         await runProgram(code, 'ai');
+        addActivity(sessionId, {
+          phase: 'complete',
+          tone: bestSuccessful ? 'success' : 'warning',
+          title: bestSuccessful
+            ? 'Editor updated and design run completed'
+            : 'Editor updated; manual repair is still required',
+        });
+        endActivity(sessionId, 'completed');
       } catch (err) {
-        addMsg(`AI error: ${err instanceof Error ? err.message : String(err)}`, 'err');
+        const message = err instanceof Error ? err.message : String(err);
+        addMsg(`AI error: ${message}`, 'err');
+        addActivity(sessionId, {
+          phase: 'error',
+          tone: 'error',
+          title: 'AI generation failed',
+          summary: message,
+        });
+        endActivity(sessionId, 'failed');
       } finally {
         isGeneratingRef.current = false;
         setIsGenerating(false);
       }
     },
-    [getClient, sourceRef, selectedModel, compile, setSource, runProgram, addMsg, getLastError],
+    [
+      beginActivity,
+      getClient,
+      sourceRef,
+      selectedModel,
+      compile,
+      setSource,
+      runProgram,
+      addMsg,
+      getLastError,
+      addActivity,
+      endActivity,
+    ],
   );
 
   // ── Main command dispatcher ────────────────────────────────────
@@ -406,5 +612,6 @@ export function useAI({
     selectedModel,
     hasApiKey: apiKey.length > 0,
     isGenerating,
+    activity,
   };
 }
