@@ -129,4 +129,61 @@ describe('AI chat panel', () => {
     await render(chat(updated));
     expect(transcript.scrollTop).toBe(480);
   });
+
+  it('renders assistant Markdown with GFM while leaving user messages as text', async () => {
+    const markdown = [
+      '**Ready.** See [the guide](https://example.com/guide).',
+      '',
+      '- first',
+      '- second',
+      '',
+      '| Item | State |',
+      '| --- | --- |',
+      '| Outline | done |',
+      '',
+      '```ns',
+      'forward 10',
+      '```',
+      '',
+      '<img src="invalid" alt="unsafe">',
+    ].join('\n');
+    const active = thread({
+      intent: 'edit',
+      turns: [
+        {
+          id: 'turn',
+          startedAt: 1,
+          status: 'completed',
+          user: { role: 'user', content: '**Keep this literal.**' },
+          steps: [
+            {
+              kind: 'assistant',
+              message: { role: 'assistant', content: markdown },
+            },
+          ],
+          usage: { ...EMPTY_AI_USAGE },
+          modelSteps: 1,
+          toolCalls: 0,
+          compiles: 0,
+        },
+      ],
+    });
+
+    await render(chat(active));
+
+    const article = container?.querySelector('article');
+    const userMessage = article?.querySelector('h3 + div');
+    const assistant = article?.querySelector('ol li');
+    expect(userMessage?.querySelector('strong')).toBeNull();
+    expect(userMessage?.textContent).toBe('**Keep this literal.**');
+    expect(assistant?.querySelector('strong')?.textContent).toBe('Ready.');
+    expect(assistant?.querySelectorAll('ul li')).toHaveLength(2);
+    expect(assistant?.querySelector('table tbody td')?.textContent).toBe('Outline');
+    expect(assistant?.querySelector('pre code')?.textContent).toContain('forward 10');
+    expect(assistant?.querySelector('img')).toBeNull();
+    expect(assistant?.querySelector('a')).toMatchObject({
+      target: '_blank',
+      rel: 'noreferrer',
+    });
+  });
 });

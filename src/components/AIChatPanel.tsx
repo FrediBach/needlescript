@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { AiChatStep, AiQuestionAnswer } from '../ai/chat-types.ts';
 import type { UseAIChatReturn } from '../hooks/useAIChat.ts';
 import AIQuestionSet from './AIQuestionSet.tsx';
@@ -13,13 +15,41 @@ interface Props {
   onApplyProposal: () => void;
 }
 
+/**
+ * Render model-authored Markdown through react-markdown's remark pipeline. Raw HTML stays disabled
+ * so assistant output cannot inject DOM, while GFM adds the tables, task lists, and fenced-code
+ * behavior commonly used in model responses.
+ */
+function AssistantMarkdown({ children }: { children: string }) {
+  return (
+    <div className={styles.assistantMarkdown}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        skipHtml
+        components={{
+          a: ({ href, children: linkChildren }) => {
+            const external = /^https?:\/\//i.test(href ?? '');
+            return (
+              <a href={href} {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}>
+                {linkChildren}
+              </a>
+            );
+          },
+        }}
+      >
+        {children}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 function Step({ step }: { step: AiChatStep }) {
   if (step.kind === 'assistant') {
     if (!step.message.content) return null;
     return (
       <li className={styles.assistantMessage}>
         <span className="sr-only">Assistant</span>
-        <div>{step.message.content}</div>
+        <AssistantMarkdown>{step.message.content}</AssistantMarkdown>
       </li>
     );
   }
