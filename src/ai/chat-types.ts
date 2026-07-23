@@ -1,5 +1,12 @@
 import type { AiActivityUsage } from '../ai-activity.ts';
 
+/**
+ * Persistent domain model for AI chat state.
+ *
+ * Provider messages are stored verbatim only where they are needed to reconstruct valid tool-call
+ * history. UI-only events such as plan updates and question sets use explicit step variants, while
+ * source changes remain isolated in a revisioned private draft until the user applies a proposal.
+ */
 export type AiThreadStatus = 'idle' | 'running' | 'awaiting-user';
 export type AiTurnStatus = 'running' | 'awaiting-user' | 'completed' | 'cancelled' | 'failed';
 export type AiPlanStepStatus = 'pending' | 'in-progress' | 'completed';

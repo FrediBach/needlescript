@@ -1,6 +1,12 @@
 import type { AiActivityUsage } from '../ai-activity.ts';
 import type { AiProviderMessage, AiToolCall } from './chat-types.ts';
 
+/**
+ * Minimal provider-neutral chat contract used by the agent loop.
+ *
+ * Keeping SDK-specific message and response shapes behind this interface lets orchestration,
+ * storage, and tests remain independent of OpenRouter or any future transport.
+ */
 export interface AiProviderTool {
   type: 'function';
   function: {

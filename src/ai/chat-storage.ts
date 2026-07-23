@@ -13,6 +13,12 @@ interface StoredThreads {
   threads: AiChatThread[];
 }
 
+/**
+ * Normalize only the current persisted shape.
+ *
+ * Version-one threads created before explicit intents are interpreted as edit threads once they
+ * contain turns. Empty legacy threads keep their missing intent so the caller can choose one.
+ */
 function normalizeStoredThreads(threads: unknown[]): AiChatThread[] {
   return threads.flatMap((value) => {
     const thread = value as AiChatThread | undefined;
@@ -24,6 +30,7 @@ function normalizeStoredThreads(threads: unknown[]): AiChatThread[] {
 }
 
 function protectedThread(thread: AiChatThread): boolean {
+  // Never evict work that still requires a user decision or could contain an unapplied proposal.
   return Boolean(
     thread.pendingQuestionSet ||
     thread.draft?.status === 'changed' ||
@@ -36,6 +43,11 @@ export function retainChatThreads(
   threads: readonly AiChatThread[],
   now = Date.now(),
 ): AiChatThread[] {
+  /*
+   * Retention is newest-first and applies age, per-workspace, completed-turn, and approximate-size
+   * limits together. Protected threads bypass those limits, favoring recoverability of in-progress
+   * work over a strict storage cap.
+   */
   const retained: AiChatThread[] = [];
   const workspaceCounts = new Map<string, number>();
   let completedTurns = 0;

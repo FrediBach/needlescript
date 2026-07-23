@@ -1,15 +1,18 @@
 import type { AiChatThread, AiProviderMessage } from './chat-types.ts';
+import { AI_CHAT_SYSTEM_PROMPT, omittedTurnsPrompt } from './prompt-templates.ts';
 
-export const AI_CHAT_SYSTEM_PROMPT = `You are the workspace-aware NeedleScript assistant. NeedleScript is a Logo-inspired language for generative embroidery.
-
-Every thread has an explicit intent chosen by the user: create a new design or edit the current design. Never infer or change that intent. For create intent, work from the initially empty private draft; read live source only if the user asks to reference it. For edit intent, inspect relevant current source before changing its private draft.
-
-Answer and review requests are read-only unless the user asks for a change. For changes, edit only the private draft, compile it, and use spatial and physics facts as ground truth. The user alone applies a proposal to the live editor. Preserve visual intent and intentional geometry. Address physics blockers before risks; notes are informational, and an empty modeled report is not a sew-out guarantee. Never hide findings by weakening thresholds, adding preflight, deleting intent, or silencing diagnostics.
-
-Ask one concise multiple-choice question set only when a material ambiguity cannot be resolved through tools. Create and maintain a visible plan for work with three or more dependent steps, grounding completion in tool evidence. Keep final responses concise: explain the answer or summarize the private change and validation. Never claim to have applied a draft.`;
+export { AI_CHAT_SYSTEM_PROMPT } from './prompt-templates.ts';
 
 const contentLength = (message: AiProviderMessage): number => message.content?.length ?? 0;
 
+/**
+ * Assemble provider history without splitting a user/assistant/tool exchange.
+ *
+ * Context is trimmed in whole-turn bundles from oldest to newest. Keeping each assistant tool call
+ * adjacent to its result is required by chat-completion providers and also prevents a later turn
+ * from seeing an unexplained tool payload. The system prompt and current workspace snapshot are
+ * always retained.
+ */
 export function buildProviderMessages(
   thread: AiChatThread,
   workspaceSnapshot: string,
@@ -36,7 +39,7 @@ export function buildProviderMessages(
   if (retained.length < bundles.length) {
     messages.push({
       role: 'system',
-      content: `${bundles.length - retained.length} oldest completed turn(s) were omitted by the local context limit. Start a new chat if those details are required.`,
+      content: omittedTurnsPrompt(bundles.length - retained.length),
     });
   }
   messages.push(...retained.toReversed().flat());

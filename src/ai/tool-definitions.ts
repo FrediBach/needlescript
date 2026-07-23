@@ -1,4 +1,5 @@
 import type { AiProviderTool } from './provider.ts';
+import { AI_TOOL_DESCRIPTIONS } from './prompt-templates.ts';
 
 const objectSchema = (
   properties: Record<string, unknown>,
@@ -12,12 +13,19 @@ const objectSchema = (
 
 const target = { type: 'string', enum: ['live', 'draft'] };
 
+/**
+ * Provider-visible tool catalog.
+ *
+ * These schemas improve tool-call generation but are not a security boundary: providers can still
+ * emit malformed arguments. Keep every constraint synchronized with tool-validation.ts and the
+ * defensive checks in tool-runtime.ts. Human-facing descriptions live in prompt-templates.ts.
+ */
 export const AI_CHAT_TOOLS: AiProviderTool[] = [
   {
     type: 'function',
     function: {
       name: 'ask_user_questions',
-      description: 'Pause and ask one compact set of material multiple-choice questions.',
+      description: AI_TOOL_DESCRIPTIONS.ask_user_questions,
       parameters: objectSchema(
         {
           introduction: { type: 'string', maxLength: 300 },
@@ -59,7 +67,7 @@ export const AI_CHAT_TOOLS: AiProviderTool[] = [
     type: 'function',
     function: {
       name: 'create_plan',
-      description: 'Create a visible checklist for genuinely multi-step work.',
+      description: AI_TOOL_DESCRIPTIONS.create_plan,
       parameters: objectSchema(
         {
           title: { type: 'string', maxLength: 120 },
@@ -85,7 +93,7 @@ export const AI_CHAT_TOOLS: AiProviderTool[] = [
     type: 'function',
     function: {
       name: 'update_plan',
-      description: 'Atomically advance or revise the current visible checklist.',
+      description: AI_TOOL_DESCRIPTIONS.update_plan,
       parameters: objectSchema(
         {
           planId: { type: 'string' },
@@ -116,7 +124,7 @@ export const AI_CHAT_TOOLS: AiProviderTool[] = [
     type: 'function',
     function: {
       name: 'read_source',
-      description: 'Read a bounded, line-numbered page of live or private draft source.',
+      description: AI_TOOL_DESCRIPTIONS.read_source,
       parameters: objectSchema({
         target,
         startLine: { type: 'integer', minimum: 1 },
@@ -128,7 +136,7 @@ export const AI_CHAT_TOOLS: AiProviderTool[] = [
     type: 'function',
     function: {
       name: 'compile_design',
-      description: 'Compile live or draft source and return bounded stitch and physics facts.',
+      description: AI_TOOL_DESCRIPTIONS.compile_design,
       parameters: objectSchema({
         target,
         seed: { type: 'integer' },
@@ -139,8 +147,7 @@ export const AI_CHAT_TOOLS: AiProviderTool[] = [
     type: 'function',
     function: {
       name: 'inspect_spatial',
-      description:
-        'Inspect exact compiled hoop-space layout for the design or selected source lines.',
+      description: AI_TOOL_DESCRIPTIONS.inspect_spatial,
       parameters: objectSchema({
         target,
         scope: { type: 'string', enum: ['design', 'source-lines', 'box'] },
@@ -166,7 +173,7 @@ export const AI_CHAT_TOOLS: AiProviderTool[] = [
     type: 'function',
     function: {
       name: 'inspect_physics',
-      description: 'Return filtered structured physics findings from a compiled target.',
+      description: AI_TOOL_DESCRIPTIONS.inspect_physics,
       parameters: objectSchema({
         target,
         severities: {
@@ -188,8 +195,7 @@ export const AI_CHAT_TOOLS: AiProviderTool[] = [
     type: 'function',
     function: {
       name: 'edit_draft',
-      description:
-        'Apply atomic, non-overlapping edits to the private draft. Never edits live source.',
+      description: AI_TOOL_DESCRIPTIONS.edit_draft,
       parameters: objectSchema(
         {
           expectedRevision: { type: 'integer', minimum: 0 },

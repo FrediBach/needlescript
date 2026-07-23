@@ -8,6 +8,12 @@ export interface AiSourceEdit {
   text: string;
 }
 
+/**
+ * Fast, deterministic content identity for optimistic draft concurrency.
+ *
+ * This non-cryptographic FNV-1a hash detects stale model edits and apply conflicts; it must never be
+ * treated as a security or tamper-proof digest.
+ */
 export function hashSource(source: string): string {
   let hash = 0x811c9dc5;
   for (let index = 0; index < source.length; index++) {
@@ -70,6 +76,11 @@ export function applySourceEdits(
 ):
   | { ok: true; text: string; addedLines: number; removedLines: number }
   | { ok: false; error: string } {
+  /*
+   * Every range uses one-based line/column coordinates against the same pre-edit snapshot. Validate
+   * the complete batch before changing text, then apply from the end so earlier offsets remain
+   * stable. This gives the model atomic multi-edit behavior without position rebasing.
+   */
   if (edits.length === 0 || edits.length > 24) {
     return { ok: false, error: 'An edit call must contain between 1 and 24 edits.' };
   }
@@ -106,6 +117,10 @@ export function applySourceEdits(
 }
 
 export function buildLineDiff(before: string, after: string): AiLineDiff[] {
+  /*
+   * Proposals need a compact review preview, not a general-purpose diff. Preserve the common prefix
+   * and suffix and expose the changed middle with two surrounding context lines.
+   */
   const oldLines = before.split(/\r?\n/);
   const newLines = after.split(/\r?\n/);
   let prefix = 0;

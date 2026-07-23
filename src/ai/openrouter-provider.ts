@@ -2,6 +2,13 @@ import { OpenRouter } from '@openrouter/sdk';
 import type { ChatMessages } from '@openrouter/sdk/models';
 import type { AiProvider, AiProviderRequest, AiProviderResponse } from './provider.ts';
 
+/**
+ * Thin OpenRouter adapter for the provider-neutral AI contract.
+ *
+ * Tool calls stay sequential because the local runtime mutates a revisioned draft and visible plan;
+ * parallel calls could otherwise race on expected revisions. Response normalization deliberately
+ * exposes only fields consumed by the rest of the application.
+ */
 export class OpenRouterAiProvider implements AiProvider {
   readonly client: OpenRouter;
 

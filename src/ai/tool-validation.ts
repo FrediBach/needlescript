@@ -2,6 +2,14 @@ import type { AiQuestionSet, AiWorkPlan } from './chat-types.ts';
 
 type JsonObject = Record<string, unknown>;
 
+/**
+ * Runtime trust boundary for model-generated tool arguments.
+ *
+ * Provider schemas guide generation but do not guarantee conformance. These validators therefore
+ * reject unknown keys, bound allocations and text sizes, and return typed values only after all
+ * nested data has been checked. Errors are intentionally concise because they are sent back to the
+ * model as actionable tool results.
+ */
 export function parseToolArguments(
   raw: string,
 ): { ok: true; value: JsonObject } | { ok: false; error: string } {

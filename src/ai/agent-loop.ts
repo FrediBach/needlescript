@@ -8,6 +8,7 @@ import type {
 } from './chat-types.ts';
 import type { ToolExecution } from './tool-runtime.ts';
 import { MAX_MODEL_STEPS_PER_TURN, MAX_TOOL_CALLS_PER_TURN } from './chat-limits.ts';
+import { AI_FORCE_FINAL_FALLBACK, AI_FORCE_FINAL_PROMPT } from './prompt-templates.ts';
 
 export interface AgentLoopOptions {
   provider: AiProvider;
@@ -28,6 +29,14 @@ export interface AgentLoopOptions {
   tools: import('./provider.ts').AiProviderTool[];
 }
 
+/**
+ * Drive one active turn until the model answers, asks the user a question, or is cancelled.
+ *
+ * State mutations are delegated to callbacks so this loop remains provider- and UI-agnostic. A
+ * model response containing tool calls is persisted before those tools run, preserving a valid
+ * provider transcript if execution pauses. Once a turn reaches either work budget, tools are
+ * removed and the model receives one final, answer-only request.
+ */
 export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
   try {
     while (!options.signal.aborted) {
@@ -43,8 +52,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
               ...options.messages(),
               {
                 role: 'system' as const,
-                content:
-                  'The active-turn tool budget is exhausted. Return the best concise final answer now without calling tools. Clearly state any unfinished validation or plan work.',
+                content: AI_FORCE_FINAL_PROMPT,
               },
             ]
           : options.messages(),
@@ -57,6 +65,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (!/\b(429|5\d\d|network|fetch|temporar|timeout)\b/i.test(message)) throw error;
+        // Retry only transient transport/provider failures, once. Abort remains responsive during
+        // the short backoff and all other errors retain their original stack and message.
         await new Promise<void>((resolve, reject) => {
           const timer = setTimeout(resolve, 500);
           options.signal.addEventListener(
@@ -74,9 +84,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
       const assistantMessage = forceFinal
         ? {
             role: 'assistant' as const,
-            content:
-              response.message.content ??
-              'I reached the active-turn work budget before completing a final response. The completed draft and tool results are retained for a follow-up turn.',
+            content: response.message.content ?? AI_FORCE_FINAL_FALLBACK,
           }
         : response.message;
       options.appendAssistant(assistantMessage, response.model, response.usage);

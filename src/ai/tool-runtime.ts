@@ -51,6 +51,13 @@ interface Envelope {
 
 const MAX_TOOL_RESULT = 32_000;
 
+/**
+ * Serialize a bounded, JSON-safe result for the model transcript.
+ *
+ * Non-finite measurements are normalized because JSON has no representation for them. Oversized
+ * payloads are summarized before persistence so a single inspection cannot consume the remaining
+ * chat context.
+ */
 function serialize(envelope: Envelope): string {
   const raw = JSON.stringify(envelope, (_key, value: unknown) =>
     typeof value === 'number' && !Number.isFinite(value) ? null : value,
@@ -79,6 +86,11 @@ function sourceTarget(
   options: ToolRuntimeOptions,
   rawTarget: unknown,
 ): { target: 'live' | 'draft'; text: string; revision: number; hash: string } {
+  /*
+   * Omitted targets follow thread intent: create threads begin with an empty private draft, while
+   * edit threads read live source until a draft exists. Resolving a draft also materializes it so
+   * later optimistic edits see a stable revision and hash.
+   */
   const thread = options.getThread();
   const target =
     rawTarget === 'live'
@@ -179,6 +191,11 @@ function boundedDiagnostic(diagnostic: PhysicsDiagnostic, sourceLines: string[])
 }
 
 export function createToolRuntime(options: ToolRuntimeOptions) {
+  /*
+   * Cache entries are scoped to this runtime/active turn. The source hash plus optional seed fully
+   * identifies a compile, allowing spatial and physics inspections to reuse exact compiler output
+   * without spending another compile-budget unit.
+   */
   const compileCache = new Map<string, CompileResponse>();
 
   const compileTarget = async (
@@ -208,6 +225,7 @@ export function createToolRuntime(options: ToolRuntimeOptions) {
   };
 
   return async function execute(tool: string, rawArguments: string): Promise<ToolExecution> {
+    // Treat every tool call as untrusted input even when the provider advertises strict schemas.
     const parsed = parseToolArguments(rawArguments);
     if (!parsed.ok) return failure(tool, 'invalid_arguments', parsed.error);
     const args = parsed.value;
